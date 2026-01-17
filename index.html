@@ -2813,10 +2813,20 @@
                     <div id="slotEnrolledStudentsContent"></div>
                 </div>
                 
-                <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                     <button class="btn btn-success btn-sm" onclick="openAddStudentToSlotModal()">➕ Add Student</button>
                     <button class="btn btn-info btn-sm" onclick="openSalesChatFromSlotModal()" style="background: linear-gradient(135deg, rgba(255,214,130,0.9), rgba(255,244,200,0.7)); border-color: #ffd682; color: #1a1a2e;">💬 Sales Chat</button>
                     <button class="btn btn-danger btn-sm" onclick="cancelPreschedule()">❌ Cancel</button>
+                </div>
+                
+                <!-- Start Class Button -->
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,152,0,0.3);">
+                    <button class="btn btn-success" onclick="convertPrescheduleToClass()" style="width: 100%; padding: 12px; font-size: 14px;">
+                        🚀 Start Class (Create from Pre-schedule)
+                    </button>
+                    <p style="font-size: 10px; color: #888; margin-top: 8px; text-align: center;">
+                        This will create the actual class with all linked students. Unlinked students will be added by name only.
+                    </p>
                 </div>
             </div>
             
@@ -2854,6 +2864,11 @@
             </div>
             
             <div class="form-group">
+                <label style="color: #7289da;">Discord <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                <input type="text" id="directAddStudentDiscord" placeholder="Discord username">
+            </div>
+            
+            <div class="form-group">
                 <label>Notes <span style="color: #888; font-size: 11px;">(Optional)</span></label>
                 <input type="text" id="directAddStudentNotes" placeholder="Any notes about this student">
             </div>
@@ -2861,6 +2876,35 @@
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-secondary" onclick="closeAddStudentToSlotModal()">Cancel</button>
                 <button class="btn btn-success" onclick="addStudentToSlotDirectly()" style="flex: 1;">✅ Add Student</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link Student Account Modal -->
+    <div class="modal-overlay" id="linkAccountModal">
+        <div class="modal" style="max-width: 500px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close" onclick="closeLinkAccountModal()">✕</button>
+            <h3 class="modal-title">🔗 Link to Account</h3>
+            
+            <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <p style="font-size: 11px; color: #888; margin: 0;">Linking student:</p>
+                <p style="font-size: 14px; color: #00ffff; margin: 4px 0 0 0; font-weight: bold;" id="linkAccountStudentName">Student Name</p>
+            </div>
+            
+            <div class="form-group">
+                <label>Search for Account</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="linkAccountSearchInput" placeholder="Search by name or email..." style="flex: 1;" oninput="searchAccountsToLink()">
+                    <button class="btn btn-info" onclick="searchAccountsToLink()">🔍</button>
+                </div>
+            </div>
+            
+            <div id="linkAccountSearchResults" style="margin-top: 15px;">
+                <p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search...</p>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-secondary" onclick="closeLinkAccountModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -3205,6 +3249,25 @@
         // Constants
         const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM'];
         const DAYS = ['Saturday', 'Sunday'];
+        
+        // Helper function to parse date strings as local time (avoids timezone issues)
+        // When a date string like "2026-01-17" is parsed with new Date(), it's treated as UTC
+        // which causes it to display as the previous day in EST. This helper fixes that.
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return null;
+            // If it's already a Date object, return it
+            if (dateStr instanceof Date) return dateStr;
+            // If it's a string, append T12:00:00 to treat as noon local time (avoids day boundary issues)
+            if (typeof dateStr === 'string') {
+                // Check if it already has time component
+                if (dateStr.includes('T')) {
+                    return new Date(dateStr);
+                }
+                // Add noon time to avoid timezone day-shift issues
+                return new Date(dateStr + 'T12:00:00');
+            }
+            return new Date(dateStr);
+        }
         
         // Default levels (will be merged with custom class types from Firestore)
         const DEFAULT_LEVELS = { absolute: 'Absolute Beginner', novice: 'Novice', beginner: 'Beginner', advanced: 'Advanced Beginner' };
@@ -3553,8 +3616,14 @@
         // Student Registration
         function renderAvailabilityGrid() {
             const grid = document.getElementById('availabilityGrid');
-            const country = document.getElementById('studentCountry').value;
-            const state = document.getElementById('studentState').value;
+            const countryEl = document.getElementById('studentCountry');
+            const stateEl = document.getElementById('studentState');
+            
+            // Guard against null elements (page might not have student registration form)
+            if (!grid || !countryEl) return;
+            
+            const country = countryEl.value;
+            const state = stateEl?.value || '';
             const tz = getTimezone(country, state);
 
             grid.innerHTML = DAYS.map(day => `
@@ -3789,12 +3858,45 @@
             loadClassTypes().then(() => loadAllClasses()); // Load class types first, then classes
             loadProposals();
             initSalesChat(); // Initialize sales chat system
+            setupPrescheduledSlotsListener(); // Setup real-time listener for prescheduled slots
             
             // Hide delete buttons and reset button for support role
             if (currentUser.role === 'support') {
                 const resetBtn = document.getElementById('resetAllDataBtn');
                 if (resetBtn) resetBtn.style.display = 'none';
             }
+        }
+        
+        // Real-time listener for prescheduled slots
+        let prescheduledSlotsUnsubscribe = null;
+        
+        function setupPrescheduledSlotsListener() {
+            // Unsubscribe from previous listener if exists
+            if (prescheduledSlotsUnsubscribe) {
+                prescheduledSlotsUnsubscribe();
+            }
+            
+            // Set up real-time listener
+            prescheduledSlotsUnsubscribe = db.collection('prescheduled_slots').onSnapshot(snapshot => {
+                allPrescheduledSlots = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Re-render the slot grid if it's visible
+                const slotGridContainer = document.getElementById('slotGridContainer');
+                if (slotGridContainer && slotGridContainer.offsetParent !== null) {
+                    renderSlotGrid();
+                }
+                
+                // Also update slot details modal if open
+                if (selectedSlotInfo?.prescheduled) {
+                    const updatedPs = allPrescheduledSlots.find(ps => ps.id === selectedSlotInfo.prescheduled.id);
+                    if (updatedPs) {
+                        selectedSlotInfo.prescheduled = updatedPs;
+                        updateSlotEnrolledStudentsList();
+                    }
+                }
+            }, error => {
+                console.error('Error listening to prescheduled slots:', error);
+            });
         }
         
         // Helper function to check if user can delete
@@ -11685,41 +11787,77 @@ Return ONLY valid JSON (single object, not array):
                 
                 // Helper function to render a prescheduled card
                 function renderPrescheduledCard(ps) {
-                    const startDate = ps.startDate ? new Date(ps.startDate + 'T00:00:00') : null;
+                    const startDate = parseLocalDate(ps.startDate);
                     const startDateDisplay = startDate ? startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const enrolledStudents = ps.enrolledStudents || [];
+                    const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
                     
                     // Calculate days until start
                     let daysUntilStart = '';
+                    let startingSoon = false;
                     if (startDate) {
                         const now = new Date();
                         const diffTime = startDate - now;
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                         if (diffDays > 0) {
                             daysUntilStart = `(in ${diffDays} day${diffDays > 1 ? 's' : ''})`;
-                        } else if (diffDays === 0) {
-                            daysUntilStart = '(Today!)';
+                        } else if (diffDays <= 0) {
+                            daysUntilStart = '(Starting!)';
+                            startingSoon = true;
                         }
                     }
                     
                     return `
-                        <div class="class-card" style="border: 2px solid #ff9800; background: rgba(255,152,0,0.1);">
+                        <div class="class-card" style="border: 2px solid ${startingSoon ? '#39ff14' : '#ff9800'}; background: rgba(${startingSoon ? '57,255,20' : '255,152,0'},0.1);">
                             <div class="class-header">
                                 <div>
-                                    <div class="class-day" style="color: #ff9800;">${ps.day}</div>
+                                    <div class="class-day" style="color: ${startingSoon ? '#39ff14' : '#ff9800'};">${ps.day}</div>
                                     <div class="class-time">${ps.time} EST</div>
                                 </div>
                                 <div style="text-align: right;">
-                                    <span class="level-badge level-${ps.classType}" style="border-color: #ff9800;">${classTypeName}</span>
+                                    <span class="level-badge level-${ps.classType}" style="border-color: ${startingSoon ? '#39ff14' : '#ff9800'};">${classTypeName}</span>
                                 </div>
                             </div>
-                            <div style="text-align: center; padding: 15px; background: rgba(255,152,0,0.1); border-radius: 8px; margin-top: 10px;">
-                                <div style="font-size: 24px; margin-bottom: 5px;">⏳</div>
-                                <p style="color: #ff9800; font-size: 14px; margin: 0; font-weight: bold;">Pre-scheduled</p>
+                            <div style="text-align: center; padding: 15px; background: rgba(${startingSoon ? '57,255,20' : '255,152,0'},0.1); border-radius: 8px; margin-top: 10px;">
+                                <div style="font-size: 24px; margin-bottom: 5px;">${startingSoon ? '🚀' : '⏳'}</div>
+                                <p style="color: ${startingSoon ? '#39ff14' : '#ff9800'}; font-size: 14px; margin: 0; font-weight: bold;">${startingSoon ? 'Starting!' : 'Pre-scheduled'}</p>
                                 <p style="color: #fff; font-size: 13px; margin: 5px 0;">Starts: ${startDateDisplay}</p>
                                 <p style="color: #ffff00; font-size: 12px; margin: 0;">${daysUntilStart}</p>
-                                <p style="color: #888; font-size: 11px; margin-top: 10px;">Students will be assigned before the start date.</p>
                             </div>
+                            ${enrolledStudents.length > 0 ? `
+                                <div style="margin-top: 15px;">
+                                    <h4 style="color: #00ffff; font-size: 12px; margin-bottom: 8px;">👥 Enrolled Students (${enrolledStudents.length})</h4>
+                                    <div style="display: grid; gap: 6px;">
+                                        ${enrolledStudents.map(s => {
+                                            const isLinked = s.odId || s.id;
+                                            const studentName = s.name || s.linkedName || 'Unknown';
+                                            const studentEmail = s.email || s.linkedEmail || '';
+                                            const studentDiscord = s.discord || '';
+                                            return `
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                                    <div>
+                                                        <span style="color: ${isLinked ? '#39ff14' : '#ff9800'}; font-size: 11px;">${isLinked ? '✅' : '⚠️'}</span>
+                                                        <span style="color: #fff; font-size: 12px; margin-left: 5px;">${studentName}</span>
+                                                        ${studentDiscord ? `<span style="color: #7289da; font-size: 10px; margin-left: 8px;">💬 ${studentDiscord}</span>` : ''}
+                                                    </div>
+                                                    ${studentEmail ? `<span style="color: #888; font-size: 10px;">${studentEmail}</span>` : ''}
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                    ${linkedCount < enrolledStudents.length ? `<p style="color: #ff9800; font-size: 10px; margin-top: 8px;">⚠️ ${enrolledStudents.length - linkedCount} student(s) not linked to accounts</p>` : ''}
+                                </div>
+                            ` : `
+                                <div style="margin-top: 15px; text-align: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                    <p style="color: #888; font-size: 12px; margin: 0;">No students enrolled yet</p>
+                                </div>
+                            `}
+                            ${startingSoon ? `
+                                <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px; text-align: center;">
+                                    <p style="color: #888; font-size: 11px; margin: 0;">⚠️ This is a pre-scheduled class. Ask your admin to convert it to start taking attendance.</p>
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }
@@ -11727,7 +11865,14 @@ Return ONLY valid JSON (single object, not array):
                 // Helper function to render a class card
                 function renderClassCard(c) {
                     const currentWeek = getClassCurrentWeek(c);
-                    const startDateDisplay = c.startDate ? new Date(c.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const students = c.students || [];
+                    
+                    // Check if class starts today or in the future
+                    const startDate = c.startDate ? parseLocalDate(c.startDate) : null;
+                    const now = new Date();
+                    const isUpcoming = startDate && startDate > now;
+                    const startsToday = startDate && startDate.toDateString() === now.toDateString();
                     
                     // Build week tracker
                     let weekTrackerHtml = '<div class="class-week-tracker">';
@@ -11757,12 +11902,14 @@ Return ONLY valid JSON (single object, not array):
                     const attendanceWeek = currentWeek > 0 && currentWeek <= 6 ? currentWeek : 1;
                     
                     return `
-                        <div class="class-card">
+                        <div class="class-card" style="${isUpcoming || startsToday ? 'border: 2px solid #ff9800;' : ''}">
                             <div class="class-header">
                                 <div>
                                     <div class="class-day">${c.day}</div>
                                     <div class="class-time">${c.time} EST</div>
-                                    <div style="font-size: 11px; color: #00ffff; margin-top: 3px;">📅 Started: ${startDateDisplay}</div>
+                                    <div style="font-size: 11px; color: #00ffff; margin-top: 3px;">📅 ${isUpcoming ? 'Starts' : 'Started'}: ${startDateDisplay}</div>
+                                    ${startsToday ? '<div style="font-size: 11px; color: #39ff14; margin-top: 2px;">🚀 Starting Today!</div>' : ''}
+                                    ${isUpcoming && !startsToday ? '<div style="font-size: 11px; color: #ff9800; margin-top: 2px;">⏳ Upcoming</div>' : ''}
                                 </div>
                                 <div style="text-align: right;">
                                     <span class="level-badge level-${c.level}">${LEVELS[c.level]}</span>
@@ -11775,13 +11922,13 @@ Return ONLY valid JSON (single object, not array):
                             ${currentWeek >= 1 && currentWeek <= 6 ? `
                                 <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
                                 <div style="display: grid; gap: 10px;">
-                                    ${(c.students || []).map(s => `
+                                    ${students.map(s => `
                                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                            <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name}</span>
+                                            <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name || 'Unknown'}</span>
                                             <div style="display: flex; gap: 5px;">
                                                 <button class="attendance-btn present ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'present' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
                                                 <button class="attendance-btn late ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'late' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
-                                                <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${s.name.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                                                <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -11793,8 +11940,30 @@ Return ONLY valid JSON (single object, not array):
                                     <button class="btn btn-sm btn-success" onclick="markClassAsCompleted('${c.id}')" style="margin-top: 10px;">Move to Completed</button>
                                 </div>
                             ` : `
-                                <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                                    <p style="color: #888; font-size: 12px;">Class hasn't started yet.</p>
+                                <div style="margin-top: 15px;">
+                                    <h4 style="color: #00ffff; font-size: 12px; margin-bottom: 8px;">👥 Enrolled Students (${students.length})</h4>
+                                    ${students.length > 0 ? `
+                                        <div style="display: grid; gap: 6px;">
+                                            ${students.map(s => {
+                                                const studentName = s.name || 'Unknown';
+                                                const studentEmail = s.email || '';
+                                                return `
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                                    <div>
+                                                        <span style="color: ${s.isLinked !== false ? '#39ff14' : '#ff9800'}; font-size: 11px;">${s.isLinked !== false ? '✅' : '⚠️'}</span>
+                                                        <span style="color: #00ffff; font-size: 12px; margin-left: 5px; cursor: pointer; text-decoration: underline;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
+                                                        ${s.discord ? `<span style="color: #7289da; font-size: 10px; margin-left: 8px;">💬 ${s.discord}</span>` : ''}
+                                                    </div>
+                                                    ${studentEmail ? `<span style="color: #888; font-size: 10px;">${studentEmail}</span>` : ''}
+                                                </div>
+                                            `;}).join('')}
+                                        </div>
+                                    ` : `
+                                        <p style="color: #888; font-size: 12px; text-align: center;">No students enrolled yet.</p>
+                                    `}
+                                    <div style="margin-top: 10px; padding: 10px; background: rgba(255,152,0,0.1); border: 1px solid #ff9800; border-radius: 6px; text-align: center;">
+                                        <p style="color: #ff9800; font-size: 11px; margin: 0;">⏳ Attendance will be available when the class starts on ${startDateDisplay}.</p>
+                                    </div>
                                 </div>
                             `}
                         </div>
@@ -11808,6 +11977,15 @@ Return ONLY valid JSON (single object, not array):
         async function markAttendanceWithWeek(classId, studentId, status, week) {
             const key = `${classId}_${studentId}_${week}`;
             attendanceCache[key] = status;
+            
+            // Immediately update button states visually
+            const buttons = document.querySelectorAll(`button[onclick*="markAttendanceWithWeek('${classId}', '${studentId}'"]`);
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === 'P' && status === 'present') btn.classList.add('active');
+                if (btn.textContent === 'L' && status === 'late') btn.classList.add('active');
+                if (btn.textContent === 'A' && status === 'absent') btn.classList.add('active');
+            });
 
             try {
                 await db.collection('scheduler_attendance').doc(key).set({ 
@@ -11818,15 +11996,19 @@ Return ONLY valid JSON (single object, not array):
                     timestamp: firebase.firestore.FieldValue.serverTimestamp() 
                 }, { merge: true });
                 
+                // Show success toast notification
+                showToast(`✅ Marked ${status.charAt(0).toUpperCase() + status.slice(1)}`, 'success');
+                
                 // Check if this completes Week 6 attendance
                 if (week === 6) {
                     await checkWeek6Complete(classId);
                 }
                 
-                loadTeacherClasses();
             } catch (e) { 
                 console.error('Error saving attendance:', e); 
-                alert('Error saving attendance: ' + e.message);
+                showToast('❌ Error saving attendance', 'error');
+                // Reload to revert on error
+                loadTeacherClasses();
             }
         }
         
@@ -11834,6 +12016,141 @@ Return ONLY valid JSON (single object, not array):
         function handleAbsentClickWithWeek(classId, studentId, studentName, week) {
             window.currentAbsenceWeek = week;
             openAbsenceModal(classId, studentId, studentName);
+        }
+        
+        // Admin attendance functions
+        async function markAttendanceAsAdmin(classId, studentId, status, week) {
+            const key = `${classId}_${studentId}_${week}`;
+            
+            // Immediately update button states visually
+            const buttons = document.querySelectorAll(`button[onclick*="markAttendanceAsAdmin('${classId}', '${studentId}'"]`);
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === 'P' && status === 'present') btn.classList.add('active');
+                if (btn.textContent === 'L' && status === 'late') btn.classList.add('active');
+                if (btn.textContent === 'A' && status === 'absent') btn.classList.add('active');
+            });
+            
+            // Update the admin's attendance data cache
+            if (!window.adminTeacherAttendanceData) {
+                window.adminTeacherAttendanceData = {};
+            }
+            if (!window.adminTeacherAttendanceData[classId]) {
+                window.adminTeacherAttendanceData[classId] = {};
+            }
+            window.adminTeacherAttendanceData[classId][`${studentId}_${week}`] = status;
+
+            try {
+                await db.collection('scheduler_attendance').doc(key).set({ 
+                    classId, 
+                    studentId, 
+                    week, 
+                    status, 
+                    markedBy: 'admin',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp() 
+                }, { merge: true });
+                
+                // Show success toast notification
+                showToast(`✅ Marked ${status.charAt(0).toUpperCase() + status.slice(1)}`, 'success');
+                
+                // Check if this completes Week 6 attendance
+                if (week === 6) {
+                    await checkWeek6CompleteAdmin(classId);
+                }
+                
+            } catch (e) { 
+                console.error('Error saving attendance:', e); 
+                showToast('❌ Error saving attendance', 'error');
+                // Revert button states on error - reload view
+                if (typeof loadAdminTeacherView === 'function' && adminViewingTeacherId) {
+                    loadAdminTeacherView(adminViewingTeacherId);
+                }
+            }
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            // Remove existing toast if any
+            const existingToast = document.getElementById('attendanceToast');
+            if (existingToast) existingToast.remove();
+            
+            const toast = document.createElement('div');
+            toast.id = 'attendanceToast';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 30px;
+                right: 30px;
+                padding: 12px 24px;
+                background: ${type === 'success' ? 'rgba(57, 255, 20, 0.95)' : 'rgba(255, 51, 102, 0.95)'};
+                color: ${type === 'success' ? '#000' : '#fff'};
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease;
+            `;
+            toast.textContent = message;
+            
+            // Add animation styles if not exists
+            if (!document.getElementById('toastStyles')) {
+                const style = document.createElement('style');
+                style.id = 'toastStyles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100px); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100px); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(toast);
+            
+            // Auto-remove after 2 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+        
+        function handleAbsentClickAsAdmin(classId, studentId, studentName, week) {
+            window.currentAbsenceWeek = week;
+            window.isAdminMarkingAttendance = true;
+            openAbsenceModal(classId, studentId, studentName);
+        }
+        
+        // Check if Week 6 is complete for admin view
+        async function checkWeek6CompleteAdmin(classId) {
+            try {
+                const classDoc = await db.collection('scheduler_classes').doc(classId).get();
+                if (!classDoc.exists) return;
+                
+                const classData = classDoc.data();
+                const students = classData.students || [];
+                
+                const attendanceSnap = await db.collection('scheduler_attendance')
+                    .where('classId', '==', classId)
+                    .where('week', '==', 6)
+                    .get();
+                
+                const markedStudents = new Set();
+                attendanceSnap.docs.forEach(doc => {
+                    markedStudents.add(doc.data().studentId);
+                });
+                
+                const allMarked = students.every(s => markedStudents.has(s.id));
+                
+                if (allMarked) {
+                    showWeek6ReminderModal(classId, classData);
+                }
+            } catch (e) {
+                console.error('Error checking Week 6 completion:', e);
+            }
         }
         
         // Check if Week 6 is complete and show reminder
@@ -11957,6 +12274,10 @@ Return ONLY valid JSON (single object, not array):
                 // Update allClassesForTeacher so analytics can find student emails
                 allClassesForTeacher = fetchedClasses;
                 
+                // Also load prescheduled slots for this teacher
+                const prescheduledSnap = await db.collection('prescheduled_slots').where('teacherId', '==', currentUser.odId).get();
+                const prescheduledSlots = prescheduledSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                
                 // Use EST timezone for "today" determination
                 const todayEST = getESTToday();
                 const todayDayName = getESTDayName();
@@ -11968,7 +12289,21 @@ Return ONLY valid JSON (single object, not array):
                     return isDateOnOrAfter(todayEST, startDate) && c.day === todayDayName;
                 });
                 
-                if (todaysClasses.length === 0) {
+                // Filter prescheduled classes starting today
+                const todaysPreschedules = prescheduledSlots.filter(ps => {
+                    if (ps.day !== todayDayName) return false;
+                    if (!ps.startDate) return false;
+                    const startDate = parseLocalDate(ps.startDate);
+                    if (!startDate) return false;
+                    // Check if start date is today or before
+                    const todayStart = new Date(todayEST);
+                    todayStart.setHours(0, 0, 0, 0);
+                    const startDateOnly = new Date(startDate);
+                    startDateOnly.setHours(0, 0, 0, 0);
+                    return startDateOnly <= todayStart;
+                });
+                
+                if (todaysClasses.length === 0 && todaysPreschedules.length === 0) {
                     container.innerHTML = `
                         <div style="text-align: center; padding: 30px;">
                             <div style="font-size: 40px; margin-bottom: 15px;">📅</div>
@@ -11990,12 +12325,65 @@ Return ONLY valid JSON (single object, not array):
                     });
                 }
                 
-                container.innerHTML = todaysClasses.map(c => renderClassCardForToday(c, allAttendanceData)).join('');
+                let html = '';
+                
+                // Render active classes
+                if (todaysClasses.length > 0) {
+                    html += todaysClasses.map(c => renderClassCardForToday(c, allAttendanceData)).join('');
+                }
+                
+                // Render prescheduled classes starting today
+                if (todaysPreschedules.length > 0) {
+                    html += '<div style="margin-top: 20px;"><h4 style="color: #ff9800; margin-bottom: 10px; font-size: 13px;">⏳ Pre-scheduled Classes (Starting Today)</h4>';
+                    html += todaysPreschedules.map(ps => renderTeacherPrescheduleCardForToday(ps)).join('');
+                    html += '</div>';
+                }
+                
+                container.innerHTML = html;
                 
             } catch (e) { 
                 console.error(e); 
                 container.innerHTML = '<p style="color: #ff3366; font-size: 12px;">Error loading today\'s classes.</p>';
             }
+        }
+        
+        function renderTeacherPrescheduleCardForToday(ps) {
+            const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+            const enrolledStudents = ps.enrolledStudents || [];
+            const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
+            
+            return `
+                <div class="class-card" style="border: 2px solid #ff9800; background: rgba(255,152,0,0.15);">
+                    <div class="class-header">
+                        <div>
+                            <div class="class-day" style="color: #ff9800;">${ps.day}</div>
+                            <div class="class-time">${ps.time} EST</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="level-badge level-${ps.classType}" style="border-color: #ff9800;">${classTypeName}</span>
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(255,152,0,0.1); border-radius: 8px; margin-top: 10px;">
+                        <div style="font-size: 24px; margin-bottom: 5px;">🚀</div>
+                        <p style="color: #39ff14; font-size: 14px; margin: 0; font-weight: bold;">Starting Today!</p>
+                        <p style="color: #fff; font-size: 13px; margin: 5px 0;">${enrolledStudents.length} students enrolled</p>
+                        ${linkedCount < enrolledStudents.length ? `<p style="color: #ff9800; font-size: 11px; margin: 0;">⚠️ ${enrolledStudents.length - linkedCount} not linked to accounts</p>` : ''}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <p style="color: #888; font-size: 11px; margin-bottom: 5px;">Students:</p>
+                        ${enrolledStudents.map(s => `
+                            <div style="display: flex; align-items: center; gap: 5px; padding: 3px 0;">
+                                <span style="color: ${s.odId || s.id ? '#39ff14' : '#ff9800'}; font-size: 11px;">${s.odId || s.id ? '✅' : '⚠️'}</span>
+                                <span style="color: #fff; font-size: 12px;">${s.name || s.linkedName || 'Unknown'}</span>
+                                ${s.discord ? `<span style="color: #7289da; font-size: 10px; margin-left: 5px;">💬 ${s.discord}</span>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px; text-align: center;">
+                        <p style="color: #888; font-size: 11px; margin: 0;">⚠️ This is a pre-scheduled class. Ask your admin to convert it to start taking attendance.</p>
+                    </div>
+                </div>
+            `;
         }
         
         // Load Completed Classes Tab
@@ -12116,7 +12504,7 @@ Return ONLY valid JSON (single object, not array):
             // Helper functions
             function getClassWeekDates(cls, weekNum) {
                 if (!cls.startDate) return null;
-                const startDate = parseESTDate(cls.startDate);
+                const startDate = parseLocalDate(cls.startDate);
                 const weekStart = new Date(startDate);
                 weekStart.setDate(startDate.getDate() + (weekNum - 1) * 7);
                 const weekEnd = new Date(weekStart);
@@ -12125,10 +12513,10 @@ Return ONLY valid JSON (single object, not array):
             }
             
             function getClassCurrentWeek(cls) {
-                if (!cls.startDate) return null;
-                const startDate = parseESTDate(cls.startDate);
+                if (!cls.startDate) return 1; // Default to week 1 if no start date
+                const startDate = parseLocalDate(cls.startDate);
                 const todayDate = getESTToday();
-                if (todayDate < startDate) return 0;
+                if (todayDate < startDate) return 1; // If class is in Today view but hasn't technically started, treat as week 1
                 const daysSinceStart = getDaysBetween(todayDate, startDate);
                 return Math.min(Math.floor(daysSinceStart / 7) + 1, 7);
             }
@@ -12154,7 +12542,8 @@ Return ONLY valid JSON (single object, not array):
             }
             
             const currentWeek = getClassCurrentWeek(c);
-            const startDateDisplay = c.startDate ? new Date(c.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const students = c.students || [];
             
             // Build week tracker
             let weekTrackerHtml = '<div class="class-week-tracker">';
@@ -12201,22 +12590,30 @@ Return ONLY valid JSON (single object, not array):
                         <button class="btn btn-sm btn-info" onclick="showClassMaterial('${c.level}', ${attendanceWeek})" style="width: 100%;">📖 Show Material (Week ${attendanceWeek})</button>
                     </div>
                     
-                    ${currentWeek >= 1 && currentWeek <= 6 ? `
+                    ${students.length > 0 ? `
                         <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
                         <div style="display: grid; gap: 10px;">
-                            ${(c.students || []).map(s => `
+                            ${students.map(s => {
+                                const studentName = s.name || 'Unknown';
+                                const studentEmail = s.email || '';
+                                return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                    <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name}</span>
+                                    <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
                                     <div style="display: flex; gap: 5px;">
                                         <button class="attendance-btn present ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'present' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
                                         <button class="attendance-btn late ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'late' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
-                                        <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${s.name.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                                        <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${studentName.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
                                     </div>
                                 </div>
-                            `).join('')}
+                            `;}).join('')}
                         </div>
-                    ` : currentWeek > 6 ? `
-                        <div style="text-align: center; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
+                    ` : `
+                        <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                            <p style="color: #888; font-size: 12px;">No students enrolled in this class.</p>
+                        </div>
+                    `}
+                    ${currentWeek > 6 ? `
+                        <div style="text-align: center; padding: 15px; margin-top: 10px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
                             <p style="color: #39ff14; font-size: 13px; margin: 0;">🎓 Course Complete!</p>
                             <button class="btn btn-sm btn-success" onclick="markClassAsCompleted('${c.id}')" style="margin-top: 10px;">Move to Completed</button>
                         </div>
@@ -12712,6 +13109,7 @@ Return ONLY valid JSON (single object, not array):
         function closeAbsenceModal() {
             document.getElementById('absenceModal').classList.remove('active');
             window.currentAbsenceWeek = null;
+            window.isAdminMarkingAttendance = false;
         }
         
         // Edit Start Date Modal Functions
@@ -12773,6 +13171,17 @@ Return ONLY valid JSON (single object, not array):
             const studentId = document.getElementById('absenceStudentId').value;
             const week = window.currentAbsenceWeek || schedulerSettings.currentWeek;
             const key = `${classId}_${studentId}_${week}`;
+            const isAdmin = window.isAdminMarkingAttendance;
+            
+            // Immediately update button states visually
+            const btnSelector = isAdmin ? 
+                `button[onclick*="markAttendanceAsAdmin('${classId}', '${studentId}'"]` :
+                `button[onclick*="markAttendanceWithWeek('${classId}', '${studentId}'"]`;
+            const buttons = document.querySelectorAll(btnSelector);
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === 'A') btn.classList.add('active');
+            });
             
             try {
                 await db.collection('scheduler_attendance').doc(key).set({
@@ -12781,19 +13190,38 @@ Return ONLY valid JSON (single object, not array):
                     week,
                     status: 'absent',
                     reason: null,
+                    markedBy: isAdmin ? 'admin' : 'teacher',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
                 attendanceCache[key] = 'absent';
+                
+                // Update admin cache if marking as admin
+                if (isAdmin && window.adminTeacherAttendanceData) {
+                    if (!window.adminTeacherAttendanceData[classId]) {
+                        window.adminTeacherAttendanceData[classId] = {};
+                    }
+                    window.adminTeacherAttendanceData[classId][`${studentId}_${week}`] = 'absent';
+                }
+                
                 closeAbsenceModal();
+                
+                // Show success toast
+                showToast('✅ Marked Absent', 'success');
                 
                 // Check if Week 6 is complete
                 if (week === 6) {
-                    await checkWeek6Complete(classId);
+                    if (isAdmin) {
+                        await checkWeek6CompleteAdmin(classId);
+                    } else {
+                        await checkWeek6Complete(classId);
+                    }
                 }
                 
-                loadTeacherClasses();
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e);
+                showToast('❌ Error saving attendance', 'error');
+            }
         }
         
         async function submitAbsenceWithReason() {
@@ -12802,11 +13230,22 @@ Return ONLY valid JSON (single object, not array):
             const reason = document.getElementById('absenceReasonText').value.trim();
             const week = window.currentAbsenceWeek || schedulerSettings.currentWeek;
             const key = `${classId}_${studentId}_${week}`;
+            const isAdmin = window.isAdminMarkingAttendance;
             
             if (!reason) {
                 alert('Please enter the reason for absence.');
                 return;
             }
+            
+            // Immediately update button states visually
+            const btnSelector = isAdmin ? 
+                `button[onclick*="markAttendanceAsAdmin('${classId}', '${studentId}'"]` :
+                `button[onclick*="markAttendanceWithWeek('${classId}', '${studentId}'"]`;
+            const buttons = document.querySelectorAll(btnSelector);
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === 'A') btn.classList.add('active');
+            });
             
             try {
                 await db.collection('scheduler_attendance').doc(key).set({
@@ -12815,19 +13254,38 @@ Return ONLY valid JSON (single object, not array):
                     week,
                     status: 'absent',
                     reason: reason,
+                    markedBy: isAdmin ? 'admin' : 'teacher',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
                 
                 attendanceCache[key] = 'absent';
+                
+                // Update admin cache if marking as admin
+                if (isAdmin && window.adminTeacherAttendanceData) {
+                    if (!window.adminTeacherAttendanceData[classId]) {
+                        window.adminTeacherAttendanceData[classId] = {};
+                    }
+                    window.adminTeacherAttendanceData[classId][`${studentId}_${week}`] = 'absent';
+                }
+                
                 closeAbsenceModal();
+                
+                // Show success toast
+                showToast('✅ Marked Absent (with reason)', 'success');
                 
                 // Check if Week 6 is complete
                 if (week === 6) {
-                    await checkWeek6Complete(classId);
+                    if (isAdmin) {
+                        await checkWeek6CompleteAdmin(classId);
+                    } else {
+                        await checkWeek6Complete(classId);
+                    }
                 }
                 
-                loadTeacherClasses();
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e);
+                showToast('❌ Error saving attendance', 'error');
+            }
         }
 
         // ==================== ABSENCES LIST ====================
@@ -12870,23 +13328,32 @@ Return ONLY valid JSON (single object, not array):
                 for (const doc of attendanceSnap.docs) {
                     const data = doc.data();
                     
-                    // Get student info
+                    // Get student info from allStudents
                     const student = allStudents.find(s => s.id === data.studentId);
                     
                     // Get class info
                     const cls = allClasses.find(c => c.id === data.classId);
                     
-                    if (student && cls) {
+                    // Also check for student info directly in the class's students array
+                    const classStudent = cls?.students?.find(s => s.id === data.studentId);
+                    
+                    if (cls) {
+                        // Use student from allStudents if available, otherwise from class
+                        const studentName = student?.name || classStudent?.name || 'Unknown';
+                        const studentEmail = student?.email || classStudent?.email || '';
+                        const studentPhone = student?.phone || classStudent?.phone || '';
+                        const studentDiscord = student?.discord || classStudent?.discord || '';
+                        
                         allAbsencesData.push({
                             id: doc.id,
                             studentId: data.studentId,
                             classId: data.classId,
                             week: data.week,
                             reason: data.reason || null,
-                            studentName: student.name,
-                            studentEmail: student.email,
-                            studentPhone: student.phone || '',
-                            studentDiscord: student.discord || '',
+                            studentName: studentName,
+                            studentEmail: studentEmail,
+                            studentPhone: studentPhone,
+                            studentDiscord: studentDiscord,
                             classDay: cls.day,
                             classTime: cls.time,
                             classLevel: cls.level,
@@ -13481,13 +13948,29 @@ Return ONLY valid JSON (single object, not array):
             const todayEST = getESTToday();
             const todayDayName = getESTDayName();
             
+            // Get active classes for today
             const todaysClasses = activeClasses.filter(c => {
                 if (!c.startDate) return false;
                 const startDate = parseESTDate(c.startDate);
                 return isDateOnOrAfter(todayEST, startDate) && c.day === todayDayName;
             });
             
-            if (todaysClasses.length === 0) {
+            // Get prescheduled classes starting today
+            const todaysPreschedules = allPrescheduledSlots.filter(ps => {
+                if (ps.teacherId !== adminViewingTeacherId) return false;
+                if (ps.day !== todayDayName) return false;
+                if (!ps.startDate) return false;
+                const startDate = parseLocalDate(ps.startDate);
+                if (!startDate) return false;
+                // Check if start date is today or before today
+                const todayStart = new Date(todayEST);
+                todayStart.setHours(0, 0, 0, 0);
+                const startDateOnly = new Date(startDate);
+                startDateOnly.setHours(0, 0, 0, 0);
+                return startDateOnly <= todayStart;
+            });
+            
+            if (todaysClasses.length === 0 && todaysPreschedules.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 30px; background: rgba(0,0,0,0.3); border-radius: 8px;">
                         <div style="font-size: 40px; margin-bottom: 15px;">📅</div>
@@ -13497,7 +13980,57 @@ Return ONLY valid JSON (single object, not array):
                 return;
             }
             
-            container.innerHTML = todaysClasses.map(c => renderAdminTeacherClassCard(c, true)).join('');
+            let html = '';
+            
+            // Render active classes
+            if (todaysClasses.length > 0) {
+                html += todaysClasses.map(c => renderAdminTeacherClassCard(c, true)).join('');
+            }
+            
+            // Render prescheduled classes starting today
+            if (todaysPreschedules.length > 0) {
+                html += '<div style="margin-top: 15px;"><h4 style="color: #ff9800; margin-bottom: 10px; font-size: 12px;">⏳ Pre-scheduled (Starting Today)</h4>';
+                html += todaysPreschedules.map(ps => renderPrescheduleCardForToday(ps)).join('');
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function renderPrescheduleCardForToday(ps) {
+            const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+            const enrolledStudents = ps.enrolledStudents || [];
+            const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
+            
+            return `
+                <div class="class-card" style="border: 2px solid #ff9800; background: rgba(255,152,0,0.15);">
+                    <div class="class-header">
+                        <div>
+                            <div class="class-day" style="color: #ff9800;">${ps.day}</div>
+                            <div class="class-time">${ps.time} EST</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="level-badge level-${ps.classType}" style="border-color: #ff9800;">${classTypeName}</span>
+                        </div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(255,152,0,0.1); border-radius: 8px; margin-top: 10px;">
+                        <div style="font-size: 24px; margin-bottom: 5px;">🚀</div>
+                        <p style="color: #39ff14; font-size: 14px; margin: 0; font-weight: bold;">Starting Today!</p>
+                        <p style="color: #fff; font-size: 13px; margin: 5px 0;">${enrolledStudents.length} students enrolled</p>
+                        ${linkedCount < enrolledStudents.length ? `<p style="color: #ff9800; font-size: 11px; margin: 0;">⚠️ ${enrolledStudents.length - linkedCount} not linked to accounts</p>` : ''}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <p style="color: #888; font-size: 11px; margin-bottom: 5px;">Students:</p>
+                        ${enrolledStudents.map(s => `
+                            <div style="display: flex; align-items: center; gap: 5px; padding: 3px 0;">
+                                <span style="color: ${s.odId || s.id ? '#39ff14' : '#ff9800'}; font-size: 11px;">${s.odId || s.id ? '✅' : '⚠️'}</span>
+                                <span style="color: #fff; font-size: 12px;">${s.name || s.linkedName || 'Unknown'}</span>
+                                ${s.discord ? `<span style="color: #7289da; font-size: 10px; margin-left: 5px;">💬 ${s.discord}</span>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
         }
         
         function renderAdminTeacherClassesView() {
@@ -13523,40 +14056,72 @@ Return ONLY valid JSON (single object, not array):
             if (teacherPreschedules.length > 0) {
                 html += '<div style="margin-top: 20px;"><h4 style="color: #ff9800; margin-bottom: 10px; font-size: 13px;">⏳ Pre-scheduled Classes</h4>';
                 html += teacherPreschedules.map(ps => {
-                    const startDate = ps.startDate ? new Date(ps.startDate + 'T00:00:00') : null;
+                    const startDate = parseLocalDate(ps.startDate);
                     const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const enrolledStudents = ps.enrolledStudents || [];
+                    const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
                     
                     // Calculate days until start
                     let daysUntilStart = '';
+                    let startingSoon = false;
                     if (startDate) {
                         const now = new Date();
                         const diffTime = startDate - now;
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                         if (diffDays > 0) {
                             daysUntilStart = `(in ${diffDays} day${diffDays > 1 ? 's' : ''})`;
-                        } else if (diffDays === 0) {
-                            daysUntilStart = '(Today!)';
+                        } else if (diffDays <= 0) {
+                            daysUntilStart = '(Starting!)';
+                            startingSoon = true;
                         }
                     }
                     
                     return `
-                        <div class="class-card" style="border: 2px solid #ff9800; background: rgba(255,152,0,0.1);">
+                        <div class="class-card" style="border: 2px solid ${startingSoon ? '#39ff14' : '#ff9800'}; background: rgba(${startingSoon ? '57,255,20' : '255,152,0'},0.1);">
                             <div class="class-header">
                                 <div>
-                                    <div class="class-day" style="color: #ff9800;">${ps.day}</div>
+                                    <div class="class-day" style="color: ${startingSoon ? '#39ff14' : '#ff9800'};">${ps.day}</div>
                                     <div class="class-time">${ps.time} EST</div>
                                 </div>
                                 <div style="text-align: right;">
-                                    <span class="level-badge level-${ps.classType}" style="border-color: #ff9800;">${classTypeName}</span>
+                                    <span class="level-badge level-${ps.classType}" style="border-color: ${startingSoon ? '#39ff14' : '#ff9800'};">${classTypeName}</span>
                                 </div>
                             </div>
-                            <div style="text-align: center; padding: 15px; background: rgba(255,152,0,0.1); border-radius: 8px; margin-top: 10px;">
-                                <div style="font-size: 24px; margin-bottom: 5px;">⏳</div>
-                                <p style="color: #ff9800; font-size: 14px; margin: 0; font-weight: bold;">Pre-scheduled</p>
+                            <div style="text-align: center; padding: 15px; background: rgba(${startingSoon ? '57,255,20' : '255,152,0'},0.1); border-radius: 8px; margin-top: 10px;">
+                                <div style="font-size: 24px; margin-bottom: 5px;">${startingSoon ? '🚀' : '⏳'}</div>
+                                <p style="color: ${startingSoon ? '#39ff14' : '#ff9800'}; font-size: 14px; margin: 0; font-weight: bold;">${startingSoon ? 'Starting!' : 'Pre-scheduled'}</p>
                                 <p style="color: #fff; font-size: 13px; margin: 5px 0;">Starts: ${startDateStr}</p>
                                 <p style="color: #ffff00; font-size: 12px; margin: 0;">${daysUntilStart}</p>
                             </div>
+                            ${enrolledStudents.length > 0 ? `
+                                <div style="margin-top: 15px;">
+                                    <h4 style="color: #00ffff; font-size: 12px; margin-bottom: 8px;">👥 Enrolled Students (${enrolledStudents.length})</h4>
+                                    <div style="display: grid; gap: 6px;">
+                                        ${enrolledStudents.map(s => {
+                                            const isLinked = s.odId || s.id;
+                                            const studentName = s.name || s.linkedName || 'Unknown';
+                                            const studentEmail = s.email || s.linkedEmail || '';
+                                            const studentDiscord = s.discord || '';
+                                            return `
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                                    <div>
+                                                        <span style="color: ${isLinked ? '#39ff14' : '#ff9800'}; font-size: 11px;">${isLinked ? '✅' : '⚠️'}</span>
+                                                        <span style="color: #fff; font-size: 12px; margin-left: 5px;">${studentName}</span>
+                                                        ${studentDiscord ? `<span style="color: #7289da; font-size: 10px; margin-left: 8px;">💬 ${studentDiscord}</span>` : ''}
+                                                    </div>
+                                                    ${studentEmail ? `<span style="color: #888; font-size: 10px;">${studentEmail}</span>` : ''}
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                    ${linkedCount < enrolledStudents.length ? `<p style="color: #ff9800; font-size: 10px; margin-top: 8px;">⚠️ ${enrolledStudents.length - linkedCount} student(s) not linked to accounts</p>` : ''}
+                                </div>
+                            ` : `
+                                <div style="margin-top: 15px; text-align: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                    <p style="color: #888; font-size: 12px; margin: 0;">No students enrolled yet</p>
+                                </div>
+                            `}
                         </div>
                     `;
                 }).join('');
@@ -13609,7 +14174,7 @@ Return ONLY valid JSON (single object, not array):
             }
             
             const currentWeek = getClassCurrentWeek(c);
-            const startDateDisplay = c.startDate ? parseESTDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
             
             // Build week tracker
             let weekTrackerHtml = '<div class="class-week-tracker">';
@@ -13658,15 +14223,17 @@ Return ONLY valid JSON (single object, not array):
                         <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
                         <div style="display: grid; gap: 10px;">
                             ${(c.students || []).map(s => {
+                                const studentName = s.name || 'Unknown';
+                                const studentEmail = s.email || '';
                                 const status = getAttendanceStatus(c.id, s.id, attendanceWeek);
-                                const statusDisplay = status === 'present' ? '<span style="color: #39ff14;">✓ Present</span>' :
-                                    status === 'late' ? '<span style="color: #ffff00;">⏰ Late</span>' :
-                                    status === 'absent' ? '<span style="color: #ff3366;">✗ Absent</span>' :
-                                    '<span style="color: #888;">- Not marked</span>';
                                 return `
                                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                        <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name}</span>
-                                        <span style="font-size: 11px;">${statusDisplay}</span>
+                                        <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
+                                        <div style="display: flex; gap: 5px;">
+                                            <button class="attendance-btn present ${status === 'present' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
+                                            <button class="attendance-btn late ${status === 'late' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
+                                            <button class="attendance-btn absent ${status === 'absent' ? 'active' : ''}" onclick="handleAbsentClickAsAdmin('${c.id}', '${s.id}', '${studentName.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                                        </div>
                                     </div>
                                 `;
                             }).join('')}
@@ -13676,8 +14243,30 @@ Return ONLY valid JSON (single object, not array):
                             <p style="color: #39ff14; font-size: 13px; margin: 0;">🎓 Course Complete!</p>
                         </div>
                     ` : `
-                        <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                            <p style="color: #888; font-size: 12px;">Class hasn't started yet.</p>
+                        <div style="margin-top: 15px;">
+                            <h4 style="color: #00ffff; font-size: 12px; margin-bottom: 8px;">👥 Enrolled Students (${(c.students || []).length})</h4>
+                            ${(c.students || []).length > 0 ? `
+                                <div style="display: grid; gap: 6px;">
+                                    ${(c.students || []).map(s => {
+                                        const studentName = s.name || 'Unknown';
+                                        const studentEmail = s.email || '';
+                                        return `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                            <div>
+                                                <span style="color: ${s.isLinked !== false ? '#39ff14' : '#ff9800'}; font-size: 11px;">${s.isLinked !== false ? '✅' : '⚠️'}</span>
+                                                <span style="color: #00ffff; font-size: 12px; margin-left: 5px; cursor: pointer; text-decoration: underline;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
+                                                ${s.discord ? `<span style="color: #7289da; font-size: 10px; margin-left: 8px;">💬 ${s.discord}</span>` : ''}
+                                            </div>
+                                            ${studentEmail ? `<span style="color: #888; font-size: 10px;">${studentEmail}</span>` : ''}
+                                        </div>
+                                    `;}).join('')}
+                                </div>
+                            ` : `
+                                <p style="color: #888; font-size: 12px; text-align: center;">No students enrolled yet.</p>
+                            `}
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(255,152,0,0.1); border: 1px solid #ff9800; border-radius: 6px; text-align: center;">
+                                <p style="color: #ff9800; font-size: 11px; margin: 0;">⏳ Attendance will be available when the class starts.</p>
+                            </div>
                         </div>
                     `}
                 </div>
@@ -16888,26 +17477,49 @@ Return ONLY valid JSON (single object, not array):
             
             const now = new Date();
             
-            // First, check for prescheduled slots
+            // First, mark all prescheduled slots
             allPrescheduledSlots.forEach(ps => {
                 const key = `${ps.day}-${ps.time}`;
-                const startDate = ps.startDate ? new Date(ps.startDate) : null;
+                const startDate = parseLocalDate(ps.startDate);
                 
-                // Check if the prescheduled class has started (startDate is in the past)
-                if (startDate && startDate <= now) {
-                    // This prescheduled slot has started, it should now be shown as occupied
-                    // The actual class should have been created, so we skip this
-                    return;
+                // Check if there's an active class that replaced this prescheduled slot
+                const hasActiveClass = allClasses.some(cls => 
+                    cls.day === ps.day && 
+                    cls.time === ps.time && 
+                    cls.status !== 'completed'
+                );
+                
+                // Only skip prescheduled if an actual active class exists for this slot
+                if (hasActiveClass) {
+                    return; // An active class has replaced this prescheduled slot
                 }
                 
                 if (!selectedTeacherId || ps.teacherId === selectedTeacherId) {
+                    // Determine if slot is full (for coloring)
+                    const enrolledCount = ps.enrolledStudents?.length || 0;
+                    const maxSeats = ps.maxSeats || 5;
+                    const isFull = enrolledCount >= maxSeats;
+                    
+                    // Calculate end date based on class type duration
+                    const weeksTotal = getLevelWeeks(ps.classType) || 6;
+                    let endDate = null;
+                    if (startDate) {
+                        endDate = new Date(startDate);
+                        endDate.setDate(endDate.getDate() + (weeksTotal * 7));
+                    }
+                    
                     slotStatus[key] = {
-                        status: 'prescheduled',
+                        status: isFull ? 'prescheduled-full' : 'prescheduled',
                         prescheduled: ps,
                         teacherId: ps.teacherId,
                         teacherName: ps.teacherName || allTeachers.find(t => t.id === ps.teacherId)?.name || 'Unknown',
                         classType: ps.classType,
-                        startDate: startDate
+                        startDate: startDate,
+                        endDate: endDate,
+                        availableDate: endDate, // When the slot opens back up
+                        enrolledCount: enrolledCount,
+                        maxSeats: maxSeats,
+                        weeksTotal: weeksTotal
                     };
                 }
             });
@@ -16918,16 +17530,8 @@ Return ONLY valid JSON (single object, not array):
                 
                 const key = `${cls.day}-${cls.time}`;
                 
-                // Skip if already marked as prescheduled (prescheduled takes visual priority until class starts)
-                if (slotStatus[key]?.status === 'prescheduled') {
-                    // Check if class has actually started
-                    const clsStart = cls.startDate ? new Date(cls.startDate) : null;
-                    if (clsStart && clsStart <= now) {
-                        // Class has started, override prescheduled status
-                    } else {
-                        return; // Keep prescheduled status
-                    }
-                }
+                // If there's a prescheduled entry, the class has started - keep the class info
+                // (prescheduled was already skipped above if active class exists)
                 
                 const startDate = cls.startDate ? new Date(cls.startDate) : null;
                 
@@ -16977,13 +17581,23 @@ Return ONLY valid JSON (single object, not array):
                     
                     let bgColor, borderColor, statusText, statusIcon, clickable = true, xBadge = '';
                     
-                    if (slot?.status === 'prescheduled') {
+                    if (slot?.status === 'prescheduled-full') {
+                        // Full prescheduled slot - red/pink
+                        bgColor = 'rgba(255,51,102,0.3)';
+                        borderColor = '#ff3366';
+                        statusText = 'Full';
+                        statusIcon = '🔴';
+                        const classTypeName = LEVELS[slot.classType] || slot.classType || 'Class';
+                        xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: #ff3366; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${slot.enrolledCount}/${slot.maxSeats}</div>`;
+                        xBadge += `<div style="font-size: 9px; color: #ff3366; margin-top: 3px;">${classTypeName}</div>`;
+                    } else if (slot?.status === 'prescheduled') {
                         bgColor = 'rgba(255,152,0,0.3)';
                         borderColor = '#ff9800';
                         statusText = 'Pre-scheduled';
                         statusIcon = '⏳';
                         const classTypeName = LEVELS[slot.classType] || slot.classType || 'Class';
-                        xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: #ff9800; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">✗</div>`;
+                        const seatInfo = `${slot.enrolledCount || 0}/${slot.maxSeats || 5}`;
+                        xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: #ff9800; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${seatInfo}</div>`;
                         xBadge += `<div style="font-size: 9px; color: #ff9800; margin-top: 3px;">${classTypeName}</div>`;
                     } else if (!slot) {
                         // Check if any teacher is available for this day
@@ -17025,13 +17639,18 @@ Return ONLY valid JSON (single object, not array):
                         ? `<div style="font-size: 10px; color: #888; margin-top: 3px;">${LEVELS[slot.class.level] || slot.class.level}</div>`
                         : '';
                     
-                    const teacherInfo = slot?.teacherName && slot.status !== 'prescheduled'
-                        ? `<div style="font-size: 9px; color: #666; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>`
-                        : (slot?.status === 'prescheduled' ? `<div style="font-size: 9px; color: #ff9800; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>` : '');
+                    // Teacher info - show for all statuses except available/no teacher
+                    const teacherInfo = slot?.teacherName && (slot.status === 'prescheduled' || slot.status === 'prescheduled-full')
+                        ? `<div style="font-size: 9px; color: ${slot.status === 'prescheduled-full' ? '#ff3366' : '#ff9800'}; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>`
+                        : (slot?.teacherName && slot.status !== 'available' ? `<div style="font-size: 9px; color: #666; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>` : '');
                     
-                    const startDateInfo = slot?.status === 'prescheduled' && slot.startDate
-                        ? `<div style="font-size: 9px; color: #ff9800;">Starts: ${slot.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>`
+                    // Start date info for prescheduled slots
+                    const startDateInfo = (slot?.status === 'prescheduled' || slot?.status === 'prescheduled-full') && slot.startDate
+                        ? `<div style="font-size: 9px; color: ${slot.status === 'prescheduled-full' ? '#ff3366' : '#ff9800'};">Starts: ${slot.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>`
                         : '';
+                    
+                    // End date / Opens info - show for occupied, ending, AND full prescheduled slots
+                    const showOpensDate = slot?.status === 'ending' || slot?.status === 'occupied' || slot?.status === 'prescheduled-full';
                     
                     html += `
                         <div class="slot-card" onclick="${clickable ? `openSlotDetails('${day}', '${time}')` : ''}" 
@@ -17044,7 +17663,7 @@ Return ONLY valid JSON (single object, not array):
                             ${classInfo}
                             ${teacherInfo}
                             ${startDateInfo}
-                            ${slot?.status === 'ending' || slot?.status === 'occupied' ? `<div style="font-size: 9px; color: #ff9800; margin-top: 3px;">${availDateStr}</div>` : ''}
+                            ${showOpensDate && availDateStr ? `<div style="font-size: 9px; color: #39ff14; margin-top: 3px;">${availDateStr}</div>` : ''}
                         </div>
                     `;
                 });
@@ -17087,10 +17706,15 @@ Return ONLY valid JSON (single object, not array):
             
             let html = `<div style="margin-bottom: 10px;"><strong style="color: #39ff14;">${availableNow + openSlots} slots available now</strong></div>`;
             
-            // Count prescheduled
-            const prescheduledCount = Object.values(slotStatus).filter(s => s.status === 'prescheduled').length;
+            // Count prescheduled (both regular and full)
+            const prescheduledCount = Object.values(slotStatus).filter(s => s.status === 'prescheduled' || s.status === 'prescheduled-full').length;
+            const prescheduledFullCount = Object.values(slotStatus).filter(s => s.status === 'prescheduled-full').length;
             if (prescheduledCount > 0) {
-                html += `<div style="margin-bottom: 10px; color: #ff9800;">${prescheduledCount} slots pre-scheduled</div>`;
+                html += `<div style="margin-bottom: 10px; color: #ff9800;">${prescheduledCount} slots pre-scheduled`;
+                if (prescheduledFullCount > 0) {
+                    html += ` <span style="color: #ff3366;">(${prescheduledFullCount} full)</span>`;
+                }
+                html += `</div>`;
             }
             
             const sortedWeeks = Object.keys(weekBuckets).map(Number).sort((a, b) => a - b);
@@ -17206,7 +17830,7 @@ Return ONLY valid JSON (single object, not array):
             
             if (prescheduled && !cls) {
                 // Show prescheduled info
-                const startDate = prescheduled.startDate ? new Date(prescheduled.startDate) : null;
+                const startDate = parseLocalDate(prescheduled.startDate);
                 const classTypeName = LEVELS[prescheduled.classType] || prescheduled.classType || 'Class';
                 
                 html = `
@@ -17227,7 +17851,7 @@ Return ONLY valid JSON (single object, not array):
                     <div style="font-size: 13px;">
                         <div><strong>Class Type:</strong> ${classTypeName}</div>
                         <div><strong>Teacher:</strong> ${prescheduled.teacherName}</div>
-                        ${startDate ? `<div><strong>Start Date:</strong> ${startDate.toLocaleDateString()}</div>` : ''}
+                        ${startDate ? `<div><strong>Start Date:</strong> ${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
                         <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || 5} filled</div>
                     </div>
                 `;
@@ -17237,7 +17861,7 @@ Return ONLY valid JSON (single object, not array):
                 
             } else if (cls) {
                 // Show occupied class info with students
-                const startDate = cls.startDate ? new Date(cls.startDate) : null;
+                const startDate = parseLocalDate(cls.startDate);
                 const weeksTotal = getLevelWeeks(cls.level) || 6;
                 let currentWeek = 0;
                 let endDate = null;
@@ -17265,8 +17889,8 @@ Return ONLY valid JSON (single object, not array):
                         <div style="font-size: 13px; margin-bottom: 5px;">
                             <strong>Progress:</strong> Week ${currentWeek} of ${weeksTotal}
                         </div>
-                        ${startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDate.toLocaleDateString()}</div>` : ''}
-                        ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDate.toLocaleDateString()}</div>` : ''}
+                        ${startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
+                        ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
                         <div style="font-size: 13px;">
                             <strong>Students:</strong> ${cls.students?.length || 0}
                         </div>
@@ -17494,38 +18118,6 @@ Return ONLY valid JSON (single object, not array):
         }
         
         // ==================== DIRECT ADD STUDENT TO SLOT ====================
-        function openAddStudentToSlotModal() {
-            if (!selectedSlotInfo?.prescheduled) {
-                alert('No pre-scheduled slot selected.');
-                return;
-            }
-            
-            const ps = selectedSlotInfo.prescheduled;
-            const enrolledCount = ps.enrolledStudents?.length || 0;
-            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 5;
-            
-            if (enrolledCount >= maxSeats) {
-                alert('This slot is already full!');
-                return;
-            }
-            
-            // Update modal info
-            document.getElementById('addStudentSlotInfo').textContent = `${selectedSlotInfo.day} @ ${selectedSlotInfo.time} EST • ${LEVELS[ps.classType] || ps.classType}`;
-            document.getElementById('addStudentSlotSeats').textContent = `${enrolledCount}/${maxSeats} seats filled`;
-            
-            // Clear form
-            document.getElementById('directAddStudentName').value = '';
-            document.getElementById('directAddStudentEmail').value = '';
-            document.getElementById('directAddStudentPhone').value = '';
-            document.getElementById('directAddStudentNotes').value = '';
-            
-            document.getElementById('addStudentToSlotModal').classList.add('active');
-        }
-        
-        function closeAddStudentToSlotModal() {
-            document.getElementById('addStudentToSlotModal').classList.remove('active');
-        }
-        
         async function addStudentToSlotDirectly() {
             const studentName = document.getElementById('directAddStudentName').value.trim();
             if (!studentName) {
@@ -17540,6 +18132,7 @@ Return ONLY valid JSON (single object, not array):
             
             const studentEmail = document.getElementById('directAddStudentEmail').value.trim();
             const studentPhone = document.getElementById('directAddStudentPhone').value.trim();
+            const studentDiscord = document.getElementById('directAddStudentDiscord').value.trim();
             const studentNotes = document.getElementById('directAddStudentNotes').value.trim();
             
             try {
@@ -17547,7 +18140,7 @@ Return ONLY valid JSON (single object, not array):
                 const students = ps.enrolledStudents || [];
                 
                 // Check for duplicates
-                if (students.some(s => s.name.toLowerCase() === studentName.toLowerCase())) {
+                if (students.some(s => s.name && s.name.toLowerCase() === studentName.toLowerCase())) {
                     if (!confirm(`A student named "${studentName}" is already enrolled. Add anyway?`)) return;
                 }
                 
@@ -17555,6 +18148,7 @@ Return ONLY valid JSON (single object, not array):
                     name: studentName,
                     email: studentEmail || null,
                     phone: studentPhone || null,
+                    discord: studentDiscord || null,
                     notes: studentNotes || null,
                     enrolledAt: new Date().toISOString(),
                     addedDirectly: true
@@ -17579,12 +18173,36 @@ Return ONLY valid JSON (single object, not array):
                 updateSlotEnrolledStudentsList();
                 renderSlotGrid();
                 
-                alert(`✅ ${studentName} has been added to ${selectedSlotInfo.day} @ ${selectedSlotInfo.time}!`);
+                showToast(`✅ ${studentName} added!`, 'success');
                 
             } catch (e) {
                 console.error('Error adding student:', e);
                 alert('❌ Error: ' + e.message);
             }
+        }
+        
+        function openAddStudentToSlotModal() {
+            if (!selectedSlotInfo?.prescheduled) return;
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 5;
+            const currentCount = ps.enrolledStudents?.length || 0;
+            
+            document.getElementById('addStudentSlotInfo').textContent = `${selectedSlotInfo.day} @ ${selectedSlotInfo.time} EST`;
+            document.getElementById('addStudentSlotSeats').textContent = `${currentCount}/${maxSeats} seats filled`;
+            
+            // Clear form
+            document.getElementById('directAddStudentName').value = '';
+            document.getElementById('directAddStudentEmail').value = '';
+            document.getElementById('directAddStudentPhone').value = '';
+            document.getElementById('directAddStudentDiscord').value = '';
+            document.getElementById('directAddStudentNotes').value = '';
+            
+            document.getElementById('addStudentToSlotModal').classList.add('active');
+        }
+        
+        function closeAddStudentToSlotModal() {
+            document.getElementById('addStudentToSlotModal').classList.remove('active');
         }
         
         function updateSlotEnrolledStudentsList() {
@@ -17604,17 +18222,53 @@ Return ONLY valid JSON (single object, not array):
             
             let html = '<div style="display: flex; flex-direction: column; gap: 6px;">';
             students.forEach((student, index) => {
+                const isLinked = student.odId || student.id;
+                const linkStatusIcon = isLinked ? '✅' : '⚠️';
+                const linkStatusColor = isLinked ? '#39ff14' : '#ff9800';
+                const linkStatusText = isLinked ? 'Linked' : 'Not linked';
+                const studentName = student.name || student.linkedName || 'Unknown';
+                const studentEmail = student.email || student.linkedEmail || '';
+                const studentPhone = student.phone || '';
+                const studentDiscord = student.discord || '';
+                
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.3); border-radius: 6px;">
-                        <div>
-                            <span style="color: #39ff14; font-weight: 600; font-size: 12px;">${escapeHtmlSales ? escapeHtmlSales(student.name) : student.name}</span>
-                            ${student.email ? `<span style="color: #888; font-size: 10px; margin-left: 8px;">${student.email}</span>` : ''}
+                    <div style="padding: 8px 10px; background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.3); border-radius: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: #39ff14; font-weight: 600; font-size: 12px;">${escapeHtmlSales ? escapeHtmlSales(studentName) : studentName}</span>
+                                    <span style="color: ${linkStatusColor}; font-size: 10px;" title="${linkStatusText}">${linkStatusIcon}</span>
+                                </div>
+                                ${studentEmail ? `<div style="color: #888; font-size: 10px;">📧 ${studentEmail}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                ${!isLinked ? `<button class="btn btn-info btn-sm" onclick="openLinkAccountModal(${index})" style="padding: 2px 6px; font-size: 9px;">🔗 Link</button>` : `<button class="btn btn-secondary btn-sm" onclick="unlinkStudentAccount(${index})" style="padding: 2px 6px; font-size: 9px;">Unlink</button>`}
+                                <button class="btn btn-danger btn-sm" onclick="removeStudentFromSlot(${index})" style="padding: 2px 8px; font-size: 10px;">✕</button>
+                            </div>
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="removeStudentFromSlot(${index})" style="padding: 2px 8px; font-size: 10px;">✕</button>
+                        <div style="display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="editStudentPhone(${index})">
+                                <span style="color: ${studentPhone ? '#39ff14' : '#666'}; font-size: 10px;">📞 ${studentPhone || 'Add phone'}</span>
+                                <span style="color: #888; font-size: 8px;">✏️</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="editStudentDiscord(${index})">
+                                <span style="color: ${studentDiscord ? '#7289da' : '#666'}; font-size: 10px;">💬 ${studentDiscord || 'Add Discord'}</span>
+                                <span style="color: #888; font-size: 8px;">✏️</span>
+                            </div>
+                        </div>
                     </div>
                 `;
             });
             html += '</div>';
+            
+            // Show summary of linked vs unlinked
+            const linkedCount = students.filter(s => s.odId || s.id).length;
+            const unlinkedCount = students.length - linkedCount;
+            if (unlinkedCount > 0) {
+                html += `<div style="margin-top: 8px; padding: 8px; background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); border-radius: 6px; font-size: 11px; color: #ff9800;">
+                    ⚠️ ${unlinkedCount} student${unlinkedCount > 1 ? 's' : ''} not linked to accounts. Link them to enable attendance & analytics.
+                </div>`;
+            }
             
             // Update seat count in preschedule details
             const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 5;
@@ -17626,6 +18280,416 @@ Return ONLY valid JSON (single object, not array):
             }
             
             content.innerHTML = html;
+        }
+        
+        // Link account modal functions
+        let linkingStudentIndex = null;
+        
+        function openLinkAccountModal(studentIndex) {
+            linkingStudentIndex = studentIndex;
+            const student = selectedSlotInfo?.prescheduled?.enrolledStudents?.[studentIndex];
+            if (!student) return;
+            
+            const studentName = student.name || student.linkedName || 'Unknown';
+            document.getElementById('linkAccountStudentName').textContent = studentName;
+            document.getElementById('linkAccountSearchInput').value = student.email || student.linkedEmail || studentName || '';
+            document.getElementById('linkAccountSearchResults').innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search...</p>';
+            
+            document.getElementById('linkAccountModal').classList.add('active');
+            
+            // Auto-search if we have email or name
+            if (student.email || student.linkedEmail || studentName) {
+                searchAccountsToLink();
+            }
+        }
+        
+        function closeLinkAccountModal() {
+            document.getElementById('linkAccountModal').classList.remove('active');
+            linkingStudentIndex = null;
+        }
+        
+        async function searchAccountsToLink() {
+            const searchTerm = document.getElementById('linkAccountSearchInput').value.toLowerCase().trim();
+            const resultsContainer = document.getElementById('linkAccountSearchResults');
+            
+            if (!searchTerm) {
+                resultsContainer.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search...</p>';
+                return;
+            }
+            
+            resultsContainer.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Searching...</p>';
+            
+            try {
+                // Search in users collection for students
+                const usersSnap = await db.collection('users').where('role', '==', 'student').get();
+                const matchedUsers = usersSnap.docs
+                    .map(doc => ({ odId: doc.id, ...doc.data() }))
+                    .filter(u => 
+                        (u.displayName || u.name || '').toLowerCase().includes(searchTerm) ||
+                        (u.email || '').toLowerCase().includes(searchTerm)
+                    );
+                
+                // Also search scheduler_students
+                const schedulerSnap = await db.collection('scheduler_students').get();
+                const matchedScheduler = schedulerSnap.docs
+                    .map(doc => ({ odId: doc.id, source: 'scheduler', ...doc.data() }))
+                    .filter(s => 
+                        (s.name || '').toLowerCase().includes(searchTerm) ||
+                        (s.email || '').toLowerCase().includes(searchTerm)
+                    );
+                
+                // Combine and dedupe by email
+                const seenEmails = new Set();
+                const allMatches = [];
+                
+                matchedUsers.forEach(u => {
+                    const email = (u.email || '').toLowerCase();
+                    if (!seenEmails.has(email)) {
+                        seenEmails.add(email);
+                        allMatches.push({ ...u, source: 'users' });
+                    }
+                });
+                
+                matchedScheduler.forEach(s => {
+                    const email = (s.email || '').toLowerCase();
+                    if (!seenEmails.has(email)) {
+                        seenEmails.add(email);
+                        allMatches.push(s);
+                    }
+                });
+                
+                if (allMatches.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <p style="color: #888; font-size: 12px; text-align: center;">No accounts found matching "${searchTerm}"</p>
+                        <button class="btn btn-info" onclick="createNewAccountForStudent()" style="width: 100%; margin-top: 10px;">➕ Create New Student Account</button>
+                    `;
+                    return;
+                }
+                
+                let html = '<div style="max-height: 300px; overflow-y: auto;">';
+                allMatches.forEach(account => {
+                    const name = account.displayName || account.name || 'Unknown';
+                    const email = account.email || 'No email';
+                    const sourceLabel = account.source === 'scheduler' ? '📚 Scheduler' : '👤 Account';
+                    
+                    html += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,255,255,0.1); border: 1px solid rgba(0,255,255,0.3); border-radius: 6px; margin-bottom: 8px; cursor: pointer;" 
+                             onclick="linkStudentToAccount('${account.odId}', '${name.replace(/'/g, "\\'")}', '${email.replace(/'/g, "\\'")}')">
+                            <div>
+                                <div style="color: #00ffff; font-weight: 600; font-size: 13px;">${name}</div>
+                                <div style="color: #888; font-size: 11px;">${email}</div>
+                            </div>
+                            <div style="font-size: 10px; color: #666;">${sourceLabel}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                html += '<button class="btn btn-info" onclick="createNewAccountForStudent()" style="width: 100%; margin-top: 10px;">➕ Create New Student Account</button>';
+                
+                resultsContainer.innerHTML = html;
+                
+            } catch (e) {
+                console.error('Error searching accounts:', e);
+                resultsContainer.innerHTML = '<p style="color: #ff3366; font-size: 12px; text-align: center;">Error searching accounts</p>';
+            }
+        }
+        
+        async function linkStudentToAccount(accountId, accountName, accountEmail) {
+            if (linkingStudentIndex === null || !selectedSlotInfo?.prescheduled) return;
+            
+            try {
+                const ps = selectedSlotInfo.prescheduled;
+                const students = [...(ps.enrolledStudents || [])];
+                const originalStudent = students[linkingStudentIndex] || {};
+                const studentDisplayName = originalStudent.name || originalStudent.linkedName || accountName || 'Student';
+                
+                // Prompt for Discord username
+                const discord = prompt(`Enter Discord username for ${studentDisplayName} (optional):`, originalStudent.discord || '');
+                
+                // Update the student with account info
+                students[linkingStudentIndex] = {
+                    ...originalStudent,
+                    odId: accountId,
+                    id: accountId,
+                    linkedName: accountName,
+                    linkedEmail: accountEmail,
+                    linkedAt: new Date().toISOString(),
+                    // Ensure name is set if it was missing
+                    name: originalStudent.name || accountName,
+                    // Add Discord if provided
+                    discord: discord || originalStudent.discord || null
+                };
+                
+                await db.collection('prescheduled_slots').doc(ps.id).update({
+                    enrolledStudents: students
+                });
+                
+                // Update local cache
+                const idx = allPrescheduledSlots.findIndex(p => p.id === ps.id);
+                if (idx !== -1) {
+                    allPrescheduledSlots[idx].enrolledStudents = students;
+                }
+                selectedSlotInfo.prescheduled.enrolledStudents = students;
+                
+                closeLinkAccountModal();
+                updateSlotEnrolledStudentsList();
+                
+                alert(`✅ ${studentDisplayName} linked to account: ${accountName}`);
+                
+            } catch (e) {
+                console.error('Error linking account:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function unlinkStudentAccount(studentIndex) {
+            if (!selectedSlotInfo?.prescheduled) return;
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const student = ps.enrolledStudents?.[studentIndex];
+            if (!student) return;
+            
+            const studentDisplayName = student.name || student.linkedName || 'this student';
+            if (!confirm(`Unlink "${studentDisplayName}" from their account?`)) return;
+            
+            try {
+                const students = [...(ps.enrolledStudents || [])];
+                
+                // Remove account link info
+                delete students[studentIndex].odId;
+                delete students[studentIndex].id;
+                delete students[studentIndex].linkedName;
+                delete students[studentIndex].linkedEmail;
+                delete students[studentIndex].linkedAt;
+                
+                await db.collection('prescheduled_slots').doc(ps.id).update({
+                    enrolledStudents: students
+                });
+                
+                // Update local cache
+                const idx = allPrescheduledSlots.findIndex(p => p.id === ps.id);
+                if (idx !== -1) {
+                    allPrescheduledSlots[idx].enrolledStudents = students;
+                }
+                selectedSlotInfo.prescheduled.enrolledStudents = students;
+                
+                updateSlotEnrolledStudentsList();
+                alert(`✅ Account unlinked from ${studentDisplayName}`);
+                
+            } catch (e) {
+                console.error('Error unlinking account:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function editStudentDiscord(studentIndex) {
+            if (!selectedSlotInfo?.prescheduled) return;
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const student = ps.enrolledStudents?.[studentIndex];
+            if (!student) return;
+            
+            const studentDisplayName = student.name || student.linkedName || 'this student';
+            const newDiscord = prompt(`Enter Discord username for ${studentDisplayName}:`, student.discord || '');
+            
+            if (newDiscord === null) return; // User cancelled
+            
+            try {
+                const students = [...(ps.enrolledStudents || [])];
+                students[studentIndex] = {
+                    ...students[studentIndex],
+                    discord: newDiscord || null
+                };
+                
+                await db.collection('prescheduled_slots').doc(ps.id).update({
+                    enrolledStudents: students
+                });
+                
+                // Update local cache
+                const idx = allPrescheduledSlots.findIndex(p => p.id === ps.id);
+                if (idx !== -1) {
+                    allPrescheduledSlots[idx].enrolledStudents = students;
+                }
+                selectedSlotInfo.prescheduled.enrolledStudents = students;
+                
+                updateSlotEnrolledStudentsList();
+                
+                if (newDiscord) {
+                    showToast(`✅ Discord updated: ${newDiscord}`, 'success');
+                } else {
+                    showToast(`✅ Discord removed`, 'success');
+                }
+                
+            } catch (e) {
+                console.error('Error updating Discord:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function editStudentPhone(studentIndex) {
+            if (!selectedSlotInfo?.prescheduled) return;
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const student = ps.enrolledStudents?.[studentIndex];
+            if (!student) return;
+            
+            const studentDisplayName = student.name || student.linkedName || 'this student';
+            const newPhone = prompt(`Enter phone number for ${studentDisplayName}:`, student.phone || '');
+            
+            if (newPhone === null) return; // User cancelled
+            
+            try {
+                const students = [...(ps.enrolledStudents || [])];
+                students[studentIndex] = {
+                    ...students[studentIndex],
+                    phone: newPhone || null
+                };
+                
+                await db.collection('prescheduled_slots').doc(ps.id).update({
+                    enrolledStudents: students
+                });
+                
+                // Update local cache
+                const idx = allPrescheduledSlots.findIndex(p => p.id === ps.id);
+                if (idx !== -1) {
+                    allPrescheduledSlots[idx].enrolledStudents = students;
+                }
+                selectedSlotInfo.prescheduled.enrolledStudents = students;
+                
+                updateSlotEnrolledStudentsList();
+                
+                if (newPhone) {
+                    showToast(`✅ Phone updated: ${newPhone}`, 'success');
+                } else {
+                    showToast(`✅ Phone removed`, 'success');
+                }
+                
+            } catch (e) {
+                console.error('Error updating phone:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function createNewAccountForStudent() {
+            const student = selectedSlotInfo?.prescheduled?.enrolledStudents?.[linkingStudentIndex];
+            if (!student) return;
+            
+            const studentName = student.name || student.linkedName || 'Student';
+            const email = prompt(`Enter email for ${studentName}:`, student.email || '');
+            if (!email) return;
+            
+            try {
+                // Create in scheduler_students collection
+                const newStudentRef = await db.collection('scheduler_students').add({
+                    name: studentName,
+                    email: email,
+                    phone: student.phone || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdFrom: 'prescheduled_slot'
+                });
+                
+                // Link to this new account
+                await linkStudentToAccount(newStudentRef.id, studentName, email);
+                
+            } catch (e) {
+                console.error('Error creating account:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function convertPrescheduleToClass() {
+            if (!selectedSlotInfo?.prescheduled) {
+                alert('No pre-scheduled slot selected.');
+                return;
+            }
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const enrolledStudents = ps.enrolledStudents || [];
+            
+            if (enrolledStudents.length === 0) {
+                alert('Please add at least one student before starting the class.');
+                return;
+            }
+            
+            // Check for unlinked students
+            const unlinkedStudents = enrolledStudents.filter(s => !s.odId && !s.id);
+            if (unlinkedStudents.length > 0) {
+                const proceed = confirm(`⚠️ ${unlinkedStudents.length} student(s) are not linked to accounts:\n\n${unlinkedStudents.map(s => '• ' + s.name).join('\n')}\n\nThese students won't have attendance tracking or analytics until linked.\n\nContinue anyway?`);
+                if (!proceed) return;
+            }
+            
+            if (!confirm(`🚀 Create class from this pre-schedule?\n\n📅 ${ps.day} @ ${ps.time}\n📚 ${LEVELS[ps.classType] || ps.classType}\n👨‍🏫 ${ps.teacherName}\n👥 ${enrolledStudents.length} students\n\nThis will:\n• Create the actual class\n• Add all enrolled students\n• Delete the pre-schedule entry`)) {
+                return;
+            }
+            
+            try {
+                // Build students array for the class
+                const classStudents = enrolledStudents.map(s => ({
+                    id: s.odId || s.id || `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    name: s.name || s.linkedName || 'Unknown',
+                    email: s.email || s.linkedEmail || null,
+                    phone: s.phone || null,
+                    discord: s.discord || null,
+                    isLinked: !!(s.odId || s.id),
+                    addedFrom: 'prescheduled'
+                }));
+                
+                // Create the class
+                const classData = {
+                    day: ps.day,
+                    time: ps.time,
+                    level: ps.classType,
+                    teacherId: ps.teacherId,
+                    students: classStudents,
+                    startDate: ps.startDate,
+                    status: 'active',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdFrom: 'prescheduled',
+                    prescheduledId: ps.id
+                };
+                
+                const classRef = await db.collection('scheduler_classes').add(classData);
+                
+                // Add to local cache
+                allClasses.push({ id: classRef.id, ...classData, createdAt: new Date() });
+                
+                // Also add linked students to scheduler_students if they aren't already there
+                for (const student of enrolledStudents) {
+                    if (student.odId || student.id) {
+                        // Check if student exists in scheduler_students
+                        const existingDoc = await db.collection('scheduler_students').doc(student.odId || student.id).get();
+                        if (!existingDoc.exists) {
+                            // Create the student record
+                            await db.collection('scheduler_students').doc(student.odId || student.id).set({
+                                name: student.name,
+                                email: student.email || student.linkedEmail || null,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                createdFrom: 'prescheduled_class_start'
+                            });
+                        }
+                    }
+                }
+                
+                // Delete the prescheduled slot
+                await db.collection('prescheduled_slots').doc(ps.id).delete();
+                
+                // Remove from local cache
+                const psIdx = allPrescheduledSlots.findIndex(p => p.id === ps.id);
+                if (psIdx !== -1) {
+                    allPrescheduledSlots.splice(psIdx, 1);
+                }
+                
+                // Close modal and refresh
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                renderClasses();
+                
+                alert(`✅ Class created successfully!\n\n📅 ${ps.day} @ ${ps.time}\n👥 ${enrolledStudents.length} students enrolled\n\nThe class is now active and will appear in the Classes section.`);
+                
+            } catch (e) {
+                console.error('Error converting prescheduled to class:', e);
+                alert('❌ Error: ' + e.message);
+            }
         }
         
         async function removeStudentFromSlot(studentIndex) {
@@ -19064,7 +20128,8 @@ ${additionalText}
             
             const enrolledCount = prescheduled.enrolledStudents?.length || 0;
             const maxSeats = prescheduled.maxSeats || salesChatSettings.defaultMaxSeats || 5;
-            const startDate = prescheduled.startDate ? new Date(prescheduled.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD';
+            const parsedStartDate = parseLocalDate(prescheduled.startDate);
+            const startDate = parsedStartDate ? parsedStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD';
             
             document.getElementById('salesSlotTitle').textContent = `${currentSalesSlot.day} @ ${currentSalesSlot.time} EST`;
             document.getElementById('salesSlotDetails').textContent = `${LEVELS[prescheduled.classType] || prescheduled.classType} • ${prescheduled.teacherName} • Starts ${startDate}`;
@@ -19370,7 +20435,7 @@ CURRENT SLOT INFO:
 - Class Type: ${LEVELS[chat.classType] || chat.classType}
 - Teacher: ${chat.teacherName}
 - Seats Left: ${seatsLeft}
-- Start Date: ${ps?.startDate ? new Date(ps.startDate).toLocaleDateString() : 'TBD'}
+- Start Date: ${ps?.startDate ? parseLocalDate(ps.startDate).toLocaleDateString() : 'TBD'}
 
 PRICING:
 - Intro Course: ${settings.introCoursePrice}
@@ -19775,3 +20840,4 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
     </script>
 </body>
 </html>
+
