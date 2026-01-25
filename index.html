@@ -8211,17 +8211,27 @@
     .covered-text:hover { background: #555; }
     .covered-text .color-dot { opacity: 0; }
     /* Spoiler block - Reddit-style click to reveal */
-    .spoiler-block { background: #2a2a2a; color: transparent; padding: 2px 5px; border-radius: 3px; cursor: pointer; user-select: none; transition: all 0.2s ease; position: relative; display: inline-block; }
-    .spoiler-block::after { content: '[click]'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #888; font-size: 10px; pointer-events: none; white-space: nowrap; font-family: sans-serif; }
-    .spoiler-block:hover { background: #3a3a3a; }
-    .spoiler-block .color-dot { opacity: 0; }
-    .spoiler-block .word-hover { pointer-events: none; border-bottom: none; }
-    .spoiler-block .word-tooltip { display: none !important; }
-    .spoiler-block.revealed { background: transparent; color: inherit; cursor: default; }
-    .spoiler-block.revealed::after { display: none; }
+    .spoiler-block { 
+      background: #333; 
+      color: transparent; 
+      padding: 4px 8px; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      user-select: none; 
+      display: inline-block;
+      min-width: 100px;
+      text-align: center;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    .spoiler-block:hover { background: #444; }
+    .spoiler-block .color-dot { opacity: 0; transition: opacity 0.3s ease; }
+    .spoiler-block.revealed { 
+      background: transparent; 
+      color: inherit; 
+      cursor: default;
+      text-align: left;
+    }
     .spoiler-block.revealed .color-dot { opacity: 1; }
-    .spoiler-block.revealed .word-hover { pointer-events: auto; border-bottom: 1px dotted #999; }
-    .spoiler-block.revealed .word-hover:hover .word-tooltip { display: block; }
     /* Blank word for fill-in mode */
     .blank-word { background: #e0e0e0; color: #1e40af; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; border: 1px dashed #999; }
     .blank-word:hover { background: #c0c0c0; }
@@ -8243,6 +8253,14 @@
     .word-hover:hover .word-tooltip { display: block; }
     .word-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #1a1a2e; }
     .word-tooltip .wt-word { font-size: 16px; font-weight: bold; color: #00ffff; margin-bottom: 5px; }
+    
+    /* Spoiler overrides - MUST come after word-tooltip rules */
+    .spoiler-block .word-hover { pointer-events: none !important; border-bottom: none !important; cursor: default !important; }
+    .spoiler-block .word-hover:hover { background: transparent !important; }
+    .spoiler-block .word-hover:hover .word-tooltip { display: none !important; }
+    .spoiler-block.revealed .word-hover { pointer-events: auto !important; border-bottom: 1px dotted #999 !important; cursor: help !important; }
+    .spoiler-block.revealed .word-hover:hover { background: #fff3cd !important; }
+    .spoiler-block.revealed .word-hover:hover .word-tooltip { display: block !important; }
     .word-tooltip .wt-pos { font-size: 10px; color: #ff00ff; text-transform: uppercase; margin-bottom: 8px; }
     .word-tooltip .wt-def { color: #fff; margin-bottom: 8px; }
     .word-tooltip .wt-grammar { font-size: 11px; color: #39ff14; background: rgba(57,255,20,0.1); padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; font-family: monospace; }
@@ -8579,9 +8597,7 @@ Example:
         <div class="button-row" style="margin: 0;">
           <select id="junbiCoverMode" onchange="renderJunbi()" style="padding: 8px; border-radius: 5px; background: #333; color: #fff; border: 1px solid #00ffff;">
             <option value="none">Show All</option>
-            <option value="korean">Hide Korean</option>
-            <option value="english">Hide English</option>
-            <option value="both">Hide Both (Spoiler Mode)</option>
+            <option value="spoiler">Spoiler Mode</option>
             <option value="blanks">Blank Fill Mode</option>
           </select>
           <select id="junbiSortMode" onchange="renderJunbi()" style="padding: 8px; border-radius: 5px; background: #333; color: #fff; border: 1px solid #00ffff;">
@@ -10177,19 +10193,12 @@ Return ONLY valid JSON (single object, not array):
       allAnswers.forEach((a) => {
         let koreanContent, englishContent;
         
-        if (coverMode === 'korean') {
+        if (coverMode === 'spoiler') {
+          // Spoiler mode - Korean is covered until clicked, English always visible
           koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
-        } else if (coverMode === 'english') {
-          koreanContent = '<span class="spoiler-block revealed"><span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
-          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + escapeHtml(a.english || '') + '</span>';
-        } else if (coverMode === 'both') {
-          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
-            '<span class="color-dot ' + a.color + '"></span>' +
-            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
-          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + escapeHtml(a.english || '') + '</span>';
         } else if (coverMode === 'blanks') {
           // Create blanks for key words (every other word gets blanked)
           const words = a.korean.split(' ');
@@ -10197,7 +10206,8 @@ Return ONLY valid JSON (single object, not array):
           koreanContent = '<span class="color-dot ' + a.color + '"></span>' + blankedKorean;
           englishContent = escapeHtml(a.english || '');
         } else {
-          koreanContent = '<span class="spoiler-block revealed"><span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
+          // Show all - no spoiler, tooltips work immediately
+          koreanContent = '<span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary);
           englishContent = escapeHtml(a.english || '');
         }
         
@@ -10210,9 +10220,8 @@ Return ONLY valid JSON (single object, not array):
         '</tr>';
       });
       
-      const coverModeText = coverMode === 'both' ? 'Click each cell to reveal' : 
-                           coverMode === 'korean' ? 'Click Korean to reveal' :
-                           coverMode === 'english' ? 'Click English to reveal' :
+      const coverModeText = coverMode === 'spoiler' ? 'Click each Korean sentence to reveal' : 
+                           coverMode === 'blanks' ? 'Click blanks to reveal words' :
                            'Hover over Korean words for definitions';
       
       container.innerHTML = '<div class="junbi-sheet">' +
