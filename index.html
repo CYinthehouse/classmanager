@@ -3125,6 +3125,20 @@
             return date;
         }
         
+        // Format a date string (YYYY-MM-DD) for display in EST timezone
+        // This ensures the displayed weekday/date matches what was intended when saved
+        function formatDateInEST(dateString, options = {}) {
+            if (!dateString) return 'Not set';
+            // Default options for date display
+            const defaultOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+            const formatOptions = { ...defaultOptions, ...options, timeZone: 'America/New_York' };
+            
+            // Parse the date string and format in EST
+            // Add T12:00:00 to avoid any edge cases around midnight
+            const date = new Date(dateString + 'T12:00:00');
+            return date.toLocaleDateString('en-US', formatOptions);
+        }
+        
         // Get start of today in EST (midnight)
         function getESTToday() {
             const est = getESTDate();
@@ -8223,6 +8237,44 @@
     .covered-text { background: #333; color: #333; padding: 2px 5px; border-radius: 3px; cursor: pointer; user-select: none; }
     .covered-text:hover { background: #555; }
     .covered-text .color-dot { opacity: 0; }
+    
+    /* Spoiler block - Reddit-style click to reveal */
+    .spoiler-block { 
+      background: #2a2a2a; 
+      color: transparent; 
+      padding: 2px 5px; 
+      border-radius: 3px; 
+      cursor: pointer; 
+      user-select: none; 
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .spoiler-block::after {
+      content: 'click to reveal';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: #888;
+      font-size: 10px;
+      font-style: italic;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .spoiler-block:hover { background: #3a3a3a; }
+    .spoiler-block .color-dot { opacity: 0; }
+    .spoiler-block .word-hover { pointer-events: none; border-bottom: none; }
+    .spoiler-block .word-tooltip { display: none !important; }
+    .spoiler-block.revealed { 
+      background: transparent; 
+      color: inherit; 
+      cursor: default;
+    }
+    .spoiler-block.revealed::after { display: none; }
+    .spoiler-block.revealed .color-dot { opacity: 1; }
+    .spoiler-block.revealed .word-hover { pointer-events: auto; border-bottom: 1px dotted #999; }
+    .spoiler-block.revealed .word-hover:hover .word-tooltip { display: block; }
+    
     /* Blank word for fill-in mode */
     .blank-word { background: #e0e0e0; color: #1e40af; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; border: 1px dashed #999; }
     .blank-word:hover { background: #c0c0c0; }
@@ -8583,6 +8635,7 @@ Example:
             <option value="none">Show All</option>
             <option value="korean">Hide Korean</option>
             <option value="english">Hide English</option>
+            <option value="both">Hide Both (Spoiler Mode)</option>
             <option value="blanks">Blank Fill Mode</option>
           </select>
           <select id="junbiSortMode" onchange="renderJunbi()" style="padding: 8px; border-radius: 5px; background: #333; color: #fff; border: 1px solid #00ffff;">
@@ -9310,23 +9363,50 @@ Example:
 HERE ARE THE KOREAN ANSWER SENTENCES (students will respond with these - DO NOT MODIFY THEM):
 \${answersList}
 
-CRITICAL RULES:
-1. The "answers" in your response MUST be the EXACT sentences from the list above. Do not paraphrase or modify them.
-2. Each prompt MUST fit at least 2-3 sentences from the list. Design prompts that are broad enough to accommodate multiple answers.
-3. Every sentence from the list should be used at least once across all prompts.
+CRITICAL RULE - NATURAL MATCHING:
+The prompt you create MUST be something that the answer sentence would NATURALLY respond to.
+- First, understand what each answer sentence MEANS
+- Then create a prompt (question/situation/statement) that would NATURALLY elicit that answer
+- The student should be able to say the answer and it makes perfect conversational sense
+
+EXAMPLES OF GOOD MATCHING:
+- Answer: "저도요. 운동 안 해요" (Me neither. I don't exercise)
+  → Question: "저 요즘 운동 안 하는데, 너는?" (I haven't been exercising lately, how about you?)
+  → Situational: "Your friend complains they've been too lazy to exercise. Respond agreeing with them."
+  → Statement: "Your friend just said they don't exercise. Express that you're the same."
+
+- Answer: "아니요, 배 안 고파요" (No, I'm not hungry)
+  → Question: "배고파요?" (Are you hungry?)
+  → Situational: "Your mom asks if you want dinner. You're not hungry."
+  → Statement: "Someone offers you food. Decline politely."
+
+- Answer: "학교에 가요" (I'm going to school)
+  → Question: "어디 가요?" (Where are you going?)
+  → Situational: "Your roommate asks where you're headed."
+  → Statement: "Tell your friend where you're going."
+
+BAD MATCHING (AVOID):
+- Answer: "저도요" (Me too) with Question: "뭐 해요?" (What are you doing?) ❌
+  → "저도요" is an AGREEMENT, not an activity description
+- Answer: "아니요" (No) with Question: "뭐 먹었어요?" (What did you eat?) ❌
+  → "아니요" answers YES/NO questions, not "what" questions
+
 \${varietyInstructions}
 
 Generate prompts in this EXACT distribution:
 TYPE DISTRIBUTION:
-- \${numQuestions} QUESTIONS (direct Korean questions like "뭐 먹었어?", "어디 가?")
-- \${numSituational} SITUATIONAL (English scenario descriptions like "Your friend asks what you ate")
-- \${numStatements} STATEMENTS (commands/requests like "Tell your friend where you went")
+- \${numQuestions} QUESTIONS (direct Korean questions - the answer should naturally respond to this question)
+- \${numSituational} SITUATIONAL (English scenario descriptions - describe a situation where saying the answer makes sense)
+- \${numStatements} STATEMENTS (commands/requests in English - tell the student to express something that matches the answer)
 
 DIFFICULTY DISTRIBUTION:
 - \${numTier1} TIER 1 (Simple): Single clause, basic grammar. Examples: "뭐 먹었어?", "어디 가?"
 - \${numTier2} TIER 2 (Complex): Multiple clauses, advanced grammar (-ㄹ 때, -면, -서, -고, etc.). Examples: "어제 친구 만났을 때 뭐 먹었어?", "시간 있으면 뭐 하고 싶어?"
 
 \${modeInstruction}
+
+Each prompt should fit 2-3 answers that would ALL be natural responses to it.
+Every sentence from the list should be used at least once across all prompts.
 
 For EACH prompt, provide promptKeywords (key vocabulary from the Korean prompt itself).
 
@@ -10152,13 +10232,23 @@ Return ONLY valid JSON (single object, not array):
         let koreanContent, englishContent;
         
         if (coverMode === 'korean') {
-          koreanContent = '<span class="covered-text" onclick="this.classList.remove(\\'covered-text\\')">' + 
+          // Spoiler on Korean only
+          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
         } else if (coverMode === 'english') {
-          koreanContent = '<span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary);
-          englishContent = '<span class="covered-text" onclick="this.classList.remove(\\'covered-text\\')">' + escapeHtml(a.english || '') + '</span>';
+          // Spoiler on English only
+          koreanContent = '<span class="spoiler-block revealed">' +
+            '<span class="color-dot ' + a.color + '"></span>' + 
+            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
+          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + escapeHtml(a.english || '') + '</span>';
+        } else if (coverMode === 'both') {
+          // Spoiler on both Korean and English
+          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + 
+            '<span class="color-dot ' + a.color + '"></span>' +
+            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
+          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + escapeHtml(a.english || '') + '</span>';
         } else if (coverMode === 'blanks') {
           // Create blanks for key words (every other word gets blanked)
           const words = a.korean.split(' ');
@@ -10166,7 +10256,10 @@ Return ONLY valid JSON (single object, not array):
           koreanContent = '<span class="color-dot ' + a.color + '"></span>' + blankedKorean;
           englishContent = escapeHtml(a.english || '');
         } else {
-          koreanContent = '<span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary);
+          // No cover - show everything with tooltips working
+          koreanContent = '<span class="spoiler-block revealed">' +
+            '<span class="color-dot ' + a.color + '"></span>' + 
+            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
         }
         
@@ -10179,11 +10272,16 @@ Return ONLY valid JSON (single object, not array):
         '</tr>';
       });
       
+      const coverModeText = coverMode === 'both' ? 'Click each cell to reveal' : 
+                           coverMode === 'korean' ? 'Click Korean to reveal' :
+                           coverMode === 'english' ? 'Click English to reveal' :
+                           'Hover over Korean words for definitions';
+      
       container.innerHTML = '<div class="junbi-sheet">' +
         '<div class="junbi-sheet-header">' +
           '<h3>Korean Practice Sheet</h3>' +
           '<p>Level ' + currentLevel + ' • ' + allAnswers.length + ' Sentences • ' + new Date().toLocaleDateString() + '</p>' +
-          '<p style="font-size: 10px; color: #999; margin-top: 5px;">Hover over Korean words for definitions. Click covered text to reveal.</p>' +
+          '<p style="font-size: 10px; color: #999; margin-top: 5px;">' + coverModeText + '</p>' +
         '</div>' +
         '<table class="junbi-table">' +
           '<thead><tr>' +
@@ -11810,7 +11908,7 @@ Return ONLY valid JSON (single object, not array):
                 // Helper function to render a prescheduled card
                 function renderPrescheduledCard(ps) {
                     const startDate = parseLocalDate(ps.startDate);
-                    const startDateDisplay = startDate ? startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const startDateDisplay = ps.startDate ? formatDateInEST(ps.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
                     const enrolledStudents = ps.enrolledStudents || [];
                     const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
@@ -11887,7 +11985,7 @@ Return ONLY valid JSON (single object, not array):
                 // Helper function to render a class card
                 function renderClassCard(c) {
                     const currentWeek = getClassCurrentWeek(c);
-                    const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const students = c.students || [];
                     
                     // Check if class starts today or in the future
@@ -12482,9 +12580,9 @@ Return ONLY valid JSON (single object, not array):
             });
             
             container.innerHTML = filteredClasses.map(c => {
-                const startDateDisplay = c.startDate ? parseESTDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const completedDateDisplay = c.completedAt ? 
-                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) : 
                     'Unknown';
                 
                 return `
@@ -12564,7 +12662,7 @@ Return ONLY valid JSON (single object, not array):
             }
             
             const currentWeek = getClassCurrentWeek(c);
-            const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
             const students = c.students || [];
             
             // Build week tracker
@@ -13014,7 +13112,7 @@ Return ONLY valid JSON (single object, not array):
             }
             
             // Format start date for display
-            const startDateDisplay = cls.startDate ? new Date(cls.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const startDateDisplay = cls.startDate ? formatDateInEST(cls.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
             
             // Header
             document.getElementById('classDetailsHeader').innerHTML = `
@@ -13830,9 +13928,9 @@ Return ONLY valid JSON (single object, not array):
             container.innerHTML = filteredClasses.map(c => {
                 const teacher = allTeachers.find(t => t.id === c.teacherId);
                 const teacherName = teacher ? teacher.name : 'Unknown Teacher';
-                const startDateDisplay = c.startDate ? parseESTDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const completedDateDisplay = c.completedAt ? 
-                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
+                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) : 
                     'Unknown';
                 
                 return `
@@ -14196,7 +14294,7 @@ Return ONLY valid JSON (single object, not array):
             }
             
             const currentWeek = getClassCurrentWeek(c);
-            const startDateDisplay = c.startDate ? parseLocalDate(c.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+            const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
             
             // Build week tracker
             let weekTrackerHtml = '<div class="class-week-tracker">';
@@ -17852,7 +17950,7 @@ Return ONLY valid JSON (single object, not array):
             
             if (prescheduled && !cls) {
                 // Show prescheduled info
-                const startDate = parseLocalDate(prescheduled.startDate);
+                const startDateDisplay = formatDateInEST(prescheduled.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
                 const classTypeName = LEVELS[prescheduled.classType] || prescheduled.classType || 'Class';
                 
                 html = `
@@ -17862,7 +17960,7 @@ Return ONLY valid JSON (single object, not array):
                         <div style="color: #fff; margin-top: 10px;">
                             <div><strong>Class:</strong> ${classTypeName}</div>
                             <div><strong>Teacher:</strong> ${prescheduled.teacherName || 'Unknown'}</div>
-                            ${startDate ? `<div><strong>Starts:</strong> ${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
+                            ${prescheduled.startDate ? `<div><strong>Starts:</strong> ${startDateDisplay}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -17873,7 +17971,7 @@ Return ONLY valid JSON (single object, not array):
                     <div style="font-size: 13px;">
                         <div><strong>Class Type:</strong> ${classTypeName}</div>
                         <div><strong>Teacher:</strong> ${prescheduled.teacherName}</div>
-                        ${startDate ? `<div><strong>Start Date:</strong> ${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
+                        ${prescheduled.startDate ? `<div><strong>Start Date:</strong> ${startDateDisplay}</div>` : ''}
                         <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || 5} filled</div>
                     </div>
                 `;
@@ -17884,9 +17982,11 @@ Return ONLY valid JSON (single object, not array):
             } else if (cls) {
                 // Show occupied class info with students
                 const startDate = parseLocalDate(cls.startDate);
+                const startDateDisplay = formatDateInEST(cls.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
                 const weeksTotal = getLevelWeeks(cls.level) || 6;
                 let currentWeek = 0;
                 let endDate = null;
+                let endDateDisplay = '';
                 
                 if (startDate) {
                     const now = new Date();
@@ -17894,6 +17994,8 @@ Return ONLY valid JSON (single object, not array):
                     currentWeek = Math.floor(daysDiff / 7) + 1;
                     endDate = new Date(startDate);
                     endDate.setDate(endDate.getDate() + (weeksTotal * 7));
+                    // Format end date in EST
+                    endDateDisplay = endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
                 }
                 
                 const statusColor = currentWeek >= weeksTotal ? '#39ff14' : (currentWeek >= weeksTotal - 1 ? '#ffff00' : '#ff3366');
@@ -17911,8 +18013,8 @@ Return ONLY valid JSON (single object, not array):
                         <div style="font-size: 13px; margin-bottom: 5px;">
                             <strong>Progress:</strong> Week ${currentWeek} of ${weeksTotal}
                         </div>
-                        ${startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
-                        ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
+                        ${cls.startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDateDisplay}</div>` : ''}
+                        ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDateDisplay}</div>` : ''}
                         <div style="font-size: 13px;">
                             <strong>Students:</strong> ${cls.students?.length || 0}
                         </div>
@@ -18786,7 +18888,7 @@ Return ONLY valid JSON (single object, not array):
             const day = selectedSlotInfo.day;
             const time = selectedSlotInfo.time;
             const timeConversions = convertTimeToAllZones(time);
-            const startDate = cls.startDate ? parseLocalDate(cls.startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD';
+            const startDate = cls.startDate ? formatDateInEST(cls.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD';
             
             const className = LEVELS[classType] || classType || 'Class';
             
@@ -19055,8 +19157,8 @@ KoreanLearnin Team`;
             
             const className = LEVELS[classType] || classType || '[Class Type]';
             
-            // Format date - use parseLocalDate to avoid timezone day-shift issues
-            const formattedDate = startDate ? parseLocalDate(startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '[Start Date]';
+            // Format date in EST timezone to ensure correct day of week
+            const formattedDate = startDate ? formatDateInEST(startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '[Start Date]';
             
             // Convert EST to other timezones
             const timeConversions = convertTimeToAllZones(time);
