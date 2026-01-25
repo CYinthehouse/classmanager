@@ -3126,15 +3126,10 @@
         }
         
         // Format a date string (YYYY-MM-DD) for display in EST timezone
-        // This ensures the displayed weekday/date matches what was intended when saved
         function formatDateInEST(dateString, options = {}) {
             if (!dateString) return 'Not set';
-            // Default options for date display
             const defaultOptions = { month: 'short', day: 'numeric', year: 'numeric' };
             const formatOptions = { ...defaultOptions, ...options, timeZone: 'America/New_York' };
-            
-            // Parse the date string and format in EST
-            // Add T12:00:00 to avoid any edge cases around midnight
             const date = new Date(dateString + 'T12:00:00');
             return date.toLocaleDateString('en-US', formatOptions);
         }
@@ -3281,16 +3276,6 @@
                 return new Date(dateStr + 'T12:00:00');
             }
             return new Date(dateStr);
-        }
-        
-        // Format a Date object as YYYY-MM-DD string without UTC conversion
-        // This avoids the timezone day-shift issue that occurs with toISOString()
-        function formatDateString(date) {
-            if (!date) return '';
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
         }
         
         // Default levels (will be merged with custom class types from Firestore)
@@ -5214,7 +5199,7 @@
                     if (c.startDate) {
                         const classLevel = c.level;
                         const weeksInClass = getLevelWeeks(classLevel) || 6;
-                        const startDate = parseLocalDate(c.startDate);
+                        const startDate = new Date(c.startDate);
                         const endDate = new Date(startDate);
                         endDate.setDate(endDate.getDate() + (weeksInClass * 7));
                         
@@ -5543,11 +5528,7 @@
                     
                     <div class="saturday-quick-btns">
                         ${saturdays.map(sat => {
-                            // Format date as YYYY-MM-DD without UTC conversion
-                            const year = sat.getFullYear();
-                            const month = String(sat.getMonth() + 1).padStart(2, '0');
-                            const day = String(sat.getDate()).padStart(2, '0');
-                            const dateStr = `${year}-${month}-${day}`;
+                            const dateStr = sat.toISOString().split('T')[0];
                             const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                             const isSelected = cls.startDate === dateStr;
                             // For pending classes, disable dates before available date
@@ -5575,11 +5556,7 @@
                 firstAvailableSaturday.setDate(availDate.getDate() + daysUntilSat);
             }
             
-            // Format date as YYYY-MM-DD without UTC conversion
-            const year = firstAvailableSaturday.getFullYear();
-            const month = String(firstAvailableSaturday.getMonth() + 1).padStart(2, '0');
-            const day = String(firstAvailableSaturday.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
+            const dateStr = firstAvailableSaturday.toISOString().split('T')[0];
             const label = firstAvailableSaturday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const isSelected = cls.startDate === dateStr;
             
@@ -5595,11 +5572,7 @@
         function getUpcomingSaturdaysHTML(proposalId, selectedDate) {
             const saturdays = getUpcomingSaturdays(5);
             return saturdays.map(sat => {
-                // Format date as YYYY-MM-DD without UTC conversion
-                const year = sat.getFullYear();
-                const month = String(sat.getMonth() + 1).padStart(2, '0');
-                const day = String(sat.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${day}`;
+                const dateStr = sat.toISOString().split('T')[0];
                 const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const isSelected = selectedDate === dateStr;
                 return `<button type="button" class="saturday-quick-btn ${isSelected ? 'selected' : ''}" onclick="updateProposalDate('${proposalId}', '${dateStr}')">${label}</button>`;
@@ -8237,44 +8210,18 @@
     .covered-text { background: #333; color: #333; padding: 2px 5px; border-radius: 3px; cursor: pointer; user-select: none; }
     .covered-text:hover { background: #555; }
     .covered-text .color-dot { opacity: 0; }
-    
     /* Spoiler block - Reddit-style click to reveal */
-    .spoiler-block { 
-      background: #2a2a2a; 
-      color: transparent; 
-      padding: 2px 5px; 
-      border-radius: 3px; 
-      cursor: pointer; 
-      user-select: none; 
-      transition: all 0.2s ease;
-      position: relative;
-    }
-    .spoiler-block::after {
-      content: 'click to reveal';
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      color: #888;
-      font-size: 10px;
-      font-style: italic;
-      pointer-events: none;
-      white-space: nowrap;
-    }
+    .spoiler-block { background: #2a2a2a; color: transparent; padding: 2px 5px; border-radius: 3px; cursor: pointer; user-select: none; transition: all 0.2s ease; position: relative; display: inline-block; }
+    .spoiler-block::after { content: '[click]'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #888; font-size: 10px; pointer-events: none; white-space: nowrap; font-family: sans-serif; }
     .spoiler-block:hover { background: #3a3a3a; }
     .spoiler-block .color-dot { opacity: 0; }
     .spoiler-block .word-hover { pointer-events: none; border-bottom: none; }
     .spoiler-block .word-tooltip { display: none !important; }
-    .spoiler-block.revealed { 
-      background: transparent; 
-      color: inherit; 
-      cursor: default;
-    }
+    .spoiler-block.revealed { background: transparent; color: inherit; cursor: default; }
     .spoiler-block.revealed::after { display: none; }
     .spoiler-block.revealed .color-dot { opacity: 1; }
     .spoiler-block.revealed .word-hover { pointer-events: auto; border-bottom: 1px dotted #999; }
     .spoiler-block.revealed .word-hover:hover .word-tooltip { display: block; }
-    
     /* Blank word for fill-in mode */
     .blank-word { background: #e0e0e0; color: #1e40af; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; border: 1px dashed #999; }
     .blank-word:hover { background: #c0c0c0; }
@@ -10231,19 +10178,14 @@ Return ONLY valid JSON (single object, not array):
         let koreanContent, englishContent;
         
         if (coverMode === 'korean') {
-          // Spoiler on Korean only
           koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
         } else if (coverMode === 'english') {
-          // Spoiler on English only
-          koreanContent = '<span class="spoiler-block revealed">' +
-            '<span class="color-dot ' + a.color + '"></span>' + 
-            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
+          koreanContent = '<span class="spoiler-block revealed"><span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + escapeHtml(a.english || '') + '</span>';
         } else if (coverMode === 'both') {
-          // Spoiler on both Korean and English
           koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
@@ -10255,10 +10197,7 @@ Return ONLY valid JSON (single object, not array):
           koreanContent = '<span class="color-dot ' + a.color + '"></span>' + blankedKorean;
           englishContent = escapeHtml(a.english || '');
         } else {
-          // No cover - show everything with tooltips working
-          koreanContent = '<span class="spoiler-block revealed">' +
-            '<span class="color-dot ' + a.color + '"></span>' + 
-            renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
+          koreanContent = '<span class="spoiler-block revealed"><span class="color-dot ' + a.color + '"></span>' + renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
         }
         
@@ -12581,7 +12520,7 @@ Return ONLY valid JSON (single object, not array):
             container.innerHTML = filteredClasses.map(c => {
                 const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const completedDateDisplay = c.completedAt ? 
-                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) : 
+                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
                     'Unknown';
                 
                 return `
@@ -13929,7 +13868,7 @@ Return ONLY valid JSON (single object, not array):
                 const teacherName = teacher ? teacher.name : 'Unknown Teacher';
                 const startDateDisplay = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const completedDateDisplay = c.completedAt ? 
-                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) : 
+                    (c.completedAt.toDate ? c.completedAt.toDate() : new Date(c.completedAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 
                     'Unknown';
                 
                 return `
@@ -17652,7 +17591,7 @@ Return ONLY valid JSON (single object, not array):
                 // If there's a prescheduled entry, the class has started - keep the class info
                 // (prescheduled was already skipped above if active class exists)
                 
-                const startDate = cls.startDate ? parseLocalDate(cls.startDate) : null;
+                const startDate = cls.startDate ? new Date(cls.startDate) : null;
                 
                 let currentWeek = 0;
                 let weeksTotal = getLevelWeeks(cls.level) || 6;
@@ -17949,7 +17888,7 @@ Return ONLY valid JSON (single object, not array):
             
             if (prescheduled && !cls) {
                 // Show prescheduled info
-                const startDateDisplay = formatDateInEST(prescheduled.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                const startDateDisplay = prescheduled.startDate ? formatDateInEST(prescheduled.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const classTypeName = LEVELS[prescheduled.classType] || prescheduled.classType || 'Class';
                 
                 html = `
@@ -17981,7 +17920,7 @@ Return ONLY valid JSON (single object, not array):
             } else if (cls) {
                 // Show occupied class info with students
                 const startDate = parseLocalDate(cls.startDate);
-                const startDateDisplay = formatDateInEST(cls.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                const startDateDisplay = cls.startDate ? formatDateInEST(cls.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const weeksTotal = getLevelWeeks(cls.level) || 6;
                 let currentWeek = 0;
                 let endDate = null;
@@ -17993,7 +17932,6 @@ Return ONLY valid JSON (single object, not array):
                     currentWeek = Math.floor(daysDiff / 7) + 1;
                     endDate = new Date(startDate);
                     endDate.setDate(endDate.getDate() + (weeksTotal * 7));
-                    // Format end date in EST
                     endDateDisplay = endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
                 }
                 
@@ -18100,11 +18038,7 @@ Return ONLY valid JSON (single object, not array):
             let count = 0;
             
             while (currentDate <= endDate && count < 5) {
-                // Format date as YYYY-MM-DD without UTC conversion
-                const year = currentDate.getFullYear();
-                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-                const dayNum = String(currentDate.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${dayNum}`;
+                const dateStr = currentDate.toISOString().split('T')[0];
                 const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -19156,7 +19090,7 @@ KoreanLearnin Team`;
             
             const className = LEVELS[classType] || classType || '[Class Type]';
             
-            // Format date in EST timezone to ensure correct day of week
+            // Format date - use same approach as openSlotDetails
             const formattedDate = startDate ? formatDateInEST(startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '[Start Date]';
             
             // Convert EST to other timezones
@@ -19259,8 +19193,8 @@ ${additionalText}
             // Check if this is a pre-scheduled slot - only show the one scheduled date
             if (selectedSlotInfo?.prescheduled?.startDate) {
                 const dateStr = selectedSlotInfo.prescheduled.startDate;
-                // Use parseLocalDate to avoid timezone day-shift issues
-                const scheduledDate = parseLocalDate(dateStr);
+                // Use same date parsing as openSlotDetails
+                const scheduledDate = new Date(dateStr);
                 const label = scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = scheduledDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -19279,8 +19213,8 @@ ${additionalText}
             // Check if this is an active class - only show the class start date
             if (selectedSlotInfo?.class?.startDate) {
                 const dateStr = selectedSlotInfo.class.startDate;
-                // Use parseLocalDate to avoid timezone day-shift issues
-                const classDate = parseLocalDate(dateStr);
+                // Use same date parsing as openSlotDetails
+                const classDate = new Date(dateStr);
                 const label = classDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = classDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -19297,9 +19231,8 @@ ${additionalText}
             }
             
             // Empty slot - show multiple date options within 3 weeks
-            // Use EST date to ensure consistency
-            const now = getESTDate();
-            let startFrom = getESTDate();
+            const now = new Date();
+            let startFrom = new Date();
             
             // Find the first matching day (Saturday or Sunday)
             const targetDayNum = day === 'Saturday' ? 6 : 0;
@@ -19323,11 +19256,7 @@ ${additionalText}
             let firstDateSelected = false;
             
             while (currentDate <= endDate && count < 5) {
-                // Format date as YYYY-MM-DD without UTC conversion
-                const year = currentDate.getFullYear();
-                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-                const dayNum = String(currentDate.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${dayNum}`;
+                const dateStr = currentDate.toISOString().split('T')[0];
                 const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
