@@ -8213,24 +8213,21 @@
     /* Spoiler block - Reddit-style click to reveal */
     .spoiler-block { 
       background: #333; 
-      color: transparent; 
       padding: 4px 8px; 
       border-radius: 4px; 
       cursor: pointer; 
       user-select: none; 
       display: inline-block;
       min-width: 100px;
-      text-align: center;
-      transition: background 0.3s ease, color 0.3s ease;
+      transition: background 0.3s ease;
     }
-    .spoiler-block:hover { background: #444; }
+    .spoiler-block * { color: transparent !important; transition: color 0.3s ease; }
     .spoiler-block .color-dot { opacity: 0; transition: opacity 0.3s ease; }
     .spoiler-block.revealed { 
       background: transparent; 
-      color: inherit; 
       cursor: default;
-      text-align: left;
     }
+    .spoiler-block.revealed * { color: inherit !important; }
     .spoiler-block.revealed .color-dot { opacity: 1; }
     /* Blank word for fill-in mode */
     .blank-word { background: #e0e0e0; color: #1e40af; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-weight: 600; border: 1px dashed #999; }
@@ -8255,11 +8252,12 @@
     .word-tooltip .wt-word { font-size: 16px; font-weight: bold; color: #00ffff; margin-bottom: 5px; }
     
     /* Spoiler overrides - MUST come after word-tooltip rules */
-    .spoiler-block .word-hover { pointer-events: none !important; border-bottom: none !important; cursor: default !important; }
+    .spoiler-block .word-hover { pointer-events: none !important; border-bottom: none !important; cursor: default !important; background: transparent !important; }
     .spoiler-block .word-hover:hover { background: transparent !important; }
-    .spoiler-block .word-hover:hover .word-tooltip { display: none !important; }
+    .spoiler-block .word-tooltip { display: none !important; }
     .spoiler-block.revealed .word-hover { pointer-events: auto !important; border-bottom: 1px dotted #999 !important; cursor: help !important; }
     .spoiler-block.revealed .word-hover:hover { background: #fff3cd !important; }
+    .spoiler-block.revealed .word-tooltip { display: none; }
     .spoiler-block.revealed .word-hover:hover .word-tooltip { display: block !important; }
     .word-tooltip .wt-pos { font-size: 10px; color: #ff00ff; text-transform: uppercase; margin-bottom: 8px; }
     .word-tooltip .wt-def { color: #fff; margin-bottom: 8px; }
