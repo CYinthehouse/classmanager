@@ -3269,6 +3269,16 @@
             return new Date(dateStr);
         }
         
+        // Format a Date object as YYYY-MM-DD string without UTC conversion
+        // This avoids the timezone day-shift issue that occurs with toISOString()
+        function formatDateString(date) {
+            if (!date) return '';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
         // Default levels (will be merged with custom class types from Firestore)
         const DEFAULT_LEVELS = { absolute: 'Absolute Beginner', novice: 'Novice', beginner: 'Beginner', advanced: 'Advanced Beginner' };
         let LEVELS = { ...DEFAULT_LEVELS };
@@ -5190,7 +5200,7 @@
                     if (c.startDate) {
                         const classLevel = c.level;
                         const weeksInClass = getLevelWeeks(classLevel) || 6;
-                        const startDate = new Date(c.startDate);
+                        const startDate = parseLocalDate(c.startDate);
                         const endDate = new Date(startDate);
                         endDate.setDate(endDate.getDate() + (weeksInClass * 7));
                         
@@ -5519,7 +5529,11 @@
                     
                     <div class="saturday-quick-btns">
                         ${saturdays.map(sat => {
-                            const dateStr = sat.toISOString().split('T')[0];
+                            // Format date as YYYY-MM-DD without UTC conversion
+                            const year = sat.getFullYear();
+                            const month = String(sat.getMonth() + 1).padStart(2, '0');
+                            const day = String(sat.getDate()).padStart(2, '0');
+                            const dateStr = `${year}-${month}-${day}`;
                             const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                             const isSelected = cls.startDate === dateStr;
                             // For pending classes, disable dates before available date
@@ -5547,7 +5561,11 @@
                 firstAvailableSaturday.setDate(availDate.getDate() + daysUntilSat);
             }
             
-            const dateStr = firstAvailableSaturday.toISOString().split('T')[0];
+            // Format date as YYYY-MM-DD without UTC conversion
+            const year = firstAvailableSaturday.getFullYear();
+            const month = String(firstAvailableSaturday.getMonth() + 1).padStart(2, '0');
+            const day = String(firstAvailableSaturday.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             const label = firstAvailableSaturday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const isSelected = cls.startDate === dateStr;
             
@@ -5563,7 +5581,11 @@
         function getUpcomingSaturdaysHTML(proposalId, selectedDate) {
             const saturdays = getUpcomingSaturdays(5);
             return saturdays.map(sat => {
-                const dateStr = sat.toISOString().split('T')[0];
+                // Format date as YYYY-MM-DD without UTC conversion
+                const year = sat.getFullYear();
+                const month = String(sat.getMonth() + 1).padStart(2, '0');
+                const day = String(sat.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
                 const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const isSelected = selectedDate === dateStr;
                 return `<button type="button" class="saturday-quick-btn ${isSelected ? 'selected' : ''}" onclick="updateProposalDate('${proposalId}', '${dateStr}')">${label}</button>`;
@@ -17533,7 +17555,7 @@ Return ONLY valid JSON (single object, not array):
                 // If there's a prescheduled entry, the class has started - keep the class info
                 // (prescheduled was already skipped above if active class exists)
                 
-                const startDate = cls.startDate ? new Date(cls.startDate) : null;
+                const startDate = cls.startDate ? parseLocalDate(cls.startDate) : null;
                 
                 let currentWeek = 0;
                 let weeksTotal = getLevelWeeks(cls.level) || 6;
@@ -17977,7 +17999,11 @@ Return ONLY valid JSON (single object, not array):
             let count = 0;
             
             while (currentDate <= endDate && count < 5) {
-                const dateStr = currentDate.toISOString().split('T')[0];
+                // Format date as YYYY-MM-DD without UTC conversion
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const dayNum = String(currentDate.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${dayNum}`;
                 const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -18760,7 +18786,7 @@ Return ONLY valid JSON (single object, not array):
             const day = selectedSlotInfo.day;
             const time = selectedSlotInfo.time;
             const timeConversions = convertTimeToAllZones(time);
-            const startDate = cls.startDate ? new Date(cls.startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD';
+            const startDate = cls.startDate ? parseLocalDate(cls.startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD';
             
             const className = LEVELS[classType] || classType || 'Class';
             
@@ -19029,8 +19055,8 @@ KoreanLearnin Team`;
             
             const className = LEVELS[classType] || classType || '[Class Type]';
             
-            // Format date - use same approach as openSlotDetails
-            const formattedDate = startDate ? new Date(startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '[Start Date]';
+            // Format date - use parseLocalDate to avoid timezone day-shift issues
+            const formattedDate = startDate ? parseLocalDate(startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '[Start Date]';
             
             // Convert EST to other timezones
             const timeConversions = convertTimeToAllZones(time);
@@ -19132,8 +19158,8 @@ ${additionalText}
             // Check if this is a pre-scheduled slot - only show the one scheduled date
             if (selectedSlotInfo?.prescheduled?.startDate) {
                 const dateStr = selectedSlotInfo.prescheduled.startDate;
-                // Use same date parsing as openSlotDetails
-                const scheduledDate = new Date(dateStr);
+                // Use parseLocalDate to avoid timezone day-shift issues
+                const scheduledDate = parseLocalDate(dateStr);
                 const label = scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = scheduledDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -19152,8 +19178,8 @@ ${additionalText}
             // Check if this is an active class - only show the class start date
             if (selectedSlotInfo?.class?.startDate) {
                 const dateStr = selectedSlotInfo.class.startDate;
-                // Use same date parsing as openSlotDetails
-                const classDate = new Date(dateStr);
+                // Use parseLocalDate to avoid timezone day-shift issues
+                const classDate = parseLocalDate(dateStr);
                 const label = classDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = classDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
@@ -19170,8 +19196,9 @@ ${additionalText}
             }
             
             // Empty slot - show multiple date options within 3 weeks
-            const now = new Date();
-            let startFrom = new Date();
+            // Use EST date to ensure consistency
+            const now = getESTDate();
+            let startFrom = getESTDate();
             
             // Find the first matching day (Saturday or Sunday)
             const targetDayNum = day === 'Saturday' ? 6 : 0;
@@ -19195,7 +19222,11 @@ ${additionalText}
             let firstDateSelected = false;
             
             while (currentDate <= endDate && count < 5) {
-                const dateStr = currentDate.toISOString().split('T')[0];
+                // Format date as YYYY-MM-DD without UTC conversion
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const dayNum = String(currentDate.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${dayNum}`;
                 const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
