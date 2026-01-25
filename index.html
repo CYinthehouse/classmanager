@@ -8405,7 +8405,6 @@
 <body>
   <div class="container">
     <h1>🌟 Yodafy Game v2</h1>
-    <p class="subtitle">Korean Sentence Practice with AI</p>
     
     <!-- Setup Panel -->
     <div class="panel" id="setupPanel">
@@ -10233,7 +10232,7 @@ Return ONLY valid JSON (single object, not array):
         
         if (coverMode === 'korean') {
           // Spoiler on Korean only
-          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + 
+          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
           englishContent = escapeHtml(a.english || '');
@@ -10242,13 +10241,13 @@ Return ONLY valid JSON (single object, not array):
           koreanContent = '<span class="spoiler-block revealed">' +
             '<span class="color-dot ' + a.color + '"></span>' + 
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
-          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + escapeHtml(a.english || '') + '</span>';
+          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + escapeHtml(a.english || '') + '</span>';
         } else if (coverMode === 'both') {
           // Spoiler on both Korean and English
-          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + 
+          koreanContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + 
             '<span class="color-dot ' + a.color + '"></span>' +
             renderKoreanWithTooltips(a.korean, a.vocabulary) + '</span>';
-          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\'revealed\')">' + escapeHtml(a.english || '') + '</span>';
+          englishContent = '<span class="spoiler-block" onclick="this.classList.add(\\'revealed\\')">' + escapeHtml(a.english || '') + '</span>';
         } else if (coverMode === 'blanks') {
           // Create blanks for key words (every other word gets blanked)
           const words = a.korean.split(' ');
