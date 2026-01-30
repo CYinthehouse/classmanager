@@ -1025,6 +1025,7 @@
                     <button class="nav-tab" onclick="showAdminTab('outreach')">📞 Outreach</button>
                     <button class="nav-tab" onclick="showAdminTab('attendance')">📊 Attendance</button>
                     <button class="nav-tab" onclick="showAdminTab('absences')">🚫 Absences</button>
+                    <button class="nav-tab" onclick="showAdminTab('movehistory')">🔄 Move History</button>
                     <button class="nav-tab" onclick="showAdminTab('completed')">🎓 Completed</button>
                     <button class="nav-tab" onclick="showAdminTab('teachers')">👨‍🏫 Teachers</button>
                     <button class="nav-tab" onclick="showAdminTab('materials')">📖 Materials</button>
@@ -1469,6 +1470,50 @@
                         <!-- Absences List -->
                         <div id="absencesListContainer">
                             <p style="color: #888; font-size: 12px;">Click refresh to load absences...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Move History Tab -->
+                <div id="adminTabMovehistory" class="tab-content">
+                    <div class="card">
+                        <h3>🔄 Student Move History</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Track all student movements between classes, returns to pool, and drops.</p>
+                        
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+                            <button class="btn btn-info" onclick="loadMoveHistory()">🔄 Refresh</button>
+                            <input type="text" id="moveHistorySearch" placeholder="🔍 Search by student name..." oninput="filterMoveHistory()" style="padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; font-size: 12px; width: 200px;">
+                            <select id="moveHistoryFilter" onchange="filterMoveHistory()" style="padding: 8px 10px; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; font-size: 12px;">
+                                <option value="all">All Actions</option>
+                                <option value="moved">Moved to Class</option>
+                                <option value="pool">Returned to Pool</option>
+                                <option value="dropped">Dropped</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Stats -->
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+                            <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 10px; padding: 15px; text-align: center;">
+                                <div id="moveHistoryTotal" style="font-size: 24px; font-weight: 700; color: #00ffff;">0</div>
+                                <div style="font-size: 11px; color: #888;">Total Moves</div>
+                            </div>
+                            <div style="background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 10px; padding: 15px; text-align: center;">
+                                <div id="moveHistoryMoved" style="font-size: 24px; font-weight: 700; color: #39ff14;">0</div>
+                                <div style="font-size: 11px; color: #888;">Class Transfers</div>
+                            </div>
+                            <div style="background: rgba(255,170,0,0.1); border: 2px solid #ffaa00; border-radius: 10px; padding: 15px; text-align: center;">
+                                <div id="moveHistoryPool" style="font-size: 24px; font-weight: 700; color: #ffaa00;">0</div>
+                                <div style="font-size: 11px; color: #888;">Returned to Pool</div>
+                            </div>
+                            <div style="background: rgba(255,51,102,0.1); border: 2px solid #ff3366; border-radius: 10px; padding: 15px; text-align: center;">
+                                <div id="moveHistoryDropped" style="font-size: 24px; font-weight: 700; color: #ff3366;">0</div>
+                                <div style="font-size: 11px; color: #888;">Dropped</div>
+                            </div>
+                        </div>
+                        
+                        <!-- History List -->
+                        <div id="moveHistoryList" style="max-height: 500px; overflow-y: auto;">
+                            <p style="color: #888; font-size: 12px; text-align: center;">Click Refresh to load move history...</p>
                         </div>
                     </div>
                 </div>
@@ -2770,6 +2815,7 @@
                                 <th style="text-align: left; padding: 8px;">Phone</th>
                                 <th style="text-align: left; padding: 8px;">Discord</th>
                                 <th style="text-align: left; padding: 8px;">Email</th>
+                                <th style="text-align: center; padding: 8px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="slotStudentRosterBody"></tbody>
@@ -2905,6 +2951,65 @@
             
             <div style="margin-top: 20px; text-align: center;">
                 <button class="btn btn-secondary" onclick="closeLinkAccountModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Student From Slot Modal -->
+    <div class="modal-overlay" id="moveStudentFromSlotModal">
+        <div class="modal" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close" onclick="closeMoveStudentFromSlotModal()">✕</button>
+            <h3 class="modal-title">🔄 Move Student to Another Slot</h3>
+            
+            <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <p style="font-size: 11px; color: #888; margin: 0;">Moving student:</p>
+                <p style="font-size: 14px; color: #00ffff; margin: 4px 0 0 0; font-weight: bold;" id="moveSlotStudentName">Student Name</p>
+                <p style="font-size: 11px; color: #888; margin: 4px 0 0 0;" id="moveSlotFromInfo">From: Saturday @ 7:10 PM</p>
+            </div>
+            
+            <h4 style="color: #ffff00; font-size: 14px; margin-bottom: 10px;">Select destination slot:</h4>
+            
+            <div id="moveSlotDestinationList" style="max-height: 350px; overflow-y: auto;">
+                <p style="color: #888; font-size: 12px; text-align: center;">Loading available slots...</p>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeMoveStudentFromSlotModal()">Cancel</button>
+                <button class="btn btn-success" id="confirmMoveSlotBtn" onclick="confirmMoveStudentFromSlot()" disabled>✓ Confirm Move</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Student From Active Class Modal (Slot Manager) -->
+    <div class="modal-overlay" id="moveStudentFromClassModal">
+        <div class="modal" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close" onclick="closeMoveStudentFromClassModal()">✕</button>
+            <h3 class="modal-title">🔄 Move Student to Another Class</h3>
+            
+            <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <p style="font-size: 11px; color: #888; margin: 0;">Moving student:</p>
+                <p style="font-size: 14px; color: #00ffff; margin: 4px 0 0 0; font-weight: bold;" id="moveClassStudentName">Student Name</p>
+                <p style="font-size: 11px; color: #888; margin: 4px 0 0 0;" id="moveClassFromInfo">From: Saturday @ 7:10 PM</p>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="returnToPoolFromClassCheckbox" onchange="toggleMoveFromClassOptions()">
+                    <span style="font-size: 12px;">Return to student pool (schedule changed, needs reassignment)</span>
+                </label>
+            </div>
+            
+            <div id="moveClassDestinationSection">
+                <h4 style="color: #ffff00; font-size: 14px; margin-bottom: 10px;">Select destination class:</h4>
+                
+                <div id="moveClassDestinationList" style="max-height: 300px; overflow-y: auto;">
+                    <p style="color: #888; font-size: 12px; text-align: center;">Loading available classes...</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeMoveStudentFromClassModal()">Cancel</button>
+                <button class="btn btn-success" id="confirmMoveClassBtn" onclick="confirmMoveStudentFromClass()">✓ Confirm Move</button>
             </div>
         </div>
     </div>
@@ -3937,6 +4042,7 @@
             if (tab === 'attendance') loadAdminAttendance();
             if (tab === 'checkin') { console.log('Check-in tab opened'); updateCheckinWeekDisplay(); loadCheckinData(); }
             if (tab === 'outreach') { loadOutreachAnalytics(); }
+            if (tab === 'movehistory') { loadMoveHistory(); }
             if (tab === 'suggestions') loadAdminSuggestions();
             if (tab === 'proposals') { loadProposals(); renderAvailableStudentsForProposals(); }
             if (tab === 'ready') loadReadyRequests();
@@ -8321,6 +8427,7 @@
     .edit-content h3 { color: #00ffff; margin-bottom: 20px; }
     .edit-answer { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px; }
     .edit-answer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .edit-all-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, rgba(0,255,255,0.1), rgba(255,0,255,0.1)); border-radius: 10px; }
     .color-picker { display: flex; gap: 8px; }
     .color-opt { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; display: flex; align-items: center; justify-content: center; font-size: 14px; }
     .color-opt.selected { border-color: #fff; }
@@ -8595,14 +8702,16 @@ Example:
     
     <!-- Results Preview -->
     <div class="panel results-section" id="resultsSection">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <h2>📋 Generated Cards</h2>
         <div class="button-row" style="margin: 0;">
+          <button class="btn btn-sm btn-warning" onclick="editAllCards()">✏️ Edit All</button>
           <button class="btn btn-sm btn-success" onclick="saveGame()">💾 Save</button>
           <button class="btn btn-sm btn-primary" onclick="startJunbi()">📖 준비 (Prep)</button>
           <button class="btn btn-sm btn-secondary" onclick="regenerate()">🔄 Regenerate All</button>
         </div>
       </div>
+      <p style="color: #888; font-size: 12px; margin-bottom: 15px;">💡 Tip: Click ✏️ on any card to edit the question/situation, or use "Edit All" to review all cards before starting the game.</p>
       <div id="resultsContainer"></div>
     </div>
     
@@ -8705,19 +8814,64 @@ Example:
   <div class="edit-modal" id="editModal">
     <div class="edit-content">
       <h3>✏️ Edit Flashcard</h3>
+      
+      <!-- Level 4 Type/Tier Section (hidden for Level 1-3) -->
+      <div id="editTypeSection" style="display: none; margin-bottom: 15px; padding: 10px; background: rgba(255,0,255,0.1); border-radius: 8px;">
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label>Type</label>
+            <select id="editType" onchange="updateEditPromptVisibility()">
+              <option value="question">❓ Question</option>
+              <option value="situational">📍 Situational</option>
+              <option value="statement">💬 Statement</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label>Tier</label>
+            <select id="editTier">
+              <option value="1">T1 - Simple</option>
+              <option value="2">T2 - Complex</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Prompt field for Situational/Statement types -->
+      <div id="editPromptSection" class="form-group" style="display: none;">
+        <label>Prompt (English scenario/instruction)</label>
+        <textarea id="editPrompt" rows="2" placeholder="Describe the situation or instruction..."></textarea>
+      </div>
+      
       <div class="form-group">
-        <label>Question (Korean)</label>
-        <input type="text" id="editQuestion">
+        <label id="editQuestionLabel">Question/Prompt (Korean)</label>
+        <input type="text" id="editQuestion" placeholder="Korean question or prompt">
       </div>
       <div class="form-group">
-        <label>Question (English)</label>
-        <input type="text" id="editQuestionEng">
+        <label>English Translation</label>
+        <input type="text" id="editQuestionEng" placeholder="English translation">
       </div>
       <div id="editAnswersContainer"></div>
       <button class="btn btn-sm btn-success" onclick="addEditAnswer()" style="margin: 10px 0;">➕ Add Answer</button>
       <div class="button-row">
         <button class="btn btn-secondary" onclick="closeEdit()">Cancel</button>
         <button class="btn btn-primary" onclick="saveEdit()">💾 Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Edit All Cards Modal -->
+  <div class="edit-modal" id="editAllModal" style="display: none;">
+    <div class="edit-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #00ffff;">
+        <h3 style="margin: 0;">✏️ Edit All Cards</h3>
+        <button class="btn btn-sm btn-danger" onclick="closeEditAll()" style="padding: 5px 10px;">✕</button>
+      </div>
+      <div id="editAllContent">
+        <!-- Content rendered dynamically -->
+      </div>
+      <div class="button-row" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <button class="btn btn-secondary" onclick="closeEditAll()">Cancel</button>
+        <button class="btn btn-success" onclick="saveAndCloseEditAll()">💾 Save All & Close</button>
       </div>
     </div>
   </div>
@@ -10781,8 +10935,51 @@ Return ONLY valid JSON (single object, not array):
       const card = gameData[index];
       currentCardIndex = index;
       
-      document.getElementById('editQuestion').value = card.question;
-      document.getElementById('editQuestionEng').value = card.questionEnglish || '';
+      // Handle both Level 1-3 (question/questionEnglish) and Level 4 (prompt/promptKorean/promptEnglish) structures
+      // Use explicit checks for undefined/null/empty to avoid "undefined" string issues
+      let koreanText = '';
+      let englishText = '';
+      let labelText = 'Question (Korean)';
+      
+      // For Level 4 (has type property), prioritize prompt fields
+      if (card.type !== undefined) {
+        // Level 4: For questions, use promptKorean; for situational/statement, promptKorean is the Korean translation
+        if (card.type === 'question') {
+          koreanText = card.promptKorean || card.prompt || '';
+          labelText = 'Question (Korean)';
+        } else {
+          // For situational/statement, the Korean is in promptKorean
+          koreanText = card.promptKorean || '';
+          labelText = 'Korean Translation of Prompt';
+        }
+        englishText = card.promptEnglish || '';
+      } else {
+        // Level 1-3: use question/questionEnglish
+        koreanText = card.question || '';
+        englishText = card.questionEnglish || '';
+        labelText = 'Question (Korean)';
+      }
+      
+      document.getElementById('editQuestion').value = koreanText;
+      document.getElementById('editQuestionEng').value = englishText;
+      document.getElementById('editQuestionLabel').textContent = labelText;
+      
+      // For Level 4, also handle the prompt type and tier
+      if (card.type !== undefined || card.tier !== undefined) {
+        document.getElementById('editTypeSection').style.display = 'block';
+        document.getElementById('editType').value = card.type || 'question';
+        document.getElementById('editTier').value = card.tier || 1;
+        // If it's a situational or statement, show the original prompt too (the English scenario)
+        if ((card.type === 'situational' || card.type === 'statement') && card.prompt) {
+          document.getElementById('editPromptSection').style.display = 'block';
+          document.getElementById('editPrompt').value = card.prompt || '';
+        } else {
+          document.getElementById('editPromptSection').style.display = 'none';
+        }
+      } else {
+        document.getElementById('editTypeSection').style.display = 'none';
+        document.getElementById('editPromptSection').style.display = 'none';
+      }
       
       renderEditAnswers();
       document.getElementById('editModal').style.display = 'flex';
@@ -10791,27 +10988,55 @@ Return ONLY valid JSON (single object, not array):
     function renderEditAnswers() {
       const card = gameData[currentCardIndex];
       const container = document.getElementById('editAnswersContainer');
+      const isLevel4 = card.type !== undefined || card.prompt !== undefined;
       
-      container.innerHTML = card.answers.map((a, i) => 
-        '<div class="edit-answer">' +
+      container.innerHTML = card.answers.map((a, i) => {
+        let html = '<div class="edit-answer">' +
           '<div class="edit-answer-header">' +
             '<span style="color: #888; font-size: 12px;">Answer ' + (i+1) + '</span>' +
             '<button class="btn btn-sm btn-danger" onclick="removeEditAnswer(' + i + ')">✕</button>' +
           '</div>' +
           '<div class="form-group">' +
+            '<label style="font-size: 11px; color: #00ffff;">Korean</label>' +
             '<input type="text" id="editAnsK' + i + '" value="' + escapeAttr(a.korean) + '" placeholder="Korean">' +
           '</div>' +
           '<div class="form-group">' +
+            '<label style="font-size: 11px; color: #888;">English</label>' +
             '<input type="text" id="editAnsE' + i + '" value="' + escapeAttr(a.english || '') + '" placeholder="English">' +
+          '</div>';
+        
+        // Add beginner Korean/English fields for Level 4
+        if (isLevel4 && (a.beginnerKorean !== undefined || card.answers.some(ans => ans.beginnerKorean))) {
+          html += '<div class="form-group" style="background: rgba(136,255,136,0.1); padding: 8px; border-radius: 5px; margin-top: 5px;">' +
+            '<label style="font-size: 11px; color: #88ff88;">Beginner Korean (Simplified)</label>' +
+            '<input type="text" id="editAnsBK' + i + '" value="' + escapeAttr(a.beginnerKorean || '') + '" placeholder="Simplified Korean version">' +
           '</div>' +
-          '<div class="color-picker">' +
+          '<div class="form-group">' +
+            '<label style="font-size: 11px; color: #88ff88;">Beginner English</label>' +
+            '<input type="text" id="editAnsBE' + i + '" value="' + escapeAttr(a.beginnerEnglish || '') + '" placeholder="Beginner English translation">' +
+          '</div>';
+        }
+        
+        html += '<div class="color-picker">' +
             '<div class="color-opt green ' + (a.color === 'green' ? 'selected' : '') + '" onclick="setEditColor(' + i + ', \\'green\\')">🟢</div>' +
             '<div class="color-opt blue ' + (a.color === 'blue' ? 'selected' : '') + '" onclick="setEditColor(' + i + ', \\'blue\\')">🔵</div>' +
             '<div class="color-opt yellow ' + (a.color === 'yellow' ? 'selected' : '') + '" onclick="setEditColor(' + i + ', \\'yellow\\')">🟡</div>' +
             '<div class="color-opt red ' + (a.color === 'red' ? 'selected' : '') + '" onclick="setEditColor(' + i + ', \\'red\\')">🔴</div>' +
           '</div>' +
-        '</div>'
-      ).join('');
+        '</div>';
+        
+        return html;
+      }).join('');
+    }
+    
+    function updateEditPromptVisibility() {
+      const type = document.getElementById('editType').value;
+      const promptSection = document.getElementById('editPromptSection');
+      if (type === 'situational' || type === 'statement') {
+        promptSection.style.display = 'block';
+      } else {
+        promptSection.style.display = 'none';
+      }
     }
     
     function setEditColor(answerIndex, color) {
@@ -10835,18 +11060,57 @@ Return ONLY valid JSON (single object, not array):
     
     function saveEdit() {
       const card = gameData[currentCardIndex];
-      card.question = document.getElementById('editQuestion').value;
-      card.questionEnglish = document.getElementById('editQuestionEng').value;
+      const newKorean = document.getElementById('editQuestion').value;
+      const newEnglish = document.getElementById('editQuestionEng').value;
+      
+      // Handle both Level 1-3 and Level 4 structures
+      if (card.question !== undefined) {
+        // Level 1-3 structure
+        card.question = newKorean;
+        card.questionEnglish = newEnglish;
+      } else {
+        // Level 4 structure
+        card.promptKorean = newKorean;
+        card.promptEnglish = newEnglish;
+        
+        // Update type and tier if applicable
+        const typeSection = document.getElementById('editTypeSection');
+        if (typeSection && typeSection.style.display !== 'none') {
+          card.type = document.getElementById('editType').value;
+          card.tier = parseInt(document.getElementById('editTier').value) || 1;
+        }
+        
+        // Update main prompt based on type
+        const promptSection = document.getElementById('editPromptSection');
+        if (promptSection && promptSection.style.display !== 'none') {
+          card.prompt = document.getElementById('editPrompt').value;
+        } else if (card.type === 'question') {
+          card.prompt = newKorean;
+        }
+      }
       
       // Collect answers
       const newAnswers = [];
       let i = 0;
       while (document.getElementById('editAnsK' + i)) {
-        newAnswers.push({
+        const answerObj = {
           korean: document.getElementById('editAnsK' + i).value,
           english: document.getElementById('editAnsE' + i).value,
           color: card.answers[i]?.color || 'blue'
-        });
+        };
+        
+        // Preserve beginner versions if they exist (Level 4)
+        if (card.answers[i]?.beginnerKorean) {
+          answerObj.beginnerKorean = document.getElementById('editAnsBK' + i)?.value || card.answers[i].beginnerKorean;
+          answerObj.beginnerEnglish = document.getElementById('editAnsBE' + i)?.value || card.answers[i].beginnerEnglish;
+        }
+        
+        // Preserve vocabulary if it exists
+        if (card.answers[i]?.vocabulary) {
+          answerObj.vocabulary = card.answers[i].vocabulary;
+        }
+        
+        newAnswers.push(answerObj);
         i++;
       }
       card.answers = newAnswers;
@@ -10860,6 +11124,211 @@ Return ONLY valid JSON (single object, not array):
       }
       
       showToast('✅ Saved!');
+    }
+    
+    // Edit All Cards - Bulk editor
+    let editAllCurrentIndex = 0;
+    
+    function editAllCards() {
+      if (!gameData || gameData.length === 0) {
+        showToast('❌ No cards to edit');
+        return;
+      }
+      
+      editAllCurrentIndex = 0;
+      renderEditAllModal();
+      document.getElementById('editAllModal').style.display = 'flex';
+    }
+    
+    function renderEditAllModal() {
+      const card = gameData[editAllCurrentIndex];
+      const total = gameData.length;
+      const isLevel4 = card.type !== undefined || card.prompt !== undefined;
+      
+      // Get the correct question/prompt values based on card type
+      let koreanText = '';
+      let englishText = '';
+      let promptText = '';
+      
+      // For Level 4 (has type property), prioritize prompt fields
+      if (card.type !== undefined) {
+        // Level 4: For questions, use promptKorean; for situational/statement, promptKorean is the Korean translation
+        if (card.type === 'question') {
+          koreanText = card.promptKorean || card.prompt || '';
+        } else {
+          // For situational/statement, the Korean is in promptKorean, the English scenario is in prompt
+          koreanText = card.promptKorean || '';
+          promptText = card.prompt || '';
+        }
+        englishText = card.promptEnglish || '';
+      } else {
+        // Level 1-3: use question/questionEnglish
+        koreanText = card.question || '';
+        englishText = card.questionEnglish || '';
+      }
+      
+      const typeIcon = card.type === 'question' ? '❓' : card.type === 'situational' ? '📍' : card.type === 'statement' ? '💬' : '📝';
+      const tierBadge = card.tier === 2 ? '<span style="background: #ff00ff; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px;">T2</span>' : card.tier === 1 ? '<span style="background: #39ff14; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 11px;">T1</span>' : '';
+      
+      let html = '<div class="edit-all-header">' +
+        '<div style="display: flex; align-items: center; gap: 10px;">' +
+          '<span style="font-size: 24px;">' + typeIcon + '</span>' +
+          '<span style="color: #00ffff; font-weight: bold;">Card ' + (editAllCurrentIndex + 1) + ' of ' + total + '</span>' +
+          tierBadge +
+        '</div>' +
+        '<div style="display: flex; gap: 5px;">' +
+          '<button class="btn btn-sm btn-secondary" onclick="editAllPrev()" ' + (editAllCurrentIndex === 0 ? 'disabled' : '') + '>← Prev</button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="editAllNext()" ' + (editAllCurrentIndex === total - 1 ? 'disabled' : '') + '>Next →</button>' +
+        '</div>' +
+      '</div>';
+      
+      // Type/Tier selectors for Level 4
+      if (isLevel4) {
+        html += '<div style="display: flex; gap: 15px; margin-bottom: 15px; padding: 10px; background: rgba(255,0,255,0.1); border-radius: 8px;">' +
+          '<div style="flex: 1;">' +
+            '<label style="font-size: 11px; color: #888;">Type</label>' +
+            '<select id="editAllType" onchange="updateEditAllPromptVisibility()" style="width: 100%; padding: 8px;">' +
+              '<option value="question" ' + (card.type === 'question' ? 'selected' : '') + '>❓ Question</option>' +
+              '<option value="situational" ' + (card.type === 'situational' ? 'selected' : '') + '>📍 Situational</option>' +
+              '<option value="statement" ' + (card.type === 'statement' ? 'selected' : '') + '>💬 Statement</option>' +
+            '</select>' +
+          '</div>' +
+          '<div style="flex: 1;">' +
+            '<label style="font-size: 11px; color: #888;">Tier</label>' +
+            '<select id="editAllTier" style="width: 100%; padding: 8px;">' +
+              '<option value="1" ' + (card.tier === 1 ? 'selected' : '') + '>T1 - Simple</option>' +
+              '<option value="2" ' + (card.tier === 2 ? 'selected' : '') + '>T2 - Complex</option>' +
+            '</select>' +
+          '</div>' +
+        '</div>';
+        
+        // Prompt field for situational/statement
+        const showPrompt = (card.type === 'situational' || card.type === 'statement');
+        html += '<div id="editAllPromptSection" style="display: ' + (showPrompt ? 'block' : 'none') + '; margin-bottom: 15px;">' +
+          '<label style="font-size: 12px; color: #ff9800;">Prompt/Scenario (English)</label>' +
+          '<textarea id="editAllPrompt" rows="2" style="width: 100%;">' + escapeHtml(promptText) + '</textarea>' +
+        '</div>';
+      }
+      
+      // Korean question/prompt
+      html += '<div style="margin-bottom: 15px;">' +
+        '<label style="font-size: 12px; color: #00ffff;">Question/Prompt (Korean)</label>' +
+        '<input type="text" id="editAllKorean" value="' + escapeAttr(koreanText) + '" style="width: 100%; padding: 12px; font-size: 16px;">' +
+      '</div>';
+      
+      // English translation
+      html += '<div style="margin-bottom: 20px;">' +
+        '<label style="font-size: 12px; color: #888;">English Translation</label>' +
+        '<input type="text" id="editAllEnglish" value="' + escapeAttr(englishText) + '" style="width: 100%;">' +
+      '</div>';
+      
+      // Answers section
+      html += '<div style="border-top: 1px solid #333; padding-top: 15px;">' +
+        '<label style="font-size: 13px; color: #39ff14; margin-bottom: 10px; display: block;">Answers (' + card.answers.length + ')</label>' +
+        '<div style="max-height: 200px; overflow-y: auto;">';
+      
+      card.answers.forEach((a, i) => {
+        const colorClass = a.color || 'blue';
+        html += '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px; border-left: 3px solid ' + getColorHex(colorClass) + ';">' +
+          '<div style="flex: 1;">' +
+            '<input type="text" id="editAllAnsK' + i + '" value="' + escapeAttr(a.korean) + '" placeholder="Korean" style="width: 100%; margin-bottom: 4px; font-size: 13px;">' +
+            '<input type="text" id="editAllAnsE' + i + '" value="' + escapeAttr(a.english || '') + '" placeholder="English" style="width: 100%; font-size: 12px;">' +
+          '</div>' +
+          '<div class="color-picker" style="display: flex; flex-direction: column; gap: 2px;">' +
+            '<div class="color-opt green ' + (colorClass === 'green' ? 'selected' : '') + '" onclick="setEditAllColor(' + i + ', \\'green\\')" style="width: 20px; height: 20px; font-size: 12px;">🟢</div>' +
+            '<div class="color-opt blue ' + (colorClass === 'blue' ? 'selected' : '') + '" onclick="setEditAllColor(' + i + ', \\'blue\\')" style="width: 20px; height: 20px; font-size: 12px;">🔵</div>' +
+          '</div>' +
+        '</div>';
+      });
+      
+      html += '</div></div>';
+      
+      // Navigation info
+      html += '<div style="margin-top: 15px; padding: 10px; background: rgba(0,255,255,0.1); border-radius: 5px; font-size: 11px; color: #888; text-align: center;">' +
+        'Use ← → buttons or save & continue to review all cards. Changes are saved when you click Save.' +
+      '</div>';
+      
+      document.getElementById('editAllContent').innerHTML = html;
+    }
+    
+    function getColorHex(color) {
+      const colors = { green: '#39ff14', blue: '#00aaff', yellow: '#ffcc00', red: '#ff6666' };
+      return colors[color] || '#00aaff';
+    }
+    
+    function updateEditAllPromptVisibility() {
+      const type = document.getElementById('editAllType')?.value;
+      const section = document.getElementById('editAllPromptSection');
+      if (section) {
+        section.style.display = (type === 'situational' || type === 'statement') ? 'block' : 'none';
+      }
+    }
+    
+    function setEditAllColor(answerIndex, color) {
+      gameData[editAllCurrentIndex].answers[answerIndex].color = color;
+      renderEditAllModal();
+    }
+    
+    function saveEditAllCurrent() {
+      const card = gameData[editAllCurrentIndex];
+      const newKorean = document.getElementById('editAllKorean').value;
+      const newEnglish = document.getElementById('editAllEnglish').value;
+      
+      // Handle both Level 1-3 and Level 4 structures
+      if (card.question !== undefined) {
+        card.question = newKorean;
+        card.questionEnglish = newEnglish;
+      } else {
+        card.promptKorean = newKorean;
+        card.promptEnglish = newEnglish;
+        
+        const typeEl = document.getElementById('editAllType');
+        const tierEl = document.getElementById('editAllTier');
+        if (typeEl) card.type = typeEl.value;
+        if (tierEl) card.tier = parseInt(tierEl.value) || 1;
+        
+        const promptEl = document.getElementById('editAllPrompt');
+        if (promptEl && (card.type === 'situational' || card.type === 'statement')) {
+          card.prompt = promptEl.value;
+        } else if (card.type === 'question') {
+          card.prompt = newKorean;
+        }
+      }
+      
+      // Save answers
+      card.answers.forEach((a, i) => {
+        const kEl = document.getElementById('editAllAnsK' + i);
+        const eEl = document.getElementById('editAllAnsE' + i);
+        if (kEl) a.korean = kEl.value;
+        if (eEl) a.english = eEl.value;
+      });
+    }
+    
+    function editAllPrev() {
+      saveEditAllCurrent();
+      if (editAllCurrentIndex > 0) {
+        editAllCurrentIndex--;
+        renderEditAllModal();
+      }
+    }
+    
+    function editAllNext() {
+      saveEditAllCurrent();
+      if (editAllCurrentIndex < gameData.length - 1) {
+        editAllCurrentIndex++;
+        renderEditAllModal();
+      }
+    }
+    
+    function closeEditAll() {
+      document.getElementById('editAllModal').style.display = 'none';
+    }
+    
+    function saveAndCloseEditAll() {
+      saveEditAllCurrent();
+      closeEditAll();
+      showResults();
+      showToast('✅ All changes saved!');
     }
     
     // Helpers
@@ -13128,7 +13597,8 @@ Return ONLY valid JSON (single object, not array):
                         
                         ${(currentUser?.role === 'admin' || currentUser?.role === 'support') ? `
                             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-                                <button class="btn btn-sm btn-warning" onclick="closeClassDetailsModal(); openMoveStudentModal('${student.id}', '${student.name}', '${classId}')">🔄 Move Student</button>
+                                <button class="btn btn-sm btn-warning" onclick="closeClassDetailsModal(); openMoveStudentModal('${student.id}', '${student.name.replace(/'/g, "\\'")}', '${classId}')">🔄 Move Student</button>
+                                <button class="btn btn-sm btn-danger" onclick="confirmRemoveStudentFromClass('${student.id}', '${student.name.replace(/'/g, "\\'")}', '${classId}')" style="margin-left: 5px;">🗑️ Remove</button>
                             </div>
                         ` : ''}
                     </div>
@@ -14425,6 +14895,8 @@ Return ONLY valid JSON (single object, not array):
             try {
                 // Remove from current class
                 const fromClass = allClasses.find(c => c.id === fromClassId);
+                const student = allStudents.find(s => s.id === studentId);
+                
                 if (fromClass) {
                     const updatedStudents = (fromClass.students || []).filter(s => s.id !== studentId);
                     await db.collection('scheduler_classes').doc(fromClassId).update({ students: updatedStudents });
@@ -14442,6 +14914,19 @@ Return ONLY valid JSON (single object, not array):
                     allStudents[idx].status = 'pending';
                     allStudents[idx].classId = null;
                 }
+                
+                // Log the action
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: student?.name || 'Unknown',
+                    fromClassId: fromClassId,
+                    fromClassInfo: fromClass ? `${fromClass.day} @ ${fromClass.time} - ${LEVELS[fromClass.level]}` : 'Unknown',
+                    toClassId: null,
+                    toClassInfo: 'Returned to Pool',
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: 'Schedule changed - returned to pool for reassignment'
+                });
                 
                 renderStudentsTable();
                 renderClasses();
@@ -14486,6 +14971,19 @@ Return ONLY valid JSON (single object, not array):
                     student.classId = toClassId;
                 }
                 
+                // Log the move action
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: student?.name || 'Unknown',
+                    fromClassId: fromClassId,
+                    fromClassInfo: fromClass ? `${fromClass.day} @ ${fromClass.time} - ${LEVELS[fromClass.level]}` : 'Unknown',
+                    toClassId: toClassId,
+                    toClassInfo: toClass ? `${toClass.day} @ ${toClass.time} - ${LEVELS[toClass.level]}` : 'Unknown',
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: 'Manual move'
+                });
+                
                 renderClasses();
                 updateDashboardStats();
                 alert('Student moved successfully!');
@@ -14493,6 +14991,247 @@ Return ONLY valid JSON (single object, not array):
                 console.error(e);
                 alert('Error: ' + e.message);
             }
+        }
+        
+        // ==================== REMOVE STUDENT FROM CLASS ====================
+        
+        async function confirmRemoveStudentFromClass(studentId, studentName, classId) {
+            const action = await showRemoveStudentDialog(studentName);
+            if (!action) return;
+            
+            try {
+                const cls = allClasses.find(c => c.id === classId);
+                if (!cls) {
+                    alert('Class not found.');
+                    return;
+                }
+                
+                // Remove student from class
+                const updatedStudents = (cls.students || []).filter(s => s.id !== studentId);
+                await db.collection('scheduler_classes').doc(classId).update({ students: updatedStudents });
+                cls.students = updatedStudents;
+                
+                if (action === 'pool') {
+                    // Return to pool for reassignment
+                    await db.collection('scheduler_students').doc(studentId).update({ 
+                        status: 'pending', 
+                        classId: null 
+                    });
+                    
+                    const idx = allStudents.findIndex(s => s.id === studentId);
+                    if (idx !== -1) {
+                        allStudents[idx].status = 'pending';
+                        allStudents[idx].classId = null;
+                    }
+                    
+                    // Log the action
+                    await db.collection('scheduler_move_history').add({
+                        studentId: studentId,
+                        studentName: studentName,
+                        fromClassId: classId,
+                        fromClassInfo: `${cls.day} @ ${cls.time} - ${LEVELS[cls.level]}`,
+                        toClassId: null,
+                        toClassInfo: 'Returned to Pool',
+                        movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                        movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reason: 'Removed from class - returned to pool'
+                    });
+                    
+                    alert(`${studentName} has been removed and returned to the student pool.`);
+                } else if (action === 'drop') {
+                    // Mark as dropped/inactive
+                    await db.collection('scheduler_students').doc(studentId).update({ 
+                        status: 'dropped', 
+                        classId: null,
+                        droppedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        droppedFrom: classId
+                    });
+                    
+                    const idx = allStudents.findIndex(s => s.id === studentId);
+                    if (idx !== -1) {
+                        allStudents[idx].status = 'dropped';
+                        allStudents[idx].classId = null;
+                    }
+                    
+                    // Log the action
+                    await db.collection('scheduler_move_history').add({
+                        studentId: studentId,
+                        studentName: studentName,
+                        fromClassId: classId,
+                        fromClassInfo: `${cls.day} @ ${cls.time} - ${LEVELS[cls.level]}`,
+                        toClassId: null,
+                        toClassInfo: 'Dropped',
+                        movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                        movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reason: 'Dropped from class'
+                    });
+                    
+                    alert(`${studentName} has been marked as dropped.`);
+                }
+                
+                closeClassDetailsModal();
+                renderClasses();
+                renderStudentsTable();
+                updateDashboardStats();
+                
+            } catch (e) {
+                console.error(e);
+                alert('Error removing student: ' + e.message);
+            }
+        }
+        
+        function showRemoveStudentDialog(studentName) {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay active';
+                modal.id = 'removeStudentDialog';
+                modal.innerHTML = `
+                    <div class="modal" style="max-width: 400px;">
+                        <h3 class="modal-title">🗑️ Remove Student</h3>
+                        <p style="font-size: 13px; margin-bottom: 20px;">
+                            Remove <strong style="color: #00ffff;">${studentName}</strong> from this class?
+                        </p>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 20px;">Choose what happens to the student:</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button class="btn btn-warning" onclick="document.getElementById('removeStudentDialog').remove(); window.removeStudentResolve('pool');" style="width: 100%; padding: 12px;">
+                                📋 Return to Student Pool
+                                <div style="font-size: 10px; color: #888; margin-top: 3px;">Student can be reassigned to another class</div>
+                            </button>
+                            <button class="btn btn-danger" onclick="document.getElementById('removeStudentDialog').remove(); window.removeStudentResolve('drop');" style="width: 100%; padding: 12px;">
+                                ❌ Mark as Dropped
+                                <div style="font-size: 10px; color: #888; margin-top: 3px;">Student left the program</div>
+                            </button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('removeStudentDialog').remove(); window.removeStudentResolve(null);" style="width: 100%; padding: 10px;">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                window.removeStudentResolve = resolve;
+            });
+        }
+        
+        // ==================== MOVE HISTORY ====================
+        
+        let allMoveHistory = [];
+        
+        async function loadMoveHistory() {
+            const container = document.getElementById('moveHistoryList');
+            container.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Loading move history...</p>';
+            
+            try {
+                const snap = await db.collection('scheduler_move_history')
+                    .orderBy('movedAt', 'desc')
+                    .limit(100)
+                    .get();
+                
+                allMoveHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Update stats
+                const totalMoves = allMoveHistory.length;
+                const movedToClass = allMoveHistory.filter(m => m.toClassId && m.toClassInfo !== 'Returned to Pool' && m.toClassInfo !== 'Dropped').length;
+                const returnedToPool = allMoveHistory.filter(m => m.toClassInfo === 'Returned to Pool').length;
+                const dropped = allMoveHistory.filter(m => m.toClassInfo === 'Dropped').length;
+                
+                document.getElementById('moveHistoryTotal').textContent = totalMoves;
+                document.getElementById('moveHistoryMoved').textContent = movedToClass;
+                document.getElementById('moveHistoryPool').textContent = returnedToPool;
+                document.getElementById('moveHistoryDropped').textContent = dropped;
+                
+                renderMoveHistoryList();
+                
+            } catch (e) {
+                console.error('Error loading move history:', e);
+                container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error loading move history: ${e.message}</p>`;
+            }
+        }
+        
+        function filterMoveHistory() {
+            renderMoveHistoryList();
+        }
+        
+        function renderMoveHistoryList() {
+            const container = document.getElementById('moveHistoryList');
+            const searchTerm = document.getElementById('moveHistorySearch').value.toLowerCase();
+            const filterType = document.getElementById('moveHistoryFilter').value;
+            
+            let filtered = allMoveHistory;
+            
+            // Apply search filter
+            if (searchTerm) {
+                filtered = filtered.filter(m => 
+                    (m.studentName || '').toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Apply type filter
+            if (filterType === 'moved') {
+                filtered = filtered.filter(m => m.toClassId && m.toClassInfo !== 'Returned to Pool' && m.toClassInfo !== 'Dropped');
+            } else if (filterType === 'pool') {
+                filtered = filtered.filter(m => m.toClassInfo === 'Returned to Pool');
+            } else if (filterType === 'dropped') {
+                filtered = filtered.filter(m => m.toClassInfo === 'Dropped');
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">No move history found.</p>';
+                return;
+            }
+            
+            container.innerHTML = filtered.map(m => {
+                const date = m.movedAt?.toDate ? m.movedAt.toDate() : new Date(m.movedAt);
+                const dateStr = date.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                
+                let actionType = 'moved';
+                let actionColor = '#00ffff';
+                let actionIcon = '🔄';
+                let actionLabel = 'Moved';
+                
+                if (m.toClassInfo === 'Returned to Pool') {
+                    actionType = 'pool';
+                    actionColor = '#ffaa00';
+                    actionIcon = '📋';
+                    actionLabel = 'Returned to Pool';
+                } else if (m.toClassInfo === 'Dropped') {
+                    actionType = 'dropped';
+                    actionColor = '#ff3366';
+                    actionIcon = '❌';
+                    actionLabel = 'Dropped';
+                }
+                
+                return `
+                    <div style="display: flex; align-items: flex-start; gap: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; margin-bottom: 10px; border-left: 4px solid ${actionColor};">
+                        <div style="font-size: 24px;">${actionIcon}</div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #fff; font-size: 14px;">${escapeHtml(m.studentName || 'Unknown')}</div>
+                                    <div style="font-size: 12px; color: #888; margin-top: 3px;">
+                                        From: <span style="color: #ff9800;">${escapeHtml(m.fromClassInfo || 'Unknown')}</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: #888;">
+                                        To: <span style="color: ${actionColor};">${escapeHtml(m.toClassInfo || 'Unknown')}</span>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 11px; color: #888;">${dateStr}</div>
+                                    <div style="font-size: 10px; color: #666; margin-top: 3px;">by ${escapeHtml(m.movedBy || 'Unknown')}</div>
+                                    <span style="display: inline-block; margin-top: 5px; padding: 3px 8px; border-radius: 12px; font-size: 10px; background: ${actionColor}22; color: ${actionColor}; border: 1px solid ${actionColor}44;">${actionLabel}</span>
+                                </div>
+                            </div>
+                            ${m.reason ? `<div style="font-size: 11px; color: #aaa; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 5px;">💬 ${escapeHtml(m.reason)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
         // ==================== MARK COURSE COMPLETE ====================
@@ -17966,14 +18705,20 @@ Return ONLY valid JSON (single object, not array):
                     
                     // Get full student info from allStudents
                     let rosterHtml = '';
-                    cls.students.forEach(s => {
+                    cls.students.forEach((s, index) => {
                         const fullStudent = allStudents.find(st => st.id === s.id) || s;
+                        const studentName = fullStudent.name || s.name || 'Unknown';
+                        const escapedName = studentName.replace(/'/g, "\\'");
                         rosterHtml += `
                             <tr>
-                                <td style="padding: 8px;">${fullStudent.name || s.name || 'Unknown'}</td>
+                                <td style="padding: 8px;">${studentName}</td>
                                 <td style="padding: 8px;">${fullStudent.phoneNumber || fullStudent.phone || '-'}</td>
                                 <td style="padding: 8px;">${fullStudent.discord || '-'}</td>
                                 <td style="padding: 8px;">${fullStudent.email || s.email || '-'}</td>
+                                <td style="padding: 8px; text-align: center;">
+                                    <button class="btn btn-warning btn-sm" onclick="openMoveStudentFromClassModal('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px;" title="Move to another class">🔄</button>
+                                    <button class="btn btn-danger btn-sm" onclick="confirmRemoveStudentFromActiveClass('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px;" title="Remove from class">✕</button>
+                                </td>
                             </tr>
                         `;
                     });
@@ -18306,6 +19051,7 @@ Return ONLY valid JSON (single object, not array):
                             </div>
                             <div style="display: flex; gap: 4px;">
                                 ${!isLinked ? `<button class="btn btn-info btn-sm" onclick="openLinkAccountModal(${index})" style="padding: 2px 6px; font-size: 9px;">🔗 Link</button>` : `<button class="btn btn-secondary btn-sm" onclick="unlinkStudentAccount(${index})" style="padding: 2px 6px; font-size: 9px;">Unlink</button>`}
+                                <button class="btn btn-warning btn-sm" onclick="openMoveStudentFromSlotModal(${index})" style="padding: 2px 6px; font-size: 9px;">🔄 Move</button>
                                 <button class="btn btn-danger btn-sm" onclick="removeStudentFromSlot(${index})" style="padding: 2px 8px; font-size: 10px;">✕</button>
                             </div>
                         </div>
@@ -18791,7 +19537,570 @@ Return ONLY valid JSON (single object, not array):
                 alert('❌ Error: ' + e.message);
             }
         }
-        // ==================== END DIRECT ADD STUDENT TO SLOT ====================
+        
+        // ==================== MOVE STUDENT FROM SLOT ====================
+        let movingSlotStudentIndex = null;
+        let selectedDestinationSlotId = null;
+        
+        function openMoveStudentFromSlotModal(studentIndex) {
+            if (!selectedSlotInfo?.prescheduled) return;
+            
+            const ps = selectedSlotInfo.prescheduled;
+            const students = ps.enrolledStudents || [];
+            
+            if (studentIndex < 0 || studentIndex >= students.length) return;
+            
+            const student = students[studentIndex];
+            movingSlotStudentIndex = studentIndex;
+            selectedDestinationSlotId = null;
+            
+            // Update modal info
+            document.getElementById('moveSlotStudentName').textContent = student.name || 'Unknown';
+            document.getElementById('moveSlotFromInfo').textContent = `From: ${ps.day} @ ${ps.time} EST - ${ps.level || 'No level'}`;
+            
+            // Load available destination slots
+            renderMoveSlotDestinations(ps);
+            
+            // Disable confirm button until a slot is selected
+            document.getElementById('confirmMoveSlotBtn').disabled = true;
+            
+            document.getElementById('moveStudentFromSlotModal').classList.add('active');
+        }
+        
+        function closeMoveStudentFromSlotModal() {
+            document.getElementById('moveStudentFromSlotModal').classList.remove('active');
+            movingSlotStudentIndex = null;
+            selectedDestinationSlotId = null;
+        }
+        
+        function renderMoveSlotDestinations(currentSlot) {
+            const container = document.getElementById('moveSlotDestinationList');
+            
+            // Get all prescheduled slots except the current one
+            const availableSlots = allPrescheduledSlots.filter(ps => ps.id !== currentSlot.id);
+            
+            if (availableSlots.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">No other slots available. Create more prescheduled slots first.</p>';
+                return;
+            }
+            
+            // Sort by day then time
+            const dayOrder = { 'Saturday': 0, 'Sunday': 1 };
+            availableSlots.sort((a, b) => {
+                const dayDiff = (dayOrder[a.day] || 0) - (dayOrder[b.day] || 0);
+                if (dayDiff !== 0) return dayDiff;
+                return (a.time || '').localeCompare(b.time || '');
+            });
+            
+            container.innerHTML = availableSlots.map(ps => {
+                const enrolledCount = (ps.enrolledStudents || []).length;
+                const maxSeats = ps.maxSeats || 5;
+                const isFull = enrolledCount >= maxSeats;
+                const teacher = allTeachers.find(t => t.id === ps.teacherId);
+                const levelMatch = currentSlot.level === ps.level;
+                
+                return `
+                    <div class="move-slot-option ${selectedDestinationSlotId === ps.id ? 'selected' : ''} ${isFull ? 'full' : ''}" 
+                         onclick="${isFull ? '' : `selectDestinationSlot('${ps.id}')`}"
+                         style="padding: 12px; margin-bottom: 8px; border: 2px solid ${selectedDestinationSlotId === ps.id ? '#39ff14' : '#444'}; border-radius: 8px; cursor: ${isFull ? 'not-allowed' : 'pointer'}; background: ${selectedDestinationSlotId === ps.id ? 'rgba(57,255,20,0.1)' : 'rgba(0,0,0,0.2)'}; opacity: ${isFull ? '0.5' : '1'}; transition: all 0.2s;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #00ffff; font-size: 14px; font-weight: 600;">${ps.day} @ ${ps.time} EST</div>
+                                <div style="font-size: 12px; color: #888; margin-top: 3px;">
+                                    <span style="background: ${getLevelColor(ps.level)}; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: #000;">${ps.level || 'No level'}</span>
+                                    ${!levelMatch ? '<span style="color: #ff9800; margin-left: 5px;">⚠️ Level mismatch</span>' : ''}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: ${isFull ? '#ff3366' : '#39ff14'};">
+                                    👥 ${enrolledCount}/${maxSeats} ${isFull ? '(FULL)' : ''}
+                                </div>
+                                <div style="font-size: 11px; color: #888;">${teacher ? teacher.name : 'No teacher'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function selectDestinationSlot(slotId) {
+            selectedDestinationSlotId = slotId;
+            
+            // Update visual selection
+            document.querySelectorAll('.move-slot-option').forEach(el => {
+                el.style.borderColor = '#444';
+                el.style.background = 'rgba(0,0,0,0.2)';
+            });
+            
+            const selectedEl = event.currentTarget;
+            selectedEl.style.borderColor = '#39ff14';
+            selectedEl.style.background = 'rgba(57,255,20,0.1)';
+            
+            // Enable confirm button
+            document.getElementById('confirmMoveSlotBtn').disabled = false;
+        }
+        
+        async function confirmMoveStudentFromSlot() {
+            if (!selectedSlotInfo?.prescheduled || movingSlotStudentIndex === null || !selectedDestinationSlotId) {
+                alert('Please select a destination slot.');
+                return;
+            }
+            
+            const sourceSlot = selectedSlotInfo.prescheduled;
+            const destSlot = allPrescheduledSlots.find(ps => ps.id === selectedDestinationSlotId);
+            
+            if (!destSlot) {
+                alert('Destination slot not found.');
+                return;
+            }
+            
+            const sourceStudents = sourceSlot.enrolledStudents || [];
+            const student = sourceStudents[movingSlotStudentIndex];
+            
+            if (!student) {
+                alert('Student not found.');
+                return;
+            }
+            
+            // Check if destination is full
+            const destStudents = destSlot.enrolledStudents || [];
+            const maxSeats = destSlot.maxSeats || 5;
+            if (destStudents.length >= maxSeats) {
+                alert('Destination slot is full.');
+                return;
+            }
+            
+            try {
+                // Remove from source slot
+                sourceStudents.splice(movingSlotStudentIndex, 1);
+                await db.collection('prescheduled_slots').doc(sourceSlot.id).update({
+                    enrolledStudents: sourceStudents
+                });
+                
+                // Add to destination slot
+                destStudents.push(student);
+                await db.collection('prescheduled_slots').doc(destSlot.id).update({
+                    enrolledStudents: destStudents
+                });
+                
+                // Log the move
+                await db.collection('scheduler_move_history').add({
+                    studentId: student.odId || student.id || null,
+                    studentName: student.name || 'Unknown',
+                    fromClassId: sourceSlot.id,
+                    fromClassInfo: `${sourceSlot.day} @ ${sourceSlot.time} - ${sourceSlot.level || 'No level'} (Slot)`,
+                    toClassId: destSlot.id,
+                    toClassInfo: `${destSlot.day} @ ${destSlot.time} - ${destSlot.level || 'No level'} (Slot)`,
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: 'Moved via Slot Manager'
+                });
+                
+                // Update local caches
+                const sourceIdx = allPrescheduledSlots.findIndex(p => p.id === sourceSlot.id);
+                if (sourceIdx !== -1) {
+                    allPrescheduledSlots[sourceIdx].enrolledStudents = sourceStudents;
+                }
+                
+                const destIdx = allPrescheduledSlots.findIndex(p => p.id === destSlot.id);
+                if (destIdx !== -1) {
+                    allPrescheduledSlots[destIdx].enrolledStudents = destStudents;
+                }
+                
+                selectedSlotInfo.prescheduled.enrolledStudents = sourceStudents;
+                
+                closeMoveStudentFromSlotModal();
+                updateSlotEnrolledStudentsList();
+                renderSlotGrid();
+                
+                alert(`✅ ${student.name} moved to ${destSlot.day} @ ${destSlot.time}!`);
+                
+            } catch (e) {
+                console.error('Error moving student:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        // Helper function for level colors
+        function getLevelColor(level) {
+            const colors = {
+                'Absolute Beginner': '#39ff14',
+                'Novice': '#00ffff',
+                'Beginner': '#ffff00',
+                'Advanced Beginner': '#ff9800',
+                'Intermediate': '#ff00ff'
+            };
+            return colors[level] || '#888';
+        }
+        // ==================== END MOVE STUDENT FROM SLOT ====================
+        
+        // ==================== MOVE STUDENT FROM ACTIVE CLASS (Slot Manager) ====================
+        let movingClassStudentId = null;
+        let movingClassStudentName = null;
+        let movingFromClassId = null;
+        let selectedDestinationClassId = null;
+        
+        function openMoveStudentFromClassModal(studentId, studentName, classId) {
+            movingClassStudentId = studentId;
+            movingClassStudentName = studentName;
+            movingFromClassId = classId;
+            selectedDestinationClassId = null;
+            
+            const cls = allClasses.find(c => c.id === classId);
+            
+            // Update modal info
+            document.getElementById('moveClassStudentName').textContent = studentName;
+            document.getElementById('moveClassFromInfo').textContent = cls ? `From: ${cls.day} @ ${cls.time} EST - ${LEVELS[cls.level] || cls.level}` : 'From: Unknown class';
+            
+            // Reset checkbox
+            document.getElementById('returnToPoolFromClassCheckbox').checked = false;
+            document.getElementById('moveClassDestinationSection').style.display = 'block';
+            
+            // Load available destination classes
+            renderMoveClassDestinations(classId);
+            
+            document.getElementById('moveStudentFromClassModal').classList.add('active');
+        }
+        
+        function closeMoveStudentFromClassModal() {
+            document.getElementById('moveStudentFromClassModal').classList.remove('active');
+            movingClassStudentId = null;
+            movingClassStudentName = null;
+            movingFromClassId = null;
+            selectedDestinationClassId = null;
+        }
+        
+        function toggleMoveFromClassOptions() {
+            const returnToPool = document.getElementById('returnToPoolFromClassCheckbox').checked;
+            document.getElementById('moveClassDestinationSection').style.display = returnToPool ? 'none' : 'block';
+        }
+        
+        function renderMoveClassDestinations(currentClassId) {
+            const container = document.getElementById('moveClassDestinationList');
+            const currentClass = allClasses.find(c => c.id === currentClassId);
+            
+            // Get all active classes except the current one
+            const availableClasses = allClasses.filter(c => c.id !== currentClassId && c.status !== 'completed');
+            
+            if (availableClasses.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">No other active classes available.</p>';
+                return;
+            }
+            
+            // Sort by day then time
+            const dayOrder = { 'Saturday': 0, 'Sunday': 1 };
+            availableClasses.sort((a, b) => {
+                const dayDiff = (dayOrder[a.day] || 0) - (dayOrder[b.day] || 0);
+                if (dayDiff !== 0) return dayDiff;
+                return (a.time || '').localeCompare(b.time || '');
+            });
+            
+            container.innerHTML = availableClasses.map(cls => {
+                const studentCount = (cls.students || []).length;
+                const maxStudents = schedulerSettings?.maxStudents || 10;
+                const isFull = studentCount >= maxStudents;
+                const teacher = allTeachers.find(t => t.id === cls.teacherId);
+                const levelMatch = currentClass && currentClass.level === cls.level;
+                const levelName = LEVELS[cls.level] || cls.level || 'No level';
+                
+                return `
+                    <div class="move-class-option ${selectedDestinationClassId === cls.id ? 'selected' : ''} ${isFull ? 'full' : ''}" 
+                         onclick="${isFull ? '' : `selectDestinationClass('${cls.id}')`}"
+                         style="padding: 12px; margin-bottom: 8px; border: 2px solid ${selectedDestinationClassId === cls.id ? '#39ff14' : '#444'}; border-radius: 8px; cursor: ${isFull ? 'not-allowed' : 'pointer'}; background: ${selectedDestinationClassId === cls.id ? 'rgba(57,255,20,0.1)' : 'rgba(0,0,0,0.2)'}; opacity: ${isFull ? '0.5' : '1'}; transition: all 0.2s;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #00ffff; font-size: 14px; font-weight: 600;">${cls.day} @ ${cls.time} EST</div>
+                                <div style="font-size: 12px; color: #888; margin-top: 3px;">
+                                    <span class="level-badge level-${cls.level}" style="font-size: 10px; padding: 2px 6px;">${levelName}</span>
+                                    ${!levelMatch ? '<span style="color: #ff9800; margin-left: 5px;">⚠️ Level mismatch</span>' : ''}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: ${isFull ? '#ff3366' : '#39ff14'};">
+                                    👥 ${studentCount}/${maxStudents} ${isFull ? '(FULL)' : ''}
+                                </div>
+                                <div style="font-size: 11px; color: #888;">${teacher ? teacher.name : 'No teacher'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function selectDestinationClass(classId) {
+            selectedDestinationClassId = classId;
+            
+            // Update visual selection
+            document.querySelectorAll('.move-class-option').forEach(el => {
+                el.style.borderColor = '#444';
+                el.style.background = 'rgba(0,0,0,0.2)';
+            });
+            
+            const selectedEl = event.currentTarget;
+            selectedEl.style.borderColor = '#39ff14';
+            selectedEl.style.background = 'rgba(57,255,20,0.1)';
+        }
+        
+        async function confirmMoveStudentFromClass() {
+            if (!movingClassStudentId || !movingFromClassId) {
+                alert('Missing student or class information.');
+                return;
+            }
+            
+            const returnToPool = document.getElementById('returnToPoolFromClassCheckbox').checked;
+            
+            if (returnToPool) {
+                // Return student to pool
+                await returnStudentToPoolFromSlotManager(movingClassStudentId, movingFromClassId, movingClassStudentName);
+            } else if (selectedDestinationClassId) {
+                // Move to selected class
+                await moveStudentBetweenClasses(movingClassStudentId, movingFromClassId, selectedDestinationClassId, movingClassStudentName);
+            } else {
+                alert('Please select a destination class or check "Return to pool".');
+                return;
+            }
+            
+            closeMoveStudentFromClassModal();
+        }
+        
+        async function returnStudentToPoolFromSlotManager(studentId, fromClassId, studentName) {
+            try {
+                const fromClass = allClasses.find(c => c.id === fromClassId);
+                
+                // Remove from current class
+                if (fromClass) {
+                    const updatedStudents = (fromClass.students || []).filter(s => s.id !== studentId);
+                    await db.collection('scheduler_classes').doc(fromClassId).update({ students: updatedStudents });
+                    fromClass.students = updatedStudents;
+                }
+                
+                // Update student status back to pending
+                await db.collection('scheduler_students').doc(studentId).update({ 
+                    status: 'pending', 
+                    classId: null 
+                });
+                
+                const idx = allStudents.findIndex(s => s.id === studentId);
+                if (idx !== -1) {
+                    allStudents[idx].status = 'pending';
+                    allStudents[idx].classId = null;
+                }
+                
+                // Log the action
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: studentName,
+                    fromClassId: fromClassId,
+                    fromClassInfo: fromClass ? `${fromClass.day} @ ${fromClass.time} - ${LEVELS[fromClass.level] || fromClass.level}` : 'Unknown',
+                    toClassId: null,
+                    toClassInfo: 'Returned to Pool',
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: 'Returned to pool via Slot Manager'
+                });
+                
+                // Refresh the slot details
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                
+                alert(`✅ ${studentName} has been returned to the student pool.`);
+                
+            } catch (e) {
+                console.error('Error returning student to pool:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function moveStudentBetweenClasses(studentId, fromClassId, toClassId, studentName) {
+            try {
+                const student = allStudents.find(s => s.id === studentId);
+                const fromClass = allClasses.find(c => c.id === fromClassId);
+                const toClass = allClasses.find(c => c.id === toClassId);
+                
+                if (!toClass) {
+                    alert('Destination class not found.');
+                    return;
+                }
+                
+                // Check if destination is full
+                const maxStudents = schedulerSettings?.maxStudents || 10;
+                if ((toClass.students || []).length >= maxStudents) {
+                    alert('Destination class is full.');
+                    return;
+                }
+                
+                // Remove from source class
+                if (fromClass) {
+                    const updatedStudents = (fromClass.students || []).filter(s => s.id !== studentId);
+                    await db.collection('scheduler_classes').doc(fromClassId).update({ students: updatedStudents });
+                    fromClass.students = updatedStudents;
+                }
+                
+                // Add to destination class
+                const slot = `${toClass.day}-${toClass.time}`;
+                let rank = 3; // Default to 3rd preference
+                if (student?.availabilities) {
+                    for (let r = 1; r <= 3; r++) {
+                        if (student.availabilities[r] === slot) { rank = r; break; }
+                    }
+                }
+                
+                const newStudent = { 
+                    id: studentId, 
+                    name: studentName || student?.name || 'Unknown', 
+                    rank, 
+                    timezone: student?.timezone || 'Unknown' 
+                };
+                const updatedStudents = [...(toClass.students || []), newStudent];
+                await db.collection('scheduler_classes').doc(toClassId).update({ students: updatedStudents });
+                toClass.students = updatedStudents;
+                
+                // Update student record
+                await db.collection('scheduler_students').doc(studentId).update({ classId: toClassId });
+                if (student) student.classId = toClassId;
+                
+                // Log the move
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: studentName,
+                    fromClassId: fromClassId,
+                    fromClassInfo: fromClass ? `${fromClass.day} @ ${fromClass.time} - ${LEVELS[fromClass.level] || fromClass.level}` : 'Unknown',
+                    toClassId: toClassId,
+                    toClassInfo: `${toClass.day} @ ${toClass.time} - ${LEVELS[toClass.level] || toClass.level}`,
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: 'Moved via Slot Manager'
+                });
+                
+                // Refresh the slot details
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                
+                alert(`✅ ${studentName} moved to ${toClass.day} @ ${toClass.time}!`);
+                
+            } catch (e) {
+                console.error('Error moving student:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function confirmRemoveStudentFromActiveClass(studentId, studentName, classId) {
+            const action = await showRemoveStudentFromActiveClassDialog(studentName);
+            if (!action) return;
+            
+            try {
+                const cls = allClasses.find(c => c.id === classId);
+                if (!cls) {
+                    alert('Class not found.');
+                    return;
+                }
+                
+                // Remove student from class
+                const updatedStudents = (cls.students || []).filter(s => s.id !== studentId);
+                await db.collection('scheduler_classes').doc(classId).update({ students: updatedStudents });
+                cls.students = updatedStudents;
+                
+                if (action === 'pool') {
+                    // Return to pool for reassignment
+                    await db.collection('scheduler_students').doc(studentId).update({ 
+                        status: 'pending', 
+                        classId: null 
+                    });
+                    
+                    const idx = allStudents.findIndex(s => s.id === studentId);
+                    if (idx !== -1) {
+                        allStudents[idx].status = 'pending';
+                        allStudents[idx].classId = null;
+                    }
+                    
+                    // Log the action
+                    await db.collection('scheduler_move_history').add({
+                        studentId: studentId,
+                        studentName: studentName,
+                        fromClassId: classId,
+                        fromClassInfo: `${cls.day} @ ${cls.time} - ${LEVELS[cls.level] || cls.level}`,
+                        toClassId: null,
+                        toClassInfo: 'Returned to Pool',
+                        movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                        movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reason: 'Removed from class via Slot Manager - returned to pool'
+                    });
+                    
+                    alert(`${studentName} has been removed and returned to the student pool.`);
+                } else if (action === 'drop') {
+                    // Mark as dropped/inactive
+                    await db.collection('scheduler_students').doc(studentId).update({ 
+                        status: 'dropped', 
+                        classId: null,
+                        droppedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        droppedFrom: classId
+                    });
+                    
+                    const idx = allStudents.findIndex(s => s.id === studentId);
+                    if (idx !== -1) {
+                        allStudents[idx].status = 'dropped';
+                        allStudents[idx].classId = null;
+                    }
+                    
+                    // Log the action
+                    await db.collection('scheduler_move_history').add({
+                        studentId: studentId,
+                        studentName: studentName,
+                        fromClassId: classId,
+                        fromClassInfo: `${cls.day} @ ${cls.time} - ${LEVELS[cls.level] || cls.level}`,
+                        toClassId: null,
+                        toClassInfo: 'Dropped',
+                        movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                        movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reason: 'Dropped from class via Slot Manager'
+                    });
+                    
+                    alert(`${studentName} has been marked as dropped.`);
+                }
+                
+                // Refresh the view
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                
+            } catch (e) {
+                console.error('Error removing student:', e);
+                alert('Error removing student: ' + e.message);
+            }
+        }
+        
+        function showRemoveStudentFromActiveClassDialog(studentName) {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay active';
+                modal.id = 'removeStudentFromActiveClassDialog';
+                modal.innerHTML = `
+                    <div class="modal" style="max-width: 400px;">
+                        <h3 class="modal-title">🗑️ Remove Student</h3>
+                        <p style="font-size: 13px; margin-bottom: 20px;">
+                            Remove <strong style="color: #00ffff;">${studentName}</strong> from this class?
+                        </p>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 20px;">Choose what happens to the student:</p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button class="btn btn-warning" onclick="document.getElementById('removeStudentFromActiveClassDialog').remove(); window.removeStudentActiveClassResolve('pool');" style="width: 100%; padding: 12px;">
+                                📋 Return to Student Pool
+                                <div style="font-size: 10px; color: #888; margin-top: 3px;">Student can be reassigned to another class</div>
+                            </button>
+                            <button class="btn btn-danger" onclick="document.getElementById('removeStudentFromActiveClassDialog').remove(); window.removeStudentActiveClassResolve('drop');" style="width: 100%; padding: 12px;">
+                                ❌ Mark as Dropped
+                                <div style="font-size: 10px; color: #888; margin-top: 3px;">Student left the program</div>
+                            </button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('removeStudentFromActiveClassDialog').remove(); window.removeStudentActiveClassResolve(null);" style="width: 100%; padding: 10px;">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                window.removeStudentActiveClassResolve = resolve;
+            });
+        }
+        // ==================== END MOVE STUDENT FROM ACTIVE CLASS ====================
         
         // Student email functions
         function copyStudentEmails() {
