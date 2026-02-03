@@ -2614,7 +2614,7 @@
             
             <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                 <p style="font-size: 14px; color: #00ffff; margin: 0 0 5px 0;" id="addExistingStudentName">Student Name</p>
-                <p style="font-size: 12px; color: #888; margin: 0;" id="addExistingStudentEmail">student@email.com</p>
+                <p style="font-size: 12px; color: #888; margin: 0;" id="addExistingStudentEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b7c4c3c2d3d2d9c3f7d2dad6dedb99d4d8da">[email&#160;protected]</a></p>
             </div>
             
             <input type="hidden" id="addExistingStudentUid">
@@ -3185,7 +3185,7 @@
     </div>
 
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
@@ -8483,6 +8483,101 @@
     .game-card-actions .delete-btn:hover { background: rgba(255,68,68,0.4); }
     .no-games-msg { text-align: center; color: #666; padding: 40px; font-size: 16px; }
     
+
+    /* Discord Integration Styles */
+    .discord-config-panel {
+      background: rgba(88, 101, 242, 0.2);
+      border: 2px solid #5865F2;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .discord-config-panel.minimized {
+      max-height: 50px;
+      overflow: hidden;
+    }
+    .discord-config-panel h3 {
+      color: #5865F2;
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .discord-config-row {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .discord-config-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .discord-config-item label {
+      font-size: 11px;
+      color: #888;
+    }
+    .discord-config-item input {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+    .discord-webhook-input {
+      width: 350px;
+    }
+    .round-start-input {
+      width: 200px;
+    }
+    .check-answer-btn {
+      background: linear-gradient(135deg, #5865F2, #7289DA);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .check-answer-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(88, 101, 242, 0.5);
+    }
+    .check-answer-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .check-answer-btn.checking {
+      background: #FFA500;
+    }
+    .check-answer-btn.success {
+      background: #39ff14;
+      color: #000;
+    }
+    .check-answer-btn.error {
+      background: #ff4444;
+    }
+    .answer-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .points-badge {
+      background: #39ff14;
+      color: #000;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+
     /* Toast */
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 25px; border-radius: 8px; display: none; z-index: 300; }
     
@@ -8743,6 +8838,33 @@ Example:
     
     <!-- Flashcard Game -->
     <div class="flashcard-game" id="flashcardGame">
+
+      <!-- Discord Integration Panel -->
+      <div class="discord-config-panel" id="discordConfigPanel">
+        <h3>🎮 Discord Integration <span style="font-size: 11px; color: #888; font-weight: normal;">(for awarding points)</span></h3>
+        <div class="discord-config-row">
+          <div class="discord-config-item">
+            <label>Make.com Webhook URL</label>
+            <input type="text" id="discordWebhookUrl" class="discord-webhook-input" placeholder="https://hook.us1.make.com/..." onchange="saveDiscordConfig()">
+          </div>
+          <div class="discord-config-item">
+            <label>Round Start Time</label>
+            <input type="datetime-local" id="roundStartTime" class="round-start-input" onchange="saveDiscordConfig()">
+          </div>
+          <div class="discord-config-item">
+            <label>&nbsp;</label>
+            <button class="btn btn-sm btn-success" onclick="setRoundStartNow()" style="background: #39ff14; color: #000;">⏱️ Start Round Now</button>
+          </div>
+          <div class="discord-config-item">
+            <label>&nbsp;</label>
+            <button class="btn btn-sm btn-secondary" onclick="toggleDiscordPanel()" id="discordToggleBtn">🔽 Minimize</button>
+          </div>
+        </div>
+        <p style="font-size: 11px; color: #888; margin-top: 10px;">
+          💡 Set the round start time BEFORE students speak. Only transcripts AFTER this time will be checked for points.
+        </p>
+      </div>
+      
       <button onclick="exitGame()" style="position: fixed; top: 20px; right: 20px; background: #ff4444; border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; z-index: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">✕</button>
       <div class="flashcard-container">
         <div class="flashcard-3d" id="flashcard">
@@ -8974,7 +9096,156 @@ Example:
     
     // Initialize on load
     initParentFirebase();
-    
+
+    // ==================== DISCORD INTEGRATION ====================
+    var discordConfig = {
+      webhookUrl: '',
+      roundStartTime: null
+    };
+
+    // Load saved config on init
+    function loadDiscordConfig() {
+      try {
+        var saved = localStorage.getItem('yodafyDiscordConfig');
+        if (saved) {
+          discordConfig = JSON.parse(saved);
+          var webhookEl = document.getElementById('discordWebhookUrl');
+          var timeEl = document.getElementById('roundStartTime');
+          if (webhookEl) webhookEl.value = discordConfig.webhookUrl || '';
+          if (timeEl && discordConfig.roundStartTime) {
+            timeEl.value = discordConfig.roundStartTime;
+          }
+        }
+      } catch (e) {
+        console.error('Error loading Discord config:', e);
+      }
+    }
+
+    // Save config to localStorage
+    function saveDiscordConfig() {
+      var webhookEl = document.getElementById('discordWebhookUrl');
+      var timeEl = document.getElementById('roundStartTime');
+      if (webhookEl) discordConfig.webhookUrl = webhookEl.value;
+      if (timeEl) discordConfig.roundStartTime = timeEl.value;
+      localStorage.setItem('yodafyDiscordConfig', JSON.stringify(discordConfig));
+      showToast('✅ Discord config saved');
+    }
+
+    // Set round start time to now
+    function setRoundStartNow() {
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = String(now.getMonth() + 1).padStart(2, '0');
+      var day = String(now.getDate()).padStart(2, '0');
+      var hours = String(now.getHours()).padStart(2, '0');
+      var minutes = String(now.getMinutes()).padStart(2, '0');
+      var formatted = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+      
+      var timeEl = document.getElementById('roundStartTime');
+      if (timeEl) {
+        timeEl.value = formatted;
+        saveDiscordConfig();
+        showToast('⏱️ Round started at ' + now.toLocaleTimeString());
+      }
+    }
+
+    // Toggle Discord panel visibility
+    function toggleDiscordPanel() {
+      var panel = document.getElementById('discordConfigPanel');
+      var btn = document.getElementById('discordToggleBtn');
+      if (!panel) return;
+      
+      if (panel.classList.contains('minimized')) {
+        panel.classList.remove('minimized');
+        if (btn) btn.textContent = '🔽 Minimize';
+      } else {
+        panel.classList.add('minimized');
+        if (btn) btn.textContent = '🔼 Expand';
+      }
+    }
+
+    // Check answer via webhook
+    function checkAnswerViaWebhook(koreanSentence, answerIndex, btnElement, englishTranslation) {
+      var webhookUrl = discordConfig.webhookUrl;
+      var roundStartTime = discordConfig.roundStartTime;
+      
+      if (!webhookUrl) {
+        showToast('⚠️ Please set the Make.com webhook URL first');
+        return;
+      }
+      
+      if (!roundStartTime) {
+        showToast('⚠️ Please set the round start time first');
+        return;
+      }
+      
+      // Disable button and show checking state
+      btnElement.disabled = true;
+      btnElement.classList.add('checking');
+      btnElement.innerHTML = '⏳ Checking...';
+      
+      // Convert datetime-local to ISO string
+      var startTimeISO = new Date(roundStartTime).toISOString();
+      
+      var payload = {
+        action: 'check_answer',
+        korean_sentence: koreanSentence,
+        english_translation: englishTranslation || '',
+        round_start_time: startTimeISO,
+        card_index: currentCardIndex,
+        answer_index: answerIndex,
+        points: 10,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Sending to webhook:', payload);
+      
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(function(response) {
+        if (response.ok) {
+          return response.json().catch(function() { return {}; });
+        } else {
+          throw new Error('Webhook returned ' + response.status);
+        }
+      })
+      .then(function(result) {
+        btnElement.classList.remove('checking');
+        btnElement.classList.add('success');
+        var matchCount = result.matched_count || result.matchedCount || 0;
+        btnElement.innerHTML = '✅ ' + matchCount + ' matched';
+        showToast('✅ Checked! ' + matchCount + ' students matched');
+        
+        // Reset button after 5 seconds
+        setTimeout(function() {
+          btnElement.classList.remove('success');
+          btnElement.disabled = false;
+          btnElement.innerHTML = '✅ Check';
+        }, 5000);
+      })
+      .catch(function(error) {
+        console.error('Webhook error:', error);
+        btnElement.classList.remove('checking');
+        btnElement.classList.add('error');
+        btnElement.innerHTML = '❌ Error';
+        showToast('❌ Error: ' + error.message);
+        
+        // Reset button after 3 seconds
+        setTimeout(function() {
+          btnElement.classList.remove('error');
+          btnElement.disabled = false;
+          btnElement.innerHTML = '✅ Check';
+        }, 3000);
+      });
+    }
+    // ==================== END DISCORD INTEGRATION ====================
+
+
     // ==================== IMPORT MODAL FUNCTIONS ====================
     function openImportModal() {
       // Re-check parent Firebase in case it wasn't ready
@@ -9284,6 +9555,9 @@ Example:
     
     // Set up auto-parsing when textareas change
     document.addEventListener('DOMContentLoaded', function() {
+      // Load Discord config
+      loadDiscordConfig();
+      
       // Level 1-3 textarea
       const sentenceTextarea = document.getElementById('sentenceKorean');
       if (sentenceTextarea) {
@@ -10599,11 +10873,19 @@ Return ONLY valid JSON (single object, not array):
           '<div class="answer-cell beginner" data-index="b' + i + '" data-state="hidden" onclick="event.stopPropagation(); revealAnswerEnglish(\\'b' + i + '\\')">' +
             '<div class="answer-english hidden-text">' + escapeHtml(beginnerEnglish || '') + '</div>' +
             '<div class="answer-korean">' + beginnerWords + '</div>' +
+            '<div class="answer-actions">' +
+              '<button class="check-answer-btn" data-korean="' + escapeAttr(beginnerKorean) + '" data-english="' + escapeAttr(beginnerEnglish || '') + '" data-idx="' + i + '" onclick="event.stopPropagation(); checkAnswerViaWebhook(this.dataset.korean, this.dataset.idx, this, this.dataset.english)">✅ Check</button>' +
+              '<span class="points-badge">+10 pts</span>' +
+            '</div>' +
           '</div>' +
           '<div class="answer-cell advanced" data-index="a' + i + '" data-state="hidden" onclick="event.stopPropagation(); revealAnswerEnglish(\\'a' + i + '\\')">' +
             '<div class="answer-english hidden-text">' + escapeHtml(a.english || '') + '</div>' +
             '<div class="answer-korean">' + advancedWords + '</div>' +
             '<div style="font-size: 10px; color: #666; margin-top: 5px;"><span class="color-indicator ' + a.color + '"></span>' + getColorLabel(a.color) + '</div>' +
+            '<div class="answer-actions">' +
+              '<button class="check-answer-btn" data-korean="' + escapeAttr(a.korean) + '" data-english="' + escapeAttr(a.english || '') + '" data-idx="' + i + '" onclick="event.stopPropagation(); checkAnswerViaWebhook(this.dataset.korean, this.dataset.idx, this, this.dataset.english)">✅ Check</button>' +
+              '<span class="points-badge">+10 pts</span>' +
+            '</div>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -22191,11 +22473,4 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             }
             
             // Add event listener for manual timezone select
-            const studentTimezone = document.getElementById('studentTimezone');
-            if (studentTimezone) {
-                studentTimezone.addEventListener('change', renderAvailabilityGrid);
-            }
-        });
-    </script>
-</body>
-</html>
+            const studentTim
