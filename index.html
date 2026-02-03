@@ -8491,10 +8491,38 @@
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 20px;
+      transition: opacity 0.4s ease, max-height 0.4s ease;
+      opacity: 1;
     }
-    .discord-config-panel.minimized {
-      max-height: 50px;
+    .discord-config-panel.hiding {
+      opacity: 0;
+      max-height: 0;
       overflow: hidden;
+      padding: 0 15px;
+      margin-bottom: 0;
+      border-width: 0;
+    }
+    .discord-config-panel.hidden {
+      display: none;
+    }
+    .discord-reopen-btn {
+      background: rgba(88, 101, 242, 0.3);
+      border: 2px solid #5865F2;
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: #5865F2;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      margin-bottom: 15px;
+      transition: opacity 0.4s ease, background 0.2s ease;
+      opacity: 1;
+    }
+    .discord-reopen-btn:hover {
+      background: rgba(88, 101, 242, 0.5);
+    }
+    .discord-reopen-btn.hidden {
+      display: none;
     }
     .discord-config-panel h3 {
       color: #5865F2;
@@ -8838,6 +8866,9 @@ Example:
     
     <!-- Flashcard Game -->
     <div class="flashcard-game" id="flashcardGame">
+
+      <!-- Discord Reopen Button (shown when panel is minimized) -->
+      <button class="discord-reopen-btn hidden" id="discordReopenBtn" onclick="toggleDiscordPanel()">🎮 Open Discord Integration</button>
 
       <!-- Discord Integration Panel -->
       <div class="discord-config-panel" id="discordConfigPanel">
@@ -9193,18 +9224,48 @@ Example:
       }
     }
 
-    // Toggle Discord panel visibility
+    // Toggle Discord panel visibility with fade
     function toggleDiscordPanel() {
       var panel = document.getElementById('discordConfigPanel');
-      var btn = document.getElementById('discordToggleBtn');
+      var reopenBtn = document.getElementById('discordReopenBtn');
       if (!panel) return;
-      
-      if (panel.classList.contains('minimized')) {
-        panel.classList.remove('minimized');
-        if (btn) btn.textContent = '🔽 Minimize';
+
+      if (panel.classList.contains('hidden') || panel.classList.contains('hiding')) {
+        // Show panel with fade in
+        panel.classList.remove('hidden');
+        panel.classList.remove('hiding');
+        reopenBtn.classList.add('hidden');
+        // Force reflow then fade in
+        panel.offsetHeight;
+        panel.style.opacity = '0';
+        panel.style.maxHeight = '0';
+        panel.style.overflow = 'hidden';
+        panel.style.padding = '0 15px';
+        panel.style.marginBottom = '0';
+        panel.style.borderWidth = '0';
+        setTimeout(function() {
+          panel.style.opacity = '1';
+          panel.style.maxHeight = '500px';
+          panel.style.padding = '15px';
+          panel.style.marginBottom = '20px';
+          panel.style.borderWidth = '2px';
+          setTimeout(function() {
+            panel.style.overflow = '';
+            panel.style.maxHeight = '';
+          }, 400);
+        }, 10);
       } else {
-        panel.classList.add('minimized');
-        if (btn) btn.textContent = '🔼 Expand';
+        // Hide panel with fade out
+        panel.style.opacity = '0';
+        panel.style.maxHeight = '0';
+        panel.style.overflow = 'hidden';
+        panel.style.padding = '0 15px';
+        panel.style.marginBottom = '0';
+        panel.style.borderWidth = '0';
+        setTimeout(function() {
+          panel.classList.add('hidden');
+          reopenBtn.classList.remove('hidden');
+        }, 400);
       }
     }
 
