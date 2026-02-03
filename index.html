@@ -8857,6 +8857,10 @@ Example:
           </div>
           <div class="discord-config-item">
             <label>&nbsp;</label>
+            <button class="btn btn-sm" onclick="fetchTranscripts()" id="fetchTranscriptsBtn" style="background: #00c853; color: #fff; border: 2px solid #00e676; font-weight: bold;">📥 Fetch Transcripts</button>
+          </div>
+          <div class="discord-config-item">
+            <label>&nbsp;</label>
             <button class="btn btn-sm btn-secondary" onclick="toggleDiscordPanel()" id="discordToggleBtn">🔽 Minimize</button>
           </div>
         </div>
@@ -9132,6 +9136,46 @@ Example:
     }
 
     // Set round start time to now
+    // Fetch Transcripts - triggers Make.com scenario to read Discord messages
+    function fetchTranscripts() {
+      var btn = document.getElementById('fetchTranscriptsBtn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Fetching...';
+      btn.style.background = '#666';
+
+      fetch('https://hook.us1.make.com/fpoxgq3wd40hbpg2mi3yzv17dyqz9n1r', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetch_transcripts',
+          timestamp: new Date().toISOString()
+        })
+      })
+      .then(function(response) {
+        if (response.ok) {
+          btn.innerHTML = '✅ Transcripts Fetched!';
+          btn.style.background = '#00c853';
+          showToast('✅ Transcripts fetched from Discord!');
+        } else {
+          throw new Error('Webhook returned ' + response.status);
+        }
+      })
+      .catch(function(error) {
+        btn.innerHTML = '❌ Error';
+        btn.style.background = '#ff4444';
+        showToast('❌ Error fetching transcripts: ' + error.message);
+      })
+      .finally(function() {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.innerHTML = '📥 Fetch Transcripts';
+          btn.style.background = '#00c853';
+        }, 3000);
+      });
+    }
+
     function setRoundStartNow() {
       var now = new Date();
       var year = now.getFullYear();
