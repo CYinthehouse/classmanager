@@ -22473,4 +22473,11 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             }
             
             // Add event listener for manual timezone select
-            const studentTim
+            const studentTimezone = document.getElementById('studentTimezone');
+            if (studentTimezone) {
+                studentTimezone.addEventListener('change', renderAvailabilityGrid);
+            }
+        });
+    </script>
+</body>
+</html>
