@@ -8874,10 +8874,7 @@ Example:
       <div class="discord-config-panel" id="discordConfigPanel">
         <h3>🎮 Discord Integration <span style="font-size: 11px; color: #888; font-weight: normal;">(for awarding points)</span></h3>
         <div class="discord-config-row">
-          <div class="discord-config-item">
-            <label>Make.com Webhook URL</label>
-            <input type="text" id="discordWebhookUrl" class="discord-webhook-input" placeholder="https://hook.us1.make.com/..." onchange="saveDiscordConfig()">
-          </div>
+          <!-- Webhook URLs are hardcoded -->
           <div class="discord-config-item">
             <label>Round Start Time</label>
             <input type="datetime-local" id="roundStartTime" class="round-start-input" onchange="saveDiscordConfig()">
@@ -8886,10 +8883,7 @@ Example:
             <label>&nbsp;</label>
             <button class="btn btn-sm btn-success" onclick="setRoundStartNow()" style="background: #39ff14; color: #000;">⏱️ Start Round Now</button>
           </div>
-          <div class="discord-config-item">
-            <label>&nbsp;</label>
-            <button class="btn btn-sm" onclick="fetchTranscripts()" id="fetchTranscriptsBtn" style="background: #00c853; color: #fff; border: 2px solid #00e676; font-weight: bold;">📥 Fetch Transcripts</button>
-          </div>
+          <!-- Fetch Transcripts is now handled automatically by Check button -->
           <div class="discord-config-item">
             <label>&nbsp;</label>
             <button class="btn btn-sm btn-secondary" onclick="toggleDiscordPanel()" id="discordToggleBtn">🔽 Minimize</button>
@@ -9134,7 +9128,7 @@ Example:
 
     // ==================== DISCORD INTEGRATION ====================
     var discordConfig = {
-      webhookUrl: '',
+      webhookUrl: '', // kept for compatibility but no longer used
       roundStartTime: null
     };
 
@@ -9167,45 +9161,7 @@ Example:
     }
 
     // Set round start time to now
-    // Fetch Transcripts - triggers Make.com scenario to read Discord messages
-    function fetchTranscripts() {
-      var btn = document.getElementById('fetchTranscriptsBtn');
-      btn.disabled = true;
-      btn.innerHTML = '⏳ Fetching...';
-      btn.style.background = '#666';
-
-      fetch('https://hook.us1.make.com/fpoxgq3wd40hbpg2mi3yzv17dyqz9n1r', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'fetch_transcripts',
-          timestamp: new Date().toISOString()
-        })
-      })
-      .then(function(response) {
-        if (response.ok) {
-          btn.innerHTML = '✅ Transcripts Fetched!';
-          btn.style.background = '#00c853';
-          showToast('✅ Transcripts fetched from Discord!');
-        } else {
-          throw new Error('Webhook returned ' + response.status);
-        }
-      })
-      .catch(function(error) {
-        btn.innerHTML = '❌ Error';
-        btn.style.background = '#ff4444';
-        showToast('❌ Error fetching transcripts: ' + error.message);
-      })
-      .finally(function() {
-        setTimeout(function() {
-          btn.disabled = false;
-          btn.innerHTML = '📥 Fetch Transcripts';
-          btn.style.background = '#00c853';
-        }, 3000);
-      });
-    }
+    // Fetch Transcripts is now handled automatically by the Check button
 
     function setRoundStartNow() {
       var now = new Date();
@@ -9269,15 +9225,11 @@ Example:
       }
     }
 
-    // Check answer via webhook
+    // Check answer — calls Scenario 1 (fetch transcripts) then Scenario 2 (grade students)
     function checkAnswerViaWebhook(koreanSentence, answerIndex, btnElement, englishTranslation) {
-      var webhookUrl = discordConfig.webhookUrl;
+      var SCENARIO_1_URL = 'https://hook.us1.make.com/fpoxgq3wd40hbpg2mi3yzv17dyqz9n1r';
+      var SCENARIO_2_URL = 'https://hook.us1.make.com/gmht3b3d2e7hvdrx6wk12z6qkkmr2g8i';
       var roundStartTime = discordConfig.roundStartTime;
-      
-      if (!webhookUrl) {
-        showToast('⚠️ Please set the Make.com webhook URL first');
-        return;
-      }
       
       if (!roundStartTime) {
         showToast('⚠️ Please set the round start time first');
@@ -9287,36 +9239,53 @@ Example:
       // Disable button and show checking state
       btnElement.disabled = true;
       btnElement.classList.add('checking');
-      btnElement.innerHTML = '⏳ Checking...';
+      btnElement.innerHTML = '⏳ Fetching transcripts...';
       
-      // Convert datetime-local to ISO string
       var startTimeISO = new Date(roundStartTime).toISOString();
       
-      var payload = {
-        action: 'check_answer',
-        korean_sentence: koreanSentence,
-        english_translation: englishTranslation || '',
-        round_start_time: startTimeISO,
-        card_index: currentCardIndex,
-        answer_index: answerIndex,
-        points: 10,
-        timestamp: new Date().toISOString()
-      };
-      
-      console.log('Sending to webhook:', payload);
-      
-      fetch(webhookUrl, {
+      // Step 1: Call Scenario 1 to fetch and transcribe Discord messages
+      fetch(SCENARIO_1_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fetch_transcripts',
+          timestamp: new Date().toISOString()
+        })
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Fetch transcripts failed (' + response.status + ')');
+        }
+        return response.text().catch(function() { return ''; });
+      })
+      .then(function() {
+        // Step 2: Call Scenario 2 to grade students
+        btnElement.innerHTML = '⏳ Grading students...';
+        
+        var payload = {
+          action: 'check_answer',
+          korean_sentence: koreanSentence,
+          english_translation: englishTranslation || '',
+          round_start_time: startTimeISO,
+          card_index: currentCardIndex,
+          answer_index: answerIndex,
+          points: 10,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Sending to grading webhook:', payload);
+        
+        return fetch(SCENARIO_2_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
       })
       .then(function(response) {
         if (response.ok) {
           return response.json().catch(function() { return {}; });
         } else {
-          throw new Error('Webhook returned ' + response.status);
+          throw new Error('Grading failed (' + response.status + ')');
         }
       })
       .then(function(result) {
@@ -9326,7 +9295,6 @@ Example:
         btnElement.innerHTML = '✅ ' + matchCount + ' matched';
         showToast('✅ Checked! ' + matchCount + ' students matched');
         
-        // Reset button after 5 seconds
         setTimeout(function() {
           btnElement.classList.remove('success');
           btnElement.disabled = false;
@@ -9340,7 +9308,6 @@ Example:
         btnElement.innerHTML = '❌ Error';
         showToast('❌ Error: ' + error.message);
         
-        // Reset button after 3 seconds
         setTimeout(function() {
           btnElement.classList.remove('error');
           btnElement.disabled = false;
