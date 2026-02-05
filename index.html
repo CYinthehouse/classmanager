@@ -9283,34 +9283,126 @@ Example:
       });
     }
 
-    // End Round & Post Leaderboard — calls Scenario 3
-    function endRoundAndPostLeaderboard() {
-      var SCENARIO_3_URL = 'https://hook.us1.make.com/723z943wbt83mpwy3r821g0x7atp858v';
-      var btn = document.getElementById('leaderboardBtn');
+    // Check ADVANCED BEGINNER answer — calls Advanced Scenario 1 (fetch transcripts) then Advanced Scenario 2 (grade students)
+    function checkAdvancedAnswerViaWebhook(koreanSentence, answerIndex, btnElement, englishTranslation) {
+      var ADV_SCENARIO_1_URL = 'https://hook.us1.make.com/bl754ty4uj0lbmbp9m2j6gou69k3fnj1';
+      var ADV_SCENARIO_2_URL = 'https://hook.us1.make.com/hk4mpu7pogu54jhk7kxeuf4nbd6esxm6';
       
-      btn.disabled = true;
-      btn.style.opacity = '0.6';
-      btn.innerHTML = '⏳ Posting leaderboard...';
+      // Disable button and show checking state
+      btnElement.disabled = true;
+      btnElement.classList.add('checking');
+      btnElement.innerHTML = '⏳ Fetching transcripts...';
       
-      fetch(SCENARIO_3_URL, {
+      // Step 1: Call Advanced Scenario 1 to fetch and transcribe Discord messages
+      fetch(ADV_SCENARIO_1_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'post_leaderboard',
+          action: 'fetch_transcripts',
           timestamp: new Date().toISOString()
         })
       })
       .then(function(response) {
         if (!response.ok) {
-          throw new Error('Leaderboard post failed (' + response.status + ')');
+          throw new Error('Fetch transcripts failed (' + response.status + ')');
         }
         return response.text().catch(function() { return ''; });
       })
       .then(function() {
-        btn.innerHTML = '✅ Leaderboard Posted!';
+        // Step 2: Call Advanced Scenario 2 to grade students
+        btnElement.innerHTML = '⏳ Grading students...';
+        
+        var payload = {
+          action: 'check_answer',
+          korean_sentence: koreanSentence,
+          english_translation: englishTranslation || '',
+          card_index: currentCardIndex,
+          answer_index: answerIndex,
+          points: 10,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Sending to advanced grading webhook:', payload);
+        
+        return fetch(ADV_SCENARIO_2_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      })
+      .then(function(response) {
+        if (response.ok) {
+          return response.json().catch(function() { return {}; });
+        } else {
+          throw new Error('Grading failed (' + response.status + ')');
+        }
+      })
+      .then(function(result) {
+        btnElement.classList.remove('checking');
+        btnElement.classList.add('success');
+        var matchCount = result.matched_count || result.matchedCount || 0;
+        btnElement.innerHTML = '✅ ' + matchCount + ' matched';
+        showToast('✅ Checked! ' + matchCount + ' advanced students matched');
+        
+        setTimeout(function() {
+          btnElement.classList.remove('success');
+          btnElement.disabled = false;
+          btnElement.innerHTML = '✅ Check';
+        }, 5000);
+      })
+      .catch(function(error) {
+        console.error('Advanced webhook error:', error);
+        btnElement.classList.remove('checking');
+        btnElement.classList.add('error');
+        btnElement.innerHTML = '❌ Error';
+        showToast('❌ Error: ' + error.message);
+        
+        setTimeout(function() {
+          btnElement.classList.remove('error');
+          btnElement.disabled = false;
+          btnElement.innerHTML = '✅ Check';
+        }, 3000);
+      });
+    }
+
+    // End Round & Post Leaderboard — calls BOTH beginner and advanced Scenario 3
+    function endRoundAndPostLeaderboard() {
+      var SCENARIO_3_URL = 'https://hook.us1.make.com/723z943wbt83mpwy3r821g0x7atp858v';
+      var ADV_SCENARIO_3_URL = 'https://hook.us1.make.com/nak1ovnmi1s7pogrw84hgqtw96gi31h9';
+      var btn = document.getElementById('leaderboardBtn');
+      
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      btn.innerHTML = '⏳ Posting leaderboards...';
+      
+      // Call both leaderboard webhooks in parallel
+      Promise.all([
+        fetch(SCENARIO_3_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'post_leaderboard',
+            timestamp: new Date().toISOString()
+          })
+        }),
+        fetch(ADV_SCENARIO_3_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'post_leaderboard',
+            timestamp: new Date().toISOString()
+          })
+        })
+      ])
+      .then(function(responses) {
+        var allOk = responses.every(function(r) { return r.ok; });
+        if (!allOk) {
+          throw new Error('One or more leaderboard posts failed');
+        }
+        btn.innerHTML = '✅ Leaderboards Posted!';
         btn.style.background = 'linear-gradient(135deg, #39ff14, #00cc00)';
         btn.style.borderColor = '#39ff14';
-        showToast('🏆 Leaderboard posted to Discord!');
+        showToast('🏆 Both leaderboards posted to Discord!');
         
         setTimeout(function() {
           btn.disabled = false;
@@ -10976,7 +11068,7 @@ Return ONLY valid JSON (single object, not array):
             '<div class="answer-korean">' + advancedWords + '</div>' +
             '<div style="font-size: 10px; color: #666; margin-top: 5px;"><span class="color-indicator ' + a.color + '"></span>' + getColorLabel(a.color) + '</div>' +
             '<div class="answer-actions">' +
-              '<button class="check-answer-btn" data-korean="' + escapeAttr(a.korean) + '" data-english="' + escapeAttr(a.english || '') + '" data-idx="' + i + '" onclick="event.stopPropagation(); checkAnswerViaWebhook(this.dataset.korean, this.dataset.idx, this, this.dataset.english)">✅ Check</button>' +
+              '<button class="check-answer-btn" data-korean="' + escapeAttr(a.korean) + '" data-english="' + escapeAttr(a.english || '') + '" data-idx="' + i + '" onclick="event.stopPropagation(); checkAdvancedAnswerViaWebhook(this.dataset.korean, this.dataset.idx, this, this.dataset.english)">✅ Check</button>' +
               '<span class="points-badge">+10 pts</span>' +
             '</div>' +
           '</div>' +
