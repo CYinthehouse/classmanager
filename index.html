@@ -10017,6 +10017,11 @@ Example:
         return response.text().catch(function() { return ''; });
       })
       .then(function() {
+        // Wait for Scenario 1 to finish processing on Make.com before calling Scenario 2
+        btnElement.innerHTML = '⏳ Processing transcripts...';
+        return new Promise(function(resolve) { setTimeout(resolve, 5000); });
+      })
+      .then(function() {
         // Step 2: Call Scenario 2 to grade students
         btnElement.innerHTML = '⏳ Grading students...';
         
@@ -10097,6 +10102,11 @@ Example:
           throw new Error('Fetch transcripts failed (' + response.status + ')');
         }
         return response.text().catch(function() { return ''; });
+      })
+      .then(function() {
+        // Wait for Advanced Scenario 1 to finish processing on Make.com before calling Scenario 2
+        btnElement.innerHTML = '⏳ Processing transcripts...';
+        return new Promise(function(resolve) { setTimeout(resolve, 5000); });
       })
       .then(function() {
         // Step 2: Call Advanced Scenario 2 to grade students
