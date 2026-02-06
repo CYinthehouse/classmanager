@@ -937,6 +937,53 @@
         .student-lookup-stat-label { font-size: 10px; color: #888; text-transform: uppercase; }
         .student-lookup-empty { text-align: center; padding: 30px; color: #888; }
         /* ==================== END STUDENT LOOKUP STYLES ==================== */
+
+        /* ==================== TUESDAY READING CLASS STYLES ==================== */
+        #adminTabTuesdayreading { font-size: 16px; }
+        #adminTabTuesdayreading h3 { font-size: 22px; }
+        #adminTabTuesdayreading p { font-size: 14px; }
+        #adminTabTuesdayreading .card { font-size: 16px; }
+        .tr-input-mode-btn { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); transform: scale(1); box-shadow: none; }
+        .tr-input-mode-btn:hover { transform: scale(1.05); }
+        .tr-input-mode-btn.tr-mode-active { background: #00ffff !important; color: #000 !important; font-weight: 600 !important; transform: scale(1.08); box-shadow: 0 0 18px rgba(0,255,255,0.45); }
+        .tr-input-mode-btn:not(.tr-mode-active) { background: rgba(255,255,255,0.08) !important; color: #aaa !important; transform: scale(1); box-shadow: none; }
+        .tr-set-block { background: rgba(0,0,0,0.3); border: 2px solid #444; border-radius: 10px; padding: 15px; margin-bottom: 12px; }
+        .tr-set-fadein { animation: trSetFadeIn 0.4s ease-out both; }
+        @keyframes trSetFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .tr-set-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .tr-set-label { color: #00ffff; font-size: 15px; font-weight: 600; }
+        .tr-set-block textarea { width: 100%; min-height: 90px; padding: 10px; background: #0a0a15; border: 2px solid #333; border-radius: 6px; color: #fff; font-family: 'Noto Sans', sans-serif; font-size: 15px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
+        .tr-set-block textarea:focus { border-color: #00ffff; outline: none; }
+        .tr-image-drop { border: 2px dashed #555; border-radius: 8px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .tr-image-drop:hover { border-color: #00ffff; background: rgba(0,255,255,0.05); }
+        .tr-extracted-text { margin-top: 10px; padding: 10px; background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.3); border-radius: 6px; }
+        .tr-reading-card { background: rgba(0,0,0,0.4); border: 2px solid #ff00ff; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+        .tr-card-header { background: linear-gradient(135deg, rgba(255,0,255,0.15), rgba(156,39,176,0.15)); padding: 12px 18px; border-bottom: 1px solid rgba(255,0,255,0.3); }
+        .tr-card-header-title { color: #ff00ff; font-weight: 600; font-size: 16px; }
+        .tr-card-header-meta { color: #888; font-size: 13px; margin-top: 3px; }
+        .tr-card-columns { display: flex; gap: 0; min-height: 120px; }
+        .tr-card-col { flex: 1; padding: 15px; padding-bottom: 50px; position: relative; }
+        .tr-card-col-left { background: rgba(136,255,136,0.05); border-right: 1px solid rgba(255,255,255,0.1); }
+        .tr-card-col-right { background: rgba(255,170,0,0.05); }
+        .tr-col-header { display: flex; gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.15); padding: 10px 18px; }
+        .tr-col-header-cell { flex: 1; text-align: center; font-weight: 600; font-size: 15px; }
+        .tr-col-header-cell.novice-label { color: #88ff88; }
+        .tr-col-header-cell.begup-label { color: #ffaa00; }
+        .tr-sentence-item { padding: 10px 12px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 8px; }
+        .tr-sentence-item:last-child { margin-bottom: 0; }
+        .tr-korean-text { font-size: 17px; color: #fff; line-height: 1.6; margin-bottom: 5px; }
+        .tr-english-text { font-size: 14px; color: #aaa; font-style: italic; line-height: 1.4; }
+        .tr-check-area { position: absolute; bottom: 10px; right: 12px; display: flex; align-items: center; gap: 8px; }
+        .tr-check-area .tr-check-btn { background: linear-gradient(135deg, #5865F2, #7289DA); border: none; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(88,101,242,0.3); }
+        .tr-check-area .tr-check-btn:hover { transform: scale(1.07); box-shadow: 0 0 20px rgba(88,101,242,0.55); }
+        .tr-check-area .tr-check-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .tr-check-area .tr-check-btn.checking { background: linear-gradient(135deg, #FFA500, #e69500); }
+        .tr-check-area .tr-check-btn.success { background: linear-gradient(135deg, #39ff14, #20cc00); color: #000; }
+        .tr-check-area .tr-check-btn.error { background: linear-gradient(135deg, #ff4444, #cc2222); }
+        .tr-check-area .tr-pts { background: linear-gradient(135deg, #39ff14, #20cc00); color: #000; padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 700; box-shadow: 0 0 10px rgba(57,255,20,0.3); }
+        @keyframes trOverlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes trCardSlideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        /* ==================== END TUESDAY READING CLASS STYLES ==================== */
     </style>
 </head>
 <body>
@@ -1029,6 +1076,7 @@
                     <button class="nav-tab" onclick="showAdminTab('completed')">🎓 Completed</button>
                     <button class="nav-tab" onclick="showAdminTab('teachers')">👨‍🏫 Teachers</button>
                     <button class="nav-tab" onclick="showAdminTab('materials')">📖 Materials</button>
+                    <button class="nav-tab" onclick="showAdminTab('tuesdayreading')">📖 Tuesday Reading</button>
                     <button class="nav-tab" onclick="showAdminTab('slotmanager')">📅 Slot Manager</button>
                     <button class="nav-tab" onclick="showAdminTab('suggestions')">💡 Suggestions</button>
                     <button class="nav-tab" onclick="showAdminTab('ready')">✅ Ready</button>
@@ -1611,6 +1659,43 @@
                         </div>
                         <div id="materialsContainer"><p style="color: #888; font-size: 14px; font-family: 'Noto Sans', sans-serif;">No materials yet.</p></div>
                     </div>
+                </div>
+
+                <!-- Tuesday Reading Class Tab -->
+                <div id="adminTabTuesdayreading" class="tab-content">
+                    <div class="card">
+                        <h3>📖 Tuesday Reading Class</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Upload materials for Tuesday Reading Class. Select TEXT or IMAGE input. Up to 10 sets, each becomes a reading card.</p>
+
+                        <!-- Input Mode Toggle -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+                            <button class="btn btn-sm tr-input-mode-btn tr-mode-active" id="trModeTextBtn" onclick="setTRInputMode('text')">📝 TEXT Input</button>
+                            <button class="btn btn-sm tr-input-mode-btn" id="trModeImageBtn" onclick="setTRInputMode('image')">🖼️ IMAGE Input</button>
+                        </div>
+
+                        <!-- Sets Container -->
+                        <div id="trSetsContainer">
+                            <p style="color: #888; font-size: 13px;">No sets added yet. Click "➕ Add Set" to begin.</p>
+                        </div>
+
+                        <!-- Add Set Button -->
+                        <div style="margin: 15px 0;">
+                            <button class="btn btn-success" onclick="addTRSet()" id="trAddSetBtn">➕ Add Set (<span id="trSetCount">0</span>/10)</button>
+                        </div>
+
+                        <!-- Generate Cards -->
+                        <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                            <button class="btn" onclick="generateTRCards()" style="background: linear-gradient(135deg, #ff00ff, #9c27b0); border-color: #ff00ff; color: #fff; font-weight: 600;">🃏 Generate Reading Cards</button>
+                            <button class="btn btn-sm" onclick="clearAllTR()" style="background: #333; color: #ff3366; border-color: #ff3366;">🗑️ Clear All</button>
+                        </div>
+
+                        <!-- AI Processing Indicator -->
+                        <div id="trAIProcessing" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255,0,255,0.1); border: 1px solid #ff00ff; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 14px; color: #ff00ff;">⏳ Generating English translations via AI...</div>
+                            <div style="font-size: 11px; color: #888; margin-top: 5px;">This may take a moment</div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div id="adminTabSuggestions" class="tab-content">
@@ -4048,6 +4133,7 @@
             if (tab === 'ready') loadReadyRequests();
             if (tab === 'dashboard') loadTeacherButtonsForAdmin();
             if (tab === 'slotmanager') initSlotManager();
+            if (tab === 'tuesdayreading') initTuesdayReadingTab();
             if (tab === 'accounts') {
                 // Smart loading - use cache if available, otherwise show load controls
                 if (shopifyCustomersCache && shopifyCustomersCacheTime) {
@@ -8032,6 +8118,705 @@
             }
         }
 
+        // ==================== TUESDAY READING CLASS ====================
+        var trSets = [];
+        var trInputMode = 'text';
+        var trGeneratedCards = [];
+        var TR_MAX_SETS = 10;
+
+        // LEFT side (Absolute Beginner / Novice) - 2 webhooks in sequence
+        var TR_LEFT_SCENARIO_1 = 'https://hook.us1.make.com/ll6xp5y344i236cycriyi2ru85yvh1po';
+        var TR_LEFT_SCENARIO_2 = 'https://hook.us1.make.com/xdv7jd4rdg1d6etm4naj9w2cc4f1fynm';
+        // RIGHT side (Beginner and Up) - 2 webhooks in sequence
+        var TR_RIGHT_SCENARIO_1 = 'https://hook.us1.make.com/2bg4hojfj0sqvdu7cgpjfrpjlu3dy4jk';
+        var TR_RIGHT_SCENARIO_2 = 'https://hook.us1.make.com/cci2q6g601th336qlnqgwls6ubkalxxh';
+        // Leaderboard - 2 webhooks in parallel
+        var TR_LEADERBOARD_NOVICE = 'https://hook.us1.make.com/k7v6ihd0q43ydubdu4fp3ggpsqko2aba';
+        var TR_LEADERBOARD_ADVANCED = 'https://hook.us1.make.com/15ltmrk4f3mubtkyc5pt07h2cjkblrjo';
+
+        function initTuesdayReadingTab() {
+            // Auto-add first set if none exist
+            if (trSets.length === 0) {
+                trSets.push({
+                    mode: trInputMode,
+                    text: '',
+                    imageUrl: '',
+                    extractedText: '',
+                    processing: false
+                });
+            }
+            renderTRSets();
+            updateTRSetCounter();
+        }
+
+        function setTRInputMode(mode) {
+            if (trInputMode === mode) return;
+            trInputMode = mode;
+            var textBtn = document.getElementById('trModeTextBtn');
+            var imageBtn = document.getElementById('trModeImageBtn');
+            if (mode === 'text') {
+                textBtn.classList.add('tr-mode-active');
+                imageBtn.classList.remove('tr-mode-active');
+            } else {
+                imageBtn.classList.add('tr-mode-active');
+                textBtn.classList.remove('tr-mode-active');
+            }
+            // Update all existing sets to the new mode
+            for (var i = 0; i < trSets.length; i++) {
+                trSets[i].mode = mode;
+                trSets[i].text = '';
+                trSets[i].imageUrl = '';
+                trSets[i].extractedText = '';
+                trSets[i].processing = false;
+            }
+            renderTRSets();
+        }
+
+        function updateTRSetCounter() {
+            var el = document.getElementById('trSetCount');
+            if (el) el.textContent = trSets.length + 1;
+            var btn = document.getElementById('trAddSetBtn');
+            if (btn) {
+                if (trSets.length >= TR_MAX_SETS) {
+                    btn.style.display = 'none';
+                } else {
+                    btn.style.display = '';
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        function addTRSet() {
+            if (trSets.length >= TR_MAX_SETS) {
+                alert('Maximum ' + TR_MAX_SETS + ' sets allowed.');
+                return;
+            }
+            trSets.push({
+                mode: trInputMode,
+                text: '',
+                imageUrl: '',
+                extractedText: '',
+                processing: false
+            });
+            renderTRSets();
+            // Fade in only the newly added set
+            var newSetEl = document.getElementById('trSetBlock' + (trSets.length - 1));
+            if (newSetEl) {
+                newSetEl.classList.add('tr-set-fadein');
+            }
+        }
+
+        function removeTRSet(idx) {
+            trSets.splice(idx, 1);
+            renderTRSets();
+        }
+
+        function renderTRSets() {
+            var container = document.getElementById('trSetsContainer');
+            updateTRSetCounter();
+
+            if (trSets.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 13px;">No sets added yet. Click "➕ Add Set" to begin.</p>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < trSets.length; i++) {
+                var s = trSets[i];
+                html += '<div class="tr-set-block" id="trSetBlock' + i + '">';
+                html += '<div class="tr-set-header">';
+                html += '<span class="tr-set-label">📄 Set ' + (i + 1) + ' &mdash; ' + s.mode.toUpperCase() + ' input</span>';
+                html += '<button class="btn btn-sm" style="background: rgba(255,51,102,0.2); border: 1px solid #ff3366; color: #ff3366; padding: 3px 10px; font-size: 11px;" onclick="removeTRSet(' + i + ')">✕ Remove</button>';
+                html += '</div>';
+
+                if (s.mode === 'text') {
+                    html += '<p style="font-size: 11px; color: #888; margin-bottom: 5px;">Enter 2-3 Korean sentences (one per line):</p>';
+                    html += '<textarea id="trTextarea' + i + '" onblur="saveTRText(' + i + ')" placeholder="Enter Korean sentences, one per line...&#10;&#10;Example:&#10;오늘 날씨가 좋아요.&#10;저는 한국어를 공부합니다.&#10;내일 학교에 갈 거예요.">' + escapeHtml(s.text) + '</textarea>';
+                    // Show sentence count
+                    var lineCount = s.text ? s.text.split('\n').filter(function(l) { return l.trim().length > 0; }).length : 0;
+                    html += '<p style="font-size: 10px; color: #666; margin-top: 4px;">Sentences detected: ' + Math.min(lineCount, 3) + '/3' + (lineCount > 3 ? ' (only first 3 will be used)' : '') + '</p>';
+                } else {
+                    // IMAGE mode
+                    html += '<p style="font-size: 11px; color: #888; margin-bottom: 5px;">Upload an image with Korean text &mdash; OCR / ChatGPT will extract it:</p>';
+                    html += '<div class="tr-image-drop" onclick="document.getElementById(&apos;trFileInput' + i + '&apos;).click()">';
+                    if (s.imageUrl) {
+                        html += '<img src="' + s.imageUrl + '" style="max-width: 100%; max-height: 200px; border-radius: 6px; margin-bottom: 8px;">';
+                        html += '<p style="color: #39ff14; font-size: 11px;">✅ Image uploaded &mdash; click to replace</p>';
+                    } else {
+                        html += '<p style="color: #888; font-size: 13px;">📷 Click to upload image</p>';
+                        html += '<p style="color: #555; font-size: 10px;">Supports JPG, PNG, WEBP</p>';
+                    }
+                    html += '</div>';
+                    html += '<input type="file" id="trFileInput' + i + '" accept="image/*" style="display:none;" onchange="handleTRImageSelect(' + i + ', event)">';
+
+                    // Processing indicator
+                    if (s.processing) {
+                        html += '<div style="margin-top: 10px; padding: 12px; background: rgba(255,0,255,0.1); border: 1px solid #ff00ff; border-radius: 6px; text-align: center;">';
+                        html += '<span style="color: #ff00ff; font-size: 12px;">⏳ Extracting Korean text via OCR...</span>';
+                        html += '</div>';
+                    }
+
+                    // Show extracted text if available
+                    if (s.extractedText) {
+                        html += '<div class="tr-extracted-text">';
+                        html += '<p style="font-size: 11px; color: #39ff14; margin-bottom: 5px; font-weight: 600;">📝 Extracted Text:</p>';
+                        html += '<pre style="font-size: 13px; color: #fff; white-space: pre-wrap; margin: 0; font-family: &apos;Noto Sans&apos;, sans-serif;">' + escapeHtml(s.extractedText) + '</pre>';
+                        var extractedCount = s.extractedText.split('\n').filter(function(l) { return l.trim().length > 0; }).length;
+                        html += '<p style="font-size: 10px; color: #666; margin-top: 5px;">Sentences detected: ' + Math.min(extractedCount, 3) + '/3</p>';
+                        html += '</div>';
+                    }
+                }
+
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function saveTRText(idx) {
+            var el = document.getElementById('trTextarea' + idx);
+            if (el && trSets[idx]) {
+                trSets[idx].text = el.value;
+            }
+        }
+
+        function handleTRImageSelect(idx, event) {
+            var file = event.target.files[0];
+            if (!file) return;
+
+            // Read as data URL for preview
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                trSets[idx].imageUrl = e.target.result;
+                trSets[idx].processing = true;
+                trSets[idx].extractedText = '';
+                renderTRSets();
+                // Run OCR extraction
+                extractTRKoreanFromImage(idx, e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function extractTRKoreanFromImage(idx, base64DataUrl) {
+            // Use the same Cloud Function endpoint the rest of the app uses
+            var aiUrl = 'https://generateflashcardai-386010826708.us-central1.run.app';
+
+            fetch(aiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: 'Extract ALL Korean text from this image. Return ONLY the Korean sentences, one per line. Do not include any English, numbers, or explanations. Just the raw Korean text lines.' },
+                                { type: 'image_url', image_url: { url: base64DataUrl } }
+                            ]
+                        }
+                    ],
+                    model: 'gpt-4o',
+                    max_tokens: 1000,
+                    temperature: 0.1
+                })
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                trSets[idx].processing = false;
+                // Handle multiple response formats from the Cloud Function
+                var extracted = '';
+                if (data.data) {
+                    // Cloud function wraps in { success: true, data: "..." }
+                    extracted = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                } else if (data.choices && data.choices[0] && data.choices[0].message) {
+                    // Direct OpenAI format
+                    extracted = data.choices[0].message.content;
+                } else if (data.text) {
+                    extracted = data.text;
+                } else if (data.result) {
+                    extracted = data.result;
+                } else if (data.response) {
+                    extracted = data.response;
+                }
+
+                extracted = extracted.trim();
+                if (extracted) {
+                    trSets[idx].extractedText = extracted;
+                    trSets[idx].text = extracted;
+                } else {
+                    console.error('OCR response format:', data);
+                    alert('Could not extract text. Check console for details.');
+                }
+                renderTRSets();
+            })
+            .catch(function(err) {
+                trSets[idx].processing = false;
+                console.error('OCR extraction error:', err);
+                alert('OCR error: ' + err.message);
+                renderTRSets();
+            });
+        }
+
+        function getTRSentencesFromSet(setObj) {
+            var rawText = setObj.text || '';
+            if (!rawText.trim()) return [];
+            var lines = rawText.split('\n');
+            var result = [];
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (line.length > 0) {
+                    result.push(line);
+                }
+                if (result.length >= 3) break;
+            }
+            return result;
+        }
+
+        function generateTRCards() {
+            // Save any unsaved textarea content first
+            for (var i = 0; i < trSets.length; i++) {
+                if (trSets[i].mode === 'text') {
+                    var el = document.getElementById('trTextarea' + i);
+                    if (el) trSets[i].text = el.value;
+                }
+            }
+
+            if (trSets.length === 0) {
+                alert('Please add at least one set first.');
+                return;
+            }
+
+            // Collect valid sets with sentences
+            var validCards = [];
+            for (var i = 0; i < trSets.length; i++) {
+                var sentences = getTRSentencesFromSet(trSets[i]);
+                if (sentences.length > 0) {
+                    validCards.push({ setIndex: i, koreanSentences: sentences, translations: [] });
+                }
+            }
+
+            if (validCards.length === 0) {
+                alert('No Korean sentences found in any set. Please enter text or upload images first.');
+                return;
+            }
+
+            // Show processing indicator
+            var procEl = document.getElementById('trAIProcessing');
+            if (procEl) procEl.style.display = 'block';
+
+            // Gather all Korean sentences for batch translation
+            var allKorean = [];
+            for (var c = 0; c < validCards.length; c++) {
+                for (var s = 0; s < validCards[c].koreanSentences.length; s++) {
+                    allKorean.push(validCards[c].koreanSentences[s]);
+                }
+            }
+
+            var translationPrompt = 'Translate each Korean sentence below into natural, conversational English. Return ONLY a valid JSON array where each element is an object with "korean" and "english" keys. No markdown, no backticks, no explanation.\n\nSentences:\n' + allKorean.join('\n');
+
+            // Use the same AI endpoint used by Yodafy
+            var aiUrl = 'https://generateflashcardai-386010826708.us-central1.run.app';
+
+            fetch(aiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: translationPrompt, max_tokens: 2000 })
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (procEl) procEl.style.display = 'none';
+
+                var resultText = data.text || data.result || data.response || JSON.stringify(data);
+                var translations = [];
+                var jsonMatch = resultText.match(/\[[\s\S]*?\]/);
+                if (jsonMatch) {
+                    try { translations = JSON.parse(jsonMatch[0]); } catch(e) { console.error('Parse error:', e); }
+                }
+
+                // Map translations back to cards
+                var tIdx = 0;
+                for (var c = 0; c < validCards.length; c++) {
+                    validCards[c].translations = [];
+                    for (var s = 0; s < validCards[c].koreanSentences.length; s++) {
+                        var korean = validCards[c].koreanSentences[s];
+                        var english = '';
+                        if (tIdx < translations.length && translations[tIdx]) {
+                            english = translations[tIdx].english || '';
+                        }
+                        validCards[c].translations.push({ korean: korean, english: english });
+                        tIdx++;
+                    }
+                }
+
+                trGeneratedCards = validCards;
+                renderTRReadingCards();
+            })
+            .catch(function(err) {
+                if (procEl) procEl.style.display = 'none';
+                console.error('Translation API error:', err);
+
+                // Fallback: show cards without translations
+                for (var c = 0; c < validCards.length; c++) {
+                    validCards[c].translations = [];
+                    for (var s = 0; s < validCards[c].koreanSentences.length; s++) {
+                        validCards[c].translations.push({
+                            korean: validCards[c].koreanSentences[s],
+                            english: '(translation pending)'
+                        });
+                    }
+                }
+                trGeneratedCards = validCards;
+                renderTRReadingCards();
+                alert('AI translation failed (' + err.message + '). Cards shown without translations. You can edit them manually.');
+            });
+        }
+
+        function renderTRReadingCards() {
+            if (trGeneratedCards.length === 0) return;
+
+            // Remove existing overlay if any
+            closeTRCardsPopup();
+
+            // Create fullscreen overlay
+            var overlay = document.createElement('div');
+            overlay.id = 'trCardsOverlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(10,10,21,0.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10000;overflow-y:auto;animation:trOverlayFadeIn 0.35s ease-out both;';
+
+            // Red X close button
+            var closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '✕';
+            closeBtn.style.cssText = 'position:fixed;top:14px;right:14px;z-index:10001;background:rgba(255,68,68,0.9);color:#fff;border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;transition:all 0.2s;';
+            closeBtn.onmouseover = function() { this.style.background = '#ff4444'; this.style.transform = 'scale(1.15)'; };
+            closeBtn.onmouseout = function() { this.style.background = 'rgba(255,68,68,0.9)'; this.style.transform = 'scale(1)'; };
+            closeBtn.onclick = closeTRCardsPopup;
+
+            // Content container
+            var content = document.createElement('div');
+            content.style.cssText = 'max-width:1100px;margin:60px auto 40px auto;padding:0 20px;';
+
+            // Header
+            var html = '';
+            html += '<div style="text-align:center;margin-bottom:25px;">';
+            html += '<h2 style="color:#ff00ff;font-size:24px;margin:0 0 8px 0;">🃏 Reading Cards</h2>';
+            html += '<p style="font-size:13px;color:#888;">Left = Absolute Beginner/Novice (1st sentence only) | Right = Beginner and Up (all sentences)</p>';
+            html += '</div>';
+
+            // Cards
+            for (var c = 0; c < trGeneratedCards.length; c++) {
+                var card = trGeneratedCards[c];
+                var t = card.translations;
+                var cardNum = c + 1;
+
+                html += '<div class="tr-reading-card" style="animation:trCardSlideIn 0.4s ease-out both;animation-delay:' + (c * 0.1) + 's;">';
+
+                // Card Header
+                html += '<div class="tr-card-header">';
+                html += '<div class="tr-card-header-title">🃏 Card ' + cardNum + '</div>';
+                html += '<div class="tr-card-header-meta">' + t.length + ' sentence' + (t.length > 1 ? 's' : '') + ' &bull; Set ' + (card.setIndex + 1) + '</div>';
+                html += '</div>';
+
+                // Column Headers
+                html += '<div class="tr-col-header">';
+                html += '<div class="tr-col-header-cell novice-label">🌱 Absolute Beginner / Novice</div>';
+                html += '<div class="tr-col-header-cell begup-label">🌟 Beginner and Up</div>';
+                html += '</div>';
+
+                // Two-column body
+                html += '<div class="tr-card-columns">';
+
+                // LEFT COLUMN - Absolute Beginner / Novice (first sentence only)
+                html += '<div class="tr-card-col tr-card-col-left">';
+                if (t.length > 0) {
+                    html += '<div class="tr-sentence-item">';
+                    html += '<div class="tr-korean-text">' + escapeHtml(t[0].korean) + '</div>';
+                    html += '<div class="tr-english-text">' + escapeHtml(t[0].english) + '</div>';
+                    html += '</div>';
+                }
+                html += '<div class="tr-check-area">';
+                html += '<button class="tr-check-btn" onclick="trSendCheck(&apos;novice&apos;, ' + c + ')">✅ Check</button>';
+                html += '<span class="tr-pts">+10 pts</span>';
+                html += '</div>';
+                html += '</div>';
+
+                // RIGHT COLUMN - Beginner and Up (all sentences)
+                html += '<div class="tr-card-col tr-card-col-right">';
+                for (var s = 0; s < t.length; s++) {
+                    html += '<div class="tr-sentence-item">';
+                    html += '<div class="tr-korean-text">' + escapeHtml(t[s].korean) + '</div>';
+                    html += '<div class="tr-english-text">' + escapeHtml(t[s].english) + '</div>';
+                    html += '</div>';
+                }
+                html += '<div class="tr-check-area">';
+                html += '<button class="tr-check-btn" onclick="trSendCheck(&apos;beginner&apos;, ' + c + ')">✅ Check</button>';
+                html += '<span class="tr-pts">+10 pts</span>';
+                html += '</div>';
+                html += '</div>';
+
+                html += '</div>'; // close tr-card-columns
+                html += '</div>'; // close tr-reading-card
+            }
+
+            // End Round button centered beneath all cards
+            html += '<div style="text-align:center;margin-top:35px;padding-top:25px;border-top:2px solid #333;">';
+            html += '<button class="btn" onclick="trEndRoundAndLeaderboard()" style="background:linear-gradient(135deg,#ff9800,#f44336);border-color:#ff9800;color:#fff;font-size:16px;padding:15px 40px;border-radius:12px;font-weight:600;">🏆 End Round & See Leaderboard</button>';
+            html += '</div>';
+
+            content.innerHTML = html;
+            overlay.appendChild(closeBtn);
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeTRCardsPopup() {
+            var overlay = document.getElementById('trCardsOverlay');
+            if (overlay) overlay.remove();
+            document.body.style.overflow = '';
+        }
+
+        function trSendCheck(side, cardIndex) {
+            var card = trGeneratedCards[cardIndex];
+            if (!card) return;
+
+            var scenario1Url = (side === 'novice') ? TR_LEFT_SCENARIO_1 : TR_RIGHT_SCENARIO_1;
+            var scenario2Url = (side === 'novice') ? TR_LEFT_SCENARIO_2 : TR_RIGHT_SCENARIO_2;
+
+            var sentences = [];
+            if (side === 'novice') {
+                if (card.translations.length > 0) {
+                    sentences.push(card.translations[0]);
+                }
+            } else {
+                sentences = card.translations;
+            }
+
+            // Find the button
+            var cardEls = document.querySelectorAll('.tr-reading-card');
+            var cardEl = cardEls[cardIndex];
+            var sideClass = (side === 'novice') ? 'tr-card-col-left' : 'tr-card-col-right';
+            var btn = null;
+            if (cardEl) {
+                var colEl = cardEl.querySelector('.' + sideClass);
+                if (colEl) btn = colEl.querySelector('.tr-check-btn');
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('checking');
+                btn.innerHTML = '⏳ Fetching transcripts...';
+            }
+
+            // Step 1: Fetch transcripts
+            fetch(scenario1Url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'fetch_transcripts',
+                    timestamp: new Date().toISOString()
+                })
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Fetch transcripts failed (' + response.status + ')');
+                }
+                return response.text().catch(function() { return ''; });
+            })
+            .then(function() {
+                // Step 2: Grade students
+                if (btn) btn.innerHTML = '⏳ Grading students...';
+
+                var koreanText = sentences.map(function(s) { return s.korean; }).join('\n');
+                var englishText = sentences.map(function(s) { return s.english; }).join('\n');
+
+                var payload = {
+                    action: 'check_answer',
+                    korean_sentence: koreanText,
+                    english_translation: englishText,
+                    card_index: cardIndex,
+                    side: side,
+                    points: 10,
+                    timestamp: new Date().toISOString()
+                };
+
+                return fetch(scenario2Url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    return response.json().catch(function() { return {}; });
+                } else {
+                    throw new Error('Grading failed (' + response.status + ')');
+                }
+            })
+            .then(function(result) {
+                if (btn) {
+                    btn.classList.remove('checking');
+                    btn.classList.add('success');
+                    var matchCount = result.matched_count || result.matchedCount || 0;
+                    btn.innerHTML = '✅ ' + matchCount + ' matched';
+                }
+
+                setTimeout(function() {
+                    if (btn) {
+                        btn.classList.remove('success');
+                        btn.disabled = false;
+                        btn.innerHTML = '✅ Check';
+                    }
+                }, 5000);
+            })
+            .catch(function(err) {
+                console.error('TR webhook error (' + side + '):', err);
+                if (btn) {
+                    btn.classList.remove('checking');
+                    btn.classList.add('error');
+                    btn.innerHTML = '❌ Error';
+                }
+
+                setTimeout(function() {
+                    if (btn) {
+                        btn.classList.remove('error');
+                        btn.disabled = false;
+                        btn.innerHTML = '✅ Check';
+                    }
+                }, 3000);
+            });
+        }
+
+        function trEndRoundAndLeaderboard() {
+            // Find the leaderboard button
+            var btns = document.querySelectorAll('#trCardsOverlay button');
+            var btn = null;
+            for (var i = 0; i < btns.length; i++) {
+                if (btns[i].textContent.indexOf('Leaderboard') !== -1 || btns[i].textContent.indexOf('leaderboard') !== -1) {
+                    btn = btns[i];
+                    break;
+                }
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.innerHTML = '⏳ Posting leaderboards...';
+            }
+
+            // Call both leaderboard webhooks in parallel
+            Promise.all([
+                fetch(TR_LEADERBOARD_NOVICE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'post_leaderboard',
+                        timestamp: new Date().toISOString()
+                    })
+                }),
+                fetch(TR_LEADERBOARD_ADVANCED, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'post_leaderboard',
+                        timestamp: new Date().toISOString()
+                    })
+                })
+            ])
+            .then(function(responses) {
+                var allOk = responses.every(function(r) { return r.ok; });
+                if (!allOk) {
+                    throw new Error('One or more leaderboard posts failed');
+                }
+                if (btn) {
+                    btn.innerHTML = '✅ Leaderboards Posted!';
+                    btn.style.background = 'linear-gradient(135deg, #39ff14, #00cc00)';
+                    btn.style.borderColor = '#39ff14';
+                }
+
+                setTimeout(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.innerHTML = '🏆 End Round & See Leaderboard';
+                        btn.style.background = 'linear-gradient(135deg, #ff9800, #f44336)';
+                        btn.style.borderColor = '#ff9800';
+                    }
+                }, 5000);
+            })
+            .catch(function(error) {
+                console.error('TR leaderboard webhook error:', error);
+                if (btn) {
+                    btn.innerHTML = '❌ Error posting';
+                    btn.style.background = '#ff4444';
+                    btn.style.borderColor = '#ff4444';
+                }
+
+                setTimeout(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.innerHTML = '🏆 End Round & See Leaderboard';
+                        btn.style.background = 'linear-gradient(135deg, #ff9800, #f44336)';
+                        btn.style.borderColor = '#ff9800';
+                    }
+                }, 3000);
+            });
+        }
+
+        function showTRLeaderboard(data) {
+            // Build leaderboard modal
+            var overlay = document.createElement('div');
+            overlay.id = 'trLeaderboardModal';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+            var html = '';
+            html += '<div style="background:#1a1a2e;border:3px solid #ff9800;border-radius:15px;padding:30px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">';
+            html += '<h2 style="color:#ff9800;text-align:center;margin:0 0 20px 0;font-size:22px;">🏆 Leaderboard</h2>';
+
+            if (data && data.leaderboard && data.leaderboard.length > 0) {
+                for (var i = 0; i < data.leaderboard.length; i++) {
+                    var entry = data.leaderboard[i];
+                    var medal = '';
+                    if (i === 0) medal = '🥇';
+                    else if (i === 1) medal = '🥈';
+                    else if (i === 2) medal = '🥉';
+                    else medal = (i + 1) + '.';
+                    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 15px;border-bottom:1px solid #333;font-family:&apos;Noto Sans&apos;,sans-serif;">';
+                    html += '<span style="color:#fff;font-size:15px;">' + medal + ' ' + escapeHtml(entry.name || 'Student') + '</span>';
+                    html += '<span style="color:#ff9800;font-weight:700;font-size:15px;">' + (entry.score || 0) + ' pts</span>';
+                    html += '</div>';
+                }
+            } else {
+                html += '<div style="text-align:center;padding:25px;">';
+                html += '<p style="color:#ff9800;font-size:16px;margin-bottom:8px;">🏆 Round Complete!</p>';
+                html += '<p style="color:#888;font-size:12px;">Leaderboard data will appear here once the webhook endpoint is configured.</p>';
+                html += '</div>';
+            }
+
+            html += '<div style="text-align:center;margin-top:20px;">';
+            html += '<button onclick="closeTRLeaderboard()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 30px;border-radius:8px;font-size:13px;cursor:pointer;">✕ Close</button>';
+            html += '</div>';
+            html += '</div>';
+
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+        }
+
+        function closeTRLeaderboard() {
+            var modal = document.getElementById('trLeaderboardModal');
+            if (modal) modal.remove();
+        }
+
+        function clearAllTR() {
+            if (trSets.length > 0 || trGeneratedCards.length > 0) {
+                if (!confirm('Clear all sets and generated cards?')) return;
+            }
+            trSets = [];
+            trGeneratedCards = [];
+            renderTRSets();
+            var displayArea = document.getElementById('trCardsDisplayArea');
+            if (displayArea) displayArea.style.display = 'none';
+        }
+        // ==================== END TUESDAY READING CLASS ====================
+
         // ==================== PERMUTATION GAME ====================
         function openPermutationGame() {
             // Create fullscreen overlay for the game
@@ -11940,7 +12725,7 @@ Return ONLY valid JSON (single object, not array):
                     <p style="color: #ce93d8; font-size: 13px; margin: 0;">
                         <strong>🌟 Yodafy Game</strong><br><br>
                         This interactive game helps students practice Korean sentence variations through 4 levels:<br>
-                        • <strong>Level 1:</strong> Word-order permutations<br>
+                        • <strong>Level 1:</strong> Tuesday Reading Class<br>
                         • <strong>Level 2:</strong> Single word substitutions<br>
                         • <strong>Level 3:</strong> Multiple word substitutions<br>
                         • <strong>Level 4:</strong> Situational responses<br><br>
