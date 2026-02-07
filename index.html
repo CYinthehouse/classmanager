@@ -983,6 +983,91 @@
         .tr-check-area .tr-pts { background: linear-gradient(135deg, #39ff14, #20cc00); color: #000; padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 700; box-shadow: 0 0 10px rgba(57,255,20,0.3); }
         @keyframes trOverlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes trCardSlideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ==================== MATERIALS CREATION WINDOW STYLES ==================== */
+        .mat-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5,5,18,0.96); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 10000; overflow-y: auto; display: none; }
+        .mat-overlay.active { display: block; animation: trOverlayFadeIn 0.3s ease-out both; }
+        .mat-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .mat-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 0 20px 0; border-bottom: 2px solid rgba(255,0,255,0.3); margin-bottom: 25px; }
+        .mat-header h2 { color: #ff00ff; font-size: 22px; margin: 0; }
+        .mat-close-btn { background: rgba(255,68,68,0.9); color: #fff; border: none; width: 38px; height: 38px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .mat-close-btn:hover { background: #ff4444; transform: scale(1.15); }
+        .mat-panels { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+        @media (max-width: 900px) { .mat-panels { grid-template-columns: 1fr; } }
+        .mat-input-panel { background: rgba(0,0,0,0.4); border: 2px solid #444; border-radius: 12px; padding: 20px; }
+        .mat-input-panel h3 { color: #00ffff; font-size: 16px; margin: 0 0 15px 0; }
+        .mat-input-panel textarea { width: 100%; min-height: 180px; padding: 12px; background: #0a0a15; border: 2px solid #333; border-radius: 8px; color: #fff; font-family: 'Noto Sans', sans-serif; font-size: 15px; line-height: 1.7; resize: vertical; box-sizing: border-box; }
+        .mat-input-panel textarea:focus { border-color: #00ffff; outline: none; }
+        .mat-input-panel textarea::placeholder { color: #555; }
+        .mat-color-row { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+        .mat-color-row label { color: #888; font-size: 11px; }
+        .mat-color-row input[type="color"] { width: 36px; height: 28px; border: 1px solid #444; border-radius: 4px; background: none; cursor: pointer; }
+        .mat-font-size-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+        .mat-font-size-row label { color: #888; font-size: 11px; white-space: nowrap; }
+        .mat-font-size-row input[type="range"] { flex: 1; accent-color: #ff00ff; }
+        .mat-font-size-row span { color: #00ffff; font-size: 12px; min-width: 36px; }
+        .mat-generate-row { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .mat-btn-generate { padding: 12px 24px; background: linear-gradient(135deg, #ff00ff, #9c27b0); border: 2px solid #ff00ff; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.25s; }
+        .mat-btn-generate:hover { transform: scale(1.04); box-shadow: 0 0 20px rgba(255,0,255,0.4); }
+        .mat-preview-panel { background: rgba(0,0,0,0.4); border: 2px solid #444; border-radius: 12px; padding: 20px; }
+        .mat-preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .mat-preview-header h3 { color: #ff00ff; font-size: 16px; margin: 0; }
+        .mat-export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mat-btn-export { padding: 8px 16px; border: 2px solid; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: rgba(0,0,0,0.3); }
+        .mat-btn-export:hover { transform: scale(1.04); }
+        .mat-btn-pdf { color: #ff3366; border-color: #ff3366; }
+        .mat-btn-pdf:hover { background: rgba(255,51,102,0.15); box-shadow: 0 0 12px rgba(255,51,102,0.3); }
+        .mat-btn-html { color: #39ff14; border-color: #39ff14; }
+        .mat-btn-html:hover { background: rgba(57,255,20,0.15); box-shadow: 0 0 12px rgba(57,255,20,0.3); }
+        .mat-slideshow { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: #111; border: 2px solid #333; }
+        .mat-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; opacity: 0; transition: opacity 0.5s ease; box-sizing: border-box; }
+        .mat-slide.active { opacity: 1; }
+        .mat-slide-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+        .mat-slide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .mat-slide-content { position: relative; z-index: 2; max-width: 85%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .mat-slide-korean { font-size: 30px; font-weight: 700; line-height: 1.6; color: #000; word-break: keep-all; display: block; width: 100%; text-align: center; }
+        .mat-slide-number { position: absolute; bottom: 12px; right: 18px; font-size: 13px; color: #000; opacity: 0.3; z-index: 2; }
+        .mat-slide-nav { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; }
+        .mat-slide-nav button { padding: 8px 20px; background: rgba(255,0,255,0.2); border: 2px solid #ff00ff; border-radius: 6px; color: #ff00ff; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .mat-slide-nav button:hover { background: rgba(255,0,255,0.4); box-shadow: 0 0 12px rgba(255,0,255,0.3); }
+        .mat-slide-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .mat-slide-nav span { color: #888; font-size: 13px; min-width: 80px; text-align: center; }
+        .mat-slide-dots { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+        .mat-slide-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,0,255,0.25); border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: all 0.2s; }
+        .mat-slide-dot.active { background: #ff00ff; box-shadow: 0 0 8px rgba(255,0,255,0.5); }
+        .mat-empty-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: #555; }
+        .mat-empty-preview span { font-size: 48px; margin-bottom: 12px; }
+        .mat-empty-preview p { font-size: 14px; }
+        .mat-slide-title { position: absolute; top: 0; left: 0; width: 100%; padding: 10px 18px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; z-index: 2; opacity: 0.7; }
+
+        /* Expanded Preview Mode */
+        .mat-expanded-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 10px 0; }
+        .mat-expanded-overlay.active { display: flex; }
+        .mat-expanded-close { position: fixed; top: 15px; right: 20px; background: rgba(255,68,68,0.9); color: #fff; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; z-index: 20001; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .mat-expanded-close:hover { background: #ff4444; transform: scale(1.15); }
+        .mat-expanded-slide-wrap { position: relative; width: 88vw; max-width: 1300px; max-height: calc(100vh - 100px); aspect-ratio: 16/9; border-radius: 12px; overflow: visible; flex-shrink: 1; }
+        .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+        .mat-expanded-content { position: relative; z-index: 2; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 40px; box-sizing: border-box; }
+        .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+        .mat-word { font-weight: 700; color: #000; cursor: pointer; padding: 6px 8px; border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; }
+        .mat-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }
+        .mat-word.mat-word-playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }
+        .mat-word .mat-word-tip { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #1a1a2e, #2d2748); color: #fff; padding: 14px 18px; border-radius: 10px; min-width: 230px; max-width: 340px; z-index: 30000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: 14px; font-weight: 400; }
+        .mat-word:hover .mat-word-tip { opacity: 1; visibility: visible; pointer-events: auto; }
+        .mat-word .mat-word-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }
+        .mat-word-tip .tip-label { font-size: 11px; color: #00ffff; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .mat-word-tip .tip-english { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .mat-word-tip .tip-pos { font-size: 12px; color: #ff00ff; font-style: italic; margin-bottom: 4px; }
+        .mat-word-tip .tip-detail { font-size: 11px; color: #aaa; line-height: 1.5; }
+        .mat-word-tip .tip-loading { font-size: 12px; color: #888; }
+        .mat-expanded-nav { display: flex; gap: 15px; align-items: center; z-index: 20001; flex-shrink: 0; }
+        .mat-expanded-nav button { padding: 10px 24px; background: rgba(255,0,255,0.25); border: 2px solid #ff00ff; border-radius: 8px; color: #ff00ff; font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+        .mat-expanded-nav button:hover { background: rgba(255,0,255,0.45); }
+        .mat-expanded-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .mat-expanded-nav span { color: #888; font-size: 14px; min-width: 80px; text-align: center; }
+        .mat-expanded-num { position: absolute; bottom: 12px; right: 18px; font-size: 14px; color: #000; opacity: 0.3; z-index: 2; }
+        .mat-expanded-hint { color: rgba(255,255,255,0.35); font-size: 12px; flex-shrink: 0; }
+        /* ==================== END MATERIALS CREATION WINDOW STYLES ==================== */
         /* ==================== END TUESDAY READING CLASS STYLES ==================== */
     </style>
 </head>
@@ -1667,6 +1752,11 @@
                         <h3>📖 Tuesday Reading Class</h3>
                         <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Upload materials for Tuesday Reading Class. Select TEXT or IMAGE input. Up to 10 sets, each becomes a reading card.</p>
 
+                        <!-- View Materials Button -->
+                        <div style="margin-bottom: 18px;">
+                            <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
+                        </div>
+
                         <!-- Input Mode Toggle -->
                         <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
                             <button class="btn btn-sm tr-input-mode-btn tr-mode-active" id="trModeTextBtn" onclick="setTRInputMode('text')">📝 TEXT Input</button>
@@ -1696,6 +1786,57 @@
                         </div>
                     </div>
 
+                </div>
+
+                <!-- Materials Creation Window Overlay -->
+                <div class="mat-overlay" id="materialsOverlay">
+                    <div class="mat-container">
+                        <div class="mat-header">
+                            <h2>📑 Materials Creator</h2>
+                            <button class="mat-close-btn" onclick="closeMaterialsCreator()">✕</button>
+                        </div>
+                        <div class="mat-panels">
+                            <div class="mat-input-panel">
+                                <h3>📝 Korean Text Input</h3>
+                                <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Enter Korean sentences — 2 to 3 per slide. Separate slides with a blank line.</p>
+                                <textarea id="matTextInput" placeholder="오늘 날씨가 좋아요.&#10;저는 한국어를 공부합니다.&#10;내일 학교에 갈 거예요.&#10;&#10;한국은 아름다운 나라입니다.&#10;서울은 큰 도시입니다.&#10;한강이 서울을 지나갑니다."></textarea>
+                                <p style="font-size: 10px; color: #555; margin-top: 5px;">Slides detected: <span id="matSlideCount" style="color: #00ffff;">0</span> <span style="color:#444;">(separate slides with a blank line)</span></p>
+                                <div class="mat-font-size-row">
+                                    <label>Font Size</label>
+                                    <input type="range" id="matFontSize" min="16" max="60" value="30" oninput="document.getElementById('matFontSizeVal').textContent=this.value+'px'; matRegenerateSlides();">
+                                    <span id="matFontSizeVal">30px</span>
+                                </div>
+                                <div class="mat-generate-row">
+                                    <button class="mat-btn-generate" onclick="matGenerateSlides()">🎬 Generate Slideshow</button>
+                                </div>
+                            </div>
+                            <div class="mat-preview-panel">
+                                <div class="mat-preview-header">
+                                    <h3>🎬 Slideshow Preview</h3>
+                                    <div class="mat-export-btns" id="matExportBtns" style="display: none;">
+                                        <button class="mat-btn-export mat-btn-pdf" onclick="matExportPDF()">📄 Export PDF</button>
+                                        <button class="mat-btn-export mat-btn-html" onclick="matExportHTML()">🌐 Export HTML</button>
+                                    </div>
+                                </div>
+                                <div id="matSlideshowArea" onclick="matExpandPreview()" style="cursor: pointer;" title="Click to expand">
+                                    <div class="mat-empty-preview"><span>📑</span><p>Enter Korean text and click Generate to preview slides</p></div>
+                                </div>
+                                <p id="matExpandHint" style="display:none; text-align:center; font-size:11px; color:#666; margin-top:6px;">🔍 Click the preview to expand and interact with words</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expanded Slide Preview -->
+                <div class="mat-expanded-overlay" id="matExpandedOverlay">
+                    <button class="mat-expanded-close" onclick="matCloseExpanded()">✕</button>
+                    <div class="mat-expanded-slide-wrap" id="matExpandedSlideWrap"></div>
+                    <div class="mat-expanded-nav">
+                        <button onclick="matExpandedPrev()" id="matExpPrevBtn">◀ Prev</button>
+                        <span id="matExpIndicator">1 / 1</span>
+                        <button onclick="matExpandedNext()" id="matExpNextBtn">Next ▶</button>
+                    </div>
+                    <div class="mat-expanded-hint">Click a word to hear it · Hover for translation</div>
                 </div>
 
                 <div id="adminTabSuggestions" class="tab-content">
@@ -8821,6 +8962,477 @@
             if (displayArea) displayArea.style.display = 'none';
         }
         // ==================== END TUESDAY READING CLASS ====================
+
+        // ==================== MATERIALS CREATOR ====================
+        var matSlides = [];
+        var matCurrentSlide = 0;
+        var MAT_BG_URL = 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Untitled_design_35.png?v=1770487066';
+
+        function openMaterialsCreator() {
+            var overlay = document.getElementById('materialsOverlay');
+            if (overlay) {
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                matUpdateSlideCount();
+            }
+        }
+
+        function closeMaterialsCreator() {
+            var overlay = document.getElementById('materialsOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
+        function matUpdateSlideCount() {
+            var slides = matParseSlides();
+            var el = document.getElementById('matSlideCount');
+            if (el) el.textContent = slides.length;
+        }
+
+        (function() {
+            var pollInterval = setInterval(function() {
+                var ta = document.getElementById('matTextInput');
+                if (ta) { ta.addEventListener('input', matUpdateSlideCount); clearInterval(pollInterval); }
+            }, 500);
+        })();
+
+        function matParseSlides() {
+            var textarea = document.getElementById('matTextInput');
+            if (!textarea) return [];
+            var raw = textarea.value;
+            if (!raw.trim()) return [];
+            var groups = raw.split(/\n\s*\n/);
+            var slides = [];
+            for (var g = 0; g < groups.length; g++) {
+                var lines = groups[g].split('\n').filter(function(l) { return l.trim().length > 0; });
+                if (lines.length === 0) continue;
+                // Split each line further by sentence-ending punctuation
+                var allSentences = [];
+                for (var i = 0; i < lines.length; i++) {
+                    var parts = lines[i].trim().split(/(?<=[.!?。])\s*/);
+                    for (var p = 0; p < parts.length; p++) {
+                        var s = parts[p].trim();
+                        if (s.length > 0) allSentences.push(s);
+                    }
+                }
+                // Group into slides of up to 3 sentences
+                for (var k = 0; k < allSentences.length; k += 3) {
+                    var chunk = allSentences.slice(k, k + 3);
+                    slides.push({ sentences: chunk });
+                }
+            }
+            return slides;
+        }
+
+        function matGenerateSlides() {
+            var parsed = matParseSlides();
+            if (parsed.length === 0) { alert('Please enter at least one Korean sentence.'); return; }
+            matSlides = parsed;
+            matCurrentSlide = 0;
+            matRenderSlideshow();
+            document.getElementById('matExportBtns').style.display = 'flex';
+        }
+
+        function matRegenerateSlides() {
+            if (matSlides.length > 0) matRenderSlideshow();
+        }
+
+        function matRenderSlideshow() {
+            var area = document.getElementById('matSlideshowArea');
+            if (!area) return;
+            var fs = (parseInt(document.getElementById('matFontSize').value) || 30) + 'px';
+            var html = '<div class="mat-slideshow">';
+            for (var i = 0; i < matSlides.length; i++) {
+                var s = matSlides[i];
+                var ac = (i === matCurrentSlide) ? ' active' : '';
+                html += '<div class="mat-slide' + ac + '" data-slide="' + i + '">';
+                html += '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="" crossorigin="anonymous">';
+                html += '<div class="mat-slide-content" style="font-size:' + fs + ';">';
+                for (var j = 0; j < s.sentences.length; j++) {
+                    html += '<div class="mat-slide-korean">' + escapeHtml(s.sentences[j]) + '</div>';
+                }
+                html += '</div>';
+                html += '<div class="mat-slide-number">' + (i + 1) + ' / ' + matSlides.length + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            html += '<div class="mat-slide-nav">';
+            html += '<button onclick="matPrevSlide()" id="matPrevBtn">&#9664; Prev</button>';
+            html += '<span id="matSlideIndicator">' + (matCurrentSlide + 1) + ' / ' + matSlides.length + '</span>';
+            html += '<button onclick="matNextSlide()" id="matNextBtn">Next &#9654;</button>';
+            html += '</div>';
+            html += '<div class="mat-slide-dots">';
+            for (var d = 0; d < matSlides.length; d++) {
+                html += '<div class="mat-slide-dot' + (d === matCurrentSlide ? ' active' : '') + '" onclick="matGoToSlide(' + d + ')"></div>';
+            }
+            html += '</div>';
+            area.innerHTML = html;
+            matUpdateNav();
+        }
+
+        function matGoToSlide(idx) {
+            if (idx < 0 || idx >= matSlides.length) return;
+            matCurrentSlide = idx;
+            var slides = document.querySelectorAll('.mat-slide');
+            for (var i = 0; i < slides.length; i++) slides[i].classList.toggle('active', i === idx);
+            var dots = document.querySelectorAll('.mat-slide-dot');
+            for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === idx);
+            matUpdateNav();
+        }
+        function matPrevSlide() { matGoToSlide(matCurrentSlide - 1); }
+        function matNextSlide() { matGoToSlide(matCurrentSlide + 1); }
+        function matUpdateNav() {
+            var prev = document.getElementById('matPrevBtn');
+            var next = document.getElementById('matNextBtn');
+            var ind = document.getElementById('matSlideIndicator');
+            if (prev) prev.disabled = matCurrentSlide <= 0;
+            if (next) next.disabled = matCurrentSlide >= matSlides.length - 1;
+            if (ind) ind.textContent = (matCurrentSlide + 1) + ' / ' + matSlides.length;
+        }
+
+        function matExportPDF() {
+            if (matSlides.length === 0) { alert('No slides to export.'); return; }
+
+            // Dynamically load html2canvas and jsPDF if not already loaded
+            function loadScript(src) {
+                return new Promise(function(resolve, reject) {
+                    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+                    var s = document.createElement('script');
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+            }
+
+            var btn = document.querySelector('.mat-btn-pdf');
+            if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
+
+            Promise.all([
+                loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+                loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+            ]).then(function() {
+                // Create an offscreen container matching 16:9 landscape at high res
+                var offscreen = document.createElement('div');
+                offscreen.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1920px;height:1080px;z-index:-1;';
+                document.body.appendChild(offscreen);
+
+                var fs = (parseInt(document.getElementById('matFontSize').value) || 30);
+                // Scale font: preview is ~760px wide, offscreen is 1920px
+                var scale = 1920 / 760;
+                var scaledFs = Math.round(fs * scale);
+
+                var slidePromises = [];
+                for (var i = 0; i < matSlides.length; i++) {
+                    (function(idx) {
+                        slidePromises.push(new Promise(function(resolve) {
+                            var slide = document.createElement('div');
+                            slide.style.cssText = 'width:1920px;height:1080px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;';
+
+                            var img = document.createElement('img');
+                            img.crossOrigin = 'anonymous';
+                            img.src = MAT_BG_URL;
+                            img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;';
+
+                            var content = document.createElement('div');
+                            content.style.cssText = 'position:relative;z-index:1;text-align:center;max-width:85%;display:flex;flex-direction:column;align-items:center;gap:' + Math.round(12 * scale) + 'px;';
+
+                            var s = matSlides[idx];
+                            for (var j = 0; j < s.sentences.length; j++) {
+                                var line = document.createElement('div');
+                                line.style.cssText = 'font-size:' + scaledFs + 'px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;width:100%;text-align:center;font-family:"Noto Sans KR",sans-serif;';
+                                line.textContent = s.sentences[j];
+                                content.appendChild(line);
+                            }
+
+                            var num = document.createElement('div');
+                            num.style.cssText = 'position:absolute;bottom:20px;right:30px;font-size:20px;color:#000;opacity:0.3;z-index:1;font-family:"Noto Sans KR",sans-serif;';
+                            num.textContent = (idx + 1) + ' / ' + matSlides.length;
+
+                            slide.appendChild(img);
+                            slide.appendChild(content);
+                            slide.appendChild(num);
+                            offscreen.innerHTML = '';
+                            offscreen.appendChild(slide);
+
+                            // Wait for image to load
+                            function capture() {
+                                html2canvas(slide, {
+                                    width: 1920,
+                                    height: 1080,
+                                    scale: 1,
+                                    useCORS: true,
+                                    allowTaint: true,
+                                    backgroundColor: '#ffffff'
+                                }).then(function(canvas) {
+                                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                                });
+                            }
+
+                            if (img.complete && img.naturalWidth > 0) {
+                                capture();
+                            } else {
+                                img.onload = capture;
+                                img.onerror = capture;
+                            }
+                        }));
+                    })(i);
+                }
+
+                // Process slides sequentially to avoid memory issues
+                var results = [];
+                var chain = Promise.resolve();
+                slidePromises.forEach(function(p, idx) {
+                    chain = chain.then(function() {
+                        return p;
+                    }).then(function(dataUrl) {
+                        results[idx] = dataUrl;
+                    });
+                });
+
+                chain.then(function() {
+                    // Custom 16:9 page: 340mm x 191.25mm
+                    var pageW = 340;
+                    var pageH = 191.25;
+                    var pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: [pageH, pageW] });
+
+                    for (var i = 0; i < results.length; i++) {
+                        if (i > 0) pdf.addPage();
+                        pdf.addImage(results[i], 'JPEG', 0, 0, pageW, pageH);
+                    }
+
+                    pdf.save('KoreanLearnin_Reading_Materials.pdf');
+                    document.body.removeChild(offscreen);
+                    if (btn) { btn.textContent = '📄 Export PDF'; btn.disabled = false; }
+                });
+            }).catch(function(err) {
+                console.error('PDF export error:', err);
+                alert('Failed to load PDF libraries. Please check your internet connection.');
+                if (btn) { btn.textContent = '📄 Export PDF'; btn.disabled = false; }
+            });
+        }
+
+        function matExportHTML() {
+            if (matSlides.length === 0) { alert('No slides to export.'); return; }
+            var ks = parseInt(document.getElementById('matFontSize').value) || 30;
+            var t = matSlides.length;
+            var h = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>KoreanLearnin Reading Materials</title>\n';
+            h += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">\n<style>\n';
+            h += '*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Noto Sans KR",sans-serif;background:#000;overflow:hidden;width:100vw;height:100vh}.slideshow{position:relative;width:100vw;height:100vh}.slide{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.6s ease;background-image:url(' + MAT_BG_URL + ');background-size:cover;background-position:center}.slide.active{opacity:1}.content{position:relative;z-index:1;text-align:center;max-width:80%}.korean{font-size:' + ks + 'px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;margin-bottom:6px}.num{position:absolute;bottom:15px;right:20px;font-size:14px;color:#000;opacity:0.3;z-index:2}.nav{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:15px;align-items:center;z-index:100;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);padding:12px 24px;border-radius:50px;border:1px solid rgba(255,255,255,0.15)}.nav button{padding:8px 20px;background:rgba(255,0,255,0.25);border:2px solid #ff00ff;border-radius:6px;color:#ff00ff;font-size:13px;cursor:pointer;transition:all 0.2s;font-family:inherit}.nav button:hover{background:rgba(255,0,255,0.45)}.nav button:disabled{opacity:0.3;cursor:not-allowed}.nav span{color:#888;font-size:13px;min-width:70px;text-align:center}.dots{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:100}.dot{width:10px;height:10px;border-radius:50%;background:rgba(255,0,255,0.25);border:1px solid rgba(255,0,255,0.4);cursor:pointer;transition:all 0.2s}.dot.active{background:#ff00ff;box-shadow:0 0 8px rgba(255,0,255,0.5)}.info{position:fixed;top:12px;right:18px;font-size:11px;color:rgba(255,255,255,0.35);z-index:100}\n';
+            h += '</style>\n</head>\n<body>\n<div class="slideshow">\n';
+            for (var i = 0; i < matSlides.length; i++) {
+                var ac = (i === 0) ? ' active' : '';
+                h += '<div class="slide' + ac + '"><div class="content">';
+                for (var j = 0; j < matSlides[i].sentences.length; j++) {
+                    h += '<div class="korean">' + escapeHtml(matSlides[i].sentences[j]) + '</div>';
+                }
+                h += '</div><div class="num">' + (i+1) + ' / ' + t + '</div></div>\n';
+            }
+            h += '</div>\n<div class="nav"><button id="pb" onclick="go(-1)">&#9664; Prev</button><span id="ind">1 / ' + t + '</span><button id="nb" onclick="go(1)">Next &#9654;</button></div>\n<div class="dots">\n';
+            for (var d = 0; d < t; d++) {
+                h += '<div class="dot' + (d===0?' active':'') + '" onclick="goTo(' + d + ')"></div>\n';
+            }
+            h += '</div>\n<div class="info">&#8592; &#8594; arrow keys | click to advance</div>\n';
+            h += '<script>\nvar c=0,t=' + t + ';\nfunction goTo(i){if(i<0||i>=t)return;c=i;var s=document.querySelectorAll(".slide"),d=document.querySelectorAll(".dot");for(var j=0;j<s.length;j++){s[j].classList.toggle("active",j===i);if(d[j])d[j].classList.toggle("active",j===i);}document.getElementById("ind").textContent=(i+1)+" / "+t;document.getElementById("pb").disabled=i<=0;document.getElementById("nb").disabled=i>=t-1;}\nfunction go(dir){goTo(c+dir);}\ndocument.addEventListener("keydown",function(e){if(e.key==="ArrowRight"||e.key===" "){e.preventDefault();go(1);}if(e.key==="ArrowLeft"){e.preventDefault();go(-1);}});\ndocument.querySelector(".slideshow").addEventListener("click",function(e){if(e.target.tagName!=="BUTTON")go(1);});\ngoTo(0);\n<\/script>\n</body>\n</html>';
+            var blob = new Blob([h], { type: 'text/html;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'KoreanLearnin_Reading_Materials.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        // ---- EXPANDED PREVIEW MODE ----
+        var matExpCurrentSlide = 0;
+        var matWordCache = {};
+        var matCurrentAudio = null;
+
+        function matExpandPreview() {
+            if (matSlides.length === 0) return;
+            matExpCurrentSlide = matCurrentSlide;
+            document.getElementById('matExpandedOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            matRenderExpandedSlide();
+        }
+
+        function matCloseExpanded() {
+            document.getElementById('matExpandedOverlay').classList.remove('active');
+            document.body.style.overflow = 'hidden';
+            if (matCurrentAudio) { matCurrentAudio.pause(); matCurrentAudio = null; }
+        }
+
+        function matRenderExpandedSlide() {
+            var wrap = document.getElementById('matExpandedSlideWrap');
+            var s = matSlides[matExpCurrentSlide];
+            var fs = parseInt(document.getElementById('matFontSize').value) || 30;
+            var scaledFs = Math.round(fs * 2.2);
+
+            var html = '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="">';
+            html += '<div class="mat-expanded-content" style="font-size:' + scaledFs + 'px;">';
+            for (var j = 0; j < s.sentences.length; j++) {
+                html += '<div class="mat-expanded-sentence">';
+                var words = s.sentences[j].split(/\s+/);
+                for (var w = 0; w < words.length; w++) {
+                    if (!words[w]) continue;
+                    var wordId = 'matword_' + j + '_' + w;
+                    html += '<span class="mat-word" id="' + wordId + '" data-word="' + escapeHtml(words[w]) + '" data-sentence="' + escapeHtml(s.sentences[j]) + '"';
+                    html += ' onclick="event.stopPropagation(); matSpeakWord(this)"';
+                    html += ' onmouseenter="matLoadTooltip(this)">';
+                    html += escapeHtml(words[w]);
+                    // Nested tooltip div - CSS handles show/hide
+                    html += '<div class="mat-word-tip"><div class="tip-loading">⏳ Loading...</div></div>';
+                    html += '</span>';
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            html += '<div class="mat-expanded-num">' + (matExpCurrentSlide + 1) + ' / ' + matSlides.length + '</div>';
+            wrap.innerHTML = html;
+
+            document.getElementById('matExpIndicator').textContent = (matExpCurrentSlide + 1) + ' / ' + matSlides.length;
+            document.getElementById('matExpPrevBtn').disabled = matExpCurrentSlide <= 0;
+            document.getElementById('matExpNextBtn').disabled = matExpCurrentSlide >= matSlides.length - 1;
+        }
+
+        function matExpandedPrev() { if (matExpCurrentSlide > 0) { matExpCurrentSlide--; matRenderExpandedSlide(); } }
+        function matExpandedNext() { if (matExpCurrentSlide < matSlides.length - 1) { matExpCurrentSlide++; matRenderExpandedSlide(); } }
+
+        document.addEventListener('keydown', function(e) {
+            var overlay = document.getElementById('matExpandedOverlay');
+            if (!overlay || !overlay.classList.contains('active')) return;
+            if (e.key === 'ArrowLeft') { e.preventDefault(); matExpandedPrev(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); matExpandedNext(); }
+            if (e.key === 'Escape') { e.preventDefault(); matCloseExpanded(); }
+        });
+
+        // ---- WORD TTS (ElevenLabs) ----
+        function matSpeakWord(el) {
+            var word = el.getAttribute('data-word');
+            if (!word) return;
+            document.querySelectorAll('.mat-word-playing').forEach(function(w) { w.classList.remove('mat-word-playing'); });
+            el.classList.add('mat-word-playing');
+            if (matCurrentAudio) { matCurrentAudio.pause(); matCurrentAudio = null; }
+
+            var ELEVENLABS_KEY = '5cfb4c0308d17528674c2bc3402c43882a350402cc788f965e08a6fb7c2f17bc';
+            var ELEVENLABS_VOICE = 'BvhyWburo4Zh2fmksCoQ';
+
+            fetch('https://api.elevenlabs.io/v1/text-to-speech/' + ELEVENLABS_VOICE, {
+                method: 'POST',
+                headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': ELEVENLABS_KEY },
+                body: JSON.stringify({ text: word, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+            }).then(function(resp) {
+                if (!resp.ok) throw new Error('TTS failed');
+                return resp.blob();
+            }).then(function(blob) {
+                matCurrentAudio = new Audio(URL.createObjectURL(blob));
+                matCurrentAudio.onended = function() { el.classList.remove('mat-word-playing'); };
+                matCurrentAudio.play();
+            }).catch(function(err) {
+                console.error('TTS error:', err);
+                el.classList.remove('mat-word-playing');
+                if (window.speechSynthesis) {
+                    var utter = new SpeechSynthesisUtterance(word);
+                    utter.lang = 'ko-KR';
+                    utter.rate = 0.85;
+                    utter.onend = function() { el.classList.remove('mat-word-playing'); };
+                    speechSynthesis.speak(utter);
+                }
+            });
+        }
+
+        // ---- AI TOOLTIP (CSS hover, JS fetch) ----
+        function matLoadTooltip(el) {
+            var word = el.getAttribute('data-word');
+            var sentence = el.getAttribute('data-sentence');
+            var tipEl = el.querySelector('.mat-word-tip');
+            if (!tipEl) return;
+
+            // Already loaded
+            if (matWordCache[word]) {
+                matFillTip(tipEl, word, matWordCache[word]);
+                return;
+            }
+
+            // Already fetching
+            if (tipEl.dataset.fetching === 'true') return;
+            tipEl.dataset.fetching = 'true';
+
+            tipEl.innerHTML = '<div class="tip-label" style="color:#00ffff;font-size:16px;font-weight:700;margin-bottom:4px;">' + escapeHtml(word) + '</div><div class="tip-loading">⏳ Loading translation...</div>';
+
+            var prompt = 'Analyze the Korean word "' + word + '" from the sentence "' + sentence + '". Break it into its components (root word + any attached particles or grammar endings). If the word is a contraction, show the full uncontracted form. Examples: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my). "걔" = contracted from 그 + 아이 → 그아이 → 걔 (that kid). Reply ONLY with JSON: {"english":"English meaning","pos":"part of speech","particles":"attached particles/endings with function, or empty string","dictionary_form":"base form if different","conjugation":"conjugation pattern if verb/adjective, or empty string","contraction":"if contracted, show the derivation like 저 + 의 → 저의 → 제, otherwise empty string"}';
+
+            fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 300 })
+            }).then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                console.log('Tooltip AI raw response:', data);
+                var resultText = '';
+                if (typeof data === 'string') { resultText = data; }
+                else if (data.text) { resultText = data.text; }
+                else if (data.result) { resultText = data.result; }
+                else if (data.response) { resultText = data.response; }
+                else if (data.content) { resultText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content); }
+                else if (data.choices && data.choices[0]) { resultText = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || ''); }
+                else { resultText = JSON.stringify(data); }
+
+                console.log('Tooltip resultText:', resultText);
+
+                var info = { english: '', pos: '', particles: '', dictionary_form: '', conjugation: '', contraction: '' };
+                // Try to find JSON object - use greedy match
+                var jsonMatch = resultText.match(/\{[^{}]*"english"[^{}]*\}/);
+                if (!jsonMatch) jsonMatch = resultText.match(/\{[\s\S]+\}/);
+                console.log('Tooltip jsonMatch:', jsonMatch);
+
+                if (jsonMatch) {
+                    try {
+                        var parsed = JSON.parse(jsonMatch[0]);
+                        info.english = parsed.english || parsed.meaning || parsed.translation || '';
+                        info.pos = parsed.pos || parsed.part_of_speech || '';
+                        info.particles = parsed.particles || parsed.particle || parsed.grammar || '';
+                        info.dictionary_form = parsed.dictionary_form || parsed.base_form || '';
+                        info.conjugation = parsed.conjugation || parsed.conjugation_type || parsed.conjugation_pattern || '';
+                        info.contraction = parsed.contraction || parsed.contracted_form || '';
+                    } catch(e) {
+                        console.error('Tooltip JSON parse error:', e, jsonMatch[0]);
+                    }
+                }
+
+                if (!info.english) info.english = '(translation pending)';
+                matWordCache[word] = info;
+                matFillTip(tipEl, word, info);
+            }).catch(function(err) {
+                console.error('AI tooltip fetch error:', err);
+                tipEl.innerHTML = '<div class="tip-label" style="color:#00ffff;font-size:16px;font-weight:700;margin-bottom:4px;">' + escapeHtml(word) + '</div><div class="tip-loading">❌ Could not load translation</div>';
+                tipEl.dataset.fetching = 'false';
+            });
+        }
+
+        function matFillTip(tipEl, word, info) {
+            var html = '';
+            html += '<div class="tip-label" style="color:#00ffff;font-size:16px;font-weight:700;margin-bottom:6px;">' + escapeHtml(word) + '</div>';
+            html += '<div class="tip-english" style="color:#fff;font-size:14px;margin-bottom:6px;">🌐 ' + escapeHtml(info.english || '') + '</div>';
+            if (info.pos) html += '<div class="tip-pos" style="color:#ff00ff;font-size:12px;font-style:italic;margin-bottom:4px;">' + escapeHtml(info.pos) + '</div>';
+            if (info.particles) html += '<div class="tip-detail" style="color:#39ff14;font-size:11px;line-height:1.5;">🔗 ' + escapeHtml(info.particles) + '</div>';
+            if (info.dictionary_form) html += '<div class="tip-detail" style="color:#aaa;font-size:11px;line-height:1.5;">📖 Dictionary: ' + escapeHtml(info.dictionary_form) + '</div>';
+            if (info.conjugation) html += '<div class="tip-detail" style="color:#aaa;font-size:11px;line-height:1.5;">🔄 ' + escapeHtml(info.conjugation) + '</div>';
+            if (info.contraction) html += '<div class="tip-detail" style="color:#ffd700;font-size:11px;line-height:1.5;">✂️ ' + escapeHtml(info.contraction) + '</div>';
+            tipEl.innerHTML = html;
+        }
+
+        // Show expand hint after generating slides
+        var _origMatGenerate = matGenerateSlides;
+        matGenerateSlides = function() {
+            _origMatGenerate();
+            var hint = document.getElementById('matExpandHint');
+            if (hint && matSlides.length > 0) hint.style.display = 'block';
+        };
+        // ==================== END MATERIALS CREATOR ====================
 
         // ==================== PERMUTATION GAME ====================
         function openPermutationGame() {
