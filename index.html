@@ -9278,227 +9278,147 @@
             var fs = parseInt(document.getElementById('matFontSize').value) || 30;
             var totalSlides = matSlides.length;
             var cacheJSON = JSON.stringify(matWordCache || {});
-
-            // Calculate native font size on 1920 canvas
-            var previewWidth = document.querySelector('.mat-slideshow') ? document.querySelector('.mat-slideshow').offsetWidth : 760;
-            var nativeFs = Math.round(fs * (1920 / previewWidth));
-
-            // Build slides data as JSON for the exported file
             var slidesJSON = JSON.stringify(matSlides.map(function(s) { return { sentences: s.sentences }; }));
 
             var h = '';
-            h += '<!DOCTYPE html>\n<html lang="ko">\n<head>\n';
-            h += '<meta charset="UTF-8">\n';
-            h += '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
-            h += '<title>KoreanLearnin Reading Materials</title>\n';
-            h += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">\n';
-            h += '<style>\n';
-
-            // --- CSS - scoped to container ---
-            h += '.kl-reader { font-family:"Noto Sans KR",sans-serif; width:100%; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 0; -webkit-tap-highlight-color:transparent; }\n';
-
-            // Slide wrapper - sized by JS
-            h += '.kl-reader .slide-wrap { position:relative; overflow:hidden; flex-shrink:0; width:100%; }\n';
-
-            // Inner canvas at native 1920x1080
-            h += '.kl-reader .slide-inner { position:relative; width:1920px; height:1080px; transform-origin:top left; }\n';
-
-            // Each slide
-            h += '.kl-reader .slide { position:absolute; top:0; left:0; width:1920px; height:1080px; opacity:0; transition:opacity 0.5s ease; pointer-events:none; }\n';
-            h += '.kl-reader .slide.active { opacity:1; pointer-events:auto; }\n';
-            h += '.kl-reader .slide-bg { position:absolute; top:0; left:0; width:1920px; height:1080px; }\n';
-
-            // Content area - positioned inside the white box
-            h += '.kl-reader .content { position:absolute; top:123px; left:155px; right:155px; bottom:123px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:2; overflow:hidden; text-align:center; }\n';
-            h += '.kl-reader .sentence { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; width:100%; }\n';
-
-            // Interactive words
-            h += '.kl-reader .word { font-size:' + nativeFs + 'px; font-weight:700; color:#000; cursor:pointer; padding:6px 8px; border-radius:6px; transition:all 0.15s; position:relative; user-select:none; line-height:1.5; }\n';
-            h += '.kl-reader .word:hover { background:rgba(0,200,255,0.25); transform:scale(1.05); }\n';
-            h += '.kl-reader .word.playing { background:rgba(255,0,255,0.25); transform:scale(1.08); }\n';
-
-            // Tooltip
-            h += '.kl-reader .word .tip { position:absolute; bottom:calc(100% + 14px); left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#1a1a2e,#2d2748); color:#fff; padding:20px 24px; border-radius:12px; min-width:300px; max-width:420px; z-index:3000; box-shadow:0 8px 30px rgba(0,0,0,0.7); border:2px solid #00ffff; opacity:0; visibility:hidden; transition:all 0.2s ease; pointer-events:none; white-space:normal; text-align:left; font-size:16px; font-weight:400; }\n';
-            h += '.kl-reader .word:hover .tip { opacity:1; visibility:visible; }\n';
-            h += '.kl-reader .word .tip::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#00ffff; }\n';
-            h += '.kl-reader .word .tip.show { opacity:1; visibility:visible; }\n';
-            h += '.kl-reader .word.tip-left .tip { left:0; transform:translateX(0); }\n';
-            h += '.kl-reader .word.tip-left .tip::after { left:30px; transform:none; }\n';
-            h += '.kl-reader .word.tip-right .tip { left:auto; right:0; transform:translateX(0); }\n';
-            h += '.kl-reader .word.tip-right .tip::after { left:auto; right:30px; transform:none; }\n';
-
-            // Slide number
-            h += '.kl-reader .num { position:absolute; bottom:20px; right:30px; font-size:22px; color:#000; opacity:0.3; z-index:2; }\n';
-
-            // Navigation bar
-            h += '.kl-reader .nav { display:flex; gap:15px; align-items:center; z-index:100; background:rgba(30,30,30,0.85); backdrop-filter:blur(10px); padding:12px 24px; border-radius:50px; border:1px solid rgba(255,255,255,0.15); flex-shrink:0; }\n';
-            h += '.kl-reader .nav button { padding:10px 22px; background:rgba(255,0,255,0.25); border:2px solid #ff00ff; border-radius:8px; color:#ff00ff; font-size:14px; cursor:pointer; transition:all 0.2s; font-family:inherit; }\n';
-            h += '.kl-reader .nav button:hover { background:rgba(255,0,255,0.45); }\n';
-            h += '.kl-reader .nav button:disabled { opacity:0.3; cursor:not-allowed; }\n';
-            h += '.kl-reader .nav span { color:#888; font-size:14px; min-width:80px; text-align:center; }\n';
-
-            // Dots
-            h += '.kl-reader .dots { display:flex; gap:6px; z-index:100; flex-shrink:0; }\n';
-            h += '.kl-reader .dot { width:10px; height:10px; border-radius:50%; background:rgba(255,0,255,0.25); border:1px solid rgba(255,0,255,0.4); cursor:pointer; transition:all 0.2s; }\n';
-            h += '.kl-reader .dot.active { background:#ff00ff; box-shadow:0 0 8px rgba(255,0,255,0.5); }\n';
-
-            // Mobile: disable CSS hover tooltips
-            h += '@media (hover:none) {\n';
-            h += '  .kl-reader .word:hover .tip { opacity:0; visibility:hidden; }\n';
-            h += '  .kl-reader .word .tip.show { opacity:1 !important; visibility:visible !important; }\n';
-            h += '}\n';
-
-            h += '</style>\n</head>\n<body>\n';
-
-            // --- HTML structure - self-contained container ---
-            h += '<div class="kl-reader" id="klReader">\n';
-            h += '  <div class="slide-wrap" id="slideWrap">\n';
-            h += '    <div class="slide-inner" id="slideInner"></div>\n';
+            h += '<div id="klrn-reader">\n';
+            h += '  <div class="klr-slide-area">\n';
+            h += '    <div class="klr-slides" id="klrSlides"></div>\n';
             h += '  </div>\n';
-            h += '  <div class="nav">\n';
-            h += '    <button id="pb" onclick="go(-1)">&#9664; Prev</button>\n';
-            h += '    <span id="ind">1 / ' + totalSlides + '</span>\n';
-            h += '    <button id="nb" onclick="go(1)">Next &#9654;</button>\n';
+            h += '  <div class="klr-nav">\n';
+            h += '    <button id="klrPb" onclick="KLR.go(-1)">&#9664; Prev</button>\n';
+            h += '    <span id="klrInd">1 / ' + totalSlides + '</span>\n';
+            h += '    <button id="klrNb" onclick="KLR.go(1)">Next &#9654;</button>\n';
             h += '  </div>\n';
-            h += '  <div class="dots" id="dots"></div>\n';
+            h += '  <div class="klr-dots" id="klrDots"></div>\n';
             h += '</div>\n';
 
-            // --- JavaScript ---
-            h += '<script>\n';
+            h += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">\n';
 
-            // Embed data
+            h += '<style>\n';
+            h += '#klrn-reader, #klrn-reader * { box-sizing: border-box; margin: 0; padding: 0; }\n';
+            h += '#klrn-reader { font-family: "Noto Sans KR", sans-serif; width: 100%; margin: 0 auto; text-align: center; }\n';
+            h += '#klrn-reader .klr-slide-area { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: visible; border-radius: 8px; }\n';
+            h += '#klrn-reader .klr-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
+            h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; }\n';
+            h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1.5vw, 16px); overflow: hidden; text-align: center; }\n';
+            h += '#klrn-reader .klr-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: clamp(2px, 0.6vw, 12px); width: 100%; }\n';
+            h += '#klrn-reader .klr-word { font-size: clamp(14px, ' + (fs / 12) + 'vw, ' + (fs * 2.5) + 'px); font-weight: 700; color: #000; cursor: pointer; padding: clamp(2px, 0.3vw, 6px) clamp(3px, 0.4vw, 8px); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
+            h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
+            h += '#klrn-reader .klr-word.playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }\n';
+            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: clamp(10px,1.5vw,20px) clamp(12px,1.8vw,24px); border-radius: 12px; min-width: 200px; max-width: 350px; z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: clamp(11px,1.2vw,16px); font-weight: 400; }\n';
+            h += '#klrn-reader .klr-word:hover .klr-tip { opacity: 1; visibility: visible; pointer-events: auto; }\n';
+            h += '#klrn-reader .klr-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }\n';
+            h += '#klrn-reader .klr-tip.show { opacity: 1; visibility: visible; pointer-events: auto; }\n';
+            h += '#klrn-reader .klr-word.tip-left .klr-tip { left: 0; transform: translateX(0); }\n';
+            h += '#klrn-reader .klr-word.tip-left .klr-tip::after { left: 30px; transform: none; }\n';
+            h += '#klrn-reader .klr-word.tip-right .klr-tip { left: auto; right: 0; transform: translateX(0); }\n';
+            h += '#klrn-reader .klr-word.tip-right .klr-tip::after { left: auto; right: 30px; transform: none; }\n';
+            h += '#klrn-reader .klr-num { position: absolute; bottom: 2%; right: 2%; font-size: clamp(10px,1vw,18px); color: #000; opacity: 0.3; z-index: 2; }\n';
+            h += '#klrn-reader .klr-nav { display: flex; gap: 15px; align-items: center; justify-content: center; padding: 12px 0; }\n';
+            h += '#klrn-reader .klr-nav button { padding: 10px 22px; background: rgba(255,0,255,0.25); border: 2px solid #ff00ff; border-radius: 8px; color: #ff00ff; font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }\n';
+            h += '#klrn-reader .klr-nav button:hover { background: rgba(255,0,255,0.45); }\n';
+            h += '#klrn-reader .klr-nav button:disabled { opacity: 0.3; cursor: not-allowed; }\n';
+            h += '#klrn-reader .klr-nav span { color: #888; font-size: 14px; min-width: 80px; text-align: center; }\n';
+            h += '#klrn-reader .klr-dots { display: flex; gap: 6px; justify-content: center; padding: 4px 0 12px; }\n';
+            h += '#klrn-reader .klr-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,0,255,0.25); border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: all 0.2s; }\n';
+            h += '#klrn-reader .klr-dot.active { background: #ff00ff; box-shadow: 0 0 8px rgba(255,0,255,0.5); }\n';
+            h += '@media (hover:none) {\n';
+            h += '  #klrn-reader .klr-word:hover .klr-tip { opacity: 0; visibility: hidden; }\n';
+            h += '  #klrn-reader .klr-tip.show { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }\n';
+            h += '}\n';
+            h += '</style>\n';
+
+            h += '<script>\n';
+            h += '(function(){\n';
             h += 'var slides = ' + slidesJSON + ';\n';
             h += 'var wordCache = ' + cacheJSON + ';\n';
             h += 'var totalSlides = ' + totalSlides + ';\n';
-            h += 'var currentSlide = 0;\n';
-            h += 'var currentAudio = null;\n';
-            h += 'var activeTooltip = null;\n';
+            h += 'var cur = 0, audio = null, activeTip = null;\n';
             h += 'var isMobile = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);\n';
-            h += 'var BG_URL = "' + MAT_BG_URL + '";\n';
-            h += 'var TTS_PROXY = "https://tts-proxy-386010826708.us-central1.run.app";\n';
-
-            // Escape helper
+            h += 'var BG = "' + MAT_BG_URL + '";\n';
+            h += 'var TTS = "https://tts-proxy-386010826708.us-central1.run.app";\n';
             h += 'function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML;}\n';
+            h += 'function strip(w){return w.replace(/^["""\\u2018\\u2019\\u201C\\u201D()\\[\\].,!?…·~\\-]+|["""\\u2018\\u2019\\u201C\\u201D()\\[\\].,!?…·~\\-]+$/g,"");}\n';
 
-            // Scale function
-            h += 'function scaleSlide() {\n';
-            h += '  var reader = document.getElementById("klReader");\n';
-            h += '  var wrap = document.getElementById("slideWrap");\n';
-            h += '  var inner = document.getElementById("slideInner");\n';
-            h += '  var availW = reader.offsetWidth;\n';
-            h += '  var s = availW / 1920;\n';
-            h += '  wrap.style.width = Math.round(1920 * s) + "px";\n';
-            h += '  wrap.style.height = Math.round(1080 * s) + "px";\n';
-            h += '  inner.style.transform = "scale(" + s + ")";\n';
-            h += '}\n';
-
-            // Build tooltip HTML from cache
             h += 'function buildTip(word) {\n';
-            h += '  var info = wordCache[word];\n';
-            h += '  if (!info) return "<div style=\\"color:#00ffff;font-size:22px;font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;font-size:14px;\\">No data available</div>";\n';
-            h += '  var html = "";\n';
-            h += '  html += "<div style=\\"color:#00ffff;font-size:22px;font-weight:700;margin-bottom:8px;\\">" + esc(word) + "</div>";\n';
-            h += '  html += "<div style=\\"color:#fff;font-size:18px;margin-bottom:8px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
-            h += '  if (info.pos) html += "<div style=\\"color:#ff00ff;font-size:15px;font-style:italic;margin-bottom:6px;\\">" + esc(info.pos) + "</div>";\n';
-            h += '  if (info.particles) html += "<div style=\\"color:#39ff14;font-size:14px;line-height:1.5;\\">🔗 " + esc(info.particles) + "</div>";\n';
-            h += '  if (info.dictionary_form) html += "<div style=\\"color:#aaa;font-size:14px;line-height:1.5;\\">📖 Dictionary: " + esc(info.dictionary_form) + "</div>";\n';
-            h += '  if (info.conjugation) html += "<div style=\\"color:#aaa;font-size:14px;line-height:1.5;\\">🔄 " + esc(info.conjugation) + "</div>";\n';
-            h += '  if (info.contraction) html += "<div style=\\"color:#ffd700;font-size:14px;line-height:1.5;\\">✂️ " + esc(info.contraction) + "</div>";\n';
-            h += '  return html;\n';
+            h += '  var info = wordCache[word] || wordCache[strip(word)];\n';
+            h += '  if (!info) return "<div style=\\"color:#00ffff;font-size:clamp(14px,1.5vw,22px);font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;font-size:clamp(10px,1vw,14px);\\">Loading...</div>";\n';
+            h += '  var h = "";\n';
+            h += '  h += "<div style=\\"color:#00ffff;font-size:clamp(14px,1.5vw,22px);font-weight:700;margin-bottom:6px;\\">" + esc(word) + "</div>";\n';
+            h += '  h += "<div style=\\"color:#fff;font-size:clamp(12px,1.3vw,18px);margin-bottom:6px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
+            h += '  if (info.pos) h += "<div style=\\"color:#ff00ff;font-size:clamp(10px,1.1vw,15px);font-style:italic;margin-bottom:4px;\\">" + esc(info.pos) + "</div>";\n';
+            h += '  if (info.particles) h += "<div style=\\"color:#39ff14;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">🔗 " + esc(info.particles) + "</div>";\n';
+            h += '  if (info.dictionary_form) h += "<div style=\\"color:#aaa;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">📖 " + esc(info.dictionary_form) + "</div>";\n';
+            h += '  if (info.conjugation) h += "<div style=\\"color:#aaa;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">🔄 " + esc(info.conjugation) + "</div>";\n';
+            h += '  if (info.contraction) h += "<div style=\\"color:#ffd700;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">✂️ " + esc(info.contraction) + "</div>";\n';
+            h += '  return h;\n';
             h += '}\n';
 
-            // Render slides
-            h += 'function renderSlides() {\n';
-            h += '  var inner = document.getElementById("slideInner");\n';
-            h += '  var dotsEl = document.getElementById("dots");\n';
-            h += '  var html = "";\n';
-            h += '  var dotsHtml = "";\n';
+            h += 'function render() {\n';
+            h += '  var el = document.getElementById("klrSlides"), dotsEl = document.getElementById("klrDots");\n';
+            h += '  var html = "", dh = "";\n';
             h += '  for (var i = 0; i < slides.length; i++) {\n';
             h += '    var ac = (i === 0) ? " active" : "";\n';
-            h += '    html += "<div class=\\"slide" + ac + "\\">";\n';
-            h += '    html += "<img class=\\"slide-bg\\" src=\\"" + BG_URL + "\\" alt=\\"\\">";\n';
-            h += '    html += "<div class=\\"content\\">";\n';
+            h += '    html += "<div class=\\"klr-slide" + ac + "\\" style=\\"background-image:url(" + BG + ")\\">";\n';
+            h += '    html += "<div class=\\"klr-content\\">";\n';
             h += '    for (var j = 0; j < slides[i].sentences.length; j++) {\n';
-            h += '      html += "<div class=\\"sentence\\">";\n';
+            h += '      html += "<div class=\\"klr-sentence\\">";\n';
             h += '      var words = slides[i].sentences[j].split(/\\s+/);\n';
             h += '      for (var w = 0; w < words.length; w++) {\n';
             h += '        if (!words[w]) continue;\n';
-            h += '        html += "<span class=\\"word\\" data-word=\\"" + esc(words[w]) + "\\" onclick=\\"onWord(this)\\">";\n';
+            h += '        html += "<span class=\\"klr-word\\" data-word=\\"" + esc(words[w]) + "\\" onclick=\\"KLR.onWord(this,event)\\">";\n';
             h += '        html += esc(words[w]);\n';
-            h += '        html += "<div class=\\"tip\\">" + buildTip(words[w]) + "</div>";\n';
+            h += '        html += "<div class=\\"klr-tip\\">" + buildTip(words[w]) + "</div>";\n';
             h += '        html += "</span>";\n';
             h += '      }\n';
             h += '      html += "</div>";\n';
             h += '    }\n';
             h += '    html += "</div>";\n';
-            h += '    html += "<div class=\\"num\\">" + (i+1) + " / " + slides.length + "</div>";\n';
+            h += '    html += "<div class=\\"klr-num\\">" + (i+1) + " / " + slides.length + "</div>";\n';
             h += '    html += "</div>";\n';
-            h += '    dotsHtml += "<div class=\\"dot" + (i===0?" active":"") + "\\" onclick=\\"goTo(" + i + ")\\"></div>";\n';
+            h += '    dh += "<div class=\\"klr-dot" + (i===0?" active":"") + "\\" onclick=\\"KLR.goTo(" + i + ")\\"></div>";\n';
             h += '  }\n';
-            h += '  inner.innerHTML = html;\n';
-            h += '  dotsEl.innerHTML = dotsHtml;\n';
+            h += '  el.innerHTML = html;\n';
+            h += '  dotsEl.innerHTML = dh;\n';
             h += '}\n';
 
-            // Word click/tap handler
-            h += 'function onWord(el) {\n';
-            h += '  event.stopPropagation();\n';
-            h += '  var word = el.getAttribute("data-word");\n';
-            h += '  playWord(el, word);\n';
+            h += 'function onWord(el, evt) {\n';
+            h += '  evt.stopPropagation();\n';
+            h += '  playWord(el, el.getAttribute("data-word"));\n';
             h += '  if (isMobile) {\n';
-            h += '    var tip = el.querySelector(".tip");\n';
-            h += '    if (activeTooltip && activeTooltip !== tip) activeTooltip.classList.remove("show");\n';
-            h += '    if (tip) { tip.classList.toggle("show"); activeTooltip = tip.classList.contains("show") ? tip : null; }\n';
+            h += '    var tip = el.querySelector(".klr-tip");\n';
+            h += '    if (activeTip && activeTip !== tip) activeTip.classList.remove("show");\n';
+            h += '    if (tip) { tip.classList.toggle("show"); activeTip = tip.classList.contains("show") ? tip : null; }\n';
             h += '  }\n';
             h += '}\n';
 
-            // TTS
             h += 'function playWord(el, word) {\n';
-            h += '  document.querySelectorAll(".word.playing").forEach(function(w){w.classList.remove("playing");});\n';
+            h += '  document.querySelectorAll("#klrn-reader .klr-word.playing").forEach(function(w){w.classList.remove("playing");});\n';
             h += '  el.classList.add("playing");\n';
-            h += '  if (currentAudio) { currentAudio.pause(); currentAudio = null; }\n';
-            h += '  fetch(TTS_PROXY, {\n';
-            h += '    method:"POST",\n';
-            h += '    headers:{"Content-Type":"application/json"},\n';
-            h += '    body:JSON.stringify({text:word})\n';
-            h += '  }).then(function(r){if(!r.ok)throw new Error("TTS fail");return r.blob();})\n';
-            h += '  .then(function(b){currentAudio=new Audio(URL.createObjectURL(b));currentAudio.onended=function(){el.classList.remove("playing");};currentAudio.play();})\n';
-            h += '  .catch(function(e){\n';
-            h += '    console.error("TTS error:",e);el.classList.remove("playing");\n';
-            h += '    if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(word);u.lang="ko-KR";u.rate=0.85;u.onend=function(){el.classList.remove("playing");};speechSynthesis.speak(u);}\n';
-            h += '  });\n';
+            h += '  if (audio) { audio.pause(); audio = null; }\n';
+            h += '  fetch(TTS, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:word})})\n';
+            h += '  .then(function(r){if(!r.ok)throw new Error("fail");return r.blob();})\n';
+            h += '  .then(function(b){audio=new Audio(URL.createObjectURL(b));audio.onended=function(){el.classList.remove("playing");};audio.play();})\n';
+            h += '  .catch(function(e){console.error("TTS:",e);el.classList.remove("playing");if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(word);u.lang="ko-KR";u.rate=0.85;u.onend=function(){el.classList.remove("playing");};speechSynthesis.speak(u);}});\n';
             h += '}\n';
 
-            // Navigation
             h += 'function goTo(i) {\n';
-            h += '  if (i<0||i>=totalSlides) return;\n';
-            h += '  currentSlide = i;\n';
-            h += '  var sl = document.querySelectorAll(".slide"), dt = document.querySelectorAll(".dot");\n';
-            h += '  for (var j=0;j<sl.length;j++){sl[j].classList.toggle("active",j===i);if(dt[j])dt[j].classList.toggle("active",j===i);}\n';
-            h += '  document.getElementById("ind").textContent = (i+1)+" / "+totalSlides;\n';
-            h += '  document.getElementById("pb").disabled = i<=0;\n';
-            h += '  document.getElementById("nb").disabled = i>=totalSlides-1;\n';
-            h += '  if (activeTooltip) { activeTooltip.classList.remove("show"); activeTooltip = null; }\n';
+            h += '  if (i<0||i>=totalSlides) return; cur = i;\n';
+            h += '  document.querySelectorAll("#klrn-reader .klr-slide").forEach(function(s,j){s.classList.toggle("active",j===i);});\n';
+            h += '  document.querySelectorAll("#klrn-reader .klr-dot").forEach(function(d,j){d.classList.toggle("active",j===i);});\n';
+            h += '  document.getElementById("klrInd").textContent = (i+1)+" / "+totalSlides;\n';
+            h += '  document.getElementById("klrPb").disabled = i<=0;\n';
+            h += '  document.getElementById("klrNb").disabled = i>=totalSlides-1;\n';
+            h += '  if (activeTip) { activeTip.classList.remove("show"); activeTip = null; }\n';
             h += '}\n';
-            h += 'function go(dir) { goTo(currentSlide+dir); }\n';
 
-            // Keyboard navigation
-            h += 'document.addEventListener("keydown",function(e){\n';
-            h += '  if(e.key==="ArrowRight"){e.preventDefault();go(1);}\n';
-            h += '  if(e.key==="ArrowLeft"){e.preventDefault();go(-1);}\n';
-            h += '});\n';
-
-            // Dismiss tooltip on tap outside (mobile)
-            h += 'document.addEventListener("click",function(e){\n';
-            h += '  if(!e.target.closest(".word") && activeTooltip){activeTooltip.classList.remove("show");activeTooltip=null;}\n';
-            h += '});\n';
-
-            // Resize handler
-            h += 'window.addEventListener("resize", scaleSlide);\n';
-
-            // Init
-            h += 'renderSlides();\nscaleSlide();\ngoTo(0);\n';
-
-            h += '<\/script>\n</body>\n</html>';
+            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, onWord: onWord };\n';
+            h += 'document.addEventListener("keydown",function(e){ if(e.key==="ArrowRight"){e.preventDefault();KLR.go(1);} if(e.key==="ArrowLeft"){e.preventDefault();KLR.go(-1);} });\n';
+            h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && activeTip){activeTip.classList.remove("show");activeTip=null;} });\n';
+            h += 'render(); goTo(0);\n';
+            h += '})();\n';
+            h += '<\/script>\n';
 
             // Download
             var blob = new Blob([h], { type: 'text/html;charset=utf-8' });
