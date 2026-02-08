@@ -9306,10 +9306,9 @@
             h += '#klrn-reader .klr-word { font-size: calc(' + fs + 'px * var(--s)); font-weight: 700; color: #000; cursor: pointer; padding: calc(3px * var(--s)) calc(4px * var(--s)); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
             h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
             h += '#klrn-reader .klr-word.playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }\n';
-            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: calc(12px * var(--s)) calc(14px * var(--s)); border-radius: 12px; min-width: calc(180px * var(--s)); max-width: calc(320px * var(--s)); z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: calc(13px * var(--s)); font-weight: 400; }\n';
-            h += '#klrn-reader .klr-word:hover .klr-tip { opacity: 1; visibility: visible; pointer-events: auto; }\n';
+            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: calc(12px * var(--s)) calc(14px * var(--s)); border-radius: 12px; min-width: calc(180px * var(--s)); max-width: calc(320px * var(--s)); z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; white-space: normal; text-align: left; font-size: calc(13px * var(--s)); font-weight: 400; }\n';
+            h += '#klrn-reader .klr-tip.show { display: block; }\n';
             h += '#klrn-reader .klr-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }\n';
-            h += '#klrn-reader .klr-tip.show { opacity: 1; visibility: visible; pointer-events: auto; }\n';
             h += '#klrn-reader .klr-word.tip-left .klr-tip { left: 0; transform: translateX(0); }\n';
             h += '#klrn-reader .klr-word.tip-left .klr-tip::after { left: 30px; transform: none; }\n';
             h += '#klrn-reader .klr-word.tip-right .klr-tip { left: auto; right: 0; transform: translateX(0); }\n';
@@ -9323,10 +9322,6 @@
             h += '#klrn-reader .klr-dots { display: flex; gap: 6px; justify-content: center; padding: 4px 0 12px; }\n';
             h += '#klrn-reader .klr-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,0,255,0.25); border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: all 0.2s; }\n';
             h += '#klrn-reader .klr-dot.active { background: #ff00ff; box-shadow: 0 0 8px rgba(255,0,255,0.5); }\n';
-            h += '@media (hover:none) {\n';
-            h += '  #klrn-reader .klr-word:hover .klr-tip { opacity: 0; visibility: hidden; }\n';
-            h += '  #klrn-reader .klr-tip.show { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }\n';
-            h += '}\n';
             h += '</style>\n';
 
             h += '<script>\n';
@@ -9343,7 +9338,7 @@
 
             h += 'function buildTip(word) {\n';
             h += '  var info = wordCache[word] || wordCache[strip(word)];\n';
-            h += '  if (!info) return "<div style=\\"color:#00ffff;font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;\\">Loading...</div>";\n';
+            h += '  if (!info) return "<div style=\\"color:#00ffff;font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;\\">No data</div>";\n';
             h += '  var h = "";\n';
             h += '  h += "<div style=\\"color:#00ffff;font-weight:700;margin-bottom:6px;\\">" + esc(word) + "</div>";\n';
             h += '  h += "<div style=\\"color:#fff;margin-bottom:6px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
@@ -9355,42 +9350,71 @@
             h += '  return h;\n';
             h += '}\n';
 
-            h += 'function render() {\n';
-            h += '  var el = document.getElementById("klrSlides"), dotsEl = document.getElementById("klrDots");\n';
-            h += '  var html = "", dh = "";\n';
-            h += '  for (var i = 0; i < slides.length; i++) {\n';
-            h += '    var ac = (i === 0) ? " active" : "";\n';
-            h += '    html += "<div class=\\"klr-slide" + ac + "\\" style=\\"background-image:url(" + BG + ")\\">";\n';
-            h += '    html += "<div class=\\"klr-content\\">";\n';
-            h += '    for (var j = 0; j < slides[i].sentences.length; j++) {\n';
-            h += '      html += "<div class=\\"klr-sentence\\">";\n';
-            h += '      var words = slides[i].sentences[j].split(/\\s+/);\n';
-            h += '      for (var w = 0; w < words.length; w++) {\n';
-            h += '        if (!words[w]) continue;\n';
-            h += '        html += "<span class=\\"klr-word\\" data-word=\\"" + esc(words[w]) + "\\" onclick=\\"KLR.onWord(this,event)\\">";\n';
-            h += '        html += esc(words[w]);\n';
-            h += '        html += "<div class=\\"klr-tip\\">" + buildTip(words[w]) + "</div>";\n';
-            h += '        html += "</span>";\n';
-            h += '      }\n';
-            h += '      html += "</div>";\n';
+            // Only render ONE slide at a time — dramatically reduces DOM nodes and memory
+            h += 'function renderSlide(i) {\n';
+            h += '  var el = document.getElementById("klrSlides");\n';
+            h += '  var html = "<div class=\\"klr-slide active\\" style=\\"background-image:url(" + BG + ")\\">";\n';
+            h += '  html += "<div class=\\"klr-content\\">";\n';
+            h += '  for (var j = 0; j < slides[i].sentences.length; j++) {\n';
+            h += '    html += "<div class=\\"klr-sentence\\">";\n';
+            h += '    var words = slides[i].sentences[j].split(/\\s+/);\n';
+            h += '    for (var w = 0; w < words.length; w++) {\n';
+            h += '      if (!words[w]) continue;\n';
+            h += '      html += "<span class=\\"klr-word\\" data-word=\\"" + esc(words[w]) + "\\">";\n';
+            h += '      html += esc(words[w]);\n';
+            h += '      html += "</span>";\n';
             h += '    }\n';
             h += '    html += "</div>";\n';
-            h += '    html += "<div class=\\"klr-num\\">" + (i+1) + " / " + slides.length + "</div>";\n';
-            h += '    html += "</div>";\n';
-            h += '    dh += "<div class=\\"klr-dot" + (i===0?" active":"") + "\\" onclick=\\"KLR.goTo(" + i + ")\\"></div>";\n';
             h += '  }\n';
+            h += '  html += "</div>";\n';
+            h += '  html += "<div class=\\"klr-num\\">" + (i+1) + " / " + totalSlides + "</div>";\n';
+            h += '  html += "</div>";\n';
             h += '  el.innerHTML = html;\n';
+            h += '}\n';
+
+            h += 'function renderDots() {\n';
+            h += '  var dotsEl = document.getElementById("klrDots"), dh = "";\n';
+            h += '  for (var i = 0; i < totalSlides; i++) {\n';
+            h += '    dh += "<div class=\\"klr-dot" + (i===cur?" active":"") + "\\" onclick=\\"KLR.goTo(" + i + ")\\"></div>";\n';
+            h += '  }\n';
             h += '  dotsEl.innerHTML = dh;\n';
             h += '}\n';
 
-            h += 'function onWord(el, evt) {\n';
-            h += '  evt.stopPropagation();\n';
-            h += '  playWord(el, el.getAttribute("data-word"));\n';
-            h += '  if (isMobile) {\n';
-            h += '    var tip = el.querySelector(".klr-tip");\n';
-            h += '    if (activeTip && activeTip !== tip) activeTip.classList.remove("show");\n';
-            h += '    if (tip) { tip.classList.toggle("show"); activeTip = tip.classList.contains("show") ? tip : null; }\n';
-            h += '  }\n';
+            // Show tooltip on demand — created only when needed, not pre-rendered
+            h += 'var tipEl = null;\n';
+            h += 'function showTip(wordEl) {\n';
+            h += '  hideTip();\n';
+            h += '  var word = wordEl.getAttribute("data-word");\n';
+            h += '  tipEl = document.createElement("div");\n';
+            h += '  tipEl.className = "klr-tip show";\n';
+            h += '  tipEl.innerHTML = buildTip(word);\n';
+            h += '  wordEl.appendChild(tipEl);\n';
+            h += '}\n';
+            h += 'function hideTip() {\n';
+            h += '  if (tipEl && tipEl.parentNode) tipEl.parentNode.removeChild(tipEl);\n';
+            h += '  tipEl = null;\n';
+            h += '}\n';
+
+            // Word interaction — delegated event on the slide container
+            h += 'document.getElementById("klrSlides").addEventListener("click", function(e) {\n';
+            h += '  var wordEl = e.target.closest(".klr-word");\n';
+            h += '  if (!wordEl) { hideTip(); return; }\n';
+            h += '  e.stopPropagation();\n';
+            h += '  var word = wordEl.getAttribute("data-word");\n';
+            h += '  playWord(wordEl, word);\n';
+            h += '  if (tipEl && tipEl.parentNode === wordEl) { hideTip(); } else { showTip(wordEl); }\n';
+            h += '});\n';
+
+            // Desktop hover tooltips
+            h += 'if (!isMobile) {\n';
+            h += '  document.getElementById("klrSlides").addEventListener("mouseover", function(e) {\n';
+            h += '    var wordEl = e.target.closest(".klr-word");\n';
+            h += '    if (wordEl) showTip(wordEl);\n';
+            h += '  });\n';
+            h += '  document.getElementById("klrSlides").addEventListener("mouseout", function(e) {\n';
+            h += '    var wordEl = e.target.closest(".klr-word");\n';
+            h += '    if (wordEl) hideTip();\n';
+            h += '  });\n';
             h += '}\n';
 
             h += 'function playWord(el, word) {\n';
@@ -9404,18 +9428,19 @@
             h += '}\n';
 
             h += 'function goTo(i) {\n';
-            h += '  if (i<0||i>=totalSlides) return; cur = i;\n';
-            h += '  document.querySelectorAll("#klrn-reader .klr-slide").forEach(function(s,j){s.classList.toggle("active",j===i);});\n';
+            h += '  if (i<0||i>=totalSlides) return;\n';
+            h += '  cur = i;\n';
+            h += '  hideTip();\n';
+            h += '  renderSlide(i);\n';
             h += '  document.querySelectorAll("#klrn-reader .klr-dot").forEach(function(d,j){d.classList.toggle("active",j===i);});\n';
             h += '  document.getElementById("klrInd").textContent = (i+1)+" / "+totalSlides;\n';
             h += '  document.getElementById("klrPb").disabled = i<=0;\n';
             h += '  document.getElementById("klrNb").disabled = i>=totalSlides-1;\n';
-            h += '  if (activeTip) { activeTip.classList.remove("show"); activeTip = null; }\n';
             h += '}\n';
 
-            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, onWord: onWord };\n';
+            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo };\n';
             h += 'document.addEventListener("keydown",function(e){ if(e.key==="ArrowRight"){e.preventDefault();KLR.go(1);} if(e.key==="ArrowLeft"){e.preventDefault();KLR.go(-1);} });\n';
-            h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && activeTip){activeTip.classList.remove("show");activeTip=null;} });\n';
+            h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && !e.target.closest(".klr-tip")) hideTip(); });\n';
 
             // Scale function: measures container, sets --s as ratio of container width to 760 (reference width)
             h += 'function klrScale() {\n';
@@ -9426,7 +9451,7 @@
             h += '}\n';
             h += 'window.addEventListener("resize", klrScale);\n';
 
-            h += 'render(); klrScale(); goTo(0);\n';
+            h += 'renderDots(); klrScale(); goTo(0);\n';
             // Also re-scale after a short delay in case Shopify layout settles late
             h += 'setTimeout(klrScale, 300);\n';
             h += 'setTimeout(klrScale, 1000);\n';
