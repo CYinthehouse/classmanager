@@ -9159,83 +9159,97 @@
                 loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
                 loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
             ]).then(function() {
-                // Create an offscreen container matching 16:9 landscape at high res
-                var offscreen = document.createElement('div');
-                offscreen.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1920px;height:1080px;z-index:-1;';
-                document.body.appendChild(offscreen);
-
                 var fs = (parseInt(document.getElementById('matFontSize').value) || 30);
                 // Scale font: preview width to native 1920 canvas (same as expanded view)
                 var previewWidth = document.querySelector('.mat-slideshow') ? document.querySelector('.mat-slideshow').offsetWidth : 760;
                 var scaledFs = Math.round(fs * (1920 / previewWidth));
 
-                var slidePromises = [];
-                for (var i = 0; i < matSlides.length; i++) {
-                    (function(idx) {
-                        slidePromises.push(new Promise(function(resolve) {
-                            var slide = document.createElement('div');
-                            slide.style.cssText = 'width:1920px;height:1080px;position:relative;overflow:hidden;';
+                // Create an offscreen container
+                var offscreen = document.createElement('div');
+                offscreen.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1920px;height:1080px;z-index:-1;';
+                document.body.appendChild(offscreen);
 
-                            var img = document.createElement('img');
-                            img.crossOrigin = 'anonymous';
-                            img.src = MAT_BG_URL;
-                            img.style.cssText = 'position:absolute;top:0;left:0;width:1920px;height:1080px;z-index:0;';
+                // Build slide capture function (runs sequentially)
+                function captureSlide(idx) {
+                    return new Promise(function(resolve) {
+                        var slide = document.createElement('div');
+                        slide.style.cssText = 'width:1920px;height:1080px;position:relative;overflow:hidden;';
 
-                            var content = document.createElement('div');
-                            content.style.cssText = 'position:absolute;top:123px;left:155px;right:155px;bottom:123px;z-index:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;overflow:hidden;';
+                        var img = document.createElement('img');
+                        img.crossOrigin = 'anonymous';
+                        img.src = MAT_BG_URL + (MAT_BG_URL.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+                        img.style.cssText = 'position:absolute;top:0;left:0;width:1920px;height:1080px;z-index:0;';
 
-                            var s = matSlides[idx];
-                            for (var j = 0; j < s.sentences.length; j++) {
-                                var line = document.createElement('div');
-                                line.style.cssText = 'font-size:' + scaledFs + 'px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;width:100%;text-align:center;font-family:"Noto Sans KR",sans-serif;';
-                                line.textContent = s.sentences[j];
-                                content.appendChild(line);
-                            }
+                        var content = document.createElement('div');
+                        content.style.cssText = 'position:absolute;top:123px;left:155px;right:155px;bottom:123px;z-index:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;overflow:hidden;';
 
-                            var num = document.createElement('div');
-                            num.style.cssText = 'position:absolute;bottom:20px;right:30px;font-size:20px;color:#000;opacity:0.3;z-index:1;font-family:"Noto Sans KR",sans-serif;';
-                            num.textContent = (idx + 1) + ' / ' + matSlides.length;
+                        var s = matSlides[idx];
+                        for (var j = 0; j < s.sentences.length; j++) {
+                            var line = document.createElement('div');
+                            line.style.cssText = 'font-size:' + scaledFs + 'px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;width:100%;text-align:center;font-family:"Noto Sans KR",sans-serif;';
+                            line.textContent = s.sentences[j];
+                            content.appendChild(line);
+                        }
 
-                            slide.appendChild(img);
-                            slide.appendChild(content);
-                            slide.appendChild(num);
-                            offscreen.innerHTML = '';
-                            offscreen.appendChild(slide);
+                        var num = document.createElement('div');
+                        num.style.cssText = 'position:absolute;bottom:20px;right:30px;font-size:20px;color:#000;opacity:0.3;z-index:1;font-family:"Noto Sans KR",sans-serif;';
+                        num.textContent = (idx + 1) + ' / ' + matSlides.length;
 
-                            // Wait for image to load
-                            function capture() {
-                                html2canvas(slide, {
-                                    width: 1920,
-                                    height: 1080,
-                                    scale: 1,
-                                    useCORS: true,
-                                    allowTaint: true,
-                                    backgroundColor: '#ffffff'
-                                }).then(function(canvas) {
-                                    resolve(canvas.toDataURL('image/jpeg', 0.95));
-                                });
-                            }
+                        slide.appendChild(img);
+                        slide.appendChild(content);
+                        slide.appendChild(num);
+                        offscreen.innerHTML = '';
+                        offscreen.appendChild(slide);
 
-                            if (img.complete && img.naturalWidth > 0) {
-                                capture();
-                            } else {
-                                img.onload = capture;
-                                img.onerror = capture;
-                            }
-                        }));
-                    })(i);
+                        function doCapture() {
+                            // Timeout safety: resolve with blank after 10s
+                            var timeout = setTimeout(function() {
+                                console.warn('PDF capture timeout for slide', idx + 1);
+                                resolve(null);
+                            }, 10000);
+
+                            html2canvas(slide, {
+                                width: 1920,
+                                height: 1080,
+                                scale: 1,
+                                useCORS: true,
+                                allowTaint: true,
+                                backgroundColor: '#ffffff'
+                            }).then(function(canvas) {
+                                clearTimeout(timeout);
+                                resolve(canvas.toDataURL('image/jpeg', 0.95));
+                            }).catch(function(err) {
+                                clearTimeout(timeout);
+                                console.error('PDF capture error slide', idx + 1, err);
+                                resolve(null);
+                            });
+                        }
+
+                        if (img.complete && img.naturalWidth > 0) {
+                            doCapture();
+                        } else {
+                            img.onload = doCapture;
+                            img.onerror = function() {
+                                console.warn('BG image failed to load for slide', idx + 1);
+                                doCapture(); // Capture anyway without image
+                            };
+                        }
+                    });
                 }
 
-                // Process slides sequentially to avoid memory issues
+                // Process slides sequentially
                 var results = [];
                 var chain = Promise.resolve();
-                slidePromises.forEach(function(p, idx) {
-                    chain = chain.then(function() {
-                        return p;
-                    }).then(function(dataUrl) {
-                        results[idx] = dataUrl;
-                    });
-                });
+                for (var i = 0; i < matSlides.length; i++) {
+                    (function(idx) {
+                        chain = chain.then(function() {
+                            if (btn) btn.textContent = '⏳ Slide ' + (idx + 1) + '/' + matSlides.length + '...';
+                            return captureSlide(idx);
+                        }).then(function(dataUrl) {
+                            results[idx] = dataUrl;
+                        });
+                    })(i);
+                }
 
                 chain.then(function() {
                     // Custom 16:9 page: 340mm x 191.25mm
