@@ -9289,69 +9289,69 @@
             var h = '';
             h += '<!DOCTYPE html>\n<html lang="ko">\n<head>\n';
             h += '<meta charset="UTF-8">\n';
-            h += '<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">\n';
+            h += '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
             h += '<title>KoreanLearnin Reading Materials</title>\n';
             h += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">\n';
             h += '<style>\n';
 
-            // --- CSS ---
-            h += '*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }\n';
-            h += 'html, body { font-family:"Noto Sans KR",sans-serif; background:#000; overflow:hidden; width:100%; height:100%; -webkit-tap-highlight-color:transparent; }\n';
+            // --- CSS - scoped to container ---
+            h += '.kl-reader { font-family:"Noto Sans KR",sans-serif; width:100%; max-width:1200px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 0; -webkit-tap-highlight-color:transparent; }\n';
 
-            // Slideshow container - centers everything
-            h += '.slideshow { width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }\n';
-
-            // Slide wrapper - sized by JS to scaled dimensions
-            h += '.slide-wrap { position:relative; overflow:visible; flex-shrink:0; }\n';
+            // Slide wrapper - sized by JS
+            h += '.kl-reader .slide-wrap { position:relative; overflow:visible; flex-shrink:0; width:100%; }\n';
 
             // Inner canvas at native 1920x1080
-            h += '.slide-inner { position:relative; width:1920px; height:1080px; transform-origin:top left; }\n';
+            h += '.kl-reader .slide-inner { position:relative; width:1920px; height:1080px; transform-origin:top left; }\n';
 
             // Each slide
-            h += '.slide { position:absolute; top:0; left:0; width:1920px; height:1080px; opacity:0; transition:opacity 0.5s ease; pointer-events:none; }\n';
-            h += '.slide.active { opacity:1; pointer-events:auto; }\n';
-            h += '.slide-bg { position:absolute; top:0; left:0; width:1920px; height:1080px; }\n';
+            h += '.kl-reader .slide { position:absolute; top:0; left:0; width:1920px; height:1080px; opacity:0; transition:opacity 0.5s ease; pointer-events:none; }\n';
+            h += '.kl-reader .slide.active { opacity:1; pointer-events:auto; }\n';
+            h += '.kl-reader .slide-bg { position:absolute; top:0; left:0; width:1920px; height:1080px; }\n';
 
             // Content area - positioned inside the white box
-            h += '.content { position:absolute; top:123px; left:155px; right:155px; bottom:123px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:2; overflow:hidden; text-align:center; }\n';
-            h += '.sentence { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; width:100%; }\n';
+            h += '.kl-reader .content { position:absolute; top:123px; left:155px; right:155px; bottom:123px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:2; overflow:hidden; text-align:center; }\n';
+            h += '.kl-reader .sentence { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; width:100%; }\n';
 
-            // Interactive words - font size is native to 1920 canvas
-            h += '.word { font-size:' + nativeFs + 'px; font-weight:700; color:#000; cursor:pointer; padding:6px 8px; border-radius:6px; transition:all 0.15s; position:relative; user-select:none; line-height:1.5; }\n';
-            h += '.word:hover { background:rgba(0,200,255,0.25); transform:scale(1.05); }\n';
-            h += '.word.playing { background:rgba(255,0,255,0.25); transform:scale(1.08); }\n';
+            // Interactive words
+            h += '.kl-reader .word { font-size:' + nativeFs + 'px; font-weight:700; color:#000; cursor:pointer; padding:6px 8px; border-radius:6px; transition:all 0.15s; position:relative; user-select:none; line-height:1.5; }\n';
+            h += '.kl-reader .word:hover { background:rgba(0,200,255,0.25); transform:scale(1.05); }\n';
+            h += '.kl-reader .word.playing { background:rgba(255,0,255,0.25); transform:scale(1.08); }\n';
 
             // Tooltip
-            h += '.word .tip { position:absolute; bottom:calc(100% + 14px); left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#1a1a2e,#2d2748); color:#fff; padding:20px 24px; border-radius:12px; min-width:300px; max-width:420px; z-index:3000; box-shadow:0 8px 30px rgba(0,0,0,0.7); border:2px solid #00ffff; opacity:0; visibility:hidden; transition:all 0.2s ease; pointer-events:none; white-space:normal; text-align:left; font-size:16px; font-weight:400; }\n';
-            h += '.word:hover .tip { opacity:1; visibility:visible; }\n';
-            h += '.word .tip::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#00ffff; }\n';
-            h += '.word .tip.show { opacity:1; visibility:visible; }\n';
+            h += '.kl-reader .word .tip { position:absolute; bottom:calc(100% + 14px); left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#1a1a2e,#2d2748); color:#fff; padding:20px 24px; border-radius:12px; min-width:300px; max-width:420px; z-index:3000; box-shadow:0 8px 30px rgba(0,0,0,0.7); border:2px solid #00ffff; opacity:0; visibility:hidden; transition:all 0.2s ease; pointer-events:none; white-space:normal; text-align:left; font-size:16px; font-weight:400; }\n';
+            h += '.kl-reader .word:hover .tip { opacity:1; visibility:visible; }\n';
+            h += '.kl-reader .word .tip::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#00ffff; }\n';
+            h += '.kl-reader .word .tip.show { opacity:1; visibility:visible; }\n';
+            h += '.kl-reader .word.tip-left .tip { left:0; transform:translateX(0); }\n';
+            h += '.kl-reader .word.tip-left .tip::after { left:30px; transform:none; }\n';
+            h += '.kl-reader .word.tip-right .tip { left:auto; right:0; transform:translateX(0); }\n';
+            h += '.kl-reader .word.tip-right .tip::after { left:auto; right:30px; transform:none; }\n';
 
             // Slide number
-            h += '.num { position:absolute; bottom:20px; right:30px; font-size:22px; color:#000; opacity:0.3; z-index:2; }\n';
+            h += '.kl-reader .num { position:absolute; bottom:20px; right:30px; font-size:22px; color:#000; opacity:0.3; z-index:2; }\n';
 
             // Navigation bar
-            h += '.nav { display:flex; gap:15px; align-items:center; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(10px); padding:12px 24px; border-radius:50px; border:1px solid rgba(255,255,255,0.15); flex-shrink:0; }\n';
-            h += '.nav button { padding:10px 22px; background:rgba(255,0,255,0.25); border:2px solid #ff00ff; border-radius:8px; color:#ff00ff; font-size:14px; cursor:pointer; transition:all 0.2s; font-family:inherit; }\n';
-            h += '.nav button:hover { background:rgba(255,0,255,0.45); }\n';
-            h += '.nav button:disabled { opacity:0.3; cursor:not-allowed; }\n';
-            h += '.nav span { color:#888; font-size:14px; min-width:80px; text-align:center; }\n';
+            h += '.kl-reader .nav { display:flex; gap:15px; align-items:center; z-index:100; background:rgba(30,30,30,0.85); backdrop-filter:blur(10px); padding:12px 24px; border-radius:50px; border:1px solid rgba(255,255,255,0.15); flex-shrink:0; }\n';
+            h += '.kl-reader .nav button { padding:10px 22px; background:rgba(255,0,255,0.25); border:2px solid #ff00ff; border-radius:8px; color:#ff00ff; font-size:14px; cursor:pointer; transition:all 0.2s; font-family:inherit; }\n';
+            h += '.kl-reader .nav button:hover { background:rgba(255,0,255,0.45); }\n';
+            h += '.kl-reader .nav button:disabled { opacity:0.3; cursor:not-allowed; }\n';
+            h += '.kl-reader .nav span { color:#888; font-size:14px; min-width:80px; text-align:center; }\n';
 
             // Dots
-            h += '.dots { display:flex; gap:6px; z-index:100; flex-shrink:0; }\n';
-            h += '.dot { width:10px; height:10px; border-radius:50%; background:rgba(255,0,255,0.25); border:1px solid rgba(255,0,255,0.4); cursor:pointer; transition:all 0.2s; }\n';
-            h += '.dot.active { background:#ff00ff; box-shadow:0 0 8px rgba(255,0,255,0.5); }\n';
+            h += '.kl-reader .dots { display:flex; gap:6px; z-index:100; flex-shrink:0; }\n';
+            h += '.kl-reader .dot { width:10px; height:10px; border-radius:50%; background:rgba(255,0,255,0.25); border:1px solid rgba(255,0,255,0.4); cursor:pointer; transition:all 0.2s; }\n';
+            h += '.kl-reader .dot.active { background:#ff00ff; box-shadow:0 0 8px rgba(255,0,255,0.5); }\n';
 
-            // Mobile: disable CSS hover tooltips, use JS .show class instead
+            // Mobile: disable CSS hover tooltips
             h += '@media (hover:none) {\n';
-            h += '  .word:hover .tip { opacity:0; visibility:hidden; }\n';
-            h += '  .word .tip.show { opacity:1 !important; visibility:visible !important; }\n';
+            h += '  .kl-reader .word:hover .tip { opacity:0; visibility:hidden; }\n';
+            h += '  .kl-reader .word .tip.show { opacity:1 !important; visibility:visible !important; }\n';
             h += '}\n';
 
             h += '</style>\n</head>\n<body>\n';
 
-            // --- HTML structure ---
-            h += '<div class="slideshow">\n';
+            // --- HTML structure - self-contained container ---
+            h += '<div class="kl-reader" id="klReader">\n';
             h += '  <div class="slide-wrap" id="slideWrap">\n';
             h += '    <div class="slide-inner" id="slideInner"></div>\n';
             h += '  </div>\n';
@@ -9382,11 +9382,11 @@
 
             // Scale function
             h += 'function scaleSlide() {\n';
+            h += '  var reader = document.getElementById("klReader");\n';
             h += '  var wrap = document.getElementById("slideWrap");\n';
             h += '  var inner = document.getElementById("slideInner");\n';
-            h += '  var availW = window.innerWidth * 0.95;\n';
-            h += '  var availH = window.innerHeight - 100;\n';
-            h += '  var s = Math.min(availW / 1920, availH / 1080);\n';
+            h += '  var availW = reader.offsetWidth;\n';
+            h += '  var s = availW / 1920;\n';
             h += '  wrap.style.width = Math.round(1920 * s) + "px";\n';
             h += '  wrap.style.height = Math.round(1080 * s) + "px";\n';
             h += '  inner.style.transform = "scale(" + s + ")";\n';
