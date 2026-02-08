@@ -1823,6 +1823,17 @@
                                     <div class="mat-empty-preview"><span>📑</span><p>Enter Korean text and click Generate to preview slides</p></div>
                                 </div>
                                 <p id="matExpandHint" style="display:none; text-align:center; font-size:11px; color:#666; margin-top:6px;">🔍 Click the preview to expand and interact with words</p>
+                                <div id="matPrefetchStatus" style="display:none; margin-top:8px; text-align:center;">
+                                    <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(0,200,255,0.1); border:1px solid rgba(0,200,255,0.3); border-radius:20px; padding:6px 16px;">
+                                        <div id="matPrefetchSpinner" style="width:14px;height:14px;border:2px solid rgba(0,200,255,0.3);border-top-color:#00ccff;border-radius:50%;animation:matSpin 0.8s linear infinite;"></div>
+                                        <span id="matPrefetchText" style="font-size:11px;color:#00ccff;">Loading word data...</span>
+                                        <span id="matPrefetchCount" style="font-size:11px;color:#888;">0 / 0</span>
+                                    </div>
+                                    <div style="margin-top:4px;width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+                                        <div id="matPrefetchBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00ccff,#ff00ff);border-radius:2px;transition:width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+                                <style>@keyframes matSpin{to{transform:rotate(360deg)}}</style>
                             </div>
                         </div>
                     </div>
@@ -9721,8 +9732,46 @@
             var wordList = Object.keys(wordMap);
             if (wordList.length === 0) return;
 
-            // Split into batches of 15 words
+            // Show progress UI
+            var statusEl = document.getElementById('matPrefetchStatus');
+            var textEl = document.getElementById('matPrefetchText');
+            var countEl = document.getElementById('matPrefetchCount');
+            var barEl = document.getElementById('matPrefetchBar');
+            if (statusEl) statusEl.style.display = 'block';
+
+            var totalWords = wordList.length;
+            var loadedWords = 0;
             var batchSize = 15;
+            var totalBatches = Math.ceil(wordList.length / batchSize);
+            var completedBatches = 0;
+
+            function updateProgress(batchCount) {
+                loadedWords += batchCount;
+                completedBatches++;
+                var pct = Math.round((loadedWords / totalWords) * 100);
+                if (countEl) countEl.textContent = loadedWords + ' / ' + totalWords;
+                if (barEl) barEl.style.width = pct + '%';
+                if (textEl) textEl.textContent = 'Loading word data... ' + pct + '%';
+
+                if (completedBatches >= totalBatches) {
+                    // All done
+                    if (textEl) textEl.textContent = '✅ All ' + totalWords + ' words loaded!';
+                    if (barEl) barEl.style.width = '100%';
+                    if (barEl) barEl.style.background = 'linear-gradient(90deg, #39ff14, #00ccff)';
+                    var spinner = document.getElementById('matPrefetchSpinner');
+                    if (spinner) spinner.style.display = 'none';
+                    // Fade out after 3 seconds
+                    setTimeout(function() {
+                        if (statusEl) statusEl.style.transition = 'opacity 0.5s';
+                        if (statusEl) statusEl.style.opacity = '0';
+                        setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; statusEl.style.opacity = '1'; }, 500);
+                    }, 3000);
+                }
+            }
+
+            if (countEl) countEl.textContent = '0 / ' + totalWords;
+
+            // Split into batches of 15 words
             for (var b = 0; b < wordList.length; b += batchSize) {
                 (function(batch) {
                     var examples = batch.map(function(w) { return '"' + w + '" (sentence: "' + wordMap[w] + '")'; }).join('\n');
@@ -9747,6 +9796,7 @@
                         console.log('Prefetch batch raw:', resultText.substring(0, 200));
 
                         var arrMatch = resultText.match(/\[[\s\S]*\]/);
+                        var batchCached = 0;
                         if (arrMatch) {
                             try {
                                 var arr = JSON.parse(arrMatch[0]);
@@ -9762,12 +9812,17 @@
                                             conjugation: item.conjugation || '',
                                             contraction: item.contraction || ''
                                         };
+                                        batchCached++;
                                     }
                                 }
                                 console.log('Prefetch cached ' + arr.length + ' words');
                             } catch(e) { console.error('Prefetch parse error:', e); }
                         }
-                    }).catch(function(err) { console.error('Prefetch error:', err); });
+                        updateProgress(batchCached || batch.length);
+                    }).catch(function(err) {
+                        console.error('Prefetch error:', err);
+                        updateProgress(batch.length);
+                    });
                 })(wordList.slice(b, b + batchSize));
             }
         }
