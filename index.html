@@ -9012,10 +9012,39 @@
                 // Split each line further by sentence-ending punctuation
                 var allSentences = [];
                 for (var i = 0; i < lines.length; i++) {
-                    var parts = lines[i].trim().split(/(?<=[.!?。]["'"」』\)]?)\s+/);
-                    for (var p = 0; p < parts.length; p++) {
-                        var s = parts[p].trim();
-                        if (s.length > 0 && s !== '"' && s !== '"' && s !== "'" && s !== "'" && s !== '」' && s !== '』') allSentences.push(s);
+                    // Don't split inside quotes - keep quoted blocks together
+                    var line = lines[i].trim();
+                    var quotedParts = [];
+                    var remaining = line;
+                    // Extract quoted blocks first
+                    var quoteRegex = /[""\u201C]([^""\u201D]*?)[""\u201D]/g;
+                    var lastIdx = 0;
+                    var qm;
+                    while ((qm = quoteRegex.exec(line)) !== null) {
+                        // Add text before quote
+                        var before = line.substring(lastIdx, qm.index).trim();
+                        if (before) {
+                            var bParts = before.split(/(?<=[.!?。])\s+/);
+                            for (var bp = 0; bp < bParts.length; bp++) { if (bParts[bp].trim()) quotedParts.push(bParts[bp].trim()); }
+                        }
+                        // Add entire quoted block as one unit
+                        quotedParts.push(qm[0].trim());
+                        lastIdx = qm.index + qm[0].length;
+                    }
+                    // Add remaining text after last quote
+                    var after = line.substring(lastIdx).trim();
+                    if (after) {
+                        var aParts = after.split(/(?<=[.!?。])\s+/);
+                        for (var ap = 0; ap < aParts.length; ap++) { if (aParts[ap].trim()) quotedParts.push(aParts[ap].trim()); }
+                    }
+                    // If no quotes found, split normally
+                    if (quotedParts.length === 0) {
+                        var parts = line.split(/(?<=[.!?。]["'"」』\)]?)\s+/);
+                        for (var p = 0; p < parts.length; p++) { if (parts[p].trim()) quotedParts.push(parts[p].trim()); }
+                    }
+                    for (var q = 0; q < quotedParts.length; q++) {
+                        var s = quotedParts[q];
+                        if (s.length > 0 && s !== '"' && s !== '\u201D' && s !== "'" && s !== '\u2019') allSentences.push(s);
                     }
                 }
                 // Group into slides of up to 3 sentences
