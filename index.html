@@ -9300,8 +9300,8 @@
             h += '#klrn-reader { font-family: "Noto Sans KR", sans-serif; width: 100%; margin: 0 auto; text-align: center; --s: 1; }\n';
             h += '#klrn-reader .klr-slide-area { position: relative; width: 100%; padding-bottom: 56.25%; overflow: visible; border-radius: 8px; }\n';
             h += '#klrn-reader .klr-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: 100% 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
-            h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; }\n';
-            h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(8px * var(--s)); overflow: hidden; text-align: center; }\n';
+            h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; overflow: visible; }\n';
+            h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(8px * var(--s)); overflow: visible; text-align: center; }\n';
             h += '#klrn-reader .klr-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); width: 100%; }\n';
             h += '#klrn-reader .klr-word { font-size: calc(' + fs + 'px * var(--s)); font-weight: 700; color: #000; cursor: pointer; padding: calc(3px * var(--s)) calc(4px * var(--s)); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
             h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
