@@ -1048,7 +1048,7 @@
         .mat-expanded-slide-wrap { position: relative; overflow: visible; flex-shrink: 0; }
         .mat-expanded-slide-inner { position: relative; width: 1920px; height: 1080px; transform-origin: top left; }
         .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border-radius: 12px; }
-        .mat-expanded-content { position: absolute; top: 123px; left: 155px; right: 155px; bottom: 123px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 2; overflow: hidden; text-align: center; }
+        .mat-expanded-content { position: absolute; top: 123px; left: 155px; right: 155px; bottom: 123px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 2; overflow: visible; text-align: center; }
         .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; width: 100%; }
         .mat-word { font-weight: 700; color: #000; cursor: pointer; padding: 6px 8px; border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; }
         .mat-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }
@@ -9721,50 +9721,55 @@
             var wordList = Object.keys(wordMap);
             if (wordList.length === 0) return;
 
-            // Build batch prompt
-            var examples = wordList.map(function(w) { return '"' + w + '" (sentence: "' + wordMap[w] + '")'; }).join('\n');
+            // Split into batches of 15 words
+            var batchSize = 15;
+            for (var b = 0; b < wordList.length; b += batchSize) {
+                (function(batch) {
+                    var examples = batch.map(function(w) { return '"' + w + '" (sentence: "' + wordMap[w] + '")'; }).join('\n');
 
-            var prompt = 'Analyze each Korean word below. Break into components (root + particles/grammar). If contracted, show derivation. Examples of good analysis: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my).\n\nWords to analyze:\n' + examples + '\n\nReply ONLY with a JSON array where each element is: {"word":"the original word","english":"meaning","pos":"part of speech","particles":"attached particles/endings, or empty","dictionary_form":"base form if different, or empty","conjugation":"conjugation pattern if verb/adj, or empty","contraction":"derivation if contracted, or empty"}\nNo markdown, no backticks.';
+                    var prompt = 'Analyze each Korean word below. Break into components (root + particles/grammar). If contracted, show derivation. Examples of good analysis: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my).\n\nWords to analyze:\n' + examples + '\n\nReply ONLY with a JSON array where each element is: {"word":"the original word","english":"meaning","pos":"part of speech","particles":"attached particles/endings, or empty","dictionary_form":"base form if different, or empty","conjugation":"conjugation pattern if verb/adj, or empty","contraction":"derivation if contracted, or empty"}\nNo markdown, no backticks.';
 
-            fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 2000 })
-            }).then(function(resp) { return resp.json(); })
-            .then(function(data) {
-                var resultText = '';
-                if (typeof data === 'string') { resultText = data; }
-                else if (data.text) { resultText = data.text; }
-                else if (data.result) { resultText = data.result; }
-                else if (data.response) { resultText = data.response; }
-                else if (data.content) { resultText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content); }
-                else if (data.choices && data.choices[0]) { resultText = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || ''); }
-                else { resultText = JSON.stringify(data); }
+                    fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 4000 })
+                    }).then(function(resp) { return resp.json(); })
+                    .then(function(data) {
+                        var resultText = '';
+                        if (typeof data === 'string') { resultText = data; }
+                        else if (data.text) { resultText = data.text; }
+                        else if (data.result) { resultText = data.result; }
+                        else if (data.response) { resultText = data.response; }
+                        else if (data.content) { resultText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content); }
+                        else if (data.choices && data.choices[0]) { resultText = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || ''); }
+                        else { resultText = JSON.stringify(data); }
 
-                console.log('Prefetch raw:', resultText);
+                        console.log('Prefetch batch raw:', resultText.substring(0, 200));
 
-                var arrMatch = resultText.match(/\[[\s\S]*\]/);
-                if (arrMatch) {
-                    try {
-                        var arr = JSON.parse(arrMatch[0]);
-                        for (var i = 0; i < arr.length; i++) {
-                            var item = arr[i];
-                            var w = item.word || '';
-                            if (w && !matWordCache[w]) {
-                                matWordCache[w] = {
-                                    english: item.english || item.meaning || '',
-                                    pos: item.pos || item.part_of_speech || '',
-                                    particles: item.particles || item.particle || '',
-                                    dictionary_form: item.dictionary_form || item.base_form || '',
-                                    conjugation: item.conjugation || '',
-                                    contraction: item.contraction || ''
-                                };
-                            }
+                        var arrMatch = resultText.match(/\[[\s\S]*\]/);
+                        if (arrMatch) {
+                            try {
+                                var arr = JSON.parse(arrMatch[0]);
+                                for (var i = 0; i < arr.length; i++) {
+                                    var item = arr[i];
+                                    var w = item.word || '';
+                                    if (w && !matWordCache[w]) {
+                                        matWordCache[w] = {
+                                            english: item.english || item.meaning || '',
+                                            pos: item.pos || item.part_of_speech || '',
+                                            particles: item.particles || item.particle || '',
+                                            dictionary_form: item.dictionary_form || item.base_form || '',
+                                            conjugation: item.conjugation || '',
+                                            contraction: item.contraction || ''
+                                        };
+                                    }
+                                }
+                                console.log('Prefetch cached ' + arr.length + ' words');
+                            } catch(e) { console.error('Prefetch parse error:', e); }
                         }
-                        console.log('Prefetch cached ' + arr.length + ' words');
-                    } catch(e) { console.error('Prefetch parse error:', e); }
-                }
-            }).catch(function(err) { console.error('Prefetch error:', err); });
+                    }).catch(function(err) { console.error('Prefetch error:', err); });
+                })(wordList.slice(b, b + batchSize));
+            }
         }
         // ==================== END MATERIALS CREATOR ====================
 
