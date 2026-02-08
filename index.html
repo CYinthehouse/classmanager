@@ -1041,14 +1041,15 @@
         .mat-slide-title { position: absolute; top: 0; left: 0; width: 100%; padding: 10px 18px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; z-index: 2; opacity: 0.7; }
 
         /* Expanded Preview Mode */
-        .mat-expanded-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; padding: 10px 0; }
+        .mat-expanded-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
         .mat-expanded-overlay.active { display: flex; }
         .mat-expanded-close { position: fixed; top: 15px; right: 20px; background: rgba(255,68,68,0.9); color: #fff; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; z-index: 20001; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .mat-expanded-close:hover { background: #ff4444; transform: scale(1.15); }
-        .mat-expanded-slide-wrap { position: relative; width: 85vw; max-width: 1200px; height: calc(100vh - 140px); max-height: calc(85vw * 9 / 16); border-radius: 12px; overflow: visible; flex-shrink: 0; }
-        .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
-        .mat-expanded-content { position: relative; z-index: 2; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; box-sizing: border-box; overflow: hidden; text-align: center; }
-        .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; width: 100%; }
+        .mat-expanded-slide-wrap { position: relative; overflow: visible; flex-shrink: 0; }
+        .mat-expanded-slide-inner { position: relative; width: 1920px; height: 1080px; transform-origin: top left; }
+        .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border-radius: 12px; }
+        .mat-expanded-content { position: absolute; top: 80px; left: 120px; right: 120px; bottom: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 2; overflow: hidden; text-align: center; }
+        .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; width: 100%; }
         .mat-word { font-weight: 700; color: #000; cursor: pointer; padding: 6px 8px; border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; }
         .mat-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }
         .mat-word.mat-word-playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }
@@ -1065,7 +1066,7 @@
         .mat-expanded-nav button:hover { background: rgba(255,0,255,0.45); }
         .mat-expanded-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
         .mat-expanded-nav span { color: #888; font-size: 14px; min-width: 80px; text-align: center; }
-        .mat-expanded-num { position: absolute; bottom: 12px; right: 18px; font-size: 14px; color: #000; opacity: 0.3; z-index: 2; }
+        .mat-expanded-num { position: absolute; bottom: 20px; right: 30px; font-size: 22px; color: #000; opacity: 0.3; z-index: 2; }
         .mat-expanded-hint { color: rgba(255,255,255,0.35); font-size: 12px; flex-shrink: 0; }
         /* ==================== END MATERIALS CREATION WINDOW STYLES ==================== */
         /* ==================== END TUESDAY READING CLASS STYLES ==================== */
@@ -9467,15 +9468,26 @@
             var wrap = document.getElementById('matExpandedSlideWrap');
             var s = matSlides[matExpCurrentSlide];
             var fs = parseInt(document.getElementById('matFontSize').value) || 30;
-            // Scale font proportionally: expanded wrapper width vs small preview width
-            var previewWidth = document.querySelector('.mat-slideshow') ? document.querySelector('.mat-slideshow').offsetWidth : 760;
-            var expandedWidth = wrap.offsetWidth || (window.innerWidth * 0.85);
-            var scaledFs = Math.round(fs * (expandedWidth / previewWidth));
-            // Clamp to prevent overflow
-            scaledFs = Math.min(scaledFs, Math.round(fs * 2.5));
 
-            var html = '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="">';
-            html += '<div class="mat-expanded-content" style="font-size:' + scaledFs + 'px;">';
+            // The slide is rendered at native 1920x1080, then scaled to fit viewport
+            // Font size at 30px on preview (~760px wide) should be ~30 * (1920/760) ≈ 76px on the 1920 canvas
+            var previewWidth = document.querySelector('.mat-slideshow') ? document.querySelector('.mat-slideshow').offsetWidth : 760;
+            var nativeFs = Math.round(fs * (1920 / previewWidth));
+
+            // Calculate scale to fit viewport (leave room for nav + hint)
+            var availW = window.innerWidth * 0.92;
+            var availH = window.innerHeight - 120;
+            var scaleW = availW / 1920;
+            var scaleH = availH / 1080;
+            var scale = Math.min(scaleW, scaleH);
+
+            // Set wrapper size to the scaled dimensions so flexbox positions it correctly
+            wrap.style.width = Math.round(1920 * scale) + 'px';
+            wrap.style.height = Math.round(1080 * scale) + 'px';
+
+            var html = '<div class="mat-expanded-slide-inner" style="transform: scale(' + scale + ');">';
+            html += '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="">';
+            html += '<div class="mat-expanded-content" style="font-size:' + nativeFs + 'px;">';
             for (var j = 0; j < s.sentences.length; j++) {
                 html += '<div class="mat-expanded-sentence">';
                 var words = s.sentences[j].split(/\s+/);
@@ -9499,6 +9511,7 @@
             }
             html += '</div>';
             html += '<div class="mat-expanded-num">' + (matExpCurrentSlide + 1) + ' / ' + matSlides.length + '</div>';
+            html += '</div>';
             wrap.innerHTML = html;
 
             document.getElementById('matExpIndicator').textContent = (matExpCurrentSlide + 1) + ' / ' + matSlides.length;
