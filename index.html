@@ -9297,16 +9297,16 @@
 
             h += '<style>\n';
             h += '#klrn-reader, #klrn-reader * { box-sizing: border-box; margin: 0; padding: 0; }\n';
-            h += '#klrn-reader { font-family: "Noto Sans KR", sans-serif; width: 100%; margin: 0 auto; text-align: center; }\n';
+            h += '#klrn-reader { font-family: "Noto Sans KR", sans-serif; width: 100%; margin: 0 auto; text-align: center; --s: 1; }\n';
             h += '#klrn-reader .klr-slide-area { position: relative; width: 100%; padding-bottom: 56.25%; overflow: visible; border-radius: 8px; }\n';
-            h += '#klrn-reader .klr-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: 100% 100%; background-position: center; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
+            h += '#klrn-reader .klr-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: 100% 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
             h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; }\n';
-            h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1.5vw, 16px); overflow: hidden; text-align: center; }\n';
-            h += '#klrn-reader .klr-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: clamp(2px, 0.6vw, 12px); width: 100%; }\n';
-            h += '#klrn-reader .klr-word { font-size: clamp(14px, ' + (fs / 12) + 'vw, ' + (fs * 2.5) + 'px); font-weight: 700; color: #000; cursor: pointer; padding: clamp(2px, 0.3vw, 6px) clamp(3px, 0.4vw, 8px); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
+            h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(8px * var(--s)); overflow: hidden; text-align: center; }\n';
+            h += '#klrn-reader .klr-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); width: 100%; }\n';
+            h += '#klrn-reader .klr-word { font-size: calc(' + fs + 'px * var(--s)); font-weight: 700; color: #000; cursor: pointer; padding: calc(3px * var(--s)) calc(4px * var(--s)); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
             h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
             h += '#klrn-reader .klr-word.playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }\n';
-            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: clamp(10px,1.5vw,20px) clamp(12px,1.8vw,24px); border-radius: 12px; min-width: 200px; max-width: 350px; z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: clamp(11px,1.2vw,16px); font-weight: 400; }\n';
+            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: calc(12px * var(--s)) calc(14px * var(--s)); border-radius: 12px; min-width: calc(180px * var(--s)); max-width: calc(320px * var(--s)); z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: calc(13px * var(--s)); font-weight: 400; }\n';
             h += '#klrn-reader .klr-word:hover .klr-tip { opacity: 1; visibility: visible; pointer-events: auto; }\n';
             h += '#klrn-reader .klr-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }\n';
             h += '#klrn-reader .klr-tip.show { opacity: 1; visibility: visible; pointer-events: auto; }\n';
@@ -9314,7 +9314,7 @@
             h += '#klrn-reader .klr-word.tip-left .klr-tip::after { left: 30px; transform: none; }\n';
             h += '#klrn-reader .klr-word.tip-right .klr-tip { left: auto; right: 0; transform: translateX(0); }\n';
             h += '#klrn-reader .klr-word.tip-right .klr-tip::after { left: auto; right: 30px; transform: none; }\n';
-            h += '#klrn-reader .klr-num { position: absolute; bottom: 2%; right: 2%; font-size: clamp(10px,1vw,18px); color: #000; opacity: 0.3; z-index: 2; }\n';
+            h += '#klrn-reader .klr-num { position: absolute; bottom: 2%; right: 2%; font-size: calc(14px * var(--s)); color: #000; opacity: 0.3; z-index: 2; }\n';
             h += '#klrn-reader .klr-nav { display: flex; gap: 15px; align-items: center; justify-content: center; padding: 12px 0; }\n';
             h += '#klrn-reader .klr-nav button { padding: 10px 22px; background: rgba(255,0,255,0.25); border: 2px solid #ff00ff; border-radius: 8px; color: #ff00ff; font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }\n';
             h += '#klrn-reader .klr-nav button:hover { background: rgba(255,0,255,0.45); }\n';
@@ -9343,15 +9343,15 @@
 
             h += 'function buildTip(word) {\n';
             h += '  var info = wordCache[word] || wordCache[strip(word)];\n';
-            h += '  if (!info) return "<div style=\\"color:#00ffff;font-size:clamp(14px,1.5vw,22px);font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;font-size:clamp(10px,1vw,14px);\\">Loading...</div>";\n';
+            h += '  if (!info) return "<div style=\\"color:#00ffff;font-weight:700;\\">" + esc(word) + "</div><div style=\\"color:#888;\\">Loading...</div>";\n';
             h += '  var h = "";\n';
-            h += '  h += "<div style=\\"color:#00ffff;font-size:clamp(14px,1.5vw,22px);font-weight:700;margin-bottom:6px;\\">" + esc(word) + "</div>";\n';
-            h += '  h += "<div style=\\"color:#fff;font-size:clamp(12px,1.3vw,18px);margin-bottom:6px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
-            h += '  if (info.pos) h += "<div style=\\"color:#ff00ff;font-size:clamp(10px,1.1vw,15px);font-style:italic;margin-bottom:4px;\\">" + esc(info.pos) + "</div>";\n';
-            h += '  if (info.particles) h += "<div style=\\"color:#39ff14;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">🔗 " + esc(info.particles) + "</div>";\n';
-            h += '  if (info.dictionary_form) h += "<div style=\\"color:#aaa;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">📖 " + esc(info.dictionary_form) + "</div>";\n';
-            h += '  if (info.conjugation) h += "<div style=\\"color:#aaa;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">🔄 " + esc(info.conjugation) + "</div>";\n';
-            h += '  if (info.contraction) h += "<div style=\\"color:#ffd700;font-size:clamp(10px,1vw,14px);line-height:1.5;\\">✂️ " + esc(info.contraction) + "</div>";\n';
+            h += '  h += "<div style=\\"color:#00ffff;font-weight:700;margin-bottom:6px;\\">" + esc(word) + "</div>";\n';
+            h += '  h += "<div style=\\"color:#fff;margin-bottom:6px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
+            h += '  if (info.pos) h += "<div style=\\"color:#ff00ff;font-style:italic;margin-bottom:4px;\\">" + esc(info.pos) + "</div>";\n';
+            h += '  if (info.particles) h += "<div style=\\"color:#39ff14;line-height:1.5;\\">🔗 " + esc(info.particles) + "</div>";\n';
+            h += '  if (info.dictionary_form) h += "<div style=\\"color:#aaa;line-height:1.5;\\">📖 " + esc(info.dictionary_form) + "</div>";\n';
+            h += '  if (info.conjugation) h += "<div style=\\"color:#aaa;line-height:1.5;\\">🔄 " + esc(info.conjugation) + "</div>";\n';
+            h += '  if (info.contraction) h += "<div style=\\"color:#ffd700;line-height:1.5;\\">✂️ " + esc(info.contraction) + "</div>";\n';
             h += '  return h;\n';
             h += '}\n';
 
@@ -9416,7 +9416,20 @@
             h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, onWord: onWord };\n';
             h += 'document.addEventListener("keydown",function(e){ if(e.key==="ArrowRight"){e.preventDefault();KLR.go(1);} if(e.key==="ArrowLeft"){e.preventDefault();KLR.go(-1);} });\n';
             h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && activeTip){activeTip.classList.remove("show");activeTip=null;} });\n';
-            h += 'render(); goTo(0);\n';
+
+            // Scale function: measures container, sets --s as ratio of container width to 760 (reference width)
+            h += 'function klrScale() {\n';
+            h += '  var el = document.getElementById("klrn-reader"); if(!el) return;\n';
+            h += '  var w = el.offsetWidth;\n';
+            h += '  var s = w / 760;\n';
+            h += '  el.style.setProperty("--s", Math.max(0.4, Math.min(s, 2.5)));\n';
+            h += '}\n';
+            h += 'window.addEventListener("resize", klrScale);\n';
+
+            h += 'render(); klrScale(); goTo(0);\n';
+            // Also re-scale after a short delay in case Shopify layout settles late
+            h += 'setTimeout(klrScale, 300);\n';
+            h += 'setTimeout(klrScale, 1000);\n';
             h += '})();\n';
             h += '<\/script>\n';
 
