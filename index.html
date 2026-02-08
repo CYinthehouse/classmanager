@@ -9221,6 +9221,10 @@
             var totalSlides = matSlides.length;
             var cacheJSON = JSON.stringify(matWordCache || {});
 
+            // Calculate native font size on 1920 canvas
+            var previewWidth = document.querySelector('.mat-slideshow') ? document.querySelector('.mat-slideshow').offsetWidth : 760;
+            var nativeFs = Math.round(fs * (1920 / previewWidth));
+
             // Build slides data as JSON for the exported file
             var slidesJSON = JSON.stringify(matSlides.map(function(s) { return { sentences: s.sentences }; }));
 
@@ -9236,58 +9240,49 @@
             h += '*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }\n';
             h += 'html, body { font-family:"Noto Sans KR",sans-serif; background:#000; overflow:hidden; width:100%; height:100%; -webkit-tap-highlight-color:transparent; }\n';
 
-            // Slideshow container
-            h += '.slideshow { position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; }\n';
+            // Slideshow container - centers everything
+            h += '.slideshow { width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }\n';
+
+            // Slide wrapper - sized by JS to scaled dimensions
+            h += '.slide-wrap { position:relative; overflow:visible; flex-shrink:0; }\n';
+
+            // Inner canvas at native 1920x1080
+            h += '.slide-inner { position:relative; width:1920px; height:1080px; transform-origin:top left; }\n';
 
             // Each slide
-            h += '.slide { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.5s ease; pointer-events:none; }\n';
+            h += '.slide { position:absolute; top:0; left:0; width:1920px; height:1080px; opacity:0; transition:opacity 0.5s ease; pointer-events:none; }\n';
             h += '.slide.active { opacity:1; pointer-events:auto; }\n';
-            h += '.slide-bg { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; }\n';
+            h += '.slide-bg { position:absolute; top:0; left:0; width:1920px; height:1080px; }\n';
 
-            // Slide content
-            h += '.content { position:relative; z-index:2; text-align:center; max-width:85%; display:flex; flex-direction:column; align-items:center; gap:12px; }\n';
-            h += '.sentence { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }\n';
+            // Content area - positioned inside the white box
+            h += '.content { position:absolute; top:123px; left:155px; right:155px; bottom:123px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:2; overflow:hidden; text-align:center; }\n';
+            h += '.sentence { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; width:100%; }\n';
 
-            // Interactive words
-            h += '.word { font-size:' + fs + 'px; font-weight:700; color:#000; cursor:pointer; padding:6px 8px; border-radius:6px; transition:all 0.15s; position:relative; user-select:none; line-height:1.5; }\n';
+            // Interactive words - font size is native to 1920 canvas
+            h += '.word { font-size:' + nativeFs + 'px; font-weight:700; color:#000; cursor:pointer; padding:6px 8px; border-radius:6px; transition:all 0.15s; position:relative; user-select:none; line-height:1.5; }\n';
             h += '.word:hover { background:rgba(0,200,255,0.25); transform:scale(1.05); }\n';
             h += '.word.playing { background:rgba(255,0,255,0.25); transform:scale(1.08); }\n';
 
-            // Tooltip (nested inside word, CSS hover on desktop)
+            // Tooltip
             h += '.word .tip { position:absolute; bottom:calc(100% + 14px); left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#1a1a2e,#2d2748); color:#fff; padding:20px 24px; border-radius:12px; min-width:300px; max-width:420px; z-index:3000; box-shadow:0 8px 30px rgba(0,0,0,0.7); border:2px solid #00ffff; opacity:0; visibility:hidden; transition:all 0.2s ease; pointer-events:none; white-space:normal; text-align:left; font-size:16px; font-weight:400; }\n';
             h += '.word:hover .tip { opacity:1; visibility:visible; }\n';
             h += '.word .tip::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#00ffff; }\n';
             h += '.word .tip.show { opacity:1; visibility:visible; }\n';
 
             // Slide number
-            h += '.num { position:absolute; bottom:12px; right:18px; font-size:14px; color:#000; opacity:0.3; z-index:2; }\n';
+            h += '.num { position:absolute; bottom:20px; right:30px; font-size:22px; color:#000; opacity:0.3; z-index:2; }\n';
 
             // Navigation bar
-            h += '.nav { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:15px; align-items:center; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(10px); padding:12px 24px; border-radius:50px; border:1px solid rgba(255,255,255,0.15); }\n';
+            h += '.nav { display:flex; gap:15px; align-items:center; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(10px); padding:12px 24px; border-radius:50px; border:1px solid rgba(255,255,255,0.15); flex-shrink:0; }\n';
             h += '.nav button { padding:10px 22px; background:rgba(255,0,255,0.25); border:2px solid #ff00ff; border-radius:8px; color:#ff00ff; font-size:14px; cursor:pointer; transition:all 0.2s; font-family:inherit; }\n';
             h += '.nav button:hover { background:rgba(255,0,255,0.45); }\n';
             h += '.nav button:disabled { opacity:0.3; cursor:not-allowed; }\n';
             h += '.nav span { color:#888; font-size:14px; min-width:80px; text-align:center; }\n';
 
             // Dots
-            h += '.dots { position:fixed; bottom:6px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:100; }\n';
+            h += '.dots { display:flex; gap:6px; z-index:100; flex-shrink:0; }\n';
             h += '.dot { width:10px; height:10px; border-radius:50%; background:rgba(255,0,255,0.25); border:1px solid rgba(255,0,255,0.4); cursor:pointer; transition:all 0.2s; }\n';
             h += '.dot.active { background:#ff00ff; box-shadow:0 0 8px rgba(255,0,255,0.5); }\n';
-
-            // Hint
-            h += '.hint { position:fixed; top:12px; left:50%; transform:translateX(-50%); font-size:12px; color:rgba(255,255,255,0.35); z-index:100; text-align:center; }\n';
-
-            // Mobile overrides
-            h += '@media (max-width:768px) {\n';
-            h += '  .word { font-size:' + Math.round(fs * 0.7) + 'px; padding:4px 5px; }\n';
-            h += '  .word .tip { min-width:240px; max-width:85vw; padding:16px 18px; font-size:14px; bottom:calc(100% + 10px); }\n';
-            h += '  .content { max-width:92%; gap:8px; }\n';
-            h += '  .sentence { gap:5px; }\n';
-            h += '  .nav { padding:10px 18px; gap:10px; bottom:14px; }\n';
-            h += '  .nav button { padding:8px 16px; font-size:12px; }\n';
-            h += '  .nav span { font-size:12px; min-width:60px; }\n';
-            h += '  .hint { font-size:10px; top:8px; }\n';
-            h += '}\n';
 
             // Mobile: disable CSS hover tooltips, use JS .show class instead
             h += '@media (hover:none) {\n';
@@ -9298,14 +9293,17 @@
             h += '</style>\n</head>\n<body>\n';
 
             // --- HTML structure ---
-            h += '<div class="slideshow" id="slideshow"></div>\n';
-            h += '<div class="nav">\n';
-            h += '  <button id="pb" onclick="go(-1)">&#9664; Prev</button>\n';
-            h += '  <span id="ind">1 / ' + totalSlides + '</span>\n';
-            h += '  <button id="nb" onclick="go(1)">Next &#9654;</button>\n';
+            h += '<div class="slideshow">\n';
+            h += '  <div class="slide-wrap" id="slideWrap">\n';
+            h += '    <div class="slide-inner" id="slideInner"></div>\n';
+            h += '  </div>\n';
+            h += '  <div class="nav">\n';
+            h += '    <button id="pb" onclick="go(-1)">&#9664; Prev</button>\n';
+            h += '    <span id="ind">1 / ' + totalSlides + '</span>\n';
+            h += '    <button id="nb" onclick="go(1)">Next &#9654;</button>\n';
+            h += '  </div>\n';
+            h += '  <div class="dots" id="dots"></div>\n';
             h += '</div>\n';
-            h += '<div class="dots" id="dots"></div>\n';
-            h += '<div class="hint" id="hint">Click a word to hear it · Hover for translation</div>\n';
 
             // --- JavaScript ---
             h += '<script>\n';
@@ -9324,6 +9322,18 @@
             // Escape helper
             h += 'function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML;}\n';
 
+            // Scale function
+            h += 'function scaleSlide() {\n';
+            h += '  var wrap = document.getElementById("slideWrap");\n';
+            h += '  var inner = document.getElementById("slideInner");\n';
+            h += '  var availW = window.innerWidth * 0.95;\n';
+            h += '  var availH = window.innerHeight - 100;\n';
+            h += '  var s = Math.min(availW / 1920, availH / 1080);\n';
+            h += '  wrap.style.width = Math.round(1920 * s) + "px";\n';
+            h += '  wrap.style.height = Math.round(1080 * s) + "px";\n';
+            h += '  inner.style.transform = "scale(" + s + ")";\n';
+            h += '}\n';
+
             // Build tooltip HTML from cache
             h += 'function buildTip(word) {\n';
             h += '  var info = wordCache[word];\n';
@@ -9341,7 +9351,7 @@
 
             // Render slides
             h += 'function renderSlides() {\n';
-            h += '  var ss = document.getElementById("slideshow");\n';
+            h += '  var inner = document.getElementById("slideInner");\n';
             h += '  var dotsEl = document.getElementById("dots");\n';
             h += '  var html = "";\n';
             h += '  var dotsHtml = "";\n';
@@ -9367,7 +9377,7 @@
             h += '    html += "</div>";\n';
             h += '    dotsHtml += "<div class=\\"dot" + (i===0?" active":"") + "\\" onclick=\\"goTo(" + i + ")\\"></div>";\n';
             h += '  }\n';
-            h += '  ss.innerHTML = html;\n';
+            h += '  inner.innerHTML = html;\n';
             h += '  dotsEl.innerHTML = dotsHtml;\n';
             h += '}\n';
 
@@ -9375,9 +9385,7 @@
             h += 'function onWord(el) {\n';
             h += '  event.stopPropagation();\n';
             h += '  var word = el.getAttribute("data-word");\n';
-            h += '  // Play audio\n';
             h += '  playWord(el, word);\n';
-            h += '  // On mobile, toggle tooltip\n';
             h += '  if (isMobile) {\n';
             h += '    var tip = el.querySelector(".tip");\n';
             h += '    if (activeTooltip && activeTooltip !== tip) activeTooltip.classList.remove("show");\n';
@@ -9426,11 +9434,11 @@
             h += '  if(!e.target.closest(".word") && activeTooltip){activeTooltip.classList.remove("show");activeTooltip=null;}\n';
             h += '});\n';
 
-            // Mobile hint
-            h += 'if(isMobile){document.getElementById("hint").textContent="Tap a word to hear it and see translation";}\n';
+            // Resize handler
+            h += 'window.addEventListener("resize", scaleSlide);\n';
 
             // Init
-            h += 'renderSlides();\ngoTo(0);\n';
+            h += 'renderSlides();\nscaleSlide();\ngoTo(0);\n';
 
             h += '<\/script>\n</body>\n</html>';
 
