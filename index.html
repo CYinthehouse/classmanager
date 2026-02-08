@@ -1056,6 +1056,10 @@
         .mat-word .mat-word-tip { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #1a1a2e, #2d2748); color: #fff; padding: 20px 24px; border-radius: 12px; min-width: 300px; max-width: 420px; z-index: 30000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; opacity: 0; visibility: hidden; transition: all 0.2s ease; pointer-events: none; white-space: normal; text-align: left; font-size: 16px; font-weight: 400; }
         .mat-word:hover .mat-word-tip { opacity: 1; visibility: visible; pointer-events: auto; }
         .mat-word .mat-word-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }
+        .mat-word.mat-tip-left .mat-word-tip { left: 0; transform: translateX(0); }
+        .mat-word.mat-tip-left .mat-word-tip::after { left: 30px; transform: none; }
+        .mat-word.mat-tip-right .mat-word-tip { left: auto; right: 0; transform: translateX(0); }
+        .mat-word.mat-tip-right .mat-word-tip::after { left: auto; right: 30px; transform: none; }
         .mat-word-tip .tip-label { font-size: 11px; color: #00ffff; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
         .mat-word-tip .tip-english { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
         .mat-word-tip .tip-pos { font-size: 12px; color: #ff00ff; font-style: italic; margin-bottom: 4px; }
@@ -9547,7 +9551,7 @@
                     html += ' onmouseenter="matLoadTooltip(this)">';
                     html += escapeHtml(words[w]);
                     // Nested tooltip div - CSS handles show/hide
-                    var cachedInfo = matWordCache[words[w]];
+                    var cachedInfo = matWordCache[words[w]] || matWordCache[matStripPunc(words[w])];
                     if (cachedInfo) {
                         html += '<div class="mat-word-tip">' + matBuildTipHtml(words[w], cachedInfo) + '</div>';
                     } else {
@@ -9565,6 +9569,24 @@
             document.getElementById('matExpIndicator').textContent = (matExpCurrentSlide + 1) + ' / ' + matSlides.length;
             document.getElementById('matExpPrevBtn').disabled = matExpCurrentSlide <= 0;
             document.getElementById('matExpNextBtn').disabled = matExpCurrentSlide >= matSlides.length - 1;
+
+            // Detect edge words and shift tooltip alignment
+            setTimeout(function() {
+                var allWords = wrap.querySelectorAll('.mat-word');
+                var contentEl = wrap.querySelector('.mat-expanded-content');
+                if (!contentEl) return;
+                var contentRect = contentEl.getBoundingClientRect();
+                for (var i = 0; i < allWords.length; i++) {
+                    var wordRect = allWords[i].getBoundingClientRect();
+                    var wordCenter = wordRect.left + wordRect.width / 2;
+                    allWords[i].classList.remove('mat-tip-left', 'mat-tip-right');
+                    if (wordCenter - contentRect.left < 200) {
+                        allWords[i].classList.add('mat-tip-left');
+                    } else if (contentRect.right - wordCenter < 200) {
+                        allWords[i].classList.add('mat-tip-right');
+                    }
+                }
+            }, 50);
         }
 
         function matExpandedPrev() { if (matExpCurrentSlide > 0) { matExpCurrentSlide--; matRenderExpandedSlide(); } }
@@ -9611,15 +9633,23 @@
         }
 
         // ---- AI TOOLTIP (CSS hover, JS fetch) ----
+        // Strip surrounding punctuation for cache lookup
+        function matStripPunc(w) {
+            return w.replace(/^["""''「」『』()\[\].,!?…·~\-]+|["""''「」『』()\[\].,!?…·~\-]+$/g, '');
+        }
+
         function matLoadTooltip(el) {
             var word = el.getAttribute('data-word');
             var sentence = el.getAttribute('data-sentence');
             var tipEl = el.querySelector('.mat-word-tip');
             if (!tipEl) return;
 
-            // Already loaded
-            if (matWordCache[word]) {
-                matFillTip(tipEl, word, matWordCache[word]);
+            // Try exact match first, then stripped punctuation
+            var stripped = matStripPunc(word);
+            var cached = matWordCache[word] || matWordCache[stripped];
+            if (cached) {
+                if (!matWordCache[word]) matWordCache[word] = cached;
+                matFillTip(tipEl, word, cached);
                 return;
             }
 
@@ -9629,7 +9659,7 @@
 
             tipEl.innerHTML = '<div class="tip-label" style="color:#00ffff;font-size:22px;font-weight:700;margin-bottom:4px;">' + escapeHtml(word) + '</div><div class="tip-loading">⏳ Loading translation...</div>';
 
-            var prompt = 'Analyze the Korean word "' + word + '" from the sentence "' + sentence + '". Break it into its components (root word + any attached particles or grammar endings). If the word is a contraction, show the full uncontracted form. Examples: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my). "걔" = contracted from 그 + 아이 → 그아이 → 걔 (that kid). Reply ONLY with JSON: {"english":"English meaning","pos":"part of speech","particles":"attached particles/endings with function, or empty string","dictionary_form":"base form if different","conjugation":"conjugation pattern if verb/adjective, or empty string","contraction":"if contracted, show the derivation like 저 + 의 → 저의 → 제, otherwise empty string"}';
+            var prompt = 'You are a Korean language expert helping English-speaking learners. Analyze the Korean word "' + word + '" from the sentence "' + sentence + '". IMPORTANT: Always provide the actual English meaning/definition, NEVER just a romanization (e.g. 누나 = "older sister (used by males)", NOT "Noona"). Break it into components (root + particles/grammar). If contracted, show derivation. Examples: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my). "걔" = contracted from 그 + 아이 → 그아이 → 걔 (that kid). Reply ONLY with JSON: {"english":"actual English meaning/definition","pos":"part of speech","particles":"attached particles/endings with function, or empty string","dictionary_form":"base form if different","conjugation":"conjugation pattern if verb/adjective, or empty string","contraction":"if contracted, show the derivation like 저 + 의 → 저의 → 제, otherwise empty string"}';
 
             fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
                 method: 'POST',
@@ -9776,7 +9806,7 @@
                 (function(batch) {
                     var examples = batch.map(function(w) { return '"' + w + '" (sentence: "' + wordMap[w] + '")'; }).join('\n');
 
-                    var prompt = 'Analyze each Korean word below. Break into components (root + particles/grammar). If contracted, show derivation. Examples of good analysis: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my).\n\nWords to analyze:\n' + examples + '\n\nReply ONLY with a JSON array where each element is: {"word":"the original word","english":"meaning","pos":"part of speech","particles":"attached particles/endings, or empty","dictionary_form":"base form if different, or empty","conjugation":"conjugation pattern if verb/adj, or empty","contraction":"derivation if contracted, or empty"}\nNo markdown, no backticks.';
+                    var prompt = 'You are a Korean language expert. Analyze each Korean word below for English-speaking learners. IMPORTANT: Always provide the actual English meaning/definition, NEVER just a romanization. For example: 누나 = "older sister (used by males)", NOT "Noona". 엄마 = "mom/mother", NOT "Eomma". Break words into components (root + particles/grammar). If contracted, show derivation. Examples: "피자를" = 피자 (pizza, noun) + 를 (object particle). "먹었어요" = 먹다 (to eat, verb) + 었어요 (past tense polite). "제" = contracted from 저 + 의 → 저의 → 제 (my).\n\nWords to analyze:\n' + examples + '\n\nReply ONLY with a JSON array where each element is: {"word":"the original word","english":"actual English meaning/definition","pos":"part of speech","particles":"attached particles/endings, or empty","dictionary_form":"base form if different, or empty","conjugation":"conjugation pattern if verb/adj, or empty","contraction":"derivation if contracted, or empty"}\nNo markdown, no backticks.';
 
                     fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
                         method: 'POST',
@@ -9804,7 +9834,7 @@
                                     var item = arr[i];
                                     var w = item.word || '';
                                     if (w && !matWordCache[w]) {
-                                        matWordCache[w] = {
+                                        var info = {
                                             english: item.english || item.meaning || '',
                                             pos: item.pos || item.part_of_speech || '',
                                             particles: item.particles || item.particle || '',
@@ -9812,6 +9842,10 @@
                                             conjugation: item.conjugation || '',
                                             contraction: item.contraction || ''
                                         };
+                                        matWordCache[w] = info;
+                                        // Also store under stripped punctuation key
+                                        var sw = matStripPunc(w);
+                                        if (sw && sw !== w && !matWordCache[sw]) matWordCache[sw] = info;
                                         batchCached++;
                                     }
                                 }
