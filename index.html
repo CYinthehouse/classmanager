@@ -1803,8 +1803,10 @@
                         <div class="mat-panels">
                             <div class="mat-input-panel">
                                 <h3>📝 Korean Text Input</h3>
-                                <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Enter Korean sentences — 2 to 3 per slide. Separate slides with a blank line.</p>
+                                <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Enter Korean sentences — 2 to 3 per slide. Separate slides with a blank line.<br><strong style="color: #ff6b6b;">Make sure you let all of the words load before you press "Save"</strong></p>
                                 <button class="mat-btn-story" onclick="matOpenStoryPrompt()" style="margin-bottom:10px; padding:8px 18px; background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">✨ Input Story</button>
+                                <button onclick="matSaveText()" style="margin-bottom:10px; padding:8px 18px; background:linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">💾 Save</button>
+                                <button onclick="matLoadTextMenu()" style="margin-bottom:10px; padding:8px 18px; background:linear-gradient(135deg,#636e72,#95a5a6); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📂 Load</button>
                                 <textarea id="matTextInput" placeholder="오늘 날씨가 좋아요.&#10;저는 한국어를 공부합니다.&#10;내일 학교에 갈 거예요.&#10;&#10;한국은 아름다운 나라입니다.&#10;서울은 큰 도시입니다.&#10;한강이 서울을 지나갑니다."></textarea>
                                 <p style="font-size: 10px; color: #555; margin-top: 5px;">Slides detected: <span id="matSlideCount" style="color: #00ffff;">0</span> <span style="color:#444;">(separate slides with a blank line)</span></p>
                                 <div class="mat-font-size-row">
@@ -1853,6 +1855,31 @@
                         <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end;">
                             <button onclick="matCloseStoryPrompt()" style="padding:10px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#aaa; cursor:pointer; font-size:13px;">Cancel</button>
                             <button id="matStorySubmitBtn" onclick="matSubmitStoryPrompt()" style="padding:10px 24px; background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:13px; font-weight:600;">🚀 Generate Story</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Load Saved Texts Modal -->
+                <div id="matLoadModal" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; padding:20px;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#2d2748); border-radius:16px; padding:30px; max-width:550px; width:100%; border:2px solid #95a5a6; box-shadow:0 20px 60px rgba(0,0,0,0.5); max-height:80vh; display:flex; flex-direction:column;">
+                        <h3 style="color:#fff; margin-bottom:15px; font-size:18px;">📂 Saved Texts</h3>
+                        <div id="matLoadList" style="flex:1; overflow-y:auto; margin-bottom:15px; min-height:100px;">
+                            <p style="color:#888; text-align:center;">Loading...</p>
+                        </div>
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button onclick="matCloseLoadMenu()" style="padding:10px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#aaa; cursor:pointer; font-size:13px;">Close</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Tag Menu Modal -->
+                <div id="tagMenuModal" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; padding:20px;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#2d2748); border-radius:16px; padding:30px; max-width:400px; width:100%; border:2px solid #00ffff; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                        <h3 style="color:#fff; margin-bottom:5px; font-size:18px;">🏷️ Student Tags</h3>
+                        <p id="tagMenuStudentName" style="color:#00ffff; font-size:13px; margin-bottom:20px;"></p>
+                        <div id="tagMenuOptions"></div>
+                        <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+                            <button onclick="closeTagMenu()" style="padding:10px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#aaa; cursor:pointer; font-size:13px;">Close</button>
                         </div>
                     </div>
                 </div>
@@ -9132,6 +9159,158 @@
             });
         }
 
+        // ---- SAVE / LOAD TEXTS TO FIREBASE ----
+        var MAT_TEXTS_COLLECTION = 'materialTexts';
+
+        function matSaveText() {
+            var text = document.getElementById('matTextInput').value.trim();
+            if (!text) { alert('Nothing to save — the text input is empty.'); return; }
+
+            var name = prompt('Save as (enter a name):');
+            if (!name || !name.trim()) return;
+            name = name.trim();
+
+            db.collection(MAT_TEXTS_COLLECTION).add({
+                name: name,
+                text: text,
+                fontSize: parseInt(document.getElementById('matFontSize').value) || 30,
+                slides: JSON.stringify(matSlides || []),
+                wordCache: JSON.stringify(matWordCache || {}),
+                savedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(function() {
+                alert('✅ Saved "' + name + '" successfully!');
+            }).catch(function(err) {
+                console.error('Save error:', err);
+                alert('Failed to save: ' + err.message);
+            });
+        }
+
+        function matLoadTextMenu() {
+            var modal = document.getElementById('matLoadModal');
+            var list = document.getElementById('matLoadList');
+            modal.style.display = 'flex';
+            list.innerHTML = '<p style="color:#888; text-align:center;">Loading...</p>';
+
+            db.collection(MAT_TEXTS_COLLECTION).orderBy('savedAt', 'desc').get()
+            .then(function(snap) {
+                if (snap.empty) {
+                    list.innerHTML = '<p style="color:#888; text-align:center;">No saved texts yet.</p>';
+                    return;
+                }
+                var html = '';
+                snap.forEach(function(doc) {
+                    var d = doc.data();
+                    var date = d.savedAt ? d.savedAt.toDate() : new Date();
+                    var dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    var preview = (d.text || '').substring(0, 80).replace(/\n/g, ' ');
+                    if ((d.text || '').length > 80) preview += '…';
+
+                    html += '<div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 15px; margin-bottom:8px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor=\'#2ecc71\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.1)\'">';
+                    html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
+                    html += '<span style="color:#fff; font-weight:600; font-size:14px;">' + matEscHtml(d.name || 'Untitled') + '</span>';
+                    html += '<span style="color:#666; font-size:11px;">' + (d.fontSize ? d.fontSize + 'px · ' : '') + dateStr + '</span>';
+                    html += '</div>';
+                    html += '<div style="color:#888; font-size:12px; margin-bottom:8px;">' + matEscHtml(preview) + '</div>';
+                    var slideCount = 0;
+                    try { if (d.slides) slideCount = JSON.parse(d.slides).length; } catch(e) {}
+                    if (slideCount > 0) {
+                        html += '<div style="margin-bottom:8px;"><span style="background:rgba(39,174,96,0.2); color:#2ecc71; font-size:11px; padding:2px 8px; border-radius:4px; border:1px solid rgba(39,174,96,0.3);">🎬 ' + slideCount + ' slides + tooltips saved</span></div>';
+                    }
+                    html += '<div style="display:flex; gap:8px; justify-content:flex-end;">';
+                    html += '<button onclick="matLoadText(\'' + doc.id + '\')" style="padding:5px 14px; background:linear-gradient(135deg,#27ae60,#2ecc71); border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:12px; font-weight:600;">Load</button>';
+                    html += '<button onclick="matDeleteText(\'' + doc.id + '\',\'' + matEscHtml(d.name || 'Untitled').replace(/'/g, "\\'") + '\')" style="padding:5px 14px; background:rgba(255,71,87,0.2); border:1px solid rgba(255,71,87,0.4); border-radius:6px; color:#ff4757; cursor:pointer; font-size:12px;">Delete</button>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+                list.innerHTML = html;
+            })
+            .catch(function(err) {
+                console.error('Load error:', err);
+                list.innerHTML = '<p style="color:#ff4757; text-align:center;">Error loading: ' + err.message + '</p>';
+            });
+        }
+
+        function matLoadText(docId) {
+            var modal = document.getElementById('matLoadModal');
+            var list = document.getElementById('matLoadList');
+            list.innerHTML = '<div style="text-align:center; padding:30px;"><div style="color:#fff; font-size:14px; margin-bottom:12px;">⏳ Loading slideshow data...</div><div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;"><div id="matLoadBar" style="width:0%;height:100%;background:linear-gradient(90deg,#27ae60,#2ecc71);border-radius:3px;transition:width 0.3s ease;"></div></div></div>';
+
+            var bar = document.getElementById('matLoadBar');
+
+            db.collection(MAT_TEXTS_COLLECTION).doc(docId).get()
+            .then(function(doc) {
+                if (!doc.exists) { alert('Text not found.'); matLoadTextMenu(); return; }
+                var data = doc.data();
+                if (bar) bar.style.width = '30%';
+
+                // Restore text
+                document.getElementById('matTextInput').value = data.text || '';
+
+                // Restore font size
+                if (data.fontSize) {
+                    document.getElementById('matFontSize').value = data.fontSize;
+                    document.getElementById('matFontSizeVal').textContent = data.fontSize + 'px';
+                }
+                if (bar) bar.style.width = '50%';
+
+                // Restore word cache
+                if (data.wordCache) {
+                    try {
+                        var cached = JSON.parse(data.wordCache);
+                        matWordCache = cached;
+                    } catch(e) { console.error('Failed to parse wordCache:', e); }
+                }
+                if (bar) bar.style.width = '70%';
+
+                // Restore slides and render slideshow
+                if (data.slides) {
+                    try {
+                        var savedSlides = JSON.parse(data.slides);
+                        if (savedSlides.length > 0) {
+                            matSlides = savedSlides;
+                            matCurrentSlide = 0;
+                            matRenderSlideshow();
+                            document.getElementById('matExportBtns').style.display = 'flex';
+                            document.getElementById('matExpandHint').style.display = 'block';
+                        }
+                    } catch(e) { console.error('Failed to parse slides:', e); }
+                }
+                if (bar) bar.style.width = '90%';
+
+                matParseSlides();
+                if (bar) bar.style.width = '100%';
+
+                setTimeout(function() {
+                    matCloseLoadMenu();
+                }, 400);
+            })
+            .catch(function(err) {
+                alert('Failed to load: ' + err.message);
+                matLoadTextMenu();
+            });
+        }
+
+        function matDeleteText(docId, name) {
+            if (!confirm('Delete "' + name + '"?')) return;
+            db.collection(MAT_TEXTS_COLLECTION).doc(docId).delete()
+            .then(function() {
+                matLoadTextMenu(); // refresh list
+            })
+            .catch(function(err) {
+                alert('Failed to delete: ' + err.message);
+            });
+        }
+
+        function matCloseLoadMenu() {
+            document.getElementById('matLoadModal').style.display = 'none';
+        }
+
+        function matEscHtml(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
         function matGenerateSlides() {
             var parsed = matParseSlides();
             if (parsed.length === 0) { alert('Please enter at least one Korean sentence.'); return; }
@@ -15581,7 +15760,7 @@ Return ONLY valid JSON (single object, not array):
             let totalAvailableSpots = 0;
             
             activeClassList.forEach(cls => {
-                const studentCount = (cls.students || []).length;
+                const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                 const spotsLeft = schedulerSettings.maxStudents - studentCount;
                 
                 if (cls.teacherId) {
@@ -15654,7 +15833,7 @@ Return ONLY valid JSON (single object, not array):
                         
                         classes.forEach(cls => {
                             const teacher = allTeachers.find(t => t.id === cls.teacherId);
-                            const studentCount = (cls.students || []).length;
+                            const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                             const isFull = studentCount >= schedulerSettings.maxStudents;
                             const needsTeacherFlag = !cls.teacherId;
                             
@@ -15711,7 +15890,7 @@ Return ONLY valid JSON (single object, not array):
             let availableSpots = 0;
             
             myClasses.forEach(cls => {
-                const studentCount = (cls.students || []).length;
+                const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                 totalStudents += studentCount;
                 
                 if (studentCount >= schedulerSettings.maxStudents) {
@@ -15763,7 +15942,7 @@ Return ONLY valid JSON (single object, not array):
                         cellClass += ' empty';
                         html += `<div class="${cellClass}"><div style="color: #666; font-size: 11px; text-align: center;">-</div></div>`;
                     } else {
-                        const studentCount = (cls.students || []).length;
+                        const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                         const isFull = studentCount >= schedulerSettings.maxStudents;
                         
                         cellClass += isFull ? ' full' : ' has-class';
@@ -16229,11 +16408,70 @@ Return ONLY valid JSON (single object, not array):
                     return a.studentName.localeCompare(b.studentName);
                 });
                 
+                // Auto-tag students with 2+ absences in their class
+                await autoTag2PlusAbsent();
+                
                 renderAbsencesList();
                 
             } catch (e) { 
                 console.error(e);
                 container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error: ${e.message}</p>`;
+            }
+        }
+        
+        async function autoTag2PlusAbsent() {
+            // Count absences per student per class
+            const countMap = {};
+            allAbsencesData.forEach(a => {
+                const key = a.studentId + '|' + a.classId;
+                countMap[key] = (countMap[key] || 0) + 1;
+            });
+
+            // For each class, check which students need the tag added or removed
+            const classUpdates = {};
+            
+            for (const [key, count] of Object.entries(countMap)) {
+                const [studentId, classId] = key.split('|');
+                const cls = allClasses.find(c => c.id === classId);
+                if (!cls || !cls.students) continue;
+                
+                const studentIndex = cls.students.findIndex(s => s.id === studentId);
+                if (studentIndex === -1) continue;
+                
+                const student = cls.students[studentIndex];
+                const tags = student.tags || [];
+                const hasTag = tags.includes('2+ Absent');
+                
+                if (count >= 2 && !hasTag) {
+                    // Need to add tag
+                    cls.students[studentIndex].tags = [...tags, '2+ Absent'];
+                    classUpdates[classId] = cls.students;
+                }
+            }
+
+            // Also remove tag from students who no longer have 2+ absences
+            allClasses.forEach(cls => {
+                if (!cls.students) return;
+                let changed = false;
+                cls.students.forEach((s, i) => {
+                    if (!s.tags || !s.tags.includes('2+ Absent')) return;
+                    const key = s.id + '|' + cls.id;
+                    const count = countMap[key] || 0;
+                    if (count < 2) {
+                        cls.students[i].tags = s.tags.filter(t => t !== '2+ Absent');
+                        classUpdates[cls.id] = cls.students;
+                        changed = true;
+                    }
+                });
+            });
+
+            // Batch update Firestore
+            for (const [classId, students] of Object.entries(classUpdates)) {
+                try {
+                    await db.collection('scheduler_classes').doc(classId).update({ students });
+                } catch (e) {
+                    console.error('Auto-tag update failed for class ' + classId + ':', e);
+                }
             }
         }
         
@@ -17172,7 +17410,7 @@ Return ONLY valid JSON (single object, not array):
             
             container.innerHTML = availableClasses.map(c => {
                 const teacher = allTeachers.find(t => t.id === c.teacherId);
-                const studentCount = (c.students || []).length;
+                const studentCount = (c.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                 const isFull = studentCount >= schedulerSettings.maxStudents;
                 const levelMatch = student && student.level === c.level;
                 
@@ -17598,7 +17836,7 @@ Return ONLY valid JSON (single object, not array):
             const cls = allClasses.find(c => c.id === classId);
             if (!cls) return;
             
-            const studentCount = (cls.students || []).length;
+            const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
             let confirmMsg = `Are you sure you want to DELETE this class?\n\n${cls.day} @ ${cls.time} - ${LEVELS[cls.level]}`;
             
             if (studentCount > 0) {
@@ -17717,6 +17955,9 @@ Return ONLY valid JSON (single object, not array):
 
         // ==================== ADMIN ATTENDANCE ====================
         
+        // Store attendance record IDs for toggling
+        var adminAttendanceRecords = {};
+
         async function loadAdminAttendance() {
             const container = document.getElementById('adminAttendanceContainer');
             container.innerHTML = '<p style="color: #888; font-size: 12px;">Loading attendance...</p>';
@@ -17730,14 +17971,17 @@ Return ONLY valid JSON (single object, not array):
             const selectedClass = classFilter.value;
             
             try {
-                // Get all attendance records
+                // Get all attendance records (store doc IDs for toggling)
                 const attendanceSnap = await db.collection('scheduler_attendance').get();
                 const attendanceMap = {};
+                adminAttendanceRecords = {};
                 attendanceSnap.docs.forEach(d => {
                     const data = d.data();
                     if (!attendanceMap[data.classId]) attendanceMap[data.classId] = {};
                     if (!attendanceMap[data.classId][data.studentId]) attendanceMap[data.classId][data.studentId] = {};
                     attendanceMap[data.classId][data.studentId][data.week] = data.status;
+                    // Store doc ID keyed by classId|studentId|week
+                    adminAttendanceRecords[data.classId + '|' + data.studentId + '|' + data.week] = d.id;
                 });
                 
                 // Filter classes
@@ -17781,19 +18025,21 @@ Return ONLY valid JSON (single object, not array):
                     `;
                     
                     for (const student of (cls.students || [])) {
-                        html += `<tr><td><span style="color: #00ffff; cursor: pointer; text-decoration: underline;" onclick="openStudentAnalyticsMenu('${student.id}', '${student.name.replace(/'/g, "\\'")}', '${(student.email || '').replace(/'/g, "\\'")}')">${student.name}</span></td>`;
+                        const escapedName = (student.name || '').replace(/'/g, "\\'");
+                        html += `<tr><td><span style="color: #00ffff; cursor: pointer; text-decoration: underline;" onclick="openStudentAnalyticsMenu('${student.id}', '${escapedName}', '${(student.email || '').replace(/'/g, "\\'")}')">${student.name}</span></td>`;
                         
                         for (let w = 1; w <= 6; w++) {
                             const status = attendanceMap[cls.id]?.[student.id]?.[w];
                             let badge = '-';
                             let color = '#888';
+                            let bg = 'transparent';
                             
-                            if (status === 'present') { badge = '✓'; color = '#39ff14'; presentCount++; }
-                            else if (status === 'late') { badge = 'L'; color = '#ffff00'; lateCount++; }
-                            else if (status === 'absent') { badge = 'A'; color = '#ff3366'; absentCount++; }
+                            if (status === 'present') { badge = '✓'; color = '#39ff14'; bg = 'rgba(57,255,20,0.1)'; presentCount++; }
+                            else if (status === 'late') { badge = 'L'; color = '#ffff00'; bg = 'rgba(255,255,0,0.1)'; lateCount++; }
+                            else if (status === 'absent') { badge = '✕'; color = '#ff3366'; bg = 'rgba(255,51,102,0.1)'; absentCount++; }
                             else { notMarkedCount++; }
                             
-                            html += `<td style="text-align: center; color: ${color}; font-weight: bold;">${badge}</td>`;
+                            html += `<td onclick="toggleAdminAttendance('${cls.id}', '${student.id}', ${w}, '${status || 'none'}')" style="text-align: center; color: ${color}; font-weight: bold; font-size: 16px; cursor: pointer; background: ${bg}; border-radius: 4px; transition: all 0.15s; user-select: none;" onmouseover="this.style.outline='2px solid #00ffff'" onmouseout="this.style.outline='none'" title="Click to toggle">${badge}</td>`;
                         }
                         
                         html += '</tr>';
@@ -17817,6 +18063,51 @@ Return ONLY valid JSON (single object, not array):
             } catch (e) {
                 console.error(e);
                 container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function toggleAdminAttendance(classId, studentId, week, currentStatus) {
+            // Cycle: none → present → absent → none
+            let newStatus;
+            if (currentStatus === 'none') newStatus = 'present';
+            else if (currentStatus === 'present') newStatus = 'absent';
+            else if (currentStatus === 'absent') newStatus = 'present';
+            else if (currentStatus === 'late') newStatus = 'absent';
+            else newStatus = 'present';
+
+            const recordKey = classId + '|' + studentId + '|' + week;
+            const existingDocId = adminAttendanceRecords[recordKey];
+
+            try {
+                if (newStatus === 'none') {
+                    // Delete the record
+                    if (existingDocId) {
+                        await db.collection('scheduler_attendance').doc(existingDocId).delete();
+                        delete adminAttendanceRecords[recordKey];
+                    }
+                } else if (existingDocId) {
+                    // Update existing record
+                    await db.collection('scheduler_attendance').doc(existingDocId).update({ status: newStatus });
+                } else {
+                    // Create new record
+                    const docRef = await db.collection('scheduler_attendance').add({
+                        classId: classId,
+                        studentId: studentId,
+                        week: week,
+                        status: newStatus,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    adminAttendanceRecords[recordKey] = docRef.id;
+                }
+
+                // Reload while preserving scroll position
+                const scrollY = window.scrollY;
+                await loadAdminAttendance();
+                window.scrollTo(0, scrollY);
+
+            } catch (e) {
+                console.error('Toggle attendance error:', e);
+                alert('Failed to update attendance: ' + e.message);
             }
         }
         
@@ -20559,6 +20850,63 @@ Return ONLY valid JSON (single object, not array):
         
         // Use existing TIME_SLOTS and DAYS variables from schedule
         
+        // Standalone function to sync 2+ Absent tags — fetches its own absence data
+        async function syncAbsentTags() {
+            try {
+                const snap = await db.collection('scheduler_attendance').where('status', '==', 'absent').get();
+                if (snap.empty) return;
+
+                // Count absences per student per class
+                const countMap = {};
+                snap.docs.forEach(doc => {
+                    const d = doc.data();
+                    const key = d.studentId + '|' + d.classId;
+                    countMap[key] = (countMap[key] || 0) + 1;
+                });
+
+                const classUpdates = {};
+
+                // Add tag where needed
+                for (const [key, count] of Object.entries(countMap)) {
+                    const [studentId, classId] = key.split('|');
+                    const cls = allClasses.find(c => c.id === classId);
+                    if (!cls || !cls.students) continue;
+
+                    const idx = cls.students.findIndex(s => s.id === studentId);
+                    if (idx === -1) continue;
+
+                    const tags = cls.students[idx].tags || [];
+                    if (count >= 2 && !tags.includes('2+ Absent')) {
+                        cls.students[idx].tags = [...tags, '2+ Absent'];
+                        classUpdates[classId] = cls.students;
+                    }
+                }
+
+                // Remove tag where no longer applicable
+                allClasses.forEach(cls => {
+                    if (!cls.students) return;
+                    cls.students.forEach((s, i) => {
+                        if (!s.tags || !s.tags.includes('2+ Absent')) return;
+                        const key = s.id + '|' + cls.id;
+                        if ((countMap[key] || 0) < 2) {
+                            cls.students[i].tags = s.tags.filter(t => t !== '2+ Absent');
+                            classUpdates[cls.id] = cls.students;
+                        }
+                    });
+                });
+
+                // Save changes
+                for (const [classId, students] of Object.entries(classUpdates)) {
+                    await db.collection('scheduler_classes').doc(classId).update({ students });
+                }
+                if (Object.keys(classUpdates).length > 0) {
+                    console.log('Auto-tagged 2+ Absent for', Object.keys(classUpdates).length, 'classes');
+                }
+            } catch (e) {
+                console.error('syncAbsentTags error:', e);
+            }
+        }
+
         async function initSlotManager() {
             // Populate teacher dropdown
             const teacherSelect = document.getElementById('slotManagerTeacher');
@@ -20569,6 +20917,9 @@ Return ONLY valid JSON (single object, not array):
             
             // Load prescheduled slots from Firebase
             await loadPrescheduledSlots();
+            
+            // Auto-tag 2+ absent students before rendering
+            await syncAbsentTags();
             
             // Load class template for first class type
             loadClassTemplate();
@@ -21024,7 +21375,7 @@ Return ONLY valid JSON (single object, not array):
                         ${cls.startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDateDisplay}</div>` : ''}
                         ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDateDisplay}</div>` : ''}
                         <div style="font-size: 13px;">
-                            <strong>Students:</strong> ${cls.students?.length || 0}
+                            <strong>Students:</strong> ${(cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length}${(cls.students || []).some(s => s.tags && s.tags.includes('Repeat')) ? ' <span style="color:#00ffff; font-size:11px;">(+' + (cls.students || []).filter(s => s.tags && s.tags.includes('Repeat')).length + ' repeat)</span>' : ''}
                         </div>
                     </div>
                 `;
@@ -21039,14 +21390,20 @@ Return ONLY valid JSON (single object, not array):
                         const fullStudent = allStudents.find(st => st.id === s.id) || s;
                         const studentName = fullStudent.name || s.name || 'Unknown';
                         const escapedName = studentName.replace(/'/g, "\\'");
+                        const isRepeat = (s.tags && s.tags.includes('Repeat')) || false;
+                        const isAbsent = (s.tags && s.tags.includes('2+ Absent')) || false;
+                        const hasAnyTag = isRepeat || isAbsent;
+                        const repeatTag = isRepeat ? '<span style="background:#00ffff; color:#000; font-size:9px; padding:1px 6px; border-radius:4px; margin-left:5px; font-weight:700;">Repeat</span>' : '';
+                        const absentTag = isAbsent ? '<span style="background:#ff4757; color:#fff; font-size:9px; padding:1px 6px; border-radius:4px; margin-left:5px; font-weight:700;">2+ Absent</span>' : '';
                         rosterHtml += `
                             <tr>
-                                <td style="padding: 8px;">${studentName}</td>
+                                <td style="padding: 8px;">${studentName}${repeatTag}${absentTag}</td>
                                 <td style="padding: 8px;">${fullStudent.phoneNumber || fullStudent.phone || '-'}</td>
                                 <td style="padding: 8px;">${fullStudent.discord || '-'}</td>
                                 <td style="padding: 8px;">${fullStudent.email || s.email || '-'}</td>
                                 <td style="padding: 8px; text-align: center;">
                                     <button class="btn btn-warning btn-sm" onclick="openMoveStudentFromClassModal('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px;" title="Move to another class">🔄</button>
+                                    <button class="btn btn-sm" onclick="openTagMenu('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px; background: ${isAbsent ? '#ff4757' : (isRepeat ? '#00ffff' : '#666')}; color: ${isRepeat && !isAbsent ? '#000' : '#fff'}; border: none; border-radius: 4px; cursor: pointer;" title="Tag student">🏷️</button>
                                     <button class="btn btn-danger btn-sm" onclick="confirmRemoveStudentFromActiveClass('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px;" title="Remove from class">✕</button>
                                 </td>
                             </tr>
@@ -22059,6 +22416,88 @@ Return ONLY valid JSON (single object, not array):
         // ==================== END MOVE STUDENT FROM SLOT ====================
         
         // ==================== MOVE STUDENT FROM ACTIVE CLASS (Slot Manager) ====================
+        // ---- STUDENT TAG SYSTEM ----
+        var tagMenuStudentId = null;
+        var tagMenuClassId = null;
+        var AVAILABLE_TAGS = ['Repeat', '2+ Absent'];
+
+        function openTagMenu(studentId, studentName, classId) {
+            tagMenuStudentId = studentId;
+            tagMenuClassId = classId;
+            document.getElementById('tagMenuStudentName').textContent = studentName;
+            document.getElementById('tagMenuModal').style.display = 'flex';
+
+            // Find current tags
+            var cls = allClasses.find(function(c) { return c.id === classId; });
+            var student = cls && cls.students ? cls.students.find(function(s) { return s.id === studentId; }) : null;
+            var currentTags = (student && student.tags) || [];
+
+            var html = '';
+            var TAG_CONFIG = {
+                'Repeat': { color: '#00ffff', textColor: '#000', label: 'Repeat Student', desc: 'Does not count towards enrollment' },
+                '2+ Absent': { color: '#ff4757', textColor: '#fff', label: '2+ Absent', desc: 'Student has missed 2 or more classes' }
+            };
+            AVAILABLE_TAGS.forEach(function(tag) {
+                var active = currentTags.includes(tag);
+                var cfg = TAG_CONFIG[tag] || { color: '#888', textColor: '#fff', label: tag, desc: '' };
+                html += '<div onclick="toggleStudentTag(\'' + tag + '\')" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; margin-bottom:8px; background:' + (active ? 'rgba(' + (tag === 'Repeat' ? '0,255,255' : '255,71,87') + ',0.15)' : 'rgba(255,255,255,0.05)') + '; border:2px solid ' + (active ? cfg.color : 'rgba(255,255,255,0.1)') + '; border-radius:10px; cursor:pointer; transition:all 0.2s;">';
+                html += '<div>';
+                html += '<span style="background:' + cfg.color + '; color:' + cfg.textColor + '; font-size:12px; padding:3px 10px; border-radius:5px; font-weight:700;">' + cfg.label + '</span>';
+                html += '<div style="color:#888; font-size:11px; margin-top:4px;">' + cfg.desc + '</div>';
+                html += '</div>';
+                html += '<span style="font-size:20px; color:' + (active ? cfg.color : '#444') + ';">' + (active ? '✅' : '⬜') + '</span>';
+                html += '</div>';
+            });
+            document.getElementById('tagMenuOptions').innerHTML = html;
+        }
+
+        function closeTagMenu() {
+            document.getElementById('tagMenuModal').style.display = 'none';
+            tagMenuStudentId = null;
+            tagMenuClassId = null;
+        }
+
+        async function toggleStudentTag(tag) {
+            if (!tagMenuStudentId || !tagMenuClassId) return;
+            try {
+                var cls = allClasses.find(function(c) { return c.id === tagMenuClassId; });
+                if (!cls || !cls.students) return;
+
+                var studentIndex = cls.students.findIndex(function(s) { return s.id === tagMenuStudentId; });
+                if (studentIndex === -1) return;
+
+                var student = cls.students[studentIndex];
+                var tags = student.tags || [];
+
+                if (tags.includes(tag)) {
+                    tags = tags.filter(function(t) { return t !== tag; });
+                } else {
+                    tags.push(tag);
+                }
+
+                // Update locally
+                cls.students[studentIndex].tags = tags;
+
+                // Update in Firestore
+                await db.collection('scheduler_classes').doc(tagMenuClassId).update({
+                    students: cls.students
+                });
+
+                // Refresh the tag menu and the slot detail view
+                var studentName = student.name || 'Unknown';
+                openTagMenu(tagMenuStudentId, studentName, tagMenuClassId);
+
+                // Refresh the slot detail behind the modal
+                if (typeof openSlotDetails === 'function' && selectedSlotInfo) {
+                    openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
+                }
+
+            } catch (err) {
+                console.error('Tag toggle error:', err);
+                alert('Failed to update tag: ' + err.message);
+            }
+        }
+
         let movingClassStudentId = null;
         let movingClassStudentName = null;
         let movingFromClassId = null;
@@ -22120,7 +22559,7 @@ Return ONLY valid JSON (single object, not array):
             });
             
             container.innerHTML = availableClasses.map(cls => {
-                const studentCount = (cls.students || []).length;
+                const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                 const maxStudents = schedulerSettings?.maxStudents || 10;
                 const isFull = studentCount >= maxStudents;
                 const teacher = allTeachers.find(t => t.id === cls.teacherId);
