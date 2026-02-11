@@ -1027,6 +1027,12 @@
         .mat-slide-content { position: relative; z-index: 2; max-width: 85%; width: 85%; display: flex; flex-direction: column; align-items: center; gap: 12px; overflow: hidden; }
         .mat-slide-korean { font-weight: 700; line-height: 1.6; color: #000; word-break: keep-all; display: block; width: 100%; text-align: center; }
         .mat-slide-number { position: absolute; bottom: 12px; right: 18px; font-size: 13px; color: #000; opacity: 0.3; z-index: 2; }
+        .mat-audio-play-btn { position: absolute; bottom: 12px; left: 18px; z-index: 10; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; border: 2px solid #000; border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .mat-audio-play-btn:hover { transform: scale(1.15); }
+        .mat-audio-play-btn.playing { background: linear-gradient(135deg, #ef4444, #dc2626); animation: matPulsePlay 1s ease-in-out infinite; }
+        @keyframes matPulsePlay { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .mat-sync-word { transition: all 0.15s ease; border-radius: 6px; padding: 1px 2px; }
+        .mat-sync-word.mat-highlight, .mat-word.mat-highlight { background: #3b82f6 !important; color: #fff !important; border-radius: 6px; padding: 1px 4px; }
         .mat-slide-nav { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 15px; }
         .mat-slide-nav button { padding: 8px 20px; background: rgba(255,0,255,0.2); border: 2px solid #ff00ff; border-radius: 6px; color: #ff00ff; font-size: 13px; cursor: pointer; transition: all 0.2s; }
         .mat-slide-nav button:hover { background: rgba(255,0,255,0.4); box-shadow: 0 0 12px rgba(255,0,255,0.3); }
@@ -1822,6 +1828,8 @@
                                 <div class="mat-preview-header">
                                     <h3>🎬 Slideshow Preview</h3>
                                     <div class="mat-export-btns" id="matExportBtns" style="display: none;">
+                                        <input type="file" id="matAudioFileInput" accept="audio/*" style="display:none;" onchange="matHandleAudioUpload(this)">
+                                        <button class="mat-btn-export" onclick="document.getElementById('matAudioFileInput').click()" style="border-color: #a855f7; color: #a855f7;" id="matAudioUploadBtn">🎙️ Upload Audio</button>
                                         <button class="mat-btn-export mat-btn-pdf" onclick="matExportPDF()">📄 Export PDF</button>
                                         <button class="mat-btn-export mat-btn-html" onclick="matExportHTML()">🌐 Export HTML</button>
                                     </div>
@@ -9336,15 +9344,28 @@
                 html += '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="" crossorigin="anonymous">';
                 html += '<div class="mat-slide-content" style="font-size:' + fs + ';">';
                 for (var j = 0; j < s.sentences.length; j++) {
-                    html += '<div class="mat-slide-korean">' + escapeHtml(s.sentences[j]) + '</div>';
+                    html += '<div class="mat-slide-korean">';
+                    var words = s.sentences[j].split(/\s+/);
+                    for (var w = 0; w < words.length; w++) {
+                        if (!words[w]) continue;
+                        html += '<span class="mat-sync-word" data-slide="' + i + '" data-si="' + j + '" data-wi="' + w + '" id="matsw_' + i + '_' + j + '_' + w + '">' + escapeHtml(words[w]) + '</span> ';
+                    }
+                    html += '</div>';
                 }
                 html += '</div>';
+                // Audio play button (only visible when audio is loaded)
+                if (matAudioSyncData) {
+                    html += '<button class="mat-audio-play-btn" onclick="event.stopPropagation(); matToggleSlideAudio(' + i + ')" title="Play audio for this slide">&#9654;</button>';
+                }
                 html += '<div class="mat-slide-number">' + (i + 1) + ' / ' + matSlides.length + '</div>';
                 html += '</div>';
             }
             html += '</div>';
             html += '<div class="mat-slide-nav" onclick="event.stopPropagation()">';
             html += '<button onclick="event.stopPropagation(); matPrevSlide()" id="matPrevBtn">&#9664; Prev</button>';
+            if (matAudioSyncData) {
+                html += '<button onclick="event.stopPropagation(); matToggleAudioPlayAll()" id="matAudioPlayAllBtn" style="background:linear-gradient(135deg,#a855f7,#7c3aed); border-color:#a855f7; color:#fff; padding:6px 14px;">&#9654; Play All</button>';
+            }
             html += '<span id="matSlideIndicator">' + (matCurrentSlide + 1) + ' / ' + matSlides.length + '</span>';
             html += '<button onclick="event.stopPropagation(); matNextSlide()" id="matNextBtn">Next &#9654;</button>';
             html += '</div>';
@@ -9375,6 +9396,443 @@
             if (prev) prev.disabled = matCurrentSlide <= 0;
             if (next) next.disabled = matCurrentSlide >= matSlides.length - 1;
             if (ind) ind.textContent = (matCurrentSlide + 1) + ' / ' + matSlides.length;
+        }
+
+        // ---- AUDIO SYNC SYSTEM ----
+        var WHISPER_PROXY_URL = 'https://whisper-proxy-386010826708.us-central1.run.app';
+        var matAudioSyncData = null;   // { audioUrl, words: [{word, start, end}], slideMap: [{slideIdx, words}] }
+        var matAudioElement = null;
+        var matAudioAnimFrame = null;
+        var matAudioPlaying = false;
+
+        async function matHandleAudioUpload(input) {
+            var file = input.files[0];
+            if (!file) return;
+
+            var btn = document.getElementById('matAudioUploadBtn');
+            btn.textContent = '⏳ Transcribing...';
+            btn.disabled = true;
+
+            try {
+                // Build full transcript from slides to send as prompt
+                var transcript = '';
+                for (var si = 0; si < matSlides.length; si++) {
+                    for (var sj = 0; sj < matSlides[si].sentences.length; sj++) {
+                        transcript += matSlides[si].sentences[sj] + ' ';
+                    }
+                }
+                transcript = transcript.trim();
+
+                // Upload to Whisper proxy with transcript
+                var formData = new FormData();
+                formData.append('audio', file);
+                formData.append('prompt', transcript);
+
+                var res = await fetch(WHISPER_PROXY_URL, { method: 'POST', body: formData });
+                if (!res.ok) {
+                    var errText = await res.text();
+                    throw new Error('Transcription failed: ' + errText);
+                }
+                var data = await res.json();
+
+                if (!data.words || data.words.length === 0) {
+                    throw new Error('No word timestamps returned. Make sure the audio contains Korean speech.');
+                }
+
+                // Create audio URL from uploaded file
+                var audioUrl = URL.createObjectURL(file);
+
+                // Map Whisper words to slide words
+                var slideMap = matMapWordsToSlides(data.words);
+
+                matAudioSyncData = {
+                    audioUrl: audioUrl,
+                    words: data.words,
+                    slideMap: slideMap,
+                    duration: data.duration
+                };
+
+                // Create the audio element
+                matAudioElement = new Audio(audioUrl);
+
+                btn.textContent = '✅ Audio Loaded';
+                btn.style.borderColor = '#39ff14';
+                btn.style.color = '#39ff14';
+
+                // Re-render to show play buttons
+                matRenderSlideshow();
+
+            } catch (e) {
+                console.error('Audio upload error:', e);
+                alert('Audio upload failed: ' + e.message);
+                btn.textContent = '🎙️ Upload Audio';
+                btn.style.borderColor = '#a855f7';
+                btn.style.color = '#a855f7';
+            }
+            btn.disabled = false;
+            input.value = '';
+        }
+
+        function matStripPuncSync(w) {
+            return w.replace(/["""''()[\].,!?…·~\-\s]+/g, '');
+        }
+
+        function matMapWordsToSlides(whisperWords) {
+            // Build a flat list of all slide words in order
+            var slideWords = [];
+            for (var i = 0; i < matSlides.length; i++) {
+                for (var j = 0; j < matSlides[i].sentences.length; j++) {
+                    var words = matSlides[i].sentences[j].split(/\s+/);
+                    for (var w = 0; w < words.length; w++) {
+                        if (!words[w]) continue;
+                        slideWords.push({ slideIdx: i, si: j, wi: w, text: words[w], stripped: matStripPuncSync(words[w]) });
+                    }
+                }
+            }
+
+            // Clean whisper words
+            var wWords = [];
+            for (var k = 0; k < whisperWords.length; k++) {
+                var stripped = matStripPuncSync(whisperWords[k].word);
+                if (stripped) {
+                    wWords.push({ word: whisperWords[k].word, stripped: stripped, start: whisperWords[k].start, end: whisperWords[k].end });
+                }
+            }
+
+            // Two-pointer alignment: walk both lists, match when possible
+            var assignments = [];
+            for (var i = 0; i < slideWords.length; i++) assignments.push(null);
+
+            var wi = 0;
+            var si = 0;
+
+            while (si < slideWords.length && wi < wWords.length) {
+                var sw = slideWords[si].stripped;
+                var ww = wWords[wi].stripped;
+
+                if (sw === ww || matFuzzyMatch(sw, ww)) {
+                    assignments[si] = { start: wWords[wi].start, end: wWords[wi].end };
+                    si++;
+                    wi++;
+                } else {
+                    // Look ahead in whisper for current slide word
+                    var foundInWhisper = -1;
+                    for (var look = wi + 1; look < Math.min(wi + 6, wWords.length); look++) {
+                        if (wWords[look].stripped === sw || matFuzzyMatch(wWords[look].stripped, sw)) {
+                            foundInWhisper = look;
+                            break;
+                        }
+                    }
+
+                    // Look ahead in slide for current whisper word
+                    var foundInSlide = -1;
+                    for (var look = si + 1; look < Math.min(si + 6, slideWords.length); look++) {
+                        if (slideWords[look].stripped === ww || matFuzzyMatch(slideWords[look].stripped, ww)) {
+                            foundInSlide = look;
+                            break;
+                        }
+                    }
+
+                    if (foundInWhisper >= 0 && (foundInSlide < 0 || (foundInWhisper - wi) <= (foundInSlide - si))) {
+                        wi = foundInWhisper;
+                    } else if (foundInSlide >= 0) {
+                        si = foundInSlide;
+                    } else {
+                        // No match — pair them anyway
+                        assignments[si] = { start: wWords[wi].start, end: wWords[wi].end };
+                        si++;
+                        wi++;
+                    }
+                }
+            }
+
+            // Interpolate unassigned slide words
+            for (var i = 0; i < assignments.length; i++) {
+                if (assignments[i] !== null) continue;
+
+                var prevEnd = 0;
+                for (var p = i - 1; p >= 0; p--) {
+                    if (assignments[p] !== null) { prevEnd = assignments[p].end; break; }
+                }
+
+                var nextStart = -1;
+                for (var n = i + 1; n < assignments.length; n++) {
+                    if (assignments[n] !== null) { nextStart = assignments[n].start; break; }
+                }
+
+                var runEnd = i;
+                while (runEnd < assignments.length - 1 && assignments[runEnd + 1] === null) runEnd++;
+
+                if (nextStart < 0) {
+                    nextStart = wWords.length > 0 ? wWords[wWords.length - 1].end : prevEnd + 1;
+                }
+
+                var runLen = runEnd - i + 1;
+                var perWord = (nextStart - prevEnd) / runLen;
+
+                for (var r = i; r <= runEnd; r++) {
+                    assignments[r] = {
+                        start: prevEnd + (r - i) * perWord,
+                        end: prevEnd + (r - i + 1) * perWord
+                    };
+                }
+                i = runEnd;
+            }
+
+            // Build final map
+            var mapped = [];
+            for (var i = 0; i < slideWords.length; i++) {
+                if (assignments[i]) {
+                    mapped.push({
+                        slideIdx: slideWords[i].slideIdx,
+                        si: slideWords[i].si,
+                        wi: slideWords[i].wi,
+                        start: assignments[i].start,
+                        end: assignments[i].end,
+                        word: slideWords[i].text
+                    });
+                }
+            }
+
+            // Fill gaps
+            for (var g = 0; g < mapped.length - 1; g++) {
+                if (mapped[g].end < mapped[g + 1].start) {
+                    mapped[g].end = mapped[g + 1].start;
+                }
+            }
+            if (mapped.length > 0) {
+                mapped[mapped.length - 1].end += 1.0;
+            }
+
+            // Enforce minimum duration per word (200ms)
+            var MIN_DUR = 0.20;
+            for (var i = 0; i < mapped.length; i++) {
+                var dur = mapped[i].end - mapped[i].start;
+                if (dur < MIN_DUR) {
+                    // Extend this word's end, pushing into the next word's time
+                    mapped[i].end = mapped[i].start + MIN_DUR;
+                    // Push all subsequent words forward if they overlap
+                    for (var j = i + 1; j < mapped.length; j++) {
+                        if (mapped[j].start < mapped[j - 1].end) {
+                            var shift = mapped[j - 1].end - mapped[j].start;
+                            mapped[j].start = mapped[j - 1].end;
+                            mapped[j].end = Math.max(mapped[j].end, mapped[j].start + MIN_DUR);
+                        } else {
+                            break; // no more overlap
+                        }
+                    }
+                }
+            }
+
+            console.log('Audio sync: ' + mapped.length + '/' + slideWords.length + ' slide words mapped (' + wWords.length + ' whisper words)');
+            // Debug: log all words with timestamps
+            var debugLines = [];
+            for (var d = 0; d < mapped.length; d++) {
+                debugLines.push('S' + mapped[d].slideIdx + ' si:' + mapped[d].si + ' wi:' + mapped[d].wi + ' [' + mapped[d].start.toFixed(2) + '-' + mapped[d].end.toFixed(2) + '] "' + mapped[d].word + '"');
+            }
+            console.log('Audio sync full map:\n' + debugLines.join('\n'));
+            return mapped;
+        }
+
+        function matFuzzyMatch(a, b) {
+            if (!a || !b) return false;
+            if (a === b) return true;
+            if (a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return true;
+            var shorter = a.length <= b.length ? a : b;
+            var longer = a.length > b.length ? a : b;
+            var matches = 0;
+            var longerCopy = longer;
+            for (var c = 0; c < shorter.length; c++) {
+                var idx = longerCopy.indexOf(shorter[c]);
+                if (idx >= 0) { matches++; longerCopy = longerCopy.substring(0, idx) + longerCopy.substring(idx + 1); }
+            }
+            return matches >= shorter.length * 0.5;
+        }
+
+        var matAudioSyncLastIdx = 0; // Track last matched index for forward-only search
+
+        var matAudioExpandedMode = false;
+
+        function matToggleSlideAudio(slideIdx) {
+            if (matAudioPlaying) {
+                matStopAudioSync();
+            } else {
+                matStartAudioSync(slideIdx);
+            }
+        }
+
+        function matToggleExpandedAudio(slideIdx) {
+            if (matAudioPlaying) {
+                matStopAudioSync();
+            } else {
+                matStartAudioSyncExpanded(slideIdx);
+            }
+        }
+
+        function matStartAudioSyncExpanded(fromSlide) {
+            if (!matAudioSyncData || !matAudioElement) return;
+            var firstWord = matAudioSyncData.slideMap.find(function(m) { return m.slideIdx === fromSlide; });
+            if (!firstWord) return;
+
+            matAudioExpandedMode = true;
+            matAudioPlaying = true;
+            matAudioSyncLastIdx = 0;
+            matAudioElement.currentTime = firstWord.start;
+
+            var btn = document.getElementById('matExpPlayBtn');
+            if (btn) { btn.classList.add('playing'); btn.innerHTML = '&#9646;&#9646;'; }
+
+            var playPromise = matAudioElement.play();
+            if (playPromise) {
+                playPromise.then(function() { matRunSyncLoop(); }).catch(function(e) { console.error('Play failed:', e); matStopAudioSync(); });
+            } else {
+                matRunSyncLoop();
+            }
+        }
+
+        function matStartAudioSync(fromSlide) {
+            if (!matAudioSyncData || !matAudioElement) return;
+
+            // Find the first word on this slide
+            var firstWord = matAudioSyncData.slideMap.find(function(m) { return m.slideIdx === fromSlide; });
+            if (!firstWord) return;
+
+            matAudioExpandedMode = false;
+            matAudioPlaying = true;
+            matAudioSyncLastIdx = 0;
+            matAudioElement.currentTime = firstWord.start;
+            matGoToSlide(fromSlide);
+
+            // Update play button appearance
+            var btns = document.querySelectorAll('.mat-audio-play-btn');
+            btns.forEach(function(b) { b.classList.remove('playing'); b.innerHTML = '&#9654;'; });
+            var currentBtn = document.querySelector('.mat-slide[data-slide="' + fromSlide + '"] .mat-audio-play-btn');
+            if (currentBtn) { currentBtn.classList.add('playing'); currentBtn.innerHTML = '&#9646;&#9646;'; }
+
+            var playPromise = matAudioElement.play();
+            if (playPromise) {
+                playPromise.then(function() { matRunSyncLoop(); }).catch(function(e) { console.error('Play failed:', e); matStopAudioSync(); });
+            } else {
+                matRunSyncLoop();
+            }
+        }
+
+        function matToggleAudioPlayAll() {
+            if (matAudioPlaying) {
+                matStopAudioSync();
+            } else {
+                matAudioExpandedMode = false;
+                matStartAudioSync(matCurrentSlide);
+            }
+        }
+
+        function matStopAudioSync() {
+            if (matAudioElement) matAudioElement.pause();
+            matAudioPlaying = false;
+            matAudioExpandedMode = false;
+            if (matAudioAnimFrame) cancelAnimationFrame(matAudioAnimFrame);
+            matAudioAnimFrame = null;
+
+            // Clear all highlights
+            document.querySelectorAll('.mat-highlight').forEach(function(el) {
+                el.classList.remove('mat-highlight');
+            });
+
+            // Reset play buttons
+            document.querySelectorAll('.mat-audio-play-btn').forEach(function(b) {
+                b.classList.remove('playing');
+                b.innerHTML = '&#9654;';
+            });
+
+            var playAllBtn = document.getElementById('matAudioPlayAllBtn');
+            if (playAllBtn) playAllBtn.innerHTML = '&#9654; Play All';
+
+            // Reset expanded play btn
+            var expBtn = document.getElementById('matExpPlayBtn');
+            if (expBtn) {
+                expBtn.classList.remove('playing');
+                expBtn.innerHTML = '&#9654;';
+            }
+        }
+
+        function matRunSyncLoop() {
+            if (!matAudioPlaying || !matAudioElement) {
+                matStopAudioSync();
+                return;
+            }
+
+            // Stop if audio ended
+            if (matAudioElement.ended) {
+                matStopAudioSync();
+                return;
+            }
+
+            var t = matAudioElement.currentTime;
+            var map = matAudioSyncData.slideMap;
+
+            // Simple approach: advance index until we find the word containing t
+            // Since words are gap-filled and sequential, just step forward
+            while (matAudioSyncLastIdx < map.length - 1 && t >= map[matAudioSyncLastIdx + 1].start) {
+                matAudioSyncLastIdx++;
+            }
+            // Also handle if t is before current index (e.g. user seeked backward)
+            while (matAudioSyncLastIdx > 0 && t < map[matAudioSyncLastIdx].start) {
+                matAudioSyncLastIdx--;
+            }
+
+            var currentWord = (matAudioSyncLastIdx < map.length && t >= map[matAudioSyncLastIdx].start) 
+                ? map[matAudioSyncLastIdx] 
+                : null;
+
+            // Clear previous highlights
+            document.querySelectorAll('.mat-highlight').forEach(function(el) {
+                el.classList.remove('mat-highlight');
+            });
+
+            if (currentWord) {
+                if (matAudioExpandedMode) {
+                    // Expanded mode: switch slide and re-render if needed
+                    if (currentWord.slideIdx !== matExpCurrentSlide) {
+                        matExpCurrentSlide = currentWord.slideIdx;
+                        matRenderExpandedSlide();
+                        // Restore play button state after re-render
+                        var expBtn = document.getElementById('matExpPlayBtn');
+                        if (expBtn) { expBtn.classList.add('playing'); expBtn.innerHTML = '&#9646;&#9646;'; }
+                    }
+                    // Highlight word in expanded view using ID
+                    var wordId = 'matword_' + currentWord.si + '_' + currentWord.wi;
+                    var wordEl = document.getElementById(wordId);
+                    if (wordEl) {
+                        wordEl.classList.add('mat-highlight');
+                    }
+                } else {
+                    // Preview mode: switch slide if needed
+                    if (currentWord.slideIdx !== matCurrentSlide) {
+                        matGoToSlide(currentWord.slideIdx);
+
+                        document.querySelectorAll('.mat-audio-play-btn').forEach(function(b) {
+                            b.classList.remove('playing');
+                            b.innerHTML = '&#9654;';
+                        });
+                        var newBtn = document.querySelector('.mat-slide[data-slide="' + currentWord.slideIdx + '"] .mat-audio-play-btn');
+                        if (newBtn) { newBtn.classList.add('playing'); newBtn.innerHTML = '&#9646;&#9646;'; }
+                    }
+                    // Highlight word in preview
+                    var previewWordId = 'matsw_' + currentWord.slideIdx + '_' + currentWord.si + '_' + currentWord.wi;
+                    var wordEl = document.getElementById(previewWordId);
+                    if (wordEl) {
+                        wordEl.classList.add('mat-highlight');
+                    } else {
+                        console.warn('SYNC: Could not find element #' + previewWordId + ' for word "' + currentWord.word + '" (slide ' + currentWord.slideIdx + ', sentence ' + currentWord.si + ', word ' + currentWord.wi + ')');
+                    }
+                }
+            }
+
+            // Update Play All button
+            var playAllBtn = document.getElementById('matAudioPlayAllBtn');
+            if (playAllBtn) playAllBtn.innerHTML = '&#9646;&#9646; Pause';
+
+            matAudioAnimFrame = requestAnimationFrame(matRunSyncLoop);
         }
 
         function matExportPDF() {
@@ -9521,6 +9979,7 @@
             var slidesJSON = JSON.stringify(matSlides.map(function(s) { return { sentences: s.sentences }; }));
 
             var h = '';
+            h += '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n';
             h += '<div id="klrn-reader">\n';
             h += '  <div class="klr-slide-area">\n';
             h += '    <div class="klr-slides" id="klrSlides"></div>\n';
@@ -9691,12 +10150,18 @@
             h += '}\n';
             h += 'window.addEventListener("resize", klrScale);\n';
 
+            // Audio sync engine for export
             h += 'renderDots(); klrScale(); goTo(0);\n';
+
+            // Audio setup - src will be set separately to avoid huge string in JS parser
+            
+
             // Also re-scale after a short delay in case Shopify layout settles late
             h += 'setTimeout(klrScale, 300);\n';
             h += 'setTimeout(klrScale, 1000);\n';
             h += '})();\n';
             h += '<\/script>\n';
+            h += '</body></html>\n';
 
             // Download
             var blob = new Blob([h], { type: 'text/html;charset=utf-8' });
@@ -9758,7 +10223,7 @@
                 for (var w = 0; w < words.length; w++) {
                     if (!words[w]) continue;
                     var wordId = 'matword_' + j + '_' + w;
-                    html += '<span class="mat-word" id="' + wordId + '" data-word="' + escapeHtml(words[w]) + '" data-sentence="' + escapeHtml(s.sentences[j]) + '"';
+                    html += '<span class="mat-word mat-sync-word" id="' + wordId + '" data-slide="' + matExpCurrentSlide + '" data-si="' + j + '" data-wi="' + w + '" data-word="' + escapeHtml(words[w]) + '" data-sentence="' + escapeHtml(s.sentences[j]) + '"';
                     html += ' onclick="event.stopPropagation(); matSpeakWord(this)"';
                     html += ' onmouseenter="matLoadTooltip(this)">';
                     html += escapeHtml(words[w]);
@@ -9774,6 +10239,9 @@
                 html += '</div>';
             }
             html += '</div>';
+            if (matAudioSyncData) {
+                html += '<button class="mat-audio-play-btn" onclick="event.stopPropagation(); matToggleExpandedAudio(' + matExpCurrentSlide + ')" id="matExpPlayBtn" style="bottom:30px;left:40px;width:56px;height:56px;font-size:24px;">&#9654;</button>';
+            }
             html += '<div class="mat-expanded-num">' + (matExpCurrentSlide + 1) + ' / ' + matSlides.length + '</div>';
             html += '</div>';
             wrap.innerHTML = html;
@@ -20952,35 +21420,35 @@ Return ONLY valid JSON (single object, not array):
                 return;
             }
             
-            // Build slot status map
-            const slotStatus = {}; // key: "day-time" -> { status, class, teacherId, availableDate, week, prescheduled }
+            // Build slot status map — each key can have MULTIPLE entries
+            const slotEntries = {}; // key: "day-time" -> array of entries
             
             const now = new Date();
+            
+            function addSlotEntry(key, entry) {
+                if (!slotEntries[key]) slotEntries[key] = [];
+                slotEntries[key].push(entry);
+            }
             
             // First, mark all prescheduled slots
             allPrescheduledSlots.forEach(ps => {
                 const key = `${ps.day}-${ps.time}`;
                 const startDate = parseLocalDate(ps.startDate);
                 
-                // Check if there's an active class that replaced this prescheduled slot
+                // Check if there's an active class that replaced this prescheduled slot for THIS teacher
                 const hasActiveClass = allClasses.some(cls => 
                     cls.day === ps.day && 
                     cls.time === ps.time && 
+                    cls.teacherId === ps.teacherId &&
                     cls.status !== 'completed'
                 );
                 
-                // Only skip prescheduled if an actual active class exists for this slot
-                if (hasActiveClass) {
-                    return; // An active class has replaced this prescheduled slot
-                }
+                if (hasActiveClass) return;
                 
                 if (!selectedTeacherId || ps.teacherId === selectedTeacherId) {
-                    // Determine if slot is full (for coloring)
                     const enrolledCount = ps.enrolledStudents?.length || 0;
                     const maxSeats = ps.maxSeats || 5;
                     const isFull = enrolledCount >= maxSeats;
-                    
-                    // Calculate end date based on class type duration
                     const weeksTotal = getLevelWeeks(ps.classType) || 6;
                     let endDate = null;
                     if (startDate) {
@@ -20988,7 +21456,7 @@ Return ONLY valid JSON (single object, not array):
                         endDate.setDate(endDate.getDate() + (weeksTotal * 7));
                     }
                     
-                    slotStatus[key] = {
+                    addSlotEntry(key, {
                         status: isFull ? 'prescheduled-full' : 'prescheduled',
                         prescheduled: ps,
                         teacherId: ps.teacherId,
@@ -20996,11 +21464,11 @@ Return ONLY valid JSON (single object, not array):
                         classType: ps.classType,
                         startDate: startDate,
                         endDate: endDate,
-                        availableDate: endDate, // When the slot opens back up
+                        availableDate: endDate,
                         enrolledCount: enrolledCount,
                         maxSeats: maxSeats,
                         weeksTotal: weeksTotal
-                    };
+                    });
                 }
             });
             
@@ -21009,10 +21477,6 @@ Return ONLY valid JSON (single object, not array):
                 if (cls.status === 'completed') return;
                 
                 const key = `${cls.day}-${cls.time}`;
-                
-                // If there's a prescheduled entry, the class has started - keep the class info
-                // (prescheduled was already skipped above if active class exists)
-                
                 const startDate = cls.startDate ? new Date(cls.startDate) : null;
                 
                 let currentWeek = 0;
@@ -21026,16 +21490,20 @@ Return ONLY valid JSON (single object, not array):
                     endDate.setDate(endDate.getDate() + (weeksTotal * 7));
                 }
                 
-                let status = 'occupied'; // red
+                let status = 'occupied';
                 if (currentWeek >= weeksTotal) {
-                    status = 'available'; // green - class has ended
+                    status = 'available';
                 } else if (currentWeek >= weeksTotal - 1) {
-                    status = 'ending'; // yellow - ending soon
+                    status = 'ending';
                 }
                 
-                // Only track if teacher matches filter (or no filter)
                 if (!selectedTeacherId || cls.teacherId === selectedTeacherId) {
-                    slotStatus[key] = {
+                    // Remove any existing prescheduled entry for this same teacher in this slot
+                    if (slotEntries[key]) {
+                        slotEntries[key] = slotEntries[key].filter(e => e.teacherId !== cls.teacherId);
+                    }
+                    
+                    addSlotEntry(key, {
                         status,
                         class: cls,
                         teacherId: cls.teacherId,
@@ -21043,8 +21511,14 @@ Return ONLY valid JSON (single object, not array):
                         availableDate: endDate,
                         week: currentWeek,
                         weeksTotal
-                    };
+                    });
                 }
+            });
+            
+            // For legacy compatibility, build a flat slotStatus from first entry
+            const slotStatus = {};
+            Object.entries(slotEntries).forEach(([key, entries]) => {
+                if (entries.length > 0) slotStatus[key] = entries[0];
             });
             
             // Build grid HTML
@@ -21057,12 +21531,33 @@ Return ONLY valid JSON (single object, not array):
                 
                 TIME_SLOTS.forEach(time => {
                     const key = `${day}-${time}`;
-                    const slot = slotStatus[key];
+                    const entries = slotEntries[key] || [];
+                    const isAllView = !selectedTeacherId;
+                    
+                    // Multiple teachers in same slot (only in "All" view)
+                    if (isAllView && entries.length > 1) {
+                        // Blue multi-teacher slot
+                        const teacherNames = entries.map(e => e.teacherName).join(', ');
+                        html += `
+                            <div class="slot-card" onclick="openMultiTeacherSlot('${day}', '${time}')" 
+                                 style="background: rgba(59,130,246,0.3); border: 2px solid #3b82f6; border-radius: 8px; padding: 10px; 
+                                        cursor: pointer; transition: all 0.2s; text-align: center; position: relative;">
+                                <div style="position: absolute; top: -8px; right: -8px; background: #3b82f6; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${entries.length} classes</div>
+                                <div style="font-size: 14px; font-weight: bold; color: #fff;">${time}</div>
+                                <div style="font-size: 18px; margin: 5px 0;">🔵</div>
+                                <div style="font-size: 11px; color: #3b82f6;">Multi-Teacher</div>
+                                <div style="font-size: 9px; color: #888; margin-top: 3px;">👨‍🏫 ${teacherNames}</div>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Single entry or no entry — use first entry (or null)
+                    const slot = entries[0] || null;
                     
                     let bgColor, borderColor, statusText, statusIcon, clickable = true, xBadge = '';
                     
                     if (slot?.status === 'prescheduled-full') {
-                        // Full prescheduled slot - red/pink
                         bgColor = 'rgba(255,51,102,0.3)';
                         borderColor = '#ff3366';
                         statusText = 'Full';
@@ -21080,7 +21575,6 @@ Return ONLY valid JSON (single object, not array):
                         xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: #ff9800; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${seatInfo}</div>`;
                         xBadge += `<div style="font-size: 9px; color: #ff9800; margin-top: 3px;">${classTypeName}</div>`;
                     } else if (!slot) {
-                        // Check if any teacher is available for this day
                         const availableTeacher = relevantTeachers.find(t => (t.availableDays || []).includes(day));
                         if (availableTeacher) {
                             bgColor = 'rgba(57,255,20,0.2)';
@@ -21119,17 +21613,14 @@ Return ONLY valid JSON (single object, not array):
                         ? `<div style="font-size: 10px; color: #888; margin-top: 3px;">${LEVELS[slot.class.level] || slot.class.level}</div>`
                         : '';
                     
-                    // Teacher info - show for all statuses except available/no teacher
                     const teacherInfo = slot?.teacherName && (slot.status === 'prescheduled' || slot.status === 'prescheduled-full')
                         ? `<div style="font-size: 9px; color: ${slot.status === 'prescheduled-full' ? '#ff3366' : '#ff9800'}; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>`
                         : (slot?.teacherName && slot.status !== 'available' ? `<div style="font-size: 9px; color: #666; margin-top: 2px;">👨‍🏫 ${slot.teacherName}</div>` : '');
                     
-                    // Start date info for prescheduled slots
                     const startDateInfo = (slot?.status === 'prescheduled' || slot?.status === 'prescheduled-full') && slot.startDate
                         ? `<div style="font-size: 9px; color: ${slot.status === 'prescheduled-full' ? '#ff3366' : '#ff9800'};">Starts: ${slot.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>`
                         : '';
                     
-                    // End date / Opens info - show for occupied, ending, AND full prescheduled slots
                     const showOpensDate = slot?.status === 'ending' || slot?.status === 'occupied' || slot?.status === 'prescheduled-full';
                     
                     html += `
@@ -21280,6 +21771,83 @@ Return ONLY valid JSON (single object, not array):
             analyticsDiv.innerHTML = html;
         }
         
+        function openMultiTeacherSlot(day, time) {
+            // Find all classes/prescheduled for this day+time
+            const entries = [];
+            
+            allClasses.forEach(cls => {
+                if (cls.status === 'completed') return;
+                if (cls.day === day && cls.time === time) {
+                    const teacher = allTeachers.find(t => t.id === cls.teacherId);
+                    const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
+                    const maxSeats = cls.maxSeats || 5;
+                    entries.push({
+                        type: 'class',
+                        classId: cls.id,
+                        teacherName: teacher?.name || 'Unassigned',
+                        teacherId: cls.teacherId,
+                        level: LEVELS[cls.level] || cls.level,
+                        students: `${studentCount}/${maxSeats}`,
+                        isFull: studentCount >= maxSeats
+                    });
+                }
+            });
+            
+            allPrescheduledSlots.forEach(ps => {
+                if (ps.day === day && ps.time === time) {
+                    const hasActive = allClasses.some(c => c.day === day && c.time === time && c.teacherId === ps.teacherId && c.status !== 'completed');
+                    if (hasActive) return;
+                    const teacher = allTeachers.find(t => t.id === ps.teacherId);
+                    const enrolledCount = ps.enrolledStudents?.length || 0;
+                    const maxSeats = ps.maxSeats || 5;
+                    entries.push({
+                        type: 'prescheduled',
+                        prescheduledId: ps.id,
+                        teacherName: teacher?.name || ps.teacherName || 'Unknown',
+                        teacherId: ps.teacherId,
+                        level: LEVELS[ps.classType] || ps.classType || 'Class',
+                        students: `${enrolledCount}/${maxSeats}`,
+                        isFull: enrolledCount >= maxSeats
+                    });
+                }
+            });
+            
+            if (entries.length === 0) return;
+            
+            let menuHtml = `
+                <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:30000;display:flex;align-items:center;justify-content:center;" onclick="this.remove()">
+                    <div style="background:#1a1a2e;border:2px solid #3b82f6;border-radius:12px;padding:24px;max-width:400px;width:90%;" onclick="event.stopPropagation()">
+                        <h3 style="color:#3b82f6;margin:0 0 6px;">🔵 ${day} @ ${time}</h3>
+                        <p style="color:#888;font-size:12px;margin:0 0 16px;">${entries.length} classes in this time slot</p>
+            `;
+            
+            entries.forEach(e => {
+                const color = e.isFull ? '#ff3366' : '#ff9800';
+                const icon = e.isFull ? '🔴' : '🟠';
+                menuHtml += `
+                    <div onclick="document.querySelector('[onclick*=openMultiTeacherSlot]')?.closest('div[style*=fixed]')?.remove(); document.getElementById('slotManagerTeacher').value='${e.teacherId}'; renderSlotGrid(); openSlotDetails('${day}', '${time}');"
+                         style="background:rgba(255,255,255,0.05);border:2px solid ${color};border-radius:8px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s;"
+                         onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="color:#fff;font-weight:bold;font-size:14px;">${icon} ${e.teacherName}</div>
+                                <div style="color:#888;font-size:11px;margin-top:3px;">${e.level}</div>
+                            </div>
+                            <div style="color:${color};font-weight:bold;font-size:13px;">${e.students}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            menuHtml += `
+                        <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;margin-top:5px;">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', menuHtml);
+        }
+
         function openSlotDetails(day, time) {
             const key = `${day}-${time}`;
             const selectedTeacherId = document.getElementById('slotManagerTeacher')?.value || '';
