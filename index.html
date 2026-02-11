@@ -1026,6 +1026,12 @@
         .mat-slide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         .mat-slide-content { position: relative; z-index: 2; max-width: 85%; width: 85%; display: flex; flex-direction: column; align-items: center; gap: 12px; overflow: hidden; }
         .mat-slide-korean { font-weight: 700; line-height: 1.6; color: #000; word-break: keep-all; display: block; width: 100%; text-align: center; }
+        /* Display mode highlights - inline-fit behind words only */
+        .mat-slide-korean .mat-sentence-hl { display: inline; padding: 2px 8px; border-radius: 8px; transition: background 0.4s ease, box-shadow 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+        .mat-slide-korean .mat-sentence-hl.mat-hl-blue { background: rgba(59, 130, 246, 0.22); }
+        .mat-slide-korean .mat-sentence-hl.mat-hl-purple { background: rgba(168, 85, 247, 0.22); }
+        .mat-slide-korean .mat-sentence-hl.mat-hl-red { background: rgba(239, 68, 68, 0.22); }
+        /* Pronunciation mode */
         .mat-slide-number { position: absolute; bottom: 12px; right: 18px; font-size: 13px; color: #000; opacity: 0.3; z-index: 2; }
         .mat-audio-play-btn { position: absolute; bottom: 12px; left: 18px; z-index: 10; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; border: 2px solid #000; border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .mat-audio-play-btn:hover { transform: scale(1.15); }
@@ -1056,6 +1062,53 @@
         .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border-radius: 12px; }
         .mat-expanded-content { position: absolute; top: 123px; left: 155px; right: 155px; bottom: 123px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 2; overflow: visible; text-align: center; }
         .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; width: 100%; }
+        /* Expanded mode highlights - wrap behind words */
+        .mat-expanded-sentence .mat-sentence-hl { display: inline; padding: 4px 14px; border-radius: 10px; transition: background 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+        .mat-expanded-sentence .mat-sentence-hl.mat-hl-blue { background: rgba(59, 130, 246, 0.22); }
+        .mat-expanded-sentence .mat-sentence-hl.mat-hl-purple { background: rgba(168, 85, 247, 0.22); }
+        .mat-expanded-sentence .mat-sentence-hl.mat-hl-red { background: rgba(239, 68, 68, 0.22); }
+        /* Settings widget - checkbox-driven CSS animation */
+        .mat-settings-widget { position: absolute; top: 12px; right: 12px; z-index: 20; }
+        .mat-settings-widget input.mat-settings-toggle { display: none; }
+        .mat-settings-btn { background: rgba(0,0,0,0.25); border: 1.5px solid rgba(255,255,255,0.25); border-radius: 50%; width: 30px; height: 30px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.35s ease, transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55); color: #fff; backdrop-filter: blur(4px); position: relative; z-index: 22; }
+        .mat-settings-btn:hover { background: rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.5); }
+        .mat-settings-btn .mat-gear-icon { transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55), opacity 0.25s ease; display: block; }
+        .mat-settings-btn .mat-close-icon { position: absolute; opacity: 0; transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55), opacity 0.25s ease; font-size: 16px; font-weight: 700; }
+        /* Checked state - gear rotates out, X rotates in */
+        .mat-settings-toggle:checked + .mat-settings-btn { background: rgba(0,255,255,0.15); border-color: rgba(0,255,255,0.5); transform: scale(1.05); }
+        .mat-settings-toggle:checked + .mat-settings-btn .mat-gear-icon { transform: rotate(180deg); opacity: 0; }
+        .mat-settings-toggle:checked + .mat-settings-btn .mat-close-icon { transform: rotate(0deg); opacity: 1; }
+        .mat-settings-btn .mat-close-icon { transform: rotate(-180deg); }
+        /* Menu panel */
+        .mat-settings-menu { position: absolute; top: 38px; right: 0; background: linear-gradient(135deg, #1a1a2e, #2d2748); border: 1.5px solid rgba(0,255,255,0.4); border-radius: 12px; padding: 6px 0; min-width: 180px; box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,255,255,0.08); opacity: 0; transform: translateY(-8px) scale(0.95); pointer-events: none; transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.68,-0.55,0.27,1.55); z-index: 21; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        /* Menu items staggered entrance */
+        .mat-settings-menu > * { opacity: 0; transform: translateX(10px); transition: opacity 0.25s ease, transform 0.3s ease; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.08s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.14s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.20s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.26s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(5) { opacity: 1; transform: translateX(0); transition-delay: 0.32s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(6) { opacity: 1; transform: translateX(0); transition-delay: 0.38s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(7) { opacity: 1; transform: translateX(0); transition-delay: 0.44s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(8) { opacity: 1; transform: translateX(0); transition-delay: 0.50s; }
+        .mat-settings-menu label { display: flex; align-items: center; gap: 10px; padding: 9px 14px; color: #fff; font-size: 13px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; border-radius: 0; transition: background 0.15s; white-space: nowrap; margin: 0; }
+        .mat-settings-menu label:hover { background: rgba(255,255,255,0.08); }
+        .mat-settings-menu input[type=radio] { accent-color: #00ffff; width: 15px; height: 15px; margin: 0; flex-shrink: 0; }
+        .mat-settings-menu .mat-mode-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .mat-settings-menu .mat-menu-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 10px; }
+        .mat-settings-menu .mat-clear-btn { display: flex; align-items: center; gap: 10px; padding: 9px 14px; color: #999; font-size: 13px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+        .mat-settings-menu .mat-clear-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        /* Expanded settings widget - larger */
+        .mat-expanded-slide-inner .mat-settings-widget { top: 30px; right: 40px; }
+        .mat-expanded-slide-inner .mat-settings-btn { width: 52px; height: 52px; font-size: 24px; }
+        .mat-expanded-slide-inner .mat-settings-btn .mat-close-icon { font-size: 26px; }
+        .mat-expanded-slide-inner .mat-settings-menu { top: 60px; min-width: 260px; padding: 8px 0; border-radius: 14px; }
+        .mat-expanded-slide-inner .mat-settings-menu label { font-size: 17px; padding: 12px 18px; gap: 12px; }
+        .mat-expanded-slide-inner .mat-settings-menu input[type=radio] { width: 18px; height: 18px; }
+        .mat-expanded-slide-inner .mat-settings-menu .mat-mode-dot { width: 14px; height: 14px; }
+        .mat-expanded-slide-inner .mat-settings-menu .mat-clear-btn { font-size: 17px; padding: 12px 18px; gap: 12px; }
+        .mat-expanded-slide-inner .mat-settings-menu .mat-menu-divider { margin: 5px 14px; }
         .mat-word { font-weight: 700; color: #000; cursor: pointer; padding: 6px 8px; border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; }
         .mat-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }
         .mat-word.mat-word-playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }
@@ -9031,6 +9084,93 @@
         // ==================== MATERIALS CREATOR ====================
         var matSlides = [];
         var matCurrentSlide = 0;
+        var matDisplayMode = 'clear'; // 'normal', 'hard', 'clear', 'recording'
+
+
+        function matGetSentenceHlClass(sentenceIdx) {
+            if (matDisplayMode === 'recording' || matDisplayMode === 'clear') return '';
+            if (matDisplayMode === 'normal') {
+                return sentenceIdx === 0 ? 'mat-hl-blue' : '';
+            }
+            if (matDisplayMode === 'hard') {
+                return sentenceIdx === 0 ? 'mat-hl-purple' : 'mat-hl-red';
+            }
+            return '';
+        }
+
+        function matBuildSettingsWidget(context) {
+            if (matDisplayMode === 'recording') return '';
+            var uid = 'matSettingsToggle_' + context + '_' + Math.random().toString(36).substr(2,5);
+            var html = '<div class="mat-settings-widget" onclick="event.stopPropagation();">';
+            html += '<input type="checkbox" class="mat-settings-toggle" id="' + uid + '">';
+            html += '<label class="mat-settings-btn" for="' + uid + '" onclick="event.stopPropagation();">';
+            html += '<span class="mat-gear-icon">⚙️</span>';
+            html += '<span class="mat-close-icon">✕</span>';
+            html += '</label>';
+            html += '<div class="mat-settings-menu">';
+            html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="normal"' + (matDisplayMode === 'normal' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'normal\')"><span class="mat-mode-dot" style="background:rgba(59,130,246,0.4);border:1.5px solid #3b82f6;"></span> Normal Mode</label>';
+            html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="hard"' + (matDisplayMode === 'hard' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'hard\')"><span class="mat-mode-dot" style="background:rgba(168,85,247,0.4);border:1.5px solid #a855f7;"></span> Hard Mode</label>';
+            html += '<div class="mat-menu-divider"></div>';
+            html += '<div class="mat-clear-btn" onclick="event.stopPropagation(); matSetDisplayMode(\'clear\')"><span style="font-size:14px;">✕</span> Clear Highlight</div>';
+            if (context !== 'export' && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin') {
+                html += '<div class="mat-menu-divider"></div>';
+                html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="recording"' + (matDisplayMode === 'recording' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'recording\')"><span class="mat-mode-dot" style="background:rgba(136,136,136,0.3);border:1.5px solid #888;"></span> Recording Mode</label>';
+            }
+            html += '</div></div>';
+            return html;
+        }
+
+        function matToggleSettingsMenu(btn) {
+            // Legacy - no longer used, checkbox handles state
+        }
+
+        function matSetDisplayMode(mode) {
+            var prevMode = matDisplayMode;
+            matDisplayMode = mode;
+            // Close menus by unchecking toggles
+            document.querySelectorAll('.mat-settings-toggle').forEach(function(cb) { cb.checked = false; });
+            // Pronunciation and recording modes need full re-render
+            // Also re-render when LEAVING pronunciation to restore original text
+            if (mode === 'recording' || prevMode === 'recording') {
+                matRenderSlideshow();
+                if (document.getElementById('matExpandedOverlay')?.classList.contains('active')) {
+                    matRenderExpandedSlide();
+                }
+                if (mode !== 'recording') {
+                    setTimeout(function() { matApplyHighlightsInPlace(); }, 10);
+                }
+                return;
+            }
+            // Update highlights in-place (no re-render, smooth CSS transition)
+            matApplyHighlightsInPlace();
+            // Update radio buttons to reflect state
+            document.querySelectorAll('input[name^="matMode"]').forEach(function(r) {
+                r.checked = (r.value === mode);
+            });
+        }
+
+        function matApplyHighlightsInPlace() {
+            // Toggle highlight classes on all sentence-hl spans without re-rendering
+            document.querySelectorAll('.mat-sentence-hl').forEach(function(el) {
+                var parent = el.closest('.mat-slide-korean, .mat-expanded-sentence');
+                if (!parent) return;
+                var siblings = parent.parentElement.children;
+                var si = -1;
+                for (var i = 0; i < siblings.length; i++) {
+                    if (siblings[i] === parent) { si = i; break; }
+                }
+                var hlClass = matGetSentenceHlClass(si);
+                el.classList.remove('mat-hl-blue', 'mat-hl-purple', 'mat-hl-red');
+                if (hlClass) el.classList.add(hlClass);
+            });
+        }
+
+        // Close settings menus when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.mat-settings-widget')) {
+                document.querySelectorAll('.mat-settings-toggle').forEach(function(cb) { cb.checked = false; });
+            }
+        });
         var MAT_BG_URL = 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568';
 
         function openMaterialsCreator() {
@@ -9344,15 +9484,20 @@
                 html += '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="" crossorigin="anonymous">';
                 html += '<div class="mat-slide-content" style="font-size:' + fs + ';">';
                 for (var j = 0; j < s.sentences.length; j++) {
+                    var hlClass = matGetSentenceHlClass(j);
                     html += '<div class="mat-slide-korean">';
+                    html += '<span class="mat-sentence-hl' + (hlClass ? ' ' + hlClass : '') + '">';
                     var words = s.sentences[j].split(/\s+/);
                     for (var w = 0; w < words.length; w++) {
                         if (!words[w]) continue;
                         html += '<span class="mat-sync-word" data-slide="' + i + '" data-si="' + j + '" data-wi="' + w + '" id="matsw_' + i + '_' + j + '_' + w + '">' + escapeHtml(words[w]) + '</span> ';
                     }
+                    html += '</span>';
                     html += '</div>';
                 }
                 html += '</div>';
+                // Settings widget
+                html += matBuildSettingsWidget('preview');
                 // Audio play button (only visible when audio is loaded)
                 if (matAudioSyncData) {
                     html += '<button class="mat-audio-play-btn" onclick="event.stopPropagation(); matToggleSlideAudio(' + i + ')" title="Play audio for this slide">&#9654;</button>';
@@ -10001,7 +10146,31 @@
             h += '#klrn-reader .klr-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: 100% 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
             h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; overflow: visible; }\n';
             h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(8px * var(--s)); overflow: visible; text-align: center; }\n';
-            h += '#klrn-reader .klr-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); width: 100%; }\n';
+            h += '#klrn-reader .klr-sentence { width: 100%; text-align: center; }\n';
+            h += '#klrn-reader .klr-sentence-hl { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); padding: calc(2px * var(--s)) calc(8px * var(--s)); border-radius: calc(8px * var(--s)); transition: background 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }\n';
+            h += '#klrn-reader .klr-sentence-hl.klr-hl-blue { background: rgba(59,130,246,0.22); }\n';
+            h += '#klrn-reader .klr-sentence-hl.klr-hl-purple { background: rgba(168,85,247,0.22); }\n';
+            h += '#klrn-reader .klr-sentence-hl.klr-hl-red { background: rgba(239,68,68,0.22); }\n';
+            h += '#klrn-reader .klr-settings { position: absolute; top: calc(8px * var(--s)); right: calc(8px * var(--s)); z-index: 20; }\n';
+            h += '#klrn-reader .klr-settings input.klr-stoggle { display: none; }\n';
+            h += '#klrn-reader .klr-settings-btn { background: rgba(0,0,0,0.25); border: 1.5px solid rgba(255,255,255,0.25); border-radius: 50%; width: calc(28px * var(--s)); height: calc(28px * var(--s)); font-size: calc(14px * var(--s)); cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; backdrop-filter: blur(4px); transition: all 0.35s ease, transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55); position: relative; z-index: 22; }\n';
+            h += '#klrn-reader .klr-settings-btn:hover { background: rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.5); }\n';
+            h += '#klrn-reader .klr-settings-btn .klr-gear { transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55), opacity 0.25s ease; }\n';
+            h += '#klrn-reader .klr-settings-btn .klr-x { position: absolute; opacity: 0; transition: transform 0.4s cubic-bezier(0.68,-0.55,0.27,1.55), opacity 0.25s ease; transform: rotate(-180deg); font-weight: 700; font-size: calc(16px * var(--s)); }\n';
+            h += '#klrn-reader .klr-stoggle:checked + .klr-settings-btn { background: rgba(0,255,255,0.15); border-color: rgba(0,255,255,0.5); transform: scale(1.05); }\n';
+            h += '#klrn-reader .klr-stoggle:checked + .klr-settings-btn .klr-gear { transform: rotate(180deg); opacity: 0; }\n';
+            h += '#klrn-reader .klr-stoggle:checked + .klr-settings-btn .klr-x { transform: rotate(0deg); opacity: 1; }\n';
+            h += '#klrn-reader .klr-settings-menu { position: absolute; top: calc(34px * var(--s)); right: 0; background: linear-gradient(135deg,#1a1a2e,#2d2748); border: 1.5px solid rgba(0,255,255,0.4); border-radius: 12px; padding: calc(6px * var(--s)) 0; min-width: calc(170px * var(--s)); box-shadow: 0 12px 40px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-8px) scale(0.95); pointer-events: none; transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.68,-0.55,0.27,1.55); z-index: 21; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }\n';
+            h += '#klrn-reader .klr-settings-menu > * { opacity: 0; transform: translateX(10px); transition: opacity 0.25s ease, transform 0.3s ease; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.08s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.14s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.20s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.26s; }\n';
+            h += '#klrn-reader .klr-settings-menu label { display: flex; align-items: center; gap: calc(8px * var(--s)); padding: calc(8px * var(--s)) calc(12px * var(--s)); color: #fff; font-size: calc(12px * var(--s)); font-weight: 700; font-family: "Noto Sans KR", sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s; }\n';
+            h += '#klrn-reader .klr-settings-menu label:hover { background: rgba(255,255,255,0.08); }\n';
+            h += '#klrn-reader .klr-settings-menu input[type=radio] { accent-color: #00ffff; width: calc(14px * var(--s)); height: calc(14px * var(--s)); margin: 0; }\n';
+            h += '#klrn-reader .klr-mode-dot { width: calc(10px * var(--s)); height: calc(10px * var(--s)); border-radius: 50%; display: inline-block; }\n';
             h += '#klrn-reader .klr-word { font-size: calc(' + fs + 'px * var(--s)); font-weight: 700; color: #000; cursor: pointer; padding: calc(3px * var(--s)) calc(4px * var(--s)); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
             h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
             h += '#klrn-reader .klr-word.playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }\n';
@@ -10029,6 +10198,31 @@
             h += 'var wordCache = ' + cacheJSON + ';\n';
             h += 'var totalSlides = ' + totalSlides + ';\n';
             h += 'var cur = 0, audio = null, activeTip = null;\n';
+            h += 'var klrMode = "' + matDisplayMode + '";\n';
+            h += 'function klrGetHlClass(si) {\n';
+            h += '  if (klrMode === "normal") return si === 0 ? "klr-hl-blue" : "";\n';
+            h += '  if (klrMode === "hard") return si === 0 ? "klr-hl-purple" : "klr-hl-red";\n';
+            h += '  return "";\n';
+            h += '}\n';
+            h += 'function klrSetMode(m) {\n';
+            h += '  klrMode = m;\n';
+            h += '  document.querySelectorAll("#klrn-reader .klr-sentence-hl").forEach(function(el) {\n';
+            h += '    var parent = el.closest(".klr-sentence");\n';
+            h += '    if (!parent) return;\n';
+            h += '    var siblings = parent.parentElement.children;\n';
+            h += '    var si = -1;\n';
+            h += '    for (var i = 0; i < siblings.length; i++) { if (siblings[i] === parent) { si = i; break; } }\n';
+            h += '    var hc = klrGetHlClass(si);\n';
+            h += '    el.classList.remove("klr-hl-blue","klr-hl-purple","klr-hl-red");\n';
+            h += '    if (hc) el.classList.add(hc);\n';
+            h += '  });\n';
+            h += '  document.querySelectorAll("#klrn-reader input[name=klrMode]").forEach(function(r) { r.checked = (r.value === m); });\n';
+            h += '}\n';
+            h += 'document.addEventListener("click", function(e) {\n';
+            h += '  if (!e.target.closest(".klr-settings")) {\n';
+            h += '    var cb = document.getElementById("klrSToggle"); if (cb) cb.checked = false;\n';
+            h += '  }\n';
+            h += '});\n';
             h += 'var isMobile = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);\n';
             h += 'var BG = "' + MAT_BG_URL + '";\n';
             h += 'var TTS = "https://tts-proxy-386010826708.us-central1.run.app";\n';
@@ -10055,7 +10249,9 @@
             h += '  var html = "<div class=\\"klr-slide active\\" style=\\"background-image:url(" + BG + ")\\">";\n';
             h += '  html += "<div class=\\"klr-content\\">";\n';
             h += '  for (var j = 0; j < slides[i].sentences.length; j++) {\n';
+            h += '    var hc = klrGetHlClass(j);\n';
             h += '    html += "<div class=\\"klr-sentence\\">";\n';
+            h += '    html += "<span class=\\"klr-sentence-hl" + (hc ? " " + hc : "") + "\\">";\n';
             h += '    var words = slides[i].sentences[j].split(/\\s+/);\n';
             h += '    for (var w = 0; w < words.length; w++) {\n';
             h += '      if (!words[w]) continue;\n';
@@ -10063,9 +10259,19 @@
             h += '      html += esc(words[w]);\n';
             h += '      html += "</span>";\n';
             h += '    }\n';
+            h += '    html += "</span>";\n';
             h += '    html += "</div>";\n';
             h += '  }\n';
             h += '  html += "</div>";\n';
+            h += '  html += "<div class=\\"klr-settings\\">";\n';
+            h += '  html += "<input type=\\"checkbox\\" class=\\"klr-stoggle\\" id=\\"klrSToggle\\">";\n';
+            h += '  html += "<label class=\\"klr-settings-btn\\" for=\\"klrSToggle\\" onclick=\\"event.stopPropagation();\\"><span class=\\"klr-gear\\">⚙️</span><span class=\\"klr-x\\">✕</span></label>";\n';
+            h += '  html += "<div class=\\"klr-settings-menu\\">";\n';
+            h += '  html += "<label onclick=\\"event.stopPropagation();\\"><input type=\\"radio\\" name=\\"klrMode\\" value=\\"normal\\"" + (klrMode==="normal"?" checked":"") + " onchange=\\"event.stopPropagation(); KLR.setMode(\'normal\')\\">" + "<span class=\\"klr-mode-dot\\" style=\\"background:rgba(59,130,246,0.4);border:1.5px solid #3b82f6;\\"></span> Normal Mode</label>";\n';
+            h += '  html += "<label onclick=\\"event.stopPropagation();\\"><input type=\\"radio\\" name=\\"klrMode\\" value=\\"hard\\"" + (klrMode==="hard"?" checked":"") + " onchange=\\"event.stopPropagation(); KLR.setMode(\'hard\')\\">" + "<span class=\\"klr-mode-dot\\" style=\\"background:rgba(168,85,247,0.4);border:1.5px solid #a855f7;\\"></span> Hard Mode</label>";\n';
+            h += '  html += "<div style=\\"height:1px;background:rgba(255,255,255,0.08);margin:4px 10px;\\"></div>";\n';
+            h += '  html += "<div style=\\"display:flex;align-items:center;gap:8px;padding:8px 12px;color:#999;font-size:calc(12px * var(--s));font-weight:700;font-family:Noto Sans KR,sans-serif;cursor:pointer;\\" onclick=\\"event.stopPropagation(); KLR.setMode(\'clear\')\\" onmouseover=\\"this.style.background=\'rgba(255,255,255,0.08)\';this.style.color=\'#fff\'\\" onmouseout=\\"this.style.background=\'none\';this.style.color=\'#999\'\\"><span style=\\"font-size:14px;\\">✕</span> Clear Highlight</div>";\n';
+            h += '  html += "</div></div>";\n';
             h += '  html += "<div class=\\"klr-num\\">" + (i+1) + " / " + totalSlides + "</div>";\n';
             h += '  html += "</div>";\n';
             h += '  el.innerHTML = html;\n';
@@ -10137,7 +10343,7 @@
             h += '  document.getElementById("klrNb").disabled = i>=totalSlides-1;\n';
             h += '}\n';
 
-            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo };\n';
+            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, setMode: klrSetMode };\n';
             h += 'document.addEventListener("keydown",function(e){ if(e.key==="ArrowRight"){e.preventDefault();KLR.go(1);} if(e.key==="ArrowLeft"){e.preventDefault();KLR.go(-1);} });\n';
             h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && !e.target.closest(".klr-tip")) hideTip(); });\n';
 
@@ -10181,6 +10387,7 @@
 
         function matExpandPreview() {
             if (matSlides.length === 0) return;
+            if (matDisplayMode === 'recording') { matDisplayMode = 'clear'; matRenderSlideshow(); }
             matExpCurrentSlide = matCurrentSlide;
             document.getElementById('matExpandedOverlay').classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -10191,6 +10398,7 @@
             document.getElementById('matExpandedOverlay').classList.remove('active');
             document.body.style.overflow = 'hidden';
             if (matCurrentAudio) { matCurrentAudio.pause(); matCurrentAudio = null; }
+            if (matDisplayMode === 'recording') { matDisplayMode = 'clear'; matRenderSlideshow(); }
         }
 
         function matRenderExpandedSlide() {
@@ -10218,7 +10426,9 @@
             html += '<img class="mat-slide-bg" src="' + MAT_BG_URL + '" alt="">';
             html += '<div class="mat-expanded-content" style="font-size:' + nativeFs + 'px;">';
             for (var j = 0; j < s.sentences.length; j++) {
+                var hlClass = matGetSentenceHlClass(j);
                 html += '<div class="mat-expanded-sentence">';
+                html += '<span class="mat-sentence-hl' + (hlClass ? ' ' + hlClass : '') + '">';
                 var words = s.sentences[j].split(/\s+/);
                 for (var w = 0; w < words.length; w++) {
                     if (!words[w]) continue;
@@ -10236,6 +10446,7 @@
                     }
                     html += '</span>';
                 }
+                html += '</span>';
                 html += '</div>';
             }
             html += '</div>';
@@ -10243,6 +10454,8 @@
                 html += '<button class="mat-audio-play-btn" onclick="event.stopPropagation(); matToggleExpandedAudio(' + matExpCurrentSlide + ')" id="matExpPlayBtn" style="bottom:30px;left:40px;width:56px;height:56px;font-size:24px;">&#9654;</button>';
             }
             html += '<div class="mat-expanded-num">' + (matExpCurrentSlide + 1) + ' / ' + matSlides.length + '</div>';
+            // Settings widget for expanded view
+            html += matBuildSettingsWidget('expanded');
             html += '</div>';
             wrap.innerHTML = html;
 
