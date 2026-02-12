@@ -1025,7 +1025,63 @@
         .mat-slide-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
         .mat-slide-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         .mat-slide-content { position: relative; z-index: 2; max-width: 85%; width: 85%; display: flex; flex-direction: column; align-items: center; gap: 12px; overflow: hidden; }
-        .mat-slide-korean { font-weight: 700; line-height: 1.6; color: #000; word-break: keep-all; display: block; width: 100%; text-align: center; }
+        .mat-slide-korean { font-weight: 700; line-height: 1.6; color: #000; word-break: keep-all; display: block; width: 100%; text-align: center; position: relative; }
+        .mat-sentence-actions { display: inline; white-space: nowrap; }
+        .mat-sentence-actions button { background: none; border: none; font-size: 17px; cursor: pointer; padding: 0 1px; transition: transform 0.15s; line-height: 1; vertical-align: middle; position: relative; top: -1px; }
+        .mat-sentence-actions button:hover { transform: scale(1.2); }
+        .mat-sentence-actions button.mat-repeat-active { filter: drop-shadow(0 0 4px rgba(168,85,247,0.6)); }
+        .mat-sentence-translate-tip { position: fixed; background: linear-gradient(135deg, #1a1a2e, #2d2748); color: #fff; border: 1.5px solid rgba(0,255,255,0.4); border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 600; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 100001; pointer-events: auto; opacity: 0; transition: opacity 0.25s ease; }
+        .mat-sentence-translate-tip.visible { opacity: 1; }
+        .mat-particle-explain-btn { display: inline-block; background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; border: none; border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 6px; vertical-align: middle; transition: all 0.15s; font-family: 'Noto Sans KR', sans-serif; }
+        .mat-particle-explain-btn:hover { transform: scale(1.05); box-shadow: 0 0 8px rgba(239,68,68,0.4); }
+        .mat-particle-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 200001; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        .mat-particle-overlay.visible { opacity: 1; pointer-events: auto; }
+        .mat-particle-popup { background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(200,160,120,0.4); border-radius: 14px; padding: 22px 26px; max-width: 480px; width: 90vw; max-height: 80vh; overflow-y: auto; color: #ddd; font-family: 'Noto Sans KR', sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); transform: translateY(10px); transition: transform 0.3s ease; }
+        .mat-particle-overlay.visible .mat-particle-popup { transform: translateY(0); }
+        .mat-particle-popup .pp-title { color: #e8c87a; font-size: 22px; font-weight: 700; margin-bottom: 14px; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
+        .mat-particle-popup .pp-section { margin-bottom: 12px; line-height: 1.6; font-size: 14px; }
+        .mat-particle-popup .pp-label { color: #8ab4d6; font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+        .mat-particle-popup .pp-korean { color: #fff; font-size: 16px; font-weight: 700; }
+        .mat-particle-popup .pp-sov { color: #c4a0d8; font-size: 13px; }
+        .mat-particle-popup .pp-eng { color: #a8d4a0; font-size: 13px; }
+        .mat-particle-popup .pp-close { position: absolute; top: 10px; right: 14px; background: none; border: none; color: #888; font-size: 20px; cursor: pointer; transition: color 0.15s; }
+        .mat-particle-popup .pp-close:hover { color: #fff; }
+        /* Comparison Mode */
+        .mat-comparison-sentence:hover, .mat-comparison-sentence.mat-comp-hover { background: rgba(74,222,128,0.18) !important; cursor: pointer !important; border-radius: 8px; }
+        .mat-comparison-sentence *, .mat-comparison-sentence:hover *, .mat-comparison-sentence.mat-comp-hover * { color: #000 !important; }
+        .mat-comp-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200002; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        .mat-comp-overlay.visible { opacity: 1; pointer-events: auto; }
+        .mat-comp-popup { position: relative; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(74,222,128,0.4); border-radius: 16px; padding: 28px 30px; max-width: 560px; width: 92vw; max-height: 85vh; overflow-y: auto; color: #ddd; font-family: 'Noto Sans KR', sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); transform: translateY(10px); transition: transform 0.3s ease; }
+        .mat-comp-overlay.visible .mat-comp-popup { transform: translateY(0); }
+        .mat-comp-popup .comp-close { position: absolute; top: 12px; right: 16px; background: none; border: none; color: #888; font-size: 22px; cursor: pointer; transition: color 0.15s; }
+        .mat-comp-popup .comp-close:hover { color: #fff; }
+        .mat-comp-popup .comp-sentence { color: #fff; font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 20px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; line-height: 1.5; }
+        .mat-comp-popup .comp-section { margin-bottom: 16px; }
+        .mat-comp-popup .comp-label { color: #8ab4d6; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .mat-comp-popup .comp-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; border: 2px solid; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Noto Sans KR', sans-serif; }
+        .mat-comp-popup .comp-btn:hover { transform: scale(1.03); }
+        .mat-comp-popup .comp-btn-listen { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.5); color: #4ade80; }
+        .mat-comp-popup .comp-btn-listen.playing { background: rgba(74,222,128,0.3); }
+        .mat-comp-popup .comp-btn-record { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.5); color: #ef4444; }
+        .mat-comp-popup .comp-btn-record.recording { background: rgba(239,68,68,0.3); animation: matCompPulse 1s ease-in-out infinite; }
+        .mat-comp-popup .comp-btn-play { background: rgba(168,85,247,0.15); border-color: rgba(168,85,247,0.5); color: #a855f7; }
+        .mat-comp-popup .comp-btn-play.playing { background: rgba(168,85,247,0.3); }
+        .mat-comp-popup .comp-vs { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .mat-comp-popup .comp-vs-label { color: #888; font-size: 12px; font-weight: 700; }
+        .mat-comp-popup .comp-feedback { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 14px 16px; line-height: 1.6; font-size: 14px; color: #ddd; }
+        .mat-comp-popup .comp-feedback .comp-fb-loading { color: #888; }
+        @keyframes matCompPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+        .mat-comp-intro-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200003; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        .mat-comp-intro-overlay.visible { opacity: 1; pointer-events: auto; }
+        .mat-comp-intro-popup { background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(74,222,128,0.4); border-radius: 16px; padding: 32px 36px; max-width: 480px; width: 90vw; color: #ddd; font-family: 'Noto Sans KR', sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); transform: translateY(10px); transition: transform 0.3s ease; text-align: center; }
+        .mat-comp-intro-overlay.visible .mat-comp-intro-popup { transform: translateY(0); }
+        .mat-comp-intro-ok { background: linear-gradient(135deg, #4ade80, #22c55e); color: #000; border: none; border-radius: 10px; padding: 12px 40px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Noto Sans KR', sans-serif; }
+        .mat-comp-intro-ok:hover { transform: scale(1.05); box-shadow: 0 0 16px rgba(74,222,128,0.3); }
+        /* Speed control in settings */
+        .mat-speed-row { display: flex; align-items: center; gap: 6px; padding: 7px 14px; color: #888; font-size: 11px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; }
+        .mat-speed-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #aaa; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: 'Noto Sans KR', sans-serif; }
+        .mat-speed-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .mat-speed-btn.active { background: rgba(0,255,255,0.15); border-color: rgba(0,255,255,0.5); color: #00ffff; }
         /* Display mode highlights - inline-fit behind words only */
         .mat-slide-korean .mat-sentence-hl { display: inline; padding: 2px 8px; border-radius: 8px; transition: background 0.4s ease, box-shadow 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
         .mat-slide-korean .mat-sentence-hl.mat-hl-blue { background: rgba(59, 130, 246, 0.22); }
@@ -1061,7 +1117,10 @@
         .mat-expanded-slide-inner { position: relative; width: 1920px; height: 1080px; transform-origin: top left; }
         .mat-expanded-slide-wrap .mat-slide-bg { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border-radius: 12px; }
         .mat-expanded-content { position: absolute; top: 123px; left: 155px; right: 155px; bottom: 123px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 2; overflow: visible; text-align: center; }
-        .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; width: 100%; }
+        .mat-expanded-sentence { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; width: 100%; position: relative; }
+        .mat-expanded-sentence .mat-sentence-actions { margin-left: 10px; }
+        .mat-expanded-sentence .mat-sentence-actions button { font-size: 26px; }
+        .mat-expanded-sentence .mat-sentence-translate-tip { font-size: 22px; padding: 14px 22px; border-radius: 12px; }
         /* Expanded mode highlights - wrap behind words */
         .mat-expanded-sentence .mat-sentence-hl { display: inline; padding: 4px 14px; border-radius: 10px; transition: background 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
         .mat-expanded-sentence .mat-sentence-hl.mat-hl-blue { background: rgba(59, 130, 246, 0.22); }
@@ -1084,14 +1143,16 @@
         .mat-settings-toggle:checked ~ .mat-settings-menu { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
         /* Menu items staggered entrance */
         .mat-settings-menu > * { opacity: 0; transform: translateX(10px); transition: opacity 0.25s ease, transform 0.3s ease; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.08s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.14s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.20s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.26s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(5) { opacity: 1; transform: translateX(0); transition-delay: 0.32s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(6) { opacity: 1; transform: translateX(0); transition-delay: 0.38s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(7) { opacity: 1; transform: translateX(0); transition-delay: 0.44s; }
-        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(8) { opacity: 1; transform: translateX(0); transition-delay: 0.50s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.06s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.10s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.13s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.16s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(5) { opacity: 1; transform: translateX(0); transition-delay: 0.19s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(6) { opacity: 1; transform: translateX(0); transition-delay: 0.22s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(7) { opacity: 1; transform: translateX(0); transition-delay: 0.25s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(8) { opacity: 1; transform: translateX(0); transition-delay: 0.28s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(9) { opacity: 1; transform: translateX(0); transition-delay: 0.31s; }
+        .mat-settings-toggle:checked ~ .mat-settings-menu > *:nth-child(10) { opacity: 1; transform: translateX(0); transition-delay: 0.34s; }
         .mat-settings-menu label { display: flex; align-items: center; gap: 10px; padding: 9px 14px; color: #fff; font-size: 13px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; border-radius: 0; transition: background 0.15s; white-space: nowrap; margin: 0; }
         .mat-settings-menu label:hover { background: rgba(255,255,255,0.08); }
         .mat-settings-menu input[type=radio] { accent-color: #00ffff; width: 15px; height: 15px; margin: 0; flex-shrink: 0; }
@@ -1109,6 +1170,16 @@
         .mat-expanded-slide-inner .mat-settings-menu .mat-mode-dot { width: 14px; height: 14px; }
         .mat-expanded-slide-inner .mat-settings-menu .mat-clear-btn { font-size: 17px; padding: 12px 18px; gap: 12px; }
         .mat-expanded-slide-inner .mat-settings-menu .mat-menu-divider { margin: 5px 14px; }
+        .mat-expanded-slide-inner .mat-speed-row { padding: 10px 18px; font-size: 14px; }
+        .mat-expanded-slide-inner .mat-speed-btn { font-size: 14px; padding: 4px 10px; }
+        /* Expanded tooltip - much larger to compensate for scale transform (1920px canvas scaled to viewport) */
+        .mat-expanded-slide-inner .mat-word .mat-word-tip { padding: 36px 40px; min-width: 520px; max-width: 700px; border-radius: 18px; border-width: 4px; }
+        .mat-expanded-slide-inner .mat-word-tip .tip-label { font-size: 40px; margin-bottom: 14px; }
+        .mat-expanded-slide-inner .mat-word-tip .tip-english { font-size: 32px; margin-bottom: 14px; }
+        .mat-expanded-slide-inner .mat-word-tip .tip-pos { font-size: 26px; margin-bottom: 10px; }
+        .mat-expanded-slide-inner .mat-word-tip .tip-detail { font-size: 24px; line-height: 1.6; margin-bottom: 6px; }
+        .mat-expanded-slide-inner .mat-word-tip .tip-loading { font-size: 24px; }
+        .mat-expanded-slide-inner .mat-particle-explain-btn { font-size: 20px; padding: 6px 16px; border-radius: 8px; }
         .mat-word { font-weight: 700; color: #000; cursor: pointer; padding: 6px 8px; border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; }
         .mat-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }
         .mat-word.mat-word-playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }
@@ -1119,11 +1190,11 @@
         .mat-word.mat-tip-left .mat-word-tip::after { left: 30px; transform: none; }
         .mat-word.mat-tip-right .mat-word-tip { left: auto; right: 0; transform: translateX(0); }
         .mat-word.mat-tip-right .mat-word-tip::after { left: auto; right: 30px; transform: none; }
-        .mat-word-tip .tip-label { font-size: 11px; color: #00ffff; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .mat-word-tip .tip-label { font-size: 20px; color: #00ffff; margin-bottom: 6px; font-weight: 700; }
         .mat-word-tip .tip-english { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
-        .mat-word-tip .tip-pos { font-size: 12px; color: #ff00ff; font-style: italic; margin-bottom: 4px; }
-        .mat-word-tip .tip-detail { font-size: 11px; color: #aaa; line-height: 1.5; }
-        .mat-word-tip .tip-loading { font-size: 12px; color: #888; }
+        .mat-word-tip .tip-pos { font-size: 13px; color: #ff00ff; font-style: italic; margin-bottom: 4px; }
+        .mat-word-tip .tip-detail { font-size: 13px; color: #aaa; line-height: 1.5; }
+        .mat-word-tip .tip-loading { font-size: 13px; color: #888; }
         .mat-expanded-nav { display: flex; gap: 15px; align-items: center; z-index: 20001; flex-shrink: 0; }
         .mat-expanded-nav button { padding: 10px 24px; background: rgba(255,0,255,0.25); border: 2px solid #ff00ff; border-radius: 8px; color: #ff00ff; font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
         .mat-expanded-nav button:hover { background: rgba(255,0,255,0.45); }
@@ -1883,6 +1954,7 @@
                                     <div class="mat-export-btns" id="matExportBtns" style="display: none;">
                                         <input type="file" id="matAudioFileInput" accept="audio/*" style="display:none;" onchange="matHandleAudioUpload(this)">
                                         <button class="mat-btn-export" onclick="document.getElementById('matAudioFileInput').click()" style="border-color: #a855f7; color: #a855f7;" id="matAudioUploadBtn">🎙️ Upload Audio</button>
+                                        <button class="mat-btn-export" onclick="matOpenTranscriptEditor()" style="border-color: #f59e0b; color: #f59e0b; display:none;" id="matEditTranscriptBtn">✏️ Edit Transcript</button>
                                         <button class="mat-btn-export mat-btn-pdf" onclick="matExportPDF()">📄 Export PDF</button>
                                         <button class="mat-btn-export mat-btn-html" onclick="matExportHTML()">🌐 Export HTML</button>
                                     </div>
@@ -9084,11 +9156,11 @@
         // ==================== MATERIALS CREATOR ====================
         var matSlides = [];
         var matCurrentSlide = 0;
-        var matDisplayMode = 'clear'; // 'normal', 'hard', 'clear', 'recording'
+        var matDisplayMode = 'clear'; // 'normal', 'hard', 'clear', 'recording', 'comparison'
 
 
         function matGetSentenceHlClass(sentenceIdx) {
-            if (matDisplayMode === 'recording' || matDisplayMode === 'clear') return '';
+            if (matDisplayMode === 'recording' || matDisplayMode === 'clear' || matDisplayMode === 'comparison') return '';
             if (matDisplayMode === 'normal') {
                 return sentenceIdx === 0 ? 'mat-hl-blue' : '';
             }
@@ -9096,6 +9168,18 @@
                 return sentenceIdx === 0 ? 'mat-hl-purple' : 'mat-hl-red';
             }
             return '';
+        }
+
+        function matBuildSentenceActions(slideIdx, si, sentence) {
+            if (matDisplayMode === 'recording' || matDisplayMode === 'comparison') return '';
+            var safeSentence = sentence.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            var html = '<span class="mat-sentence-actions">';
+            html += '<button onclick="event.stopPropagation(); matTranslateSentence(\'' + safeSentence + '\', this)" title="Translate">🔤</button>';
+            if (matAudioSyncData) {
+                html += '<button onclick="event.stopPropagation(); matToggleSentenceRepeat(' + slideIdx + ',' + si + ', this)" title="Repeat sentence">🔁</button>';
+            }
+            html += '</span>';
+            return html;
         }
 
         function matBuildSettingsWidget(context) {
@@ -9112,8 +9196,20 @@
             html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="hard"' + (matDisplayMode === 'hard' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'hard\')"><span class="mat-mode-dot" style="background:rgba(168,85,247,0.4);border:1.5px solid #a855f7;"></span> Hard Mode</label>';
             html += '<div class="mat-menu-divider"></div>';
             html += '<div class="mat-clear-btn" onclick="event.stopPropagation(); matSetDisplayMode(\'clear\')"><span style="font-size:14px;">✕</span> Clear Highlight</div>';
-            if (context !== 'export' && typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin') {
+            html += '<div class="mat-menu-divider"></div>';
+            html += '<div class="mat-speed-row" onclick="event.stopPropagation();">SPEED: ';
+            html += '<button class="mat-speed-btn' + (matPlaySpeed === 0.75 ? ' active' : '') + '" data-speed="0.75" onclick="event.stopPropagation(); matSetSpeed(0.75)">0.75x</button>';
+            html += '<button class="mat-speed-btn' + (matPlaySpeed === 1 ? ' active' : '') + '" data-speed="1" onclick="event.stopPropagation(); matSetSpeed(1)">1x</button>';
+            html += '<button class="mat-speed-btn' + (matPlaySpeed === 1.25 ? ' active' : '') + '" data-speed="1.25" onclick="event.stopPropagation(); matSetSpeed(1.25)">1.25x</button>';
+            html += '</div>';
+            var hasExtraItems = false;
+            if (matAudioSyncData) {
                 html += '<div class="mat-menu-divider"></div>';
+                html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="comparison"' + (matDisplayMode === 'comparison' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'comparison\')"><span class="mat-mode-dot" style="background:rgba(74,222,128,0.4);border:1.5px solid #4ade80;"></span> Comparison Mode</label>';
+                hasExtraItems = true;
+            }
+            if (context !== 'export' && typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'support')) {
+                if (!hasExtraItems) html += '<div class="mat-menu-divider"></div>';
                 html += '<label onclick="event.stopPropagation();"><input type="radio" name="matMode' + context + '" value="recording"' + (matDisplayMode === 'recording' ? ' checked' : '') + ' onchange="event.stopPropagation(); matSetDisplayMode(\'recording\')"><span class="mat-mode-dot" style="background:rgba(136,136,136,0.3);border:1.5px solid #888;"></span> Recording Mode</label>';
             }
             html += '</div></div>';
@@ -9129,14 +9225,25 @@
             matDisplayMode = mode;
             // Close menus by unchecking toggles
             document.querySelectorAll('.mat-settings-toggle').forEach(function(cb) { cb.checked = false; });
-            // Pronunciation and recording modes need full re-render
-            // Also re-render when LEAVING pronunciation to restore original text
-            if (mode === 'recording' || prevMode === 'recording') {
+
+            // Show instructions popup when entering comparison mode
+            if (mode === 'comparison' && prevMode !== 'comparison') {
+                matShowCompInstructions(function() {
+                    matRenderSlideshow();
+                    if (document.getElementById('matExpandedOverlay')?.classList.contains('active')) {
+                        matRenderExpandedSlide();
+                    }
+                });
+                return;
+            }
+
+            // Modes that need full re-render
+            if (mode === 'recording' || prevMode === 'recording' || mode === 'comparison' || prevMode === 'comparison') {
                 matRenderSlideshow();
                 if (document.getElementById('matExpandedOverlay')?.classList.contains('active')) {
                     matRenderExpandedSlide();
                 }
-                if (mode !== 'recording') {
+                if (mode !== 'recording' && mode !== 'comparison') {
                     setTimeout(function() { matApplyHighlightsInPlace(); }, 10);
                 }
                 return;
@@ -9147,6 +9254,38 @@
             document.querySelectorAll('input[name^="matMode"]').forEach(function(r) {
                 r.checked = (r.value === mode);
             });
+        }
+
+        function matShowCompInstructions(callback) {
+            var existing = document.querySelector('.mat-comp-intro-overlay');
+            if (existing) existing.remove();
+
+            var overlay = document.createElement('div');
+            overlay.className = 'mat-comp-intro-overlay';
+            overlay.innerHTML = '<div class="mat-comp-intro-popup">' +
+                '<div style="font-size:20px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">🎙️ Comparison Mode</div>' +
+                '<div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:22px;">' +
+                'Welcome to Comparison Mode. Here, you can record your voice to see how you compare to Mr. Calvin\'s recording. ' +
+                'The goal here is to help you notice any subtle pronunciation mistakes you might be making. ' +
+                'To begin, please click on any sentence.' +
+                '</div>' +
+                '<button class="mat-comp-intro-ok" onclick="matDismissCompInstructions()">OK</button>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            overlay._callback = callback;
+            requestAnimationFrame(function() { overlay.classList.add('visible'); });
+        }
+
+        function matDismissCompInstructions() {
+            var overlay = document.querySelector('.mat-comp-intro-overlay');
+            if (overlay) {
+                var cb = overlay._callback;
+                overlay.classList.remove('visible');
+                setTimeout(function() {
+                    if (overlay.parentNode) overlay.remove();
+                    if (cb) cb();
+                }, 300);
+            }
         }
 
         function matApplyHighlightsInPlace() {
@@ -9318,19 +9457,58 @@
             if (!name || !name.trim()) return;
             name = name.trim();
 
-            db.collection(MAT_TEXTS_COLLECTION).add({
+            var saveData = {
                 name: name,
                 text: text,
                 fontSize: parseInt(document.getElementById('matFontSize').value) || 30,
                 slides: JSON.stringify(matSlides || []),
                 wordCache: JSON.stringify(matWordCache || {}),
                 savedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(function() {
-                alert('✅ Saved "' + name + '" successfully!');
-            }).catch(function(err) {
-                console.error('Save error:', err);
-                alert('Failed to save: ' + err.message);
-            });
+            };
+
+            // Save slideMap if exists
+            if (matAudioSyncData && matAudioSyncData.slideMap) {
+                saveData.slideMap = JSON.stringify(matAudioSyncData.slideMap);
+                saveData.audioDuration = matAudioSyncData.duration || 0;
+            }
+
+            // If audio is loaded, upload to Firebase Storage first
+            if (matAudioSyncData && matAudioSyncData.audioUrl) {
+                var statusEl = document.getElementById('matAudioUploadBtn');
+                var origText = statusEl.textContent;
+                statusEl.textContent = '⏳ Saving audio...';
+
+                fetch(matAudioSyncData.audioUrl)
+                .then(function(r) { return r.blob(); })
+                .then(function(blob) {
+                    var filename = 'materials_audio/' + name.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.webm';
+                    var storageRef = firebase.storage().ref().child(filename);
+                    return storageRef.put(blob).then(function() {
+                        return storageRef.getDownloadURL();
+                    });
+                })
+                .then(function(url) {
+                    saveData.audioUrl = url;
+                    return db.collection(MAT_TEXTS_COLLECTION).add(saveData);
+                })
+                .then(function() {
+                    statusEl.textContent = origText;
+                    alert('✅ Saved "' + name + '" with audio!');
+                })
+                .catch(function(err) {
+                    console.error('Save error:', err);
+                    statusEl.textContent = origText;
+                    alert('Failed to save: ' + err.message);
+                });
+            } else {
+                db.collection(MAT_TEXTS_COLLECTION).add(saveData)
+                .then(function() {
+                    alert('✅ Saved "' + name + '" successfully!');
+                }).catch(function(err) {
+                    console.error('Save error:', err);
+                    alert('Failed to save: ' + err.message);
+                });
+            }
         }
 
         function matLoadTextMenu() {
@@ -9362,7 +9540,9 @@
                     var slideCount = 0;
                     try { if (d.slides) slideCount = JSON.parse(d.slides).length; } catch(e) {}
                     if (slideCount > 0) {
-                        html += '<div style="margin-bottom:8px;"><span style="background:rgba(39,174,96,0.2); color:#2ecc71; font-size:11px; padding:2px 8px; border-radius:4px; border:1px solid rgba(39,174,96,0.3);">🎬 ' + slideCount + ' slides + tooltips saved</span></div>';
+                        html += '<div style="margin-bottom:8px;"><span style="background:rgba(39,174,96,0.2); color:#2ecc71; font-size:11px; padding:2px 8px; border-radius:4px; border:1px solid rgba(39,174,96,0.3);">🎬 ' + slideCount + ' slides + tooltips saved</span>';
+                        if (d.audioUrl) html += ' <span style="background:rgba(168,85,247,0.2); color:#a855f7; font-size:11px; padding:2px 8px; border-radius:4px; border:1px solid rgba(168,85,247,0.3);">🎙️ Audio + timing</span>';
+                        html += '</div>';
                     }
                     html += '<div style="display:flex; gap:8px; justify-content:flex-end;">';
                     html += '<button onclick="matLoadText(\'' + doc.id + '\')" style="padding:5px 14px; background:linear-gradient(135deg,#27ae60,#2ecc71); border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:12px; font-weight:600;">Load</button>';
@@ -9420,12 +9600,39 @@
                             matRenderSlideshow();
                             document.getElementById('matExportBtns').style.display = 'flex';
                             document.getElementById('matExpandHint').style.display = 'block';
+                            matPrefetchTranslations();
                         }
                     } catch(e) { console.error('Failed to parse slides:', e); }
                 }
                 if (bar) bar.style.width = '90%';
 
                 matParseSlides();
+                if (bar) bar.style.width = '90%';
+
+                // Restore audio sync data if saved
+                if (data.slideMap) {
+                    try {
+                        var savedMap = JSON.parse(data.slideMap);
+                        matAudioSyncData = {
+                            audioUrl: data.audioUrl || null,
+                            slideMap: savedMap,
+                            duration: data.audioDuration || 0,
+                            words: []
+                        };
+                        if (data.audioUrl) {
+                            matAudioElement = new Audio(data.audioUrl);
+                            var audioBtn = document.getElementById('matAudioUploadBtn');
+                            if (audioBtn) {
+                                audioBtn.textContent = '✅ Audio Loaded';
+                                audioBtn.style.borderColor = '#39ff14';
+                                audioBtn.style.color = '#39ff14';
+                            }
+                            var editBtn = document.getElementById('matEditTranscriptBtn');
+                            if (editBtn) editBtn.style.display = '';
+                            matRenderSlideshow();
+                        }
+                    } catch(e) { console.error('Failed to parse slideMap:', e); }
+                }
                 if (bar) bar.style.width = '100%';
 
                 setTimeout(function() {
@@ -9466,6 +9673,41 @@
             matCurrentSlide = 0;
             matRenderSlideshow();
             document.getElementById('matExportBtns').style.display = 'flex';
+            matPrefetchTranslations();
+        }
+
+        function matPrefetchTranslations() {
+            if (!matSlides || matSlides.length === 0) return;
+            var sentences = [];
+            for (var i = 0; i < matSlides.length; i++) {
+                for (var j = 0; j < matSlides[i].sentences.length; j++) {
+                    var s = matSlides[i].sentences[j];
+                    if (s && !matTranslateCache[s]) sentences.push(s);
+                }
+            }
+            if (sentences.length === 0) return;
+            console.log('Prefetching translations for', sentences.length, 'sentences');
+            sentences.forEach(function(sentence) {
+                var prompt = 'Translate this Korean sentence to natural English. Reply with ONLY the English translation, nothing else: "' + sentence + '"';
+                fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 200 })
+                }).then(function(resp) { return resp.json(); })
+                .then(function(data) {
+                    var resultText = '';
+                    if (typeof data === 'string') resultText = data;
+                    else if (data.data) resultText = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                    else if (data.text) resultText = data.text;
+                    else if (data.result) resultText = data.result;
+                    else if (data.response) resultText = data.response;
+                    else if (data.content) resultText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                    else if (data.choices && data.choices[0]) resultText = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || '');
+                    else resultText = JSON.stringify(data);
+                    resultText = resultText.replace(/^["']+|["']+$/g, '').trim();
+                    if (resultText) matTranslateCache[sentence] = resultText;
+                }).catch(function(err) { console.error('Prefetch translation error for:', sentence, err); });
+            });
         }
 
         function matRegenerateSlides() {
@@ -9476,7 +9718,7 @@
             var area = document.getElementById('matSlideshowArea');
             if (!area) return;
             var fs = (parseInt(document.getElementById('matFontSize').value) || 30) + 'px';
-            var html = '<div class="mat-slideshow" onclick="matExpandPreview()">';
+            var html = '<div class="mat-slideshow" onclick="matExpandPreview(event)">';
             for (var i = 0; i < matSlides.length; i++) {
                 var s = matSlides[i];
                 var ac = (i === matCurrentSlide) ? ' active' : '';
@@ -9485,13 +9727,16 @@
                 html += '<div class="mat-slide-content" style="font-size:' + fs + ';">';
                 for (var j = 0; j < s.sentences.length; j++) {
                     var hlClass = matGetSentenceHlClass(j);
-                    html += '<div class="mat-slide-korean">';
+                    var compClass = matDisplayMode === 'comparison' ? ' mat-comparison-sentence' : '';
+                    var compClick = matDisplayMode === 'comparison' ? ' onclick="event.stopPropagation(); matOpenComparison(' + i + ',' + j + ')"' : '';
+                    html += '<div class="mat-slide-korean' + compClass + '"' + compClick + '>';
                     html += '<span class="mat-sentence-hl' + (hlClass ? ' ' + hlClass : '') + '">';
                     var words = s.sentences[j].split(/\s+/);
                     for (var w = 0; w < words.length; w++) {
                         if (!words[w]) continue;
                         html += '<span class="mat-sync-word" data-slide="' + i + '" data-si="' + j + '" data-wi="' + w + '" id="matsw_' + i + '_' + j + '_' + w + '">' + escapeHtml(words[w]) + '</span> ';
                     }
+                    html += matBuildSentenceActions(i, j, s.sentences[j]);
                     html += '</span>';
                     html += '</div>';
                 }
@@ -9549,6 +9794,179 @@
         var matAudioElement = null;
         var matAudioAnimFrame = null;
         var matAudioPlaying = false;
+        var matPlaySpeed = 1;
+        var matSentenceRepeatState = null; // {slideIdx, si, looping}
+
+        function matSetSpeed(speed) {
+            matPlaySpeed = speed;
+            if (matAudioElement) matAudioElement.playbackRate = speed;
+            document.querySelectorAll('.mat-speed-btn').forEach(function(b) {
+                b.classList.toggle('active', parseFloat(b.getAttribute('data-speed')) === speed);
+            });
+        }
+
+        function matGetSentenceTimeRange(slideIdx, si) {
+            if (!matAudioSyncData) return null;
+            var words = matAudioSyncData.slideMap.filter(function(m) {
+                return m.slideIdx === slideIdx && m.si === si;
+            });
+            if (words.length === 0) return null;
+            return { start: words[0].start, end: words[words.length - 1].end };
+        }
+
+        function matToggleSentenceRepeat(slideIdx, si, btn) {
+            // If already repeating this sentence, stop
+            if (matSentenceRepeatState && matSentenceRepeatState.slideIdx === slideIdx && matSentenceRepeatState.si === si) {
+                matStopSentenceRepeat();
+                return;
+            }
+            matStopSentenceRepeat();
+            matStopAudioSync();
+
+            if (!matAudioSyncData || !matAudioElement) return;
+            var range = matGetSentenceTimeRange(slideIdx, si);
+            if (!range) return;
+
+            matSentenceRepeatState = { slideIdx: slideIdx, si: si, range: range };
+            btn.classList.add('mat-repeat-active');
+            matAudioElement.playbackRate = matPlaySpeed;
+            matAudioElement.currentTime = range.start;
+            matAudioPlaying = true;
+            matAudioSyncLastIdx = 0;
+            var expOverlay = document.getElementById('matExpandedOverlay');
+            matAudioExpandedMode = expOverlay && expOverlay.classList.contains('active');
+            matAudioElement.play().then(function() {
+                matRunSentenceHighlightLoop(range.end);
+            }).catch(function(e) { console.error('Repeat play failed:', e); matStopSentenceRepeat(); });
+        }
+
+        function matRunSentenceHighlightLoop(endTime) {
+            if (!matSentenceRepeatState || !matAudioPlaying || !matAudioElement) {
+                matStopSentenceRepeat();
+                return;
+            }
+            if (matAudioElement.ended || matAudioElement.currentTime >= endTime) {
+                matAudioElement.pause();
+                matAudioPlaying = false;
+                document.querySelectorAll('.mat-highlight').forEach(function(el) { el.classList.remove('mat-highlight'); });
+                matStopSentenceRepeat();
+                return;
+            }
+            // Reuse the sync highlight logic inline
+            var t = matAudioElement.currentTime;
+            var map = matAudioSyncData.slideMap;
+            while (matAudioSyncLastIdx < map.length - 1 && t >= map[matAudioSyncLastIdx + 1].start) matAudioSyncLastIdx++;
+            while (matAudioSyncLastIdx > 0 && t < map[matAudioSyncLastIdx].start) matAudioSyncLastIdx--;
+            var cw = (matAudioSyncLastIdx < map.length && t >= map[matAudioSyncLastIdx].start) ? map[matAudioSyncLastIdx] : null;
+            document.querySelectorAll('.mat-highlight').forEach(function(el) { el.classList.remove('mat-highlight'); });
+            if (cw) {
+                if (matAudioExpandedMode) {
+                    var wId = 'matword_' + cw.si + '_' + cw.wi;
+                    var wEl = document.getElementById(wId);
+                    if (wEl) wEl.classList.add('mat-highlight');
+                } else {
+                    var pId = 'matsw_' + cw.slideIdx + '_' + cw.si + '_' + cw.wi;
+                    var wEl = document.getElementById(pId);
+                    if (wEl) wEl.classList.add('mat-highlight');
+                }
+            }
+            requestAnimationFrame(function() { matRunSentenceHighlightLoop(endTime); });
+        }
+
+        function matStopSentenceRepeat() {
+            if (matSentenceRepeatState) {
+                matAudioPlaying = false;
+                if (matAudioElement) matAudioElement.pause();
+                document.querySelectorAll('.mat-highlight').forEach(function(el) { el.classList.remove('mat-highlight'); });
+                matSentenceRepeatState = null;
+                document.querySelectorAll('.mat-repeat-active').forEach(function(b) { b.classList.remove('mat-repeat-active'); });
+            }
+        }
+
+        var matTranslateCache = {};
+        var matActiveTranslateTip = null;
+        function matTranslateSentence(sentence, btn) {
+            // Toggle off if tip exists
+            if (matActiveTranslateTip) {
+                matActiveTranslateTip.classList.remove('visible');
+                var oldTip = matActiveTranslateTip;
+                setTimeout(function() { if (oldTip.parentNode) oldTip.remove(); }, 250);
+                if (oldTip._closer) document.removeEventListener('click', oldTip._closer);
+                matActiveTranslateTip = null;
+                return;
+            }
+            document.querySelectorAll('.mat-sentence-translate-tip').forEach(function(t) { t.remove(); });
+
+            if (matTranslateCache[sentence]) {
+                matActiveTranslateTip = matShowTranslateTip(btn, matTranslateCache[sentence]);
+                return;
+            }
+            matActiveTranslateTip = matShowTranslateTip(btn, '⏳ Translating...');
+
+            var prompt = 'Translate this Korean sentence to natural English. Reply with ONLY the English translation, nothing else: "' + sentence + '"';
+            fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 200 })
+            }).then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                var resultText = '';
+                if (typeof data === 'string') resultText = data;
+                else if (data.data) resultText = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                else if (data.text) resultText = data.text;
+                else if (data.result) resultText = data.result;
+                else if (data.response) resultText = data.response;
+                else if (data.content) resultText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                else if (data.choices && data.choices[0]) resultText = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || '');
+                else resultText = JSON.stringify(data);
+                // Clean up quotes
+                resultText = resultText.replace(/^["']+|["']+$/g, '').trim();
+                matTranslateCache[sentence] = resultText || '(Unavailable)';
+                if (matActiveTranslateTip) {
+                    matActiveTranslateTip.textContent = matTranslateCache[sentence];
+                    matPositionTranslateTip(matActiveTranslateTip, matActiveTranslateTip._btn);
+                }
+            }).catch(function(err) {
+                console.error('Translation error:', err);
+                if (matActiveTranslateTip) matActiveTranslateTip.textContent = '(Translation failed)';
+            });
+        }
+
+        function matShowTranslateTip(btn, text) {
+            var tip = document.createElement('div');
+            tip.className = 'mat-sentence-translate-tip';
+            tip.textContent = text;
+            document.body.appendChild(tip);
+            matPositionTranslateTip(tip, btn);
+            requestAnimationFrame(function() { tip.classList.add('visible'); });
+            tip._closer = function closer(e) {
+                if (!e.target.closest('.mat-sentence-translate-tip') && !e.target.closest('.mat-sentence-actions') && !e.target.closest('.klr-sentence-actions')) {
+                    tip.classList.remove('visible');
+                    setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 250);
+                    matActiveTranslateTip = null;
+                    document.removeEventListener('click', closer);
+                }
+            };
+            tip._btn = btn;
+            setTimeout(function() { document.addEventListener('click', tip._closer); }, 100);
+            return tip;
+        }
+
+        function matPositionTranslateTip(tip, btn) {
+            var sentenceDiv = btn.closest('.mat-slide-korean, .mat-expanded-sentence, .klr-sentence');
+            if (!sentenceDiv) return;
+            var sRect = sentenceDiv.getBoundingClientRect();
+            var tipW = tip.offsetWidth;
+            var tipH = tip.offsetHeight;
+            // Position below the sentence
+            tip.style.top = (sRect.bottom + 6) + 'px';
+            // If that goes off bottom of viewport, put above
+            if (sRect.bottom + 6 + tipH > window.innerHeight) {
+                tip.style.top = (sRect.top - tipH - 6) + 'px';
+            }
+            // Center horizontally over the sentence
+            tip.style.left = Math.max(4, Math.min(window.innerWidth - tipW - 4, sRect.left + (sRect.width - tipW) / 2)) + 'px';
+        }
 
         async function matHandleAudioUpload(input) {
             var file = input.files[0];
@@ -9603,6 +10021,8 @@
                 btn.textContent = '✅ Audio Loaded';
                 btn.style.borderColor = '#39ff14';
                 btn.style.color = '#39ff14';
+                var editBtn = document.getElementById('matEditTranscriptBtn');
+                if (editBtn) editBtn.style.display = '';
 
                 // Re-render to show play buttons
                 matRenderSlideshow();
@@ -9823,6 +10243,7 @@
             matAudioPlaying = true;
             matAudioSyncLastIdx = 0;
             matAudioElement.currentTime = firstWord.start;
+            matAudioElement.playbackRate = matPlaySpeed;
 
             var btn = document.getElementById('matExpPlayBtn');
             if (btn) { btn.classList.add('playing'); btn.innerHTML = '&#9646;&#9646;'; }
@@ -9846,6 +10267,7 @@
             matAudioPlaying = true;
             matAudioSyncLastIdx = 0;
             matAudioElement.currentTime = firstWord.start;
+            matAudioElement.playbackRate = matPlaySpeed;
             matGoToSlide(fromSlide);
 
             // Update play button appearance
@@ -10118,10 +10540,32 @@
 
         function matExportHTML() {
             if (matSlides.length === 0) { alert('No slides to export.'); return; }
+            
+            // Pre-load particle explanations from Firebase, then build export
+            db.collection(MAT_PARTICLE_COLLECTION).get()
+            .then(function(snap) {
+                var particleData = {};
+                snap.forEach(function(doc) {
+                    var key = doc.id.replace(/_/g, function(m, offset, str) {
+                        // Reconstruct original key: doc.id had / and spaces replaced with _
+                        return '_';
+                    });
+                    particleData[doc.id] = doc.data();
+                });
+                matBuildExportHTML(particleData);
+            })
+            .catch(function() {
+                // If Firebase fails, export without cache
+                matBuildExportHTML({});
+            });
+        }
+
+        function matBuildExportHTML(particleData) {
             var fs = parseInt(document.getElementById('matFontSize').value) || 30;
             var totalSlides = matSlides.length;
             var cacheJSON = JSON.stringify(matWordCache || {});
             var slidesJSON = JSON.stringify(matSlides.map(function(s) { return { sentences: s.sentences }; }));
+            var particleJSON = JSON.stringify(particleData);
 
             var h = '';
             h += '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n';
@@ -10146,7 +10590,12 @@
             h += '#klrn-reader .klr-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: 100% 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }\n';
             h += '#klrn-reader .klr-slide.active { opacity: 1; pointer-events: auto; overflow: visible; }\n';
             h += '#klrn-reader .klr-content { position: absolute; top: 11.5%; left: 8%; right: 8%; bottom: 11.5%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(8px * var(--s)); overflow: visible; text-align: center; }\n';
-            h += '#klrn-reader .klr-sentence { width: 100%; text-align: center; }\n';
+            h += '#klrn-reader .klr-sentence { width: 100%; display: block; text-align: center; position: relative; }\n';
+            h += '#klrn-reader .klr-sentence-actions { display: inline; white-space: nowrap; }\n';
+            h += '#klrn-reader .klr-sentence-actions button { background: none; border: none; font-size: calc(17px * var(--s)); cursor: pointer; padding: 0 calc(1px * var(--s)); transition: transform 0.15s; vertical-align: middle; position: relative; top: -1px; }\n';
+            h += '#klrn-reader .klr-sentence-actions button:hover { transform: scale(1.2); }\n';
+            h += '.klr-translate-tip { position: fixed; background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; border: 1.5px solid rgba(0,255,255,0.4); border-radius: 12px; padding: 14px 22px; font-size: 22px; font-family: "Noto Sans KR", sans-serif; font-weight: 600; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 100001; pointer-events: auto; opacity: 0; transition: opacity 0.25s ease; }\n';
+            h += '.klr-translate-tip.visible { opacity: 1; }\n';
             h += '#klrn-reader .klr-sentence-hl { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); padding: calc(2px * var(--s)) calc(8px * var(--s)); border-radius: calc(8px * var(--s)); transition: background 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }\n';
             h += '#klrn-reader .klr-sentence-hl.klr-hl-blue { background: rgba(59,130,246,0.22); }\n';
             h += '#klrn-reader .klr-sentence-hl.klr-hl-purple { background: rgba(168,85,247,0.22); }\n';
@@ -10163,10 +10612,14 @@
             h += '#klrn-reader .klr-settings-menu { position: absolute; top: calc(34px * var(--s)); right: 0; background: linear-gradient(135deg,#1a1a2e,#2d2748); border: 1.5px solid rgba(0,255,255,0.4); border-radius: 12px; padding: calc(6px * var(--s)) 0; min-width: calc(170px * var(--s)); box-shadow: 0 12px 40px rgba(0,0,0,0.6); opacity: 0; transform: translateY(-8px) scale(0.95); pointer-events: none; transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.68,-0.55,0.27,1.55); z-index: 21; }\n';
             h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }\n';
             h += '#klrn-reader .klr-settings-menu > * { opacity: 0; transform: translateX(10px); transition: opacity 0.25s ease, transform 0.3s ease; }\n';
-            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 0.08s; }\n';
-            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(2) { opacity: 1; transform: translateX(0); transition-delay: 0.14s; }\n';
-            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(3) { opacity: 1; transform: translateX(0); transition-delay: 0.20s; }\n';
-            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(4) { opacity: 1; transform: translateX(0); transition-delay: 0.26s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > * { opacity: 1; transform: translateX(0); }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(1) { transition-delay: 0.06s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(2) { transition-delay: 0.08s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(3) { transition-delay: 0.10s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(4) { transition-delay: 0.12s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(5) { transition-delay: 0.14s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(6) { transition-delay: 0.16s; }\n';
+            h += '#klrn-reader .klr-stoggle:checked ~ .klr-settings-menu > *:nth-child(n+7) { transition-delay: 0.18s; }\n';
             h += '#klrn-reader .klr-settings-menu label { display: flex; align-items: center; gap: calc(8px * var(--s)); padding: calc(8px * var(--s)) calc(12px * var(--s)); color: #fff; font-size: calc(12px * var(--s)); font-weight: 700; font-family: "Noto Sans KR", sans-serif; cursor: pointer; white-space: nowrap; transition: background 0.15s; }\n';
             h += '#klrn-reader .klr-settings-menu label:hover { background: rgba(255,255,255,0.08); }\n';
             h += '#klrn-reader .klr-settings-menu input[type=radio] { accent-color: #00ffff; width: calc(14px * var(--s)); height: calc(14px * var(--s)); margin: 0; }\n';
@@ -10174,7 +10627,7 @@
             h += '#klrn-reader .klr-word { font-size: calc(' + fs + 'px * var(--s)); font-weight: 700; color: #000; cursor: pointer; padding: calc(3px * var(--s)) calc(4px * var(--s)); border-radius: 6px; transition: all 0.15s; position: relative; user-select: none; line-height: 1.5; }\n';
             h += '#klrn-reader .klr-word:hover { background: rgba(0,200,255,0.25); transform: scale(1.05); }\n';
             h += '#klrn-reader .klr-word.playing { background: rgba(255,0,255,0.25); transform: scale(1.08); }\n';
-            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: calc(12px * var(--s)) calc(14px * var(--s)); border-radius: 12px; min-width: calc(180px * var(--s)); max-width: calc(320px * var(--s)); z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; white-space: normal; text-align: left; font-size: calc(13px * var(--s)); font-weight: 400; }\n';
+            h += '#klrn-reader .klr-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; padding: calc(12px * var(--s)) calc(14px * var(--s)); border-radius: 12px; min-width: calc(180px * var(--s)); max-width: calc(320px * var(--s)); z-index: 3000; box-shadow: 0 8px 30px rgba(0,0,0,0.7); border: 2px solid #00ffff; white-space: normal; text-align: left; font-size: calc(13px * var(--s)); font-weight: 400; pointer-events: auto; }\n';
             h += '#klrn-reader .klr-tip.show { display: block; }\n';
             h += '#klrn-reader .klr-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #00ffff; }\n';
             h += '#klrn-reader .klr-word.tip-left .klr-tip { left: 0; transform: translateX(0); }\n';
@@ -10190,6 +10643,47 @@
             h += '#klrn-reader .klr-dots { display: flex; gap: 6px; justify-content: center; padding: 4px 0 12px; }\n';
             h += '#klrn-reader .klr-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,0,255,0.25); border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: all 0.2s; }\n';
             h += '#klrn-reader .klr-dot.active { background: #ff00ff; box-shadow: 0 0 8px rgba(255,0,255,0.5); }\n';
+            h += '#klrn-reader .klr-play-btn { position: absolute; bottom: calc(12px * var(--s)); left: calc(18px * var(--s)); z-index: 10; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; border: 2px solid #000; border-radius: 50%; width: calc(36px * var(--s)); height: calc(36px * var(--s)); font-size: calc(16px * var(--s)); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }\n';
+            h += '#klrn-reader .klr-play-btn:hover { transform: scale(1.15); }\n';
+            h += '#klrn-reader .klr-play-btn.playing { background: linear-gradient(135deg, #ef4444, #dc2626); }\n';
+            h += '#klrn-reader .klr-word.klr-highlight { background: #3b82f6 !important; color: #fff !important; border-radius: 6px; padding: 1px 4px; }\n';
+            h += '#klrn-reader .klr-repeat-active { }\n';
+            h += '.klr-particle-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 200001; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }\n';
+            h += '.klr-particle-overlay.visible { opacity: 1; pointer-events: auto; }\n';
+            h += '.klr-particle-popup { position: relative; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(200,160,120,0.4); border-radius: 14px; padding: 22px 26px; max-width: 480px; width: 90vw; max-height: 80vh; overflow-y: auto; color: #ddd; font-family: "Noto Sans KR", sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); transform: translateY(10px); transition: transform 0.3s ease; }\n';
+            h += '.klr-particle-overlay.visible .klr-particle-popup { transform: translateY(0); }\n';
+            h += '.klr-comp-sentence { cursor: pointer; border-radius: calc(8px * var(--s)); transition: background 0.2s; }\n';
+            h += '.klr-comp-sentence:hover { background: rgba(74,222,128,0.18) !important; }\n';
+            h += '.klr-comp-sentence *, .klr-comp-sentence:hover * { color: #000 !important; }\n';
+            h += '.klr-comp-word { pointer-events: none; }\n';
+            h += '.klr-comp-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200002; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }\n';
+            h += '.klr-comp-overlay.visible { opacity: 1; pointer-events: auto; }\n';
+            h += '.klr-comp-popup { position: relative; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(74,222,128,0.4); border-radius: 16px; padding: 28px 30px; max-width: 560px; width: 92vw; max-height: 85vh; overflow-y: auto; color: #ddd; font-family: "Noto Sans KR", sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); transform: translateY(10px); transition: transform 0.3s ease; }\n';
+            h += '.klr-comp-overlay.visible .klr-comp-popup { transform: translateY(0); }\n';
+            h += '.klr-comp-intro-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200003; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }\n';
+            h += '.klr-comp-intro-overlay.visible { opacity: 1; pointer-events: auto; }\n';
+            h += '.klr-comp-intro-popup { background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(74,222,128,0.4); border-radius: 16px; padding: 32px 36px; max-width: 480px; width: 90vw; color: #ddd; font-family: "Noto Sans KR", sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); text-align: center; transform: translateY(10px); transition: transform 0.3s ease; }\n';
+            h += '.klr-comp-intro-overlay.visible .klr-comp-intro-popup { transform: translateY(0); }\n';
+            h += '@keyframes klrCompPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }\n';
+            h += '@keyframes klrBounce { 0%,20%,50%,80%,100% { transform: translate(0,0); } 40% { transform: translate(20px,0); } 60% { transform: translate(10px,0); } }\n';
+            h += '.klr-tut-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 300000; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }\n';
+            h += '.klr-tut-overlay.visible { opacity: 1; pointer-events: auto; }\n';
+            h += '.klr-tut-popup { position: absolute; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(0,255,255,0.3); border-radius: 16px; padding: 32px 36px; max-width: 500px; width: 90vw; color: #ddd; font-family: "Noto Sans KR", sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); text-align: center; transform: translateY(10px); transition: transform 0.3s ease; }\n';
+            h += '.klr-tut-overlay.visible .klr-tut-popup { transform: translateY(0); }\n';
+            h += '.klr-tut-arrow { position: fixed; z-index: 300001; pointer-events: none; animation: klrBounce 1.5s infinite; transition: top 0.4s ease, left 0.4s ease, right 0.4s ease, bottom 0.4s ease; }\n';
+            h += '.klr-tut-arrow img { width: 48px; height: auto; }\n';
+            h += '.klr-tut-arrow.point-down img { transform: rotate(90deg); }\n';
+            h += '.klr-tut-arrow.point-up img { transform: rotate(270deg); }\n';
+            h += '.klr-tut-arrow.point-left img { transform: rotate(180deg); }\n';
+            h += '.klr-tut-arrow.point-right img { transform: rotate(0deg); }\n';
+            h += '.klr-tut-msg { position: fixed; z-index: 300001; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(0,255,255,0.3); border-radius: 14px; padding: 18px 24px; max-width: 340px; color: #ddd; font-family: "Noto Sans KR", sans-serif; font-size: 14px; line-height: 1.6; box-shadow: 0 12px 40px rgba(0,0,0,0.7); }\n';
+            h += '.klr-tut-msg .klr-tut-next { display: inline-block; margin-top: 12px; background: linear-gradient(135deg, #00cccc, #0099aa); color: #000; border: none; border-radius: 8px; padding: 8px 24px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: "Noto Sans KR", sans-serif; transition: transform 0.15s; }\n';
+            h += '.klr-tut-msg .klr-tut-next:hover { transform: scale(1.05); }\n';
+            h += '.klr-tut-highlight { display: none !important; }\n';
+            h += '#klrn-reader .klr-speed-row { display: flex; align-items: center; gap: 6px; padding: 7px 14px; color: #888; font-size: calc(11px * var(--s)); font-weight: 700; font-family: "Noto Sans KR", sans-serif; }\n';
+            h += '#klrn-reader .klr-speed-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #aaa; font-size: calc(11px * var(--s)); font-weight: 700; padding: calc(3px * var(--s)) calc(8px * var(--s)); border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: "Noto Sans KR", sans-serif; }\n';
+            h += '#klrn-reader .klr-speed-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }\n';
+            h += '#klrn-reader .klr-speed-btn.active { background: rgba(0,255,255,0.15); border-color: rgba(0,255,255,0.5); color: #00ffff; }\n';
             h += '</style>\n';
 
             h += '<script>\n';
@@ -10199,13 +10693,30 @@
             h += 'var totalSlides = ' + totalSlides + ';\n';
             h += 'var cur = 0, audio = null, activeTip = null;\n';
             h += 'var klrMode = "' + matDisplayMode + '";\n';
+
+            // Embed audio data
+            if (matAudioSyncData && matAudioSyncData.audioUrl) {
+                h += 'var klrAudioUrl = "' + matAudioSyncData.audioUrl.replace(/"/g, '\\"') + '";\n';
+                h += 'var klrSlideMap = ' + JSON.stringify(matAudioSyncData.slideMap.map(function(w) {
+                    return { slideIdx: w.slideIdx, si: w.si, wi: w.wi, start: Math.round(w.start * 100) / 100, end: Math.round(w.end * 100) / 100, word: w.word };
+                })) + ';\n';
+            } else {
+                h += 'var klrAudioUrl = null;\n';
+                h += 'var klrSlideMap = null;\n';
+            }
+
+            h += 'var klrAudioEl = null, klrPlaying = false, klrSyncIdx = 0, klrSpeed = 1;\n';
             h += 'function klrGetHlClass(si) {\n';
             h += '  if (klrMode === "normal") return si === 0 ? "klr-hl-blue" : "";\n';
             h += '  if (klrMode === "hard") return si === 0 ? "klr-hl-purple" : "klr-hl-red";\n';
             h += '  return "";\n';
             h += '}\n';
             h += 'function klrSetMode(m) {\n';
+            h += '  var prev = klrMode;\n';
             h += '  klrMode = m;\n';
+            h += '  var cb = document.getElementById("klrSToggle"); if (cb) cb.checked = false;\n';
+            h += '  if (m === "comparison" && prev !== "comparison") { klrShowCompIntro(); return; }\n';
+            h += '  if (m === "comparison" || prev === "comparison") { renderSlide(cur); renderDots(); return; }\n';
             h += '  document.querySelectorAll("#klrn-reader .klr-sentence-hl").forEach(function(el) {\n';
             h += '    var parent = el.closest(".klr-sentence");\n';
             h += '    if (!parent) return;\n';
@@ -10226,6 +10737,7 @@
             h += 'var isMobile = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);\n';
             h += 'var BG = "' + MAT_BG_URL + '";\n';
             h += 'var TTS = "https://tts-proxy-386010826708.us-central1.run.app";\n';
+            h += 'var AI_URL = "https://generateflashcardai-386010826708.us-central1.run.app";\n';
             h += 'function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML;}\n';
             h += 'function strip(w){return w.replace(/^["""\\u2018\\u2019\\u201C\\u201D()\\[\\].,!?…·~\\-]+|["""\\u2018\\u2019\\u201C\\u201D()\\[\\].,!?…·~\\-]+$/g,"");}\n';
 
@@ -10236,7 +10748,9 @@
             h += '  h += "<div style=\\"color:#00ffff;font-weight:700;margin-bottom:6px;\\">" + esc(word) + "</div>";\n';
             h += '  h += "<div style=\\"color:#fff;margin-bottom:6px;\\">🌐 " + esc(info.english || "") + "</div>";\n';
             h += '  if (info.pos) h += "<div style=\\"color:#ff00ff;font-style:italic;margin-bottom:4px;\\">" + esc(info.pos) + "</div>";\n';
-            h += '  if (info.particles) h += "<div style=\\"color:#39ff14;line-height:1.5;\\">🔗 " + esc(info.particles) + "</div>";\n';
+            h += '  if (info.particles) {\n';
+            h += '    h += "<div style=\\"color:#39ff14;line-height:1.5;\\">🔗 " + esc(info.particles) + " <button class=\\"klr-explain-btn\\" data-particle=\\"" + encodeURIComponent(info.particles) + "\\" data-word=\\"" + encodeURIComponent(word) + "\\" style=\\"display:inline-block;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:calc(11px * var(--s));font-weight:700;cursor:pointer;margin-left:6px;vertical-align:middle;\\">Explain this particle!</button></div>";\n';
+            h += '  }\n';
             h += '  if (info.dictionary_form) h += "<div style=\\"color:#aaa;line-height:1.5;\\">📖 " + esc(info.dictionary_form) + "</div>";\n';
             h += '  if (info.conjugation) h += "<div style=\\"color:#aaa;line-height:1.5;\\">🔄 " + esc(info.conjugation) + "</div>";\n';
             h += '  if (info.contraction) h += "<div style=\\"color:#ffd700;line-height:1.5;\\">✂️ " + esc(info.contraction) + "</div>";\n';
@@ -10250,14 +10764,27 @@
             h += '  html += "<div class=\\"klr-content\\">";\n';
             h += '  for (var j = 0; j < slides[i].sentences.length; j++) {\n';
             h += '    var hc = klrGetHlClass(j);\n';
-            h += '    html += "<div class=\\"klr-sentence\\">";\n';
+            h += '    var compCls = klrMode==="comparison" ? " klr-comp-sentence" : "";\n';
+            h += '    var compClk = klrMode==="comparison" ? " onclick=\\"event.stopPropagation(); KLR.openComp(" + i + "," + j + ")\\"" : "";\n';
+            h += '    html += "<div class=\\"klr-sentence" + compCls + "\\"" + compClk + ">";\n';
             h += '    html += "<span class=\\"klr-sentence-hl" + (hc ? " " + hc : "") + "\\">";\n';
             h += '    var words = slides[i].sentences[j].split(/\\s+/);\n';
+            h += '    var wIdx = 0;\n';
             h += '    for (var w = 0; w < words.length; w++) {\n';
             h += '      if (!words[w]) continue;\n';
-            h += '      html += "<span class=\\"klr-word\\" data-word=\\"" + esc(words[w]) + "\\">";\n';
+            h += '      if (klrMode==="comparison") {\n';
+            h += '        html += "<span class=\\"klr-word klr-comp-word\\" data-slide=\\"" + i + "\\" data-si=\\"" + j + "\\" data-wi=\\"" + wIdx + "\\" id=\\"klrw_" + i + "_" + j + "_" + wIdx + "\\">" + esc(words[w]) + "</span>";\n';
+            h += '      } else {\n';
+            h += '      html += "<span class=\\"klr-word\\" data-word=\\"" + esc(words[w]) + "\\" data-slide=\\"" + i + "\\" data-si=\\"" + j + "\\" data-wi=\\"" + wIdx + "\\" id=\\"klrw_" + i + "_" + j + "_" + wIdx + "\\">";\n';
             h += '      html += esc(words[w]);\n';
             h += '      html += "</span>";\n';
+            h += '      }\n';
+            h += '      wIdx++;\n';
+            h += '    }\n';
+            h += '    if (klrMode!=="comparison") {\n';
+            h += '    html += "<span class=\\"klr-sentence-actions\\"><button onclick=\\"event.stopPropagation(); KLR.translateSentence(" + i + "," + j + ", this)\\" title=\\"Translate\\">🔤</button>";\n';
+            h += '    if (klrAudioUrl) html += "<button onclick=\\"event.stopPropagation(); KLR.repeatSentence(" + i + ", " + j + ", this)\\" title=\\"Repeat sentence\\">🔁</button>";\n';
+            h += '    html += "</span>";\n';
             h += '    }\n';
             h += '    html += "</span>";\n';
             h += '    html += "</div>";\n';
@@ -10271,7 +10798,20 @@
             h += '  html += "<label onclick=\\"event.stopPropagation();\\"><input type=\\"radio\\" name=\\"klrMode\\" value=\\"hard\\"" + (klrMode==="hard"?" checked":"") + " onchange=\\"event.stopPropagation(); KLR.setMode(\'hard\')\\">" + "<span class=\\"klr-mode-dot\\" style=\\"background:rgba(168,85,247,0.4);border:1.5px solid #a855f7;\\"></span> Hard Mode</label>";\n';
             h += '  html += "<div style=\\"height:1px;background:rgba(255,255,255,0.08);margin:4px 10px;\\"></div>";\n';
             h += '  html += "<div style=\\"display:flex;align-items:center;gap:8px;padding:8px 12px;color:#999;font-size:calc(12px * var(--s));font-weight:700;font-family:Noto Sans KR,sans-serif;cursor:pointer;\\" onclick=\\"event.stopPropagation(); KLR.setMode(\'clear\')\\" onmouseover=\\"this.style.background=\'rgba(255,255,255,0.08)\';this.style.color=\'#fff\'\\" onmouseout=\\"this.style.background=\'none\';this.style.color=\'#999\'\\"><span style=\\"font-size:14px;\\">✕</span> Clear Highlight</div>";\n';
+            if (matAudioSyncData && matAudioSyncData.audioUrl) {
+                h += '  html += "<div style=\\"height:1px;background:rgba(255,255,255,0.08);margin:4px 10px;\\"></div>";\n';
+                h += '  html += "<div class=\\"klr-speed-row\\" onclick=\\"event.stopPropagation();\\">SPEED: ";\n';
+                h += '  html += "<button class=\\"klr-speed-btn" + (klrSpeed===0.75?" active":"") + "\\" onclick=\\"event.stopPropagation(); KLR.setSpeed(0.75)\\">0.75x</button>";\n';
+                h += '  html += "<button class=\\"klr-speed-btn" + (klrSpeed===1?" active":"") + "\\" onclick=\\"event.stopPropagation(); KLR.setSpeed(1)\\">1x</button>";\n';
+                h += '  html += "<button class=\\"klr-speed-btn" + (klrSpeed===1.25?" active":"") + "\\" onclick=\\"event.stopPropagation(); KLR.setSpeed(1.25)\\">1.25x</button>";\n';
+                h += '  html += "</div>";\n';
+                h += '  html += "<div style=\\"height:1px;background:rgba(255,255,255,0.08);margin:4px 10px;\\"></div>";\n';
+                h += '  html += "<label onclick=\\"event.stopPropagation();\\"><input type=\\"radio\\" name=\\"klrMode\\" value=\\"comparison\\"" + (klrMode==="comparison"?" checked":"") + " onchange=\\"event.stopPropagation(); KLR.setMode(\'comparison\')\\"><span class=\\"klr-mode-dot\\" style=\\"background:rgba(74,222,128,0.4);border:1.5px solid #4ade80;\\"></span> Comparison Mode</label>";\n';
+            }
             h += '  html += "</div></div>";\n';
+            if (matAudioSyncData && matAudioSyncData.audioUrl) {
+                h += '  html += "<button class=\\"klr-play-btn" + (klrPlaying ? " playing" : "") + "\\" id=\\"klrPlayBtn\\" onclick=\\"event.stopPropagation(); KLR.togglePlay()\\">&#9654;</button>";\n';
+            }
             h += '  html += "<div class=\\"klr-num\\">" + (i+1) + " / " + totalSlides + "</div>";\n';
             h += '  html += "</div>";\n';
             h += '  el.innerHTML = html;\n';
@@ -10296,12 +10836,15 @@
             h += '  wordEl.appendChild(tipEl);\n';
             h += '}\n';
             h += 'function hideTip() {\n';
+            h += '  if (window._tutLockedTip && tipEl === window._tutLockedTip) return;\n';
             h += '  if (tipEl && tipEl.parentNode) tipEl.parentNode.removeChild(tipEl);\n';
             h += '  tipEl = null;\n';
             h += '}\n';
 
             // Word interaction — delegated event on the slide container
             h += 'document.getElementById("klrSlides").addEventListener("click", function(e) {\n';
+            h += '  if (e.target.closest(".klr-explain-btn")) return;\n';
+            h += '  if (klrMode === "comparison") return;\n';
             h += '  var wordEl = e.target.closest(".klr-word");\n';
             h += '  if (!wordEl) { hideTip(); return; }\n';
             h += '  e.stopPropagation();\n';
@@ -10313,12 +10856,17 @@
             // Desktop hover tooltips
             h += 'if (!isMobile) {\n';
             h += '  document.getElementById("klrSlides").addEventListener("mouseover", function(e) {\n';
+            h += '    if (klrMode === "comparison") return;\n';
+            h += '    if (window._tutLockedTip) return;\n';
             h += '    var wordEl = e.target.closest(".klr-word");\n';
-            h += '    if (wordEl) showTip(wordEl);\n';
+            h += '    if (wordEl && (!tipEl || tipEl.parentNode !== wordEl)) showTip(wordEl);\n';
             h += '  });\n';
             h += '  document.getElementById("klrSlides").addEventListener("mouseout", function(e) {\n';
             h += '    var wordEl = e.target.closest(".klr-word");\n';
-            h += '    if (wordEl) hideTip();\n';
+            h += '    if (!wordEl) return;\n';
+            h += '    var to = e.relatedTarget;\n';
+            h += '    if (to && (wordEl.contains(to) || (to.closest && to.closest(".klr-word") === wordEl))) return;\n';
+            h += '    hideTip();\n';
             h += '  });\n';
             h += '}\n';
 
@@ -10343,9 +10891,648 @@
             h += '  document.getElementById("klrNb").disabled = i>=totalSlides-1;\n';
             h += '}\n';
 
-            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, setMode: klrSetMode };\n';
+            h += 'function posTransTip(tip,btn){\n';
+            h += '  var s=btn.closest(".klr-sentence");if(!s)return;\n';
+            h += '  var r=s.getBoundingClientRect(),tw=tip.offsetWidth,th=tip.offsetHeight;\n';
+            h += '  tip.style.top=(r.bottom+6)+"px";\n';
+            h += '  if(r.bottom+6+th>window.innerHeight)tip.style.top=(r.top-th-6)+"px";\n';
+            h += '  tip.style.left=Math.max(4,Math.min(window.innerWidth-tw-4,r.left+(r.width-tw)/2))+"px";\n';
+            h += '}\n';
+            h += 'var activeTT=null;\n';
+            h += 'var translateCache={};\n';
+            h += 'function klrTranslateSentence(slideIdx, sentIdx, btn) {\n';
+            h += '  var sent = slides[slideIdx] && slides[slideIdx].sentences ? slides[slideIdx].sentences[sentIdx] : "";\n';
+            h += '  if (sent) klrTranslate(sent, btn);\n';
+            h += '}\n';
+            h += 'function klrTranslate(sentence, btn) {\n';
+            h += '  if(activeTT){activeTT.classList.remove("visible");var o=activeTT;setTimeout(function(){if(o.parentNode)o.remove();},250);activeTT=null;return;}\n';
+            h += '  document.querySelectorAll(".klr-translate-tip").forEach(function(t){t.remove();});\n';
+            h += '  if (translateCache[sentence]) { activeTT=showTransTip(btn,translateCache[sentence]); return; }\n';
+            h += '  activeTT=showTransTip(btn, "⏳ Translating...");\n';
+            h += '  var prompt="Translate this Korean sentence to natural English. Reply with ONLY the English translation, nothing else: \\""+sentence+"\\"";\n';
+            h += '  fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:prompt}],max_tokens:200})})\n';
+            h += '  .then(function(r){return r.json();})\n';
+            h += '  .then(function(d){var t="";if(typeof d==="string")t=d;else if(d.data)t=typeof d.data==="string"?d.data:JSON.stringify(d.data);else if(d.text)t=d.text;else if(d.result)t=d.result;else if(d.response)t=d.response;else if(d.content)t=typeof d.content==="string"?d.content:JSON.stringify(d.content);else if(d.choices&&d.choices[0])t=d.choices[0].message?d.choices[0].message.content:(d.choices[0].text||"");t=t.replace(/^["\']+|["\']+$/g,"").trim();translateCache[sentence]=t||"(Unavailable)";if(activeTT){activeTT.textContent=translateCache[sentence];posTransTip(activeTT,activeTT._btn);}})\n';
+            h += '  .catch(function(){if(activeTT)activeTT.textContent="(Failed)";});\n';
+            h += '}\n';
+            h += 'function showTransTip(btn, text) {\n';
+            h += '  var tip=document.createElement("div");tip.className="klr-translate-tip";tip.textContent=text;document.body.appendChild(tip);\n';
+            h += '  tip._btn=btn;\n';
+            h += '  posTransTip(tip,btn);\n';
+            h += '  requestAnimationFrame(function(){tip.classList.add("visible");});\n';
+            h += '  setTimeout(function(){document.addEventListener("click",function closer(e){if(!e.target.closest(".klr-translate-tip")&&!e.target.closest(".klr-sentence-actions")){tip.classList.remove("visible");setTimeout(function(){if(tip.parentNode)tip.remove();},250);activeTT=null;document.removeEventListener("click",closer);}});},100);\n';
+            h += '  return tip;\n';
+            h += '}\n';
+            // Audio sync engine
+            h += 'function klrInitAudio() {\n';
+            h += '  if (!klrAudioUrl || klrAudioEl) return;\n';
+            h += '  klrAudioEl = new Audio(klrAudioUrl);\n';
+            h += '  klrAudioEl.addEventListener("ended", function() { klrStopSync(); });\n';
+            h += '}\n';
+
+            h += 'function klrTogglePlay() {\n';
+            h += '  klrInitAudio();\n';
+            h += '  if (!klrAudioEl) return;\n';
+            h += '  var btn = document.getElementById("klrPlayBtn");\n';
+            h += '  if (klrPlaying) {\n';
+            h += '    klrAudioEl.pause();\n';
+            h += '    klrPlaying = false;\n';
+            h += '    if (btn) { btn.innerHTML = "&#9654;"; btn.classList.remove("playing"); }\n';
+            h += '    document.querySelectorAll(".klr-highlight").forEach(function(el) { el.classList.remove("klr-highlight"); });\n';
+            h += '    return;\n';
+            h += '  }\n';
+            h += '  // Start from current slide\n';
+            h += '  var firstWord = null;\n';
+            h += '  for (var i = 0; i < klrSlideMap.length; i++) {\n';
+            h += '    if (klrSlideMap[i].slideIdx === cur) { firstWord = klrSlideMap[i]; klrSyncIdx = i; break; }\n';
+            h += '  }\n';
+            h += '  if (firstWord) klrAudioEl.currentTime = firstWord.start;\n';
+            h += '  klrAudioEl.playbackRate = klrSpeed;\n';
+            h += '  klrAudioEl.play();\n';
+            h += '  klrPlaying = true;\n';
+            h += '  if (btn) { btn.innerHTML = "⏸"; btn.classList.add("playing"); }\n';
+            h += '  klrRunSync();\n';
+            h += '}\n';
+
+            h += 'function klrRunSync() {\n';
+            h += '  if (!klrPlaying || !klrAudioEl) return;\n';
+            h += '  if (klrAudioEl.ended || klrAudioEl.paused) { klrStopSync(); return; }\n';
+            h += '  var t = klrAudioEl.currentTime;\n';
+            h += '  var map = klrSlideMap;\n';
+            h += '  while (klrSyncIdx < map.length - 1 && t >= map[klrSyncIdx + 1].start) klrSyncIdx++;\n';
+            h += '  while (klrSyncIdx > 0 && t < map[klrSyncIdx].start) klrSyncIdx--;\n';
+            h += '  var cw = (klrSyncIdx < map.length && t >= map[klrSyncIdx].start) ? map[klrSyncIdx] : null;\n';
+            h += '  document.querySelectorAll(".klr-highlight").forEach(function(el) { el.classList.remove("klr-highlight"); });\n';
+            h += '  if (cw) {\n';
+            h += '    if (cw.slideIdx !== cur) { goTo(cw.slideIdx); }\n';
+            h += '    var wEl = document.getElementById("klrw_" + cw.slideIdx + "_" + cw.si + "_" + cw.wi);\n';
+            h += '    if (wEl) wEl.classList.add("klr-highlight");\n';
+            h += '  }\n';
+            h += '  requestAnimationFrame(klrRunSync);\n';
+            h += '}\n';
+
+            h += 'function klrStopSync() {\n';
+            h += '  klrPlaying = false;\n';
+            h += '  if (klrAudioEl) klrAudioEl.pause();\n';
+            h += '  document.querySelectorAll(".klr-highlight").forEach(function(el) { el.classList.remove("klr-highlight"); });\n';
+            h += '  var btn = document.getElementById("klrPlayBtn");\n';
+            h += '  if (btn) { btn.innerHTML = "&#9654;"; btn.classList.remove("playing"); }\n';
+            h += '}\n';
+
+            h += 'function klrSetSpeed(s) {\n';
+            h += '  klrSpeed = s;\n';
+            h += '  if (klrAudioEl) klrAudioEl.playbackRate = s;\n';
+            h += '  document.querySelectorAll(".klr-speed-btn").forEach(function(b) {\n';
+            h += '    b.classList.toggle("active", parseFloat(b.textContent) === s);\n';
+            h += '  });\n';
+            h += '}\n';
+
+            h += 'function klrRepeatSentence(slideIdx, si, btn) {\n';
+            h += '  klrInitAudio();\n';
+            h += '  if (!klrAudioEl || !klrSlideMap) return;\n';
+            h += '  var map = klrSlideMap;\n';
+            h += '  var first = -1, last = -1;\n';
+            h += '  for (var i = 0; i < map.length; i++) {\n';
+            h += '    if (map[i].slideIdx === slideIdx && map[i].si === si) {\n';
+            h += '      if (first < 0) first = i;\n';
+            h += '      last = i;\n';
+            h += '    }\n';
+            h += '  }\n';
+            h += '  if (first < 0) return;\n';
+            h += '  if (klrPlaying) klrStopSync();\n';
+            h += '  klrAudioEl.currentTime = map[first].start;\n';
+            h += '  klrAudioEl.playbackRate = klrSpeed;\n';
+            h += '  klrAudioEl.play();\n';
+            h += '  klrPlaying = true;\n';
+            h += '  klrSyncIdx = first;\n';
+            h += '  var endTime = map[last].end;\n';
+            h += '  btn.classList.add("klr-repeat-active");\n';
+            h += '  function sentenceSync() {\n';
+            h += '    if (!klrPlaying || klrAudioEl.paused || klrAudioEl.currentTime >= endTime) {\n';
+            h += '      klrAudioEl.pause();\n';
+            h += '      klrPlaying = false;\n';
+            h += '      document.querySelectorAll(".klr-highlight").forEach(function(el) { el.classList.remove("klr-highlight"); });\n';
+            h += '      btn.classList.remove("klr-repeat-active");\n';
+            h += '      return;\n';
+            h += '    }\n';
+            h += '    var t = klrAudioEl.currentTime;\n';
+            h += '    while (klrSyncIdx < map.length - 1 && t >= map[klrSyncIdx + 1].start) klrSyncIdx++;\n';
+            h += '    var cw = (klrSyncIdx < map.length && t >= map[klrSyncIdx].start) ? map[klrSyncIdx] : null;\n';
+            h += '    document.querySelectorAll(".klr-highlight").forEach(function(el) { el.classList.remove("klr-highlight"); });\n';
+            h += '    if (cw) {\n';
+            h += '      var wEl = document.getElementById("klrw_" + cw.slideIdx + "_" + cw.si + "_" + cw.wi);\n';
+            h += '      if (wEl) wEl.classList.add("klr-highlight");\n';
+            h += '    }\n';
+            h += '    requestAnimationFrame(sentenceSync);\n';
+            h += '  }\n';
+            h += '  sentenceSync();\n';
+            h += '}\n';
+
+            h += 'var particleCache = {};\n';
+            h += 'var particleDataDB = ' + particleJSON + ';\n';
+            // Build HTML cache from Firebase data on load
+            h += 'function buildPPHtml(info, particleText) {\n';
+            h += '  var html="<div style=\\"color:#e8c87a;font-size:22px;font-weight:700;margin-bottom:14px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;\\">"+esc((info&&info.particle)||particleText)+" — "+esc((info&&info.name)||"Particle")+"</div>";\n';
+            h += '  if(info.korean_label)html+="<div style=\\"color:#c4a0d8;font-size:13px;margin-top:-8px;margin-bottom:14px;\\">"+esc(info.korean_label)+"</div>";\n';
+            h += '  if(info.variants)html+="<div style=\\"margin-bottom:12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">📋 FORMS</div><div style=\\"color:#d4b896;\\">"+esc(info.variants)+"</div></div>";\n';
+            h += '  if(info.explanation)html+="<div style=\\"margin-bottom:12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">💡 WHAT IT DOES</div><div>"+esc(info.explanation)+"</div></div>";\n';
+            h += '  if(info.example_kr){html+="<div style=\\"background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">📝 EXAMPLE</div><div style=\\"color:#fff;font-size:16px;font-weight:700;\\">"+esc(info.example_kr)+"</div>";if(info.example_sov)html+="<div style=\\"color:#c4a0d8;font-size:13px;\\">Yodafied: "+esc(info.example_sov)+"</div>";if(info.example_eng)html+="<div style=\\"color:#a8d4a0;font-size:13px;\\">ENG: "+esc(info.example_eng)+"</div>";html+="</div>";}\n';
+            h += '  return html;\n';
+            h += '}\n';
+            h += 'function klrExplainParticle(particleText, word) {\n';
+            h += '  var existing = document.querySelector(".klr-particle-overlay"); if (existing) existing.remove();\n';
+            h += '  var ov = document.createElement("div"); ov.className = "klr-particle-overlay";\n';
+            h += '  ov.innerHTML = \'<div class="klr-particle-popup"><button onclick="KLR.closeParticle()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button><div style="color:#e8c87a;font-size:22px;font-weight:700;margin-bottom:14px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">Particle Explanation</div><div style="color:#888;">⏳ Loading...</div></div>\';\n';
+            h += '  document.body.appendChild(ov);\n';
+            h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ pp.style.position="absolute"; pp.style.top=(sr.top+sr.height/2)+"px"; pp.style.left=(sr.left+sr.width/2)+"px"; pp.style.transform="translate(-50%,-50%)"; } }\n';
+            h += '  requestAnimationFrame(function(){ ov.classList.add("visible"); });\n';
+            h += '  ov.addEventListener("click", function(e){ if(e.target===ov) KLR.closeParticle(); });\n';
+            h += '  var ck = particleText + "|" + word;\n';
+            h += '  if (particleCache[ck]) { ov.querySelector(".klr-particle-popup").innerHTML = \'<button onclick="KLR.closeParticle()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>\' + particleCache[ck]; return; }\n';
+            h += '  var dbKey = ck.replace(/[\\/\\s]/g, "_");\n';
+            h += '  if (particleDataDB[dbKey]) { var html = buildPPHtml(particleDataDB[dbKey], particleText); particleCache[ck] = html; ov.querySelector(".klr-particle-popup").innerHTML = \'<button onclick="KLR.closeParticle()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>\' + html; return; }\n';
+            h += '  var prompt = "You are a Korean language teacher explaining a grammar particle to an English-speaking beginner. The word is \\"" + word + "\\" and the particle/ending info is: \\"" + particleText + "\\". IMPORTANT: In example sentences write natural sentences only. Do NOT include grammar labels like [subject] [object] [verb] [topic] etc. Reply ONLY with JSON (no markdown, no backticks): {\\\"particle\\\":\\\"the particle itself\\\",\\\"name\\\":\\\"English name\\\",\\\"korean_label\\\":\\\"Korean name\\\",\\\"variants\\\":\\\"consonant/vowel forms or empty\\\",\\\"explanation\\\":\\\"1-2 sentence explanation\\\",\\\"example_kr\\\":\\\"Korean example\\\",\\\"example_sov\\\":\\\"English in Korean word order\\\",\\\"example_eng\\\":\\\"normal English\\\"}";\n';
+            h += '  fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:prompt}],max_tokens:400})})\n';
+            h += '  .then(function(r){return r.json();})\n';
+            h += '  .then(function(data){\n';
+            h += '    var t="";if(typeof data==="string")t=data;else if(data.data)t=typeof data.data==="string"?data.data:JSON.stringify(data.data);else if(data.text)t=data.text;else if(data.result)t=data.result;else if(data.response)t=data.response;else if(data.content)t=typeof data.content==="string"?data.content:JSON.stringify(data.content);else t=JSON.stringify(data);\n';
+            h += '    t=t.replace(/^```json\\s*|```\\s*$/g,"").trim();\n';
+            h += '    var info; try{info=JSON.parse(t);}catch(e){var m=t.match(/{[\\s\\S]*}/);if(m)try{info=JSON.parse(m[0]);}catch(e2){}}\n';
+            h += '    var html="<div style=\\"color:#e8c87a;font-size:22px;font-weight:700;margin-bottom:14px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;\\">"+esc((info&&info.particle)||particleText)+" — "+esc((info&&info.name)||"Particle")+"</div>";\n';
+            h += '    if(info){\n';
+            h += '      if(info.korean_label)html+="<div style=\\"color:#c4a0d8;font-size:13px;margin-top:-8px;margin-bottom:14px;\\">"+esc(info.korean_label)+"</div>";\n';
+            h += '      if(info.variants)html+="<div style=\\"margin-bottom:12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">📋 FORMS</div><div style=\\"color:#d4b896;\\">"+esc(info.variants)+"</div></div>";\n';
+            h += '      if(info.explanation)html+="<div style=\\"margin-bottom:12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">💡 WHAT IT DOES</div><div>"+esc(info.explanation)+"</div></div>";\n';
+            h += '      if(info.example_kr){html+="<div style=\\"background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;\\"><div style=\\"color:#8ab4d6;font-weight:700;font-size:12px;margin-bottom:4px;\\">📝 EXAMPLE</div><div style=\\"color:#fff;font-size:16px;font-weight:700;\\">"+esc(info.example_kr)+"</div>";if(info.example_sov)html+="<div style=\\"color:#c4a0d8;font-size:13px;\\">Yodafied: "+esc(info.example_sov)+"</div>";if(info.example_eng)html+="<div style=\\"color:#a8d4a0;font-size:13px;\\">ENG: "+esc(info.example_eng)+"</div>";html+="</div>";}\n';
+            h += '    }else{html+="<div>"+esc(t)+"</div>";}\n';
+            h += '    particleCache[ck]=html;\n';
+            h += '    var popup=ov.querySelector(".klr-particle-popup");if(popup)popup.innerHTML=\'<button onclick="KLR.closeParticle()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>\'+html;\n';
+            h += '  }).catch(function(){var p=ov.querySelector(".klr-particle-popup");if(p){var s=p.querySelector("div:last-child");if(s)s.textContent="(Failed)";}});\n';
+            h += '}\n';
+            h += 'function klrCloseParticle(){ var o=document.querySelector(".klr-particle-overlay");if(o){o.classList.remove("visible");setTimeout(function(){if(o.parentNode)o.remove();},300);} }\n';
+
+            // Comparison mode functions
+            h += 'var klrCompRecording=null, klrCompBlob=null, klrCompUrl=null, klrCompAudio=null;\n';
+            h += 'function klrShowCompIntro() {\n';
+            h += '  var ex=document.querySelector(".klr-comp-intro-overlay");if(ex)ex.remove();\n';
+            h += '  var ov=document.createElement("div");ov.className="klr-comp-intro-overlay";\n';
+            h += '  ov.innerHTML=\'<div class="klr-comp-intro-popup"><div style="font-size:20px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">🎙️ Comparison Mode</div><div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:22px;">Welcome to Comparison Mode. Here, you can record your voice to see how you compare to Mr. Calvin\\\'s recording. The goal here is to help you notice any subtle pronunciation mistakes you might be making. To begin, please click on any sentence.</div><button onclick="KLR.dismissCompIntro()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#000;border:none;border-radius:10px;padding:12px 40px;font-size:16px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;">OK</button></div>\';\n';
+            h += '  document.body.appendChild(ov);\n';
+            h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ pp.style.position="absolute"; pp.style.top=(sr.top+sr.height/2)+"px"; pp.style.left=(sr.left+sr.width/2)+"px"; pp.style.transform="translate(-50%,-50%)"; } }\n';
+            h += '  requestAnimationFrame(function(){ov.classList.add("visible");});\n';
+            h += '}\n';
+            h += 'function klrDismissCompIntro() {\n';
+            h += '  var ov=document.querySelector(".klr-comp-intro-overlay");\n';
+            h += '  if(ov){ov.classList.remove("visible");setTimeout(function(){if(ov.parentNode)ov.remove();renderSlide(cur);renderDots();},300);}\n';
+            h += '}\n';
+            h += 'function klrOpenComp(slideIdx,si) {\n';
+            h += '  if(!klrAudioUrl||!klrSlideMap)return;\n';
+            h += '  var sentence=slides[slideIdx].sentences[si];\n';
+            h += '  var words=klrSlideMap.filter(function(m){return m.slideIdx===slideIdx&&m.si===si;});\n';
+            h += '  if(!words.length){alert("No timing data for this sentence.");return;}\n';
+            h += '  klrCompBlob=null;klrCompUrl=null;\n';
+            h += '  var ex=document.querySelector(".klr-comp-overlay");if(ex)ex.remove();\n';
+            h += '  var ov=document.createElement("div");ov.className="klr-comp-overlay";\n';
+            h += '  ov.innerHTML=\'<div class="klr-comp-popup"><button onclick="KLR.closeComp()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#888;font-size:22px;cursor:pointer;">✕</button><div style="color:#fff;font-size:20px;font-weight:700;text-align:center;margin-bottom:20px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;line-height:1.5;">\'+esc(sentence)+\'</div><div style="margin-bottom:16px;"><div style="color:#8ab4d6;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Step 1: Listen to the native audio</div><button id="klrCompListenBtn" onclick="KLR.compListen(\'+slideIdx+\',\'+si+\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:2px solid rgba(74,222,128,0.5);font-size:14px;font-weight:700;cursor:pointer;background:rgba(74,222,128,0.15);color:#4ade80;font-family:Noto Sans KR,sans-serif;">🔊 Listen</button></div><div style="margin-bottom:16px;"><div style="color:#8ab4d6;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Step 2: Record yourself</div><button id="klrCompRecordBtn" onclick="KLR.compRecord()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:2px solid rgba(239,68,68,0.5);font-size:14px;font-weight:700;cursor:pointer;background:rgba(239,68,68,0.15);color:#ef4444;font-family:Noto Sans KR,sans-serif;">🎤 Record</button></div><div id="klrCompPlayback" style="display:none;margin-bottom:16px;"><div style="color:#8ab4d6;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Step 3: Compare</div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><button onclick="KLR.compListen(\'+slideIdx+\',\'+si+\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:2px solid rgba(74,222,128,0.5);font-size:14px;font-weight:700;cursor:pointer;background:rgba(74,222,128,0.15);color:#4ade80;font-family:Noto Sans KR,sans-serif;">🔊 Native</button><span style="color:#888;font-size:12px;font-weight:700;">vs</span><button id="klrCompPlayMine" onclick="KLR.compPlayMine()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:2px solid rgba(168,85,247,0.5);font-size:14px;font-weight:700;cursor:pointer;background:rgba(168,85,247,0.15);color:#a855f7;font-family:Noto Sans KR,sans-serif;">🎧 Yours</button></div></div><div id="klrCompFBSection" style="display:none;"><div style="color:#8ab4d6;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">AI Feedback</div><div id="klrCompFB" style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px 16px;line-height:1.6;font-size:14px;color:#ddd;"><span style="color:#888;">⏳ Analyzing pronunciation...</span></div></div></div>\';\n';
+            h += '  document.body.appendChild(ov);ov.dataset.slideIdx=slideIdx;ov.dataset.si=si;\n';
+            h += '  requestAnimationFrame(function(){ov.classList.add("visible");});\n';
+            h += '  ov.addEventListener("click",function(e){if(e.target===ov)KLR.closeComp();});\n';
+            h += '}\n';
+            h += 'function klrCloseComp() {\n';
+            h += '  if(klrCompAudio){klrCompAudio.pause();klrCompAudio=null;}\n';
+            h += '  if(klrCompRecording&&klrCompRecording.state==="recording")klrCompRecording.stop();\n';
+            h += '  if(klrAudioEl)klrAudioEl.pause();\n';
+            h += '  var ov=document.querySelector(".klr-comp-overlay");\n';
+            h += '  if(ov){ov.classList.remove("visible");setTimeout(function(){if(ov.parentNode)ov.remove();},300);}\n';
+            h += '}\n';
+            h += 'function klrCompListen(slideIdx,si) {\n';
+            h += '  klrInitAudio();\n';
+            h += '  if(!klrAudioEl||!klrSlideMap)return;\n';
+            h += '  var words=klrSlideMap.filter(function(m){return m.slideIdx===slideIdx&&m.si===si;});\n';
+            h += '  if(!words.length)return;\n';
+            h += '  var start=words[0].start, end=words[words.length-1].end;\n';
+            h += '  klrAudioEl.pause();klrAudioEl.currentTime=start;klrAudioEl.playbackRate=klrSpeed;klrAudioEl.play();\n';
+            h += '  var btn=document.getElementById("klrCompListenBtn");if(btn)btn.style.background="rgba(74,222,128,0.3)";\n';
+            h += '  var check=function(){if(klrAudioEl.currentTime>=end){klrAudioEl.pause();if(btn)btn.style.background="rgba(74,222,128,0.15)";}else if(!klrAudioEl.paused)requestAnimationFrame(check);};\n';
+            h += '  requestAnimationFrame(check);\n';
+            h += '}\n';
+            h += 'function klrCompRecord() {\n';
+            h += '  var btn=document.getElementById("klrCompRecordBtn");\n';
+            h += '  if(klrCompRecording&&klrCompRecording.state==="recording"){klrCompRecording.stop();if(btn){btn.innerHTML="🎤 Record Again";btn.style.animation="none";}return;}\n';
+            h += '  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){\n';
+            h += '    var chunks=[];klrCompRecording=new MediaRecorder(stream);\n';
+            h += '    klrCompRecording.ondataavailable=function(e){chunks.push(e.data);};\n';
+            h += '    klrCompRecording.onstop=function(){stream.getTracks().forEach(function(t){t.stop();});klrCompBlob=new Blob(chunks,{type:"audio/webm"});klrCompUrl=URL.createObjectURL(klrCompBlob);var ps=document.getElementById("klrCompPlayback");if(ps)ps.style.display="block";klrCompGetFB();};\n';
+            h += '    klrCompRecording.start();if(btn){btn.innerHTML="⏹ Stop Recording";btn.style.animation="klrCompPulse 1s ease-in-out infinite";}\n';
+            h += '  }).catch(function(err){alert("Microphone access denied: "+err.message);});\n';
+            h += '}\n';
+            h += 'function klrCompPlayMine() {\n';
+            h += '  if(!klrCompUrl)return;if(klrCompAudio)klrCompAudio.pause();\n';
+            h += '  var btn=document.getElementById("klrCompPlayMine");\n';
+            h += '  klrCompAudio=new Audio(klrCompUrl);if(btn)btn.style.background="rgba(168,85,247,0.3)";\n';
+            h += '  klrCompAudio.onended=function(){if(btn)btn.style.background="rgba(168,85,247,0.15)";};klrCompAudio.play();\n';
+            h += '}\n';
+            h += 'function klrCompGetFB() {\n';
+            h += '  var ov=document.querySelector(".klr-comp-overlay");if(!ov)return;\n';
+            h += '  var slideIdx=parseInt(ov.dataset.slideIdx),si=parseInt(ov.dataset.si);\n';
+            h += '  var sentence=slides[slideIdx].sentences[si];\n';
+            h += '  var fbSec=document.getElementById("klrCompFBSection");var fbEl=document.getElementById("klrCompFB");\n';
+            h += '  if(fbSec)fbSec.style.display="block";if(fbEl)fbEl.innerHTML="<span style=\\"color:#888;\\">⏳ Analyzing pronunciation...</span>";\n';
+            h += '  var prompt="You are a Korean pronunciation coach helping an English-speaking student. The student attempted to say: \\""+sentence+"\\". Based on common English speaker mistakes when pronouncing this Korean sentence, give specific pronunciation feedback. Focus on: aspiration differences, tensification rules, liaison/linking, vowel distinctions, and batchim rules. Be encouraging but specific. 3-5 bullet points max. Do NOT use [brackets] around words. Reply ONLY with JSON: {\\"tips\\":[{\\"point\\":\\"short title\\",\\"detail\\":\\"explanation\\"}]}";\n';
+            h += '  fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:prompt}],max_tokens:600})})\n';
+            h += '  .then(function(r){return r.json();})\n';
+            h += '  .then(function(data){\n';
+            h += '    var t="";if(typeof data==="string")t=data;else if(data.data)t=typeof data.data==="string"?data.data:JSON.stringify(data.data);else if(data.text)t=data.text;else if(data.result)t=data.result;else if(data.response)t=data.response;else if(data.content)t=typeof data.content==="string"?data.content:JSON.stringify(data.content);else t=JSON.stringify(data);\n';
+            h += '    t=t.replace(/^```json\\s*|```\\s*$/g,"").trim();\n';
+            h += '    var info;try{info=JSON.parse(t);}catch(e){var m=t.match(/{[\\s\\S]*}/);if(m)try{info=JSON.parse(m[0]);}catch(e2){}}\n';
+            h += '    if(fbEl){\n';
+            h += '      if(info&&info.tips&&info.tips.length){var html="";for(var i=0;i<info.tips.length;i++){html+="<div style=\\"margin-bottom:10px;\\"><span style=\\"color:#e8c87a;font-weight:700;\\">"+esc(info.tips[i].point)+"</span><div style=\\"color:#ccc;font-size:13px;margin-top:2px;\\">"+esc(info.tips[i].detail)+"</div></div>";}fbEl.innerHTML=html;}\n';
+            h += '      else{fbEl.innerHTML="<div style=\\"color:#ccc;\\">"+esc(t)+"</div>";}\n';
+            h += '    }\n';
+            h += '  }).catch(function(){if(fbEl)fbEl.innerHTML="<div style=\\"color:#888;\\">(Could not load feedback)</div>";});\n';
+            h += '}\n';
+
+            // Tutorial demo data - hardcoded so every export has the same tutorial
+            h += 'var TUT_AUDIO = "https://cdn.shopify.com/s/files/1/0674/6747/7282/files/finished_feb_10_audio.MP3?v=1770905169";\n';
+            h += 'var TUT_SLIDES = ' + JSON.stringify([
+                {"sentences":["제가 어렸을 때 자전거를 타면서 정신을 잃은 적이 있어요.","오늘은 제 어린시절에 있었던 이상한 이야기를 하나 공유하려고 해요."]},
+                {"sentences":["어렸을 때 누나랑 같이 자전거를 타고 있었어요.","누나는 눈을 감고도 자전거를 5초동안 탈 수 있다고 말했지요.","\u201c너는 이렇게 못 탈 걸!\u201d"]},
+                {"sentences":["저는 승부욕이 강했어요.","그 말을 들은 저는 20초까지 탈 수 있다고 소리쳤어요."]},
+                {"sentences":["누나는 자전거를 타면서 눈을 감은 것처럼 보였어요.","하지만 사실 눈을 완전히 감고 있지는 않았어요.","그때는 그 사실을 전혀 몰랐어요."]},
+                {"sentences":["저는 누나보다 더 잘하고 싶었어요.","그래서 제 차례가 오자 진짜로 눈을 감고 자전거를 탔어요.","\u201c누나! 나 보여? 나 보이냐고?!\u201d"]},
+                {"sentences":["눈을 감았는데도 처음에는 괜찮은 것 같았어요.","얼굴에 시원한 바람이 스쳤고, 자전거도 잘 나아가는 것 같았거든요.","속으로 정말 신이 났어요."]},
+                {"sentences":["제가 분명히 이겼다고 생각했어요.","\u201c누나에게 자랑해야지!\u201d","그 순간만큼은 아무 걱정도 없었어요."]},
+                {"sentences":["그런데 갑자기 눈앞이 캄캄해지더니 모든 것이 멈췄어요.","제가 소나무에 그대로 부딪혀버린 거예요.","한 순간에 벌어진 일이었어요."]},
+                {"sentences":["저는 나무 옆에 그대로 쓰러졌어요.","한참 뒤에 이웃이 저를 발견하고 집으로 데려다 주셨대요."]},
+                {"sentences":["이모는 저를 보자마자 얼굴에 연고를 발라주셨어요.","그날은 너무 아파서 하루종일 소파에서 쉬어야 했어요.","그 후유증으로 아직까지 얼굴에 흉터가 남아있어요."]},
+                {"sentences":["제가 스물여섯살이 되고 다시 그때 생각이 났어요…","\u201c그런데 그때 누나도 같이 놀았는데, 누나는 어디 있었지?\u201d","너무 궁금해서 누나한테 그때 왜 저를 도와주지 않았는지 물어봤어요."]},
+                {"sentences":["사실 누나는 다 봤대요.","제 머리가 나무에","\u201c와당탕탕!\u201d"]},
+                {"sentences":["제가 정신을 잃자, 누나는 스스로를 먼저 살려야겠다고 생각했대요.","엄마가 아는 순간 끝이니까요."]},
+                {"sentences":["그래서 누나는 그냥 모른 척하고 그냥 집으로 가버렸대요.","세상에!"]}
+            ]) + ';\n';
+            h += 'var TUT_SLIDEMAP = [{"slideIdx":0,"si":0,"wi":0,"word":"제가","start":0,"end":0.11},{"slideIdx":0,"si":0,"wi":1,"word":"어렸을","start":0.51,"end":1.1},{"slideIdx":0,"si":0,"wi":2,"word":"때","start":1.1,"end":1.3},{"slideIdx":0,"si":0,"wi":3,"word":"자전거를","start":1.6,"end":2.04},{"slideIdx":0,"si":0,"wi":4,"word":"타면서","start":2.54,"end":3.52},{"slideIdx":0,"si":0,"wi":5,"word":"정신을","start":3.57,"end":4.69},{"slideIdx":0,"si":0,"wi":6,"word":"잃은","start":4.87,"end":5.48},{"slideIdx":0,"si":0,"wi":7,"word":"적이","start":5.48,"end":5.92},{"slideIdx":0,"si":0,"wi":8,"word":"있어요.","start":5.92,"end":7.26},{"slideIdx":0,"si":1,"wi":0,"word":"오늘은","start":7.38,"end":8.58},{"slideIdx":0,"si":1,"wi":1,"word":"제","start":8.58,"end":9.21},{"slideIdx":0,"si":1,"wi":2,"word":"어린시절에","start":9.21,"end":10.78},{"slideIdx":0,"si":1,"wi":3,"word":"있었던","start":10.78,"end":11.28},{"slideIdx":0,"si":1,"wi":4,"word":"이상한","start":11.28,"end":11.98},{"slideIdx":0,"si":1,"wi":5,"word":"이야기를","start":11.98,"end":12.46},{"slideIdx":0,"si":1,"wi":6,"word":"하나","start":12.46,"end":13.26},{"slideIdx":0,"si":1,"wi":7,"word":"공유하려고","start":13.26,"end":14.14},{"slideIdx":0,"si":1,"wi":8,"word":"해요.","start":14.14,"end":15.86},{"slideIdx":1,"si":0,"wi":0,"word":"어렸을","start":16.33,"end":16.98},{"slideIdx":1,"si":0,"wi":1,"word":"때","start":17.39,"end":17.88},{"slideIdx":1,"si":0,"wi":2,"word":"누나랑","start":17.88,"end":18.42},{"slideIdx":1,"si":0,"wi":3,"word":"같이","start":18.42,"end":19.14},{"slideIdx":1,"si":0,"wi":4,"word":"자전거를","start":19.14,"end":19.78},{"slideIdx":1,"si":0,"wi":5,"word":"타고","start":19.78,"end":20.2},{"slideIdx":1,"si":0,"wi":6,"word":"있었어요.","start":20.2,"end":21.41},{"slideIdx":1,"si":1,"wi":0,"word":"누나는","start":21.72,"end":22.74},{"slideIdx":1,"si":1,"wi":1,"word":"눈을","start":22.74,"end":23.32},{"slideIdx":1,"si":1,"wi":2,"word":"감고도","start":23.32,"end":24.46},{"slideIdx":1,"si":1,"wi":3,"word":"자전거를","start":24.46,"end":24.98},{"slideIdx":1,"si":1,"wi":4,"word":"5초동안","start":24.98,"end":26.18},{"slideIdx":1,"si":1,"wi":5,"word":"탈","start":26.18,"end":26.46},{"slideIdx":1,"si":1,"wi":6,"word":"수","start":26.46,"end":26.72},{"slideIdx":1,"si":1,"wi":7,"word":"있다고","start":26.72,"end":27.1},{"slideIdx":1,"si":1,"wi":8,"word":"말했지요.","start":27.1,"end":28.98},{"slideIdx":1,"si":2,"wi":0,"word":"\\u201c너는","start":28.98,"end":29.41},{"slideIdx":1,"si":2,"wi":1,"word":"이렇게","start":29.68,"end":30.21},{"slideIdx":1,"si":2,"wi":2,"word":"못","start":30.21,"end":30.35},{"slideIdx":1,"si":2,"wi":3,"word":"탈","start":30.35,"end":30.52},{"slideIdx":1,"si":2,"wi":4,"word":"걸!\\u201d","start":30.53,"end":31.34},{"slideIdx":2,"si":0,"wi":0,"word":"저는","start":31.34,"end":32.26},{"slideIdx":2,"si":0,"wi":1,"word":"승부욕이","start":32.26,"end":33.08},{"slideIdx":2,"si":0,"wi":2,"word":"강했어요.","start":33.08,"end":34.06},{"slideIdx":2,"si":1,"wi":0,"word":"그","start":34.43,"end":34.69},{"slideIdx":2,"si":1,"wi":1,"word":"말을","start":34.7,"end":35},{"slideIdx":2,"si":1,"wi":2,"word":"들은","start":35,"end":35.58},{"slideIdx":2,"si":1,"wi":3,"word":"저는","start":35.58,"end":36.07},{"slideIdx":2,"si":1,"wi":4,"word":"20초까지","start":36.08,"end":37.76},{"slideIdx":2,"si":1,"wi":5,"word":"탈","start":37.76,"end":38.04},{"slideIdx":2,"si":1,"wi":6,"word":"수","start":38.04,"end":38.3},{"slideIdx":2,"si":1,"wi":7,"word":"있다고","start":38.3,"end":38.72},{"slideIdx":2,"si":1,"wi":8,"word":"소리쳤어요.","start":38.72,"end":40.14},{"slideIdx":3,"si":0,"wi":0,"word":"누나는","start":40.4,"end":41.42},{"slideIdx":3,"si":0,"wi":1,"word":"자전거를","start":41.42,"end":41.98},{"slideIdx":3,"si":0,"wi":2,"word":"타면서","start":41.98,"end":42.92},{"slideIdx":3,"si":0,"wi":3,"word":"눈을","start":42.93,"end":43.7},{"slideIdx":3,"si":0,"wi":4,"word":"감은","start":43.7,"end":44.02},{"slideIdx":3,"si":0,"wi":5,"word":"것처럼","start":44.02,"end":44.5},{"slideIdx":3,"si":0,"wi":6,"word":"보였어요.","start":44.5,"end":45.66},{"slideIdx":3,"si":1,"wi":0,"word":"하지만","start":45.75,"end":46.68},{"slideIdx":3,"si":1,"wi":1,"word":"사실","start":46.68,"end":47.11},{"slideIdx":3,"si":1,"wi":2,"word":"눈을","start":47.12,"end":47.43},{"slideIdx":3,"si":1,"wi":3,"word":"완전히","start":47.44,"end":48},{"slideIdx":3,"si":1,"wi":4,"word":"감고","start":48.06,"end":48.68},{"slideIdx":3,"si":1,"wi":5,"word":"있지는","start":48.68,"end":49.04},{"slideIdx":3,"si":1,"wi":6,"word":"않았어요.","start":49.04,"end":49.97},{"slideIdx":3,"si":2,"wi":0,"word":"그때는","start":50,"end":51.3},{"slideIdx":3,"si":2,"wi":1,"word":"그","start":51.3,"end":51.6},{"slideIdx":3,"si":2,"wi":2,"word":"사실을","start":51.6,"end":52.04},{"slideIdx":3,"si":2,"wi":3,"word":"전혀","start":52.04,"end":52.48},{"slideIdx":3,"si":2,"wi":4,"word":"몰랐어요.","start":52.48,"end":54.49},{"slideIdx":4,"si":0,"wi":0,"word":"저는","start":54.84,"end":55.77},{"slideIdx":4,"si":0,"wi":1,"word":"누나보다","start":55.78,"end":56.53},{"slideIdx":4,"si":0,"wi":2,"word":"더","start":56.54,"end":56.8},{"slideIdx":4,"si":0,"wi":3,"word":"잘하고","start":56.81,"end":57.38},{"slideIdx":4,"si":0,"wi":4,"word":"싶었어요.","start":57.38,"end":58.12},{"slideIdx":4,"si":1,"wi":0,"word":"그래서","start":58.27,"end":59.22},{"slideIdx":4,"si":1,"wi":1,"word":"제","start":59.22,"end":60.04},{"slideIdx":4,"si":1,"wi":2,"word":"차례가","start":60.04,"end":60.44},{"slideIdx":4,"si":1,"wi":3,"word":"오자","start":60.44,"end":60.82},{"slideIdx":4,"si":1,"wi":4,"word":"진짜로","start":60.82,"end":61.6},{"slideIdx":4,"si":1,"wi":5,"word":"눈을","start":61.6,"end":62.1},{"slideIdx":4,"si":1,"wi":6,"word":"감고","start":62.1,"end":62.36},{"slideIdx":4,"si":1,"wi":7,"word":"자전거를","start":62.36,"end":62.84},{"slideIdx":4,"si":1,"wi":8,"word":"탔어요.","start":62.84,"end":63.97},{"slideIdx":4,"si":2,"wi":0,"word":"\\u201c누나!","start":64,"end":64.68},{"slideIdx":4,"si":2,"wi":1,"word":"나","start":64.68,"end":65.1},{"slideIdx":4,"si":2,"wi":2,"word":"보여?","start":65.1,"end":66.04},{"slideIdx":4,"si":2,"wi":3,"word":"나","start":66.04,"end":66.26},{"slideIdx":4,"si":2,"wi":4,"word":"보이냐고?!\\u201d","start":66.26,"end":67.51},{"slideIdx":5,"si":0,"wi":0,"word":"눈을","start":67.6,"end":68.52},{"slideIdx":5,"si":0,"wi":1,"word":"감았는데도","start":68.52,"end":69.3},{"slideIdx":5,"si":0,"wi":2,"word":"처음에는","start":69.3,"end":70.26},{"slideIdx":5,"si":0,"wi":3,"word":"괜찮은","start":70.26,"end":70.94},{"slideIdx":5,"si":0,"wi":4,"word":"것","start":70.94,"end":71.14},{"slideIdx":5,"si":0,"wi":5,"word":"같았어요.","start":71.14,"end":72.62},{"slideIdx":5,"si":1,"wi":0,"word":"얼굴에","start":72.65,"end":73.24},{"slideIdx":5,"si":1,"wi":1,"word":"시원한","start":73.24,"end":73.84},{"slideIdx":5,"si":1,"wi":2,"word":"바람이","start":73.84,"end":74.22},{"slideIdx":5,"si":1,"wi":3,"word":"스쳤고,","start":74.22,"end":75.2},{"slideIdx":5,"si":1,"wi":4,"word":"자전거도","start":75.2,"end":76.1},{"slideIdx":5,"si":1,"wi":5,"word":"잘","start":76.1,"end":76.44},{"slideIdx":5,"si":1,"wi":6,"word":"나아가는","start":76.44,"end":76.88},{"slideIdx":5,"si":1,"wi":7,"word":"것","start":76.88,"end":77.12},{"slideIdx":5,"si":1,"wi":8,"word":"같았거든요.","start":77.12,"end":78.25},{"slideIdx":5,"si":2,"wi":0,"word":"속으로","start":78.28,"end":79.22},{"slideIdx":5,"si":2,"wi":1,"word":"정말","start":79.22,"end":79.88},{"slideIdx":5,"si":2,"wi":2,"word":"신이","start":79.88,"end":80.26},{"slideIdx":5,"si":2,"wi":3,"word":"났어요.","start":80.26,"end":81.3},{"slideIdx":6,"si":0,"wi":0,"word":"제가","start":81.3,"end":82},{"slideIdx":6,"si":0,"wi":1,"word":"분명히","start":82,"end":83},{"slideIdx":6,"si":0,"wi":2,"word":"이겼다고","start":83,"end":83.4},{"slideIdx":6,"si":0,"wi":3,"word":"생각했어요.","start":83.4,"end":84.79},{"slideIdx":6,"si":1,"wi":0,"word":"\\u201c누나에게","start":84.83,"end":85.74},{"slideIdx":6,"si":1,"wi":1,"word":"자랑해야지!\\u201d","start":85.74,"end":87},{"slideIdx":6,"si":2,"wi":0,"word":"그","start":87.02,"end":87.58},{"slideIdx":6,"si":2,"wi":1,"word":"순간만큼은","start":87.59,"end":88.8},{"slideIdx":6,"si":2,"wi":2,"word":"아무","start":88.8,"end":89.09},{"slideIdx":6,"si":2,"wi":3,"word":"걱정도","start":89.1,"end":89.78},{"slideIdx":6,"si":2,"wi":4,"word":"없었어요.","start":89.78,"end":92.58},{"slideIdx":7,"si":0,"wi":0,"word":"그런데","start":92.6,"end":93.8},{"slideIdx":7,"si":0,"wi":1,"word":"갑자기","start":93.8,"end":94.38},{"slideIdx":7,"si":0,"wi":2,"word":"눈앞이","start":94.38,"end":95.34},{"slideIdx":7,"si":0,"wi":3,"word":"캄캄해지더니","start":95.34,"end":96.36},{"slideIdx":7,"si":0,"wi":4,"word":"모든","start":96.36,"end":97.28},{"slideIdx":7,"si":0,"wi":5,"word":"것이","start":97.29,"end":97.66},{"slideIdx":7,"si":0,"wi":6,"word":"멈췄어요.","start":97.66,"end":98.54},{"slideIdx":7,"si":1,"wi":0,"word":"제가","start":98.55,"end":98.99},{"slideIdx":7,"si":1,"wi":1,"word":"소나무에","start":99.08,"end":99.88},{"slideIdx":7,"si":1,"wi":2,"word":"그대로","start":99.88,"end":100.84},{"slideIdx":7,"si":1,"wi":3,"word":"부딪혀버린","start":100.84,"end":101.26},{"slideIdx":7,"si":1,"wi":4,"word":"거예요.","start":101.27,"end":102.35},{"slideIdx":7,"si":2,"wi":0,"word":"한","start":102.37,"end":102.92},{"slideIdx":7,"si":2,"wi":1,"word":"순간에","start":102.94,"end":103.37},{"slideIdx":7,"si":2,"wi":2,"word":"벌어진","start":103.38,"end":103.74},{"slideIdx":7,"si":2,"wi":3,"word":"일이었어요.","start":103.74,"end":105.7},{"slideIdx":8,"si":0,"wi":0,"word":"저는","start":105.76,"end":106.4},{"slideIdx":8,"si":0,"wi":1,"word":"나무","start":106.4,"end":106.7},{"slideIdx":8,"si":0,"wi":2,"word":"옆에","start":106.7,"end":107.06},{"slideIdx":8,"si":0,"wi":3,"word":"그대로","start":107.06,"end":107.38},{"slideIdx":8,"si":0,"wi":4,"word":"쓰러졌어요.","start":107.38,"end":108},{"slideIdx":8,"si":1,"wi":0,"word":"한참","start":109,"end":109.64},{"slideIdx":8,"si":1,"wi":1,"word":"뒤에","start":109.64,"end":110.16},{"slideIdx":8,"si":1,"wi":2,"word":"이웃이","start":110.16,"end":110.62},{"slideIdx":8,"si":1,"wi":3,"word":"저를","start":110.62,"end":110.86},{"slideIdx":8,"si":1,"wi":4,"word":"발견하고","start":110.86,"end":111.8},{"slideIdx":8,"si":1,"wi":5,"word":"집으로","start":111.8,"end":112.44},{"slideIdx":8,"si":1,"wi":6,"word":"데려다","start":112.44,"end":112.82},{"slideIdx":8,"si":1,"wi":7,"word":"주셨대요.","start":112.82,"end":114.7},{"slideIdx":9,"si":0,"wi":0,"word":"이모는","start":114.7,"end":115.7},{"slideIdx":9,"si":0,"wi":1,"word":"저를","start":115.7,"end":115.94},{"slideIdx":9,"si":0,"wi":2,"word":"보자마자","start":115.94,"end":116.84},{"slideIdx":9,"si":0,"wi":3,"word":"얼굴에","start":116.84,"end":117.36},{"slideIdx":9,"si":0,"wi":4,"word":"연고를","start":117.36,"end":117.84},{"slideIdx":9,"si":0,"wi":5,"word":"발라주셨어요.","start":117.84,"end":119},{"slideIdx":9,"si":1,"wi":0,"word":"그날은","start":119.2,"end":120.14},{"slideIdx":9,"si":1,"wi":1,"word":"너무","start":120.14,"end":120.36},{"slideIdx":9,"si":1,"wi":2,"word":"아파서","start":120.36,"end":121.06},{"slideIdx":9,"si":1,"wi":3,"word":"하루종일","start":121.06,"end":121.84},{"slideIdx":9,"si":1,"wi":4,"word":"소파에서","start":121.84,"end":122.42},{"slideIdx":9,"si":1,"wi":5,"word":"쉬어야","start":122.42,"end":122.88},{"slideIdx":9,"si":1,"wi":6,"word":"했어요.","start":122.88,"end":123.5},{"slideIdx":9,"si":2,"wi":0,"word":"그","start":123.9,"end":124.78},{"slideIdx":9,"si":2,"wi":1,"word":"후유증으로","start":124.78,"end":125.78},{"slideIdx":9,"si":2,"wi":2,"word":"아직까지","start":125.78,"end":126.6},{"slideIdx":9,"si":2,"wi":3,"word":"얼굴에","start":126.6,"end":126.94},{"slideIdx":9,"si":2,"wi":4,"word":"흉터가","start":126.94,"end":127.42},{"slideIdx":9,"si":2,"wi":5,"word":"남아있어요.","start":127.42,"end":128.3},{"slideIdx":10,"si":0,"wi":0,"word":"제가","start":128.31,"end":129.32},{"slideIdx":10,"si":0,"wi":1,"word":"스물여섯살이","start":129.32,"end":130.2},{"slideIdx":10,"si":0,"wi":2,"word":"되고","start":130.22,"end":130.86},{"slideIdx":10,"si":0,"wi":3,"word":"다시","start":130.84,"end":131.1},{"slideIdx":10,"si":0,"wi":4,"word":"그때","start":131.21,"end":131.4},{"slideIdx":10,"si":0,"wi":5,"word":"생각이","start":131.41,"end":131.6},{"slideIdx":10,"si":0,"wi":6,"word":"났어요…","start":131.61,"end":132},{"slideIdx":10,"si":1,"wi":0,"word":"\\u201c그런데","start":132.2,"end":133.78},{"slideIdx":10,"si":1,"wi":1,"word":"그때","start":133.78,"end":134.16},{"slideIdx":10,"si":1,"wi":2,"word":"누나도","start":134.16,"end":134.42},{"slideIdx":10,"si":1,"wi":3,"word":"같이","start":134.42,"end":135},{"slideIdx":10,"si":1,"wi":4,"word":"놀았는데,","start":135,"end":135.62},{"slideIdx":10,"si":1,"wi":5,"word":"누나는","start":135.62,"end":136.86},{"slideIdx":10,"si":1,"wi":6,"word":"어디","start":136.86,"end":137.26},{"slideIdx":10,"si":1,"wi":7,"word":"있었지?\\u201d","start":137.26,"end":138.2},{"slideIdx":10,"si":2,"wi":0,"word":"너무","start":138.25,"end":139.16},{"slideIdx":10,"si":2,"wi":1,"word":"궁금해서","start":139.16,"end":140.08},{"slideIdx":10,"si":2,"wi":2,"word":"누나한테","start":140.08,"end":140.78},{"slideIdx":10,"si":2,"wi":3,"word":"그때","start":140.78,"end":141.26},{"slideIdx":10,"si":2,"wi":4,"word":"왜","start":141.26,"end":142.12},{"slideIdx":10,"si":2,"wi":5,"word":"저를","start":142.12,"end":142.46},{"slideIdx":10,"si":2,"wi":6,"word":"도와주지","start":142.46,"end":143},{"slideIdx":10,"si":2,"wi":7,"word":"않았는지","start":143.03,"end":143.62},{"slideIdx":10,"si":2,"wi":8,"word":"물어봤어요.","start":143.64,"end":145},{"slideIdx":11,"si":0,"wi":0,"word":"사실","start":145.3,"end":145.7},{"slideIdx":11,"si":0,"wi":1,"word":"누나는","start":145.73,"end":146.12},{"slideIdx":11,"si":0,"wi":2,"word":"다","start":146.14,"end":146.6},{"slideIdx":11,"si":0,"wi":3,"word":"봤대요.","start":146.62,"end":147.6},{"slideIdx":11,"si":1,"wi":0,"word":"제","start":147.8,"end":148},{"slideIdx":11,"si":1,"wi":1,"word":"머리가","start":148.02,"end":148.24},{"slideIdx":11,"si":1,"wi":2,"word":"나무에","start":148.35,"end":149.1},{"slideIdx":11,"si":2,"wi":0,"word":"\\u201c와당탕탕!\\u201d","start":149.2,"end":150.68},{"slideIdx":12,"si":0,"wi":0,"word":"제가","start":150.7,"end":152.04},{"slideIdx":12,"si":0,"wi":1,"word":"정신을","start":152.06,"end":152.38},{"slideIdx":12,"si":0,"wi":2,"word":"잃자,","start":152.4,"end":153.06},{"slideIdx":12,"si":0,"wi":3,"word":"누나는","start":153.06,"end":154.1},{"slideIdx":12,"si":0,"wi":4,"word":"스스로를","start":154.1,"end":154.9},{"slideIdx":12,"si":0,"wi":5,"word":"먼저","start":154.9,"end":155.46},{"slideIdx":12,"si":0,"wi":6,"word":"살려야겠다고","start":155.46,"end":156.32},{"slideIdx":12,"si":0,"wi":7,"word":"생각했대요.","start":156.32,"end":157.3},{"slideIdx":12,"si":1,"wi":0,"word":"엄마가","start":157.33,"end":157.97},{"slideIdx":12,"si":1,"wi":1,"word":"아는","start":157.99,"end":158.22},{"slideIdx":12,"si":1,"wi":2,"word":"순간","start":158.24,"end":158.68},{"slideIdx":12,"si":1,"wi":3,"word":"끝이니까요.","start":158.69,"end":160.73},{"slideIdx":13,"si":0,"wi":0,"word":"그래서","start":160.9,"end":161.62},{"slideIdx":13,"si":0,"wi":1,"word":"누나는","start":161.62,"end":161.9},{"slideIdx":13,"si":0,"wi":2,"word":"그냥","start":161.92,"end":162.46},{"slideIdx":13,"si":0,"wi":3,"word":"모른","start":162.46,"end":162.82},{"slideIdx":13,"si":0,"wi":4,"word":"척하고","start":162.82,"end":163.34},{"slideIdx":13,"si":0,"wi":5,"word":"그냥","start":163.34,"end":164.1},{"slideIdx":13,"si":0,"wi":6,"word":"집으로","start":164.1,"end":164.52},{"slideIdx":13,"si":0,"wi":7,"word":"가버렸대요.","start":164.52,"end":165.7},{"slideIdx":13,"si":1,"wi":0,"word":"세상에!","start":165.8,"end":168}];\n';
+            h += 'var REAL_SLIDES = null, REAL_AUDIO = null, REAL_SLIDEMAP = null, REAL_TOTAL = null;\n';
+            h += 'function tutSwapIn() {\n';
+            h += '  REAL_SLIDES = slides; REAL_AUDIO = klrAudioUrl; REAL_SLIDEMAP = klrSlideMap; REAL_TOTAL = totalSlides;\n';
+            h += '  slides = TUT_SLIDES; totalSlides = TUT_SLIDES.length;\n';
+            h += '  klrAudioUrl = TUT_AUDIO; klrSlideMap = TUT_SLIDEMAP;\n';
+            h += '  if (klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
+            h += '  klrInitAudio();\n';
+            h += '  cur = 0; renderSlide(cur); renderDots();\n';
+            h += '}\n';
+            h += 'function tutSwapOut() {\n';
+            h += '  if (REAL_SLIDES) {\n';
+            h += '    slides = REAL_SLIDES; totalSlides = REAL_TOTAL;\n';
+            h += '    klrAudioUrl = REAL_AUDIO; klrSlideMap = REAL_SLIDEMAP;\n';
+            h += '    if (klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
+            h += '    if (klrAudioUrl) klrInitAudio();\n';
+            h += '    REAL_SLIDES = null;\n';
+            h += '  }\n';
+            h += '  cur = 0; renderSlide(cur); renderDots();\n';
+            h += '}\n';
+
+            // Tutorial system
+            h += 'var ARROW_IMG = "https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Copy_of_Press_Start_2P_16.png?v=1770863077";\n';
+            h += 'var tutStep = -1;\n';
+            h += 'var tutActive = false;\n';
+            h += 'var TUT_DEBUG = true;\n';
+            h += 'document.addEventListener("click", function(e) {\n';
+            h += '  if (TUT_DEBUG) {\n';
+            h += '    var el = e.target;\n';
+            h += '    var sel = el.id ? "#"+el.id : (el.className ? "."+el.className.split(" ")[0] : el.tagName);\n';
+            h += '    console.log("TUT_DEBUG click:", {\n';
+            h += '      x: e.clientX, y: e.clientY,\n';
+            h += '      pageX: e.pageX, pageY: e.pageY,\n';
+            h += '      vpW: window.innerWidth, vpH: window.innerHeight,\n';
+            h += '      pctX: Math.round(e.clientX/window.innerWidth*100), pctY: Math.round(e.clientY/window.innerHeight*100),\n';
+            h += '      element: sel,\n';
+            h += '      rect: el.getBoundingClientRect()\n';
+            h += '    });\n';
+            h += '  }\n';
+            h += '});\n';
+            h += 'var tutSteps = [\n';
+            // Step 0: Intro text
+            h += '  function(){\n';
+            h += '    klrTutCenter("Here you can read the sentences we will go over in Tuesday\'s Reading class. Reading class is at 8 PM EST (New York time). Use the pink buttons at the very bottom to navigate between slides.", true);\n';
+            h += '  },\n';
+            // Step 1: Point to first sentence area, ask them to hover/click 제가
+            h += '  function(){\n';
+            h += '    if (cur !== 0) { goTo(0); }\n';
+            h += '    var firstSentence = document.querySelector("#klrSlides .klr-sentence");\n';
+            h += '    if (!firstSentence) { KLR.tutNext(); return; }\n';
+            h += '    var r = firstSentence.getBoundingClientRect();\n';
+            h += '    tutArrow.style.display = "block";\n';
+            h += '    tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '    tutArrow.style.top = (r.top + r.height/2 - 24) + "px";\n';
+            h += '    tutArrow.style.left = Math.max(5, r.left - 60) + "px";\n';
+            h += '    klrTutMsgAbove("Hover over (on computer) or click on (on mobile) any word to see the dictionary entry for the word. You can also click on each individual word to hear it spoken out loud. Try hovering or clicking on <b>제가</b> now.");\n';
+            h += '    window._tutMsgTop = tutMsg.style.top;\n';
+            h += '    window._tutMsgLeft = tutMsg.style.left;\n';
+            h += '    function onWord(e) {\n';
+            h += '      if (e.target.closest(".klr-word")) {\n';
+            h += '        document.removeEventListener("mouseover", onWord, true);\n';
+            h += '        document.removeEventListener("click", onWord, true);\n';
+            // Lock the current tooltip so it stays visible through step 2
+            h += '        setTimeout(function(){ window._tutLockedTip = tipEl; }, 50);\n';
+            h += '        setTimeout(function(){ KLR.tutNext(); }, 200);\n';
+            h += '      }\n';
+            h += '    }\n';
+            h += '    document.addEventListener("mouseover", onWord, true);\n';
+            h += '    document.addEventListener("click", onWord, true);\n';
+            h += '  },\n';
+            // Step 2: Point to "explain this particle" button
+            h += '  function(){\n';
+            h += '    setTimeout(function(){\n';
+            h += '      var explainBtn = document.querySelector("#klrSlides .klr-explain-btn");\n';
+            h += '      if (!explainBtn) {\n';
+            h += '        klrTutCenter("If a word has a particle, you will see a red \\"Explain this particle!\\" button. Click it to learn how the particle works. Let\'s continue!", true);\n';
+            h += '        return;\n';
+            h += '      }\n';
+            h += '      var r = explainBtn.getBoundingClientRect();\n';
+            h += '      tutArrow.style.display = "block";\n';
+            h += '      tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '      tutArrow.style.top = (r.top + r.height/2 - 24) + "px";\n';
+            h += '      tutArrow.style.left = Math.max(5, r.left - 60) + "px";\n';
+            // Just update text, keep same position from step 1
+            h += '      if (window._tutMsgTop) tutMsg.style.top = window._tutMsgTop;\n';
+            h += '      if (window._tutMsgLeft) tutMsg.style.left = window._tutMsgLeft;\n';
+            h += '      tutMsg.innerHTML = "If you don\'t know a particle, you can click this red button to see the definition and how it\'s used. Click on the red button now.";\n';
+            h += '      function onExplain(e) {\n';
+            h += '        if (e.target.closest(".klr-explain-btn")) {\n';
+            h += '          document.removeEventListener("click", onExplain, true);\n';
+            h += '          setTimeout(function(){ KLR.tutNext(); }, 300);\n';
+            h += '        }\n';
+            h += '      }\n';
+            h += '      document.addEventListener("click", onExplain, true);\n';
+            h += '    }, 100);\n';
+            h += '  },\n';
+            // Step 3: Wait for them to read particle explanation, then click OK
+            h += '  function(){\n';
+            h += '    window._tutLockedTip = null;\n';
+            h += '    hideTip();\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    klrTutMsgAbove(\'Click OK when you are done reading!<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\');\n';
+            h += '  },\n';
+            // Step 4: Close particle popup, point to sentence actions (🔤 🔁)
+            h += '  function(){\n';
+            h += '    var ppOverlay = document.querySelector(".klr-particle-overlay"); if (ppOverlay) ppOverlay.remove();\n';
+            h += '    window._tutLockedTip = null;\n';
+            h += '    hideTip();\n';
+            h += '    var actions = document.querySelector("#klrSlides .klr-sentence-actions");\n';
+            h += '    if (actions) {\n';
+            h += '      var r = actions.getBoundingClientRect();\n';
+            h += '      tutArrow.style.display = "block";\n';
+            h += '      tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '      tutArrow.style.top = (r.top + r.height/2 - 24) + "px";\n';
+            h += '      tutArrow.style.left = Math.max(5, r.left - 60) + "px";\n';
+            h += '    } else { tutArrow.style.display = "none"; }\n';
+            h += '    klrTutMsgAbove("Click on the 🔤 button to see a translation of the entire Korean sentence. Then, click on the 🔁 button to hear the audio of this sentence. You can click it as many times as you want. Try to read on your own first before relying on the audio. When you are finished, click OK.<br><button class=\\"klr-tut-next\\" onclick=\\"KLR.tutNext()\\">OK</button>");\n';
+            h += '  },\n';
+            // Step 5: Point to purple play button
+            h += '  function(){\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    klrTutCenter("To hear the audio for ALL the slides, press the purple play button in the bottom left corner. It will automatically take you through the entire slideshow.", true);\n';
+            h += '  },\n';
+            // Step 6: Point to settings gear button
+            h += '  function(){\n';
+            h += '    var gear = document.querySelector("#klrSlides .klr-settings-btn");\n';
+            h += '    if (!gear) { KLR.tutNext(); return; }\n';
+            h += '    var r = gear.getBoundingClientRect();\n';
+            h += '    tutArrow.style.display = "block";\n';
+            h += '    tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '    tutArrow.style.top = (r.top + r.height/2 - 24) + "px";\n';
+            h += '    tutArrow.style.left = Math.max(5, r.left - 60) + "px";\n';
+            h += '    klrTutMsgBelow("Here is the settings menu. Click the gear button in the upper right corner.");\n';
+            h += '    function onGear() { gear.removeEventListener("click", onGear); setTimeout(function(){ KLR.tutNext(); }, 400); }\n';
+            h += '    gear.addEventListener("click", onGear);\n';
+            h += '  },\n';
+            // Step 7: Settings menu explanation
+            h += '  function(){\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    var msg = "In the settings menu, you will see several different Modes.<br><br><b style=\\"color:#6ea8fe;\\">Normal Mode</b> highlights the first sentence only (for Absolute Beginners and Novices). <b style=\\"color:#c084fc;\\">Hard Mode</b> highlights ALL sentences in purple and red (for Beginners and up).<br><br><b>Clear Highlight</b> removes all highlights. You can also adjust the <b>Speed</b> of the audio here.";\n';
+            h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
+            h += '    tutMsg.style.textAlign = "center"; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.innerHTML = msg + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\';\n';
+            // Find the settings menu left edge
+            h += '    var settingsMenu = document.querySelector("#klrSlides .klr-settings-menu");\n';
+            h += '    var menuLeft = window.innerWidth;\n';
+            h += '    if (settingsMenu) { var smr = settingsMenu.getBoundingClientRect(); if (smr.width > 0) menuLeft = smr.left; }\n';
+            // Width: wide enough to reduce height, but leave gap before menu
+            h += '    var msgW = Math.min(720, menuLeft - 40);\n';
+            h += '    if (msgW < 300) msgW = 300;\n';
+            h += '    tutMsg.style.maxWidth = msgW + "px";\n';
+            // Center between absolute left (0) and settings menu left edge
+            h += '    tutMsg.style.left = (menuLeft / 2) + "px";\n';
+            h += '    tutMsg.style.transform = "translateX(-50%)";\n';
+            // Position above content - use slide area top as reference
+            h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '    if (sa) {\n';
+            h += '      var sr = sa.getBoundingClientRect();\n';
+            h += '      tutMsg.style.top = (sr.top + 5) + "px";\n';
+            h += '    } else { tutMsg.style.top = "10px"; }\n';
+            h += '  },\n';
+            // Step 8: Comparison mode explanation
+            h += '  function(){\n';
+            h += '    var cb = document.getElementById("klrSToggle"); if (cb) cb.checked = false;\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
+            h += '    tutMsg.style.textAlign = "center"; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.innerHTML = "Lastly, you will see <b style=\\"color:#4ade80;\\">Comparison Mode</b>. In Comparison Mode, you can record your voice to see how you compare to Mr. Calvin\'s recording. Let\'s try it!" + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\';\n';
+            // Same positioning as step 7: center between left edge and where settings menu was
+            h += '    var settingsMenu = document.querySelector("#klrSlides .klr-settings-menu");\n';
+            h += '    var menuLeft = window.innerWidth;\n';
+            h += '    if (settingsMenu) { var smr = settingsMenu.getBoundingClientRect(); if (smr.width > 0) menuLeft = smr.left; }\n';
+            h += '    var msgW = Math.min(720, menuLeft - 40);\n';
+            h += '    if (msgW < 300) msgW = 300;\n';
+            h += '    tutMsg.style.maxWidth = msgW + "px";\n';
+            h += '    tutMsg.style.left = (menuLeft / 2) + "px";\n';
+            h += '    tutMsg.style.transform = "translateX(-50%)";\n';
+            h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '    if (sa) {\n';
+            h += '      var sr = sa.getBoundingClientRect();\n';
+            h += '      tutMsg.style.top = (sr.top + 5) + "px";\n';
+            h += '    } else { tutMsg.style.top = "10px"; }\n';
+            h += '  },\n';
+            // Step 9: Switch to comparison mode and let them use it
+            h += '  function(){\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    tutMsg.style.display = "none";\n';
+            h += '    klrMode = "comparison";\n';
+            h += '    renderSlide(cur); renderDots();\n';
+            h += '    klrShowCompIntro();\n';
+            // Wait for intro to be dismissed, then wait for comp overlay to open AND close
+            h += '    var compPhase = 0;\n';
+            // phase 0: waiting for intro to close
+            // phase 1: waiting for comp overlay to appear (user clicks a sentence)
+            // phase 2: waiting for comp overlay to close (user finishes comparison)
+            h += '    var checkCompDone = setInterval(function(){\n';
+            h += '      if (compPhase === 0) {\n';
+            h += '        if (!document.querySelector(".klr-comp-intro-overlay")) compPhase = 1;\n';
+            h += '      } else if (compPhase === 1) {\n';
+            h += '        if (document.querySelector(".klr-comp-overlay")) compPhase = 2;\n';
+            h += '      } else if (compPhase === 2) {\n';
+            h += '        if (!document.querySelector(".klr-comp-overlay")) {\n';
+            h += '          clearInterval(checkCompDone);\n';
+            h += '          klrMode = "clear"; renderSlide(cur); renderDots();\n';
+            h += '          KLR.tutNext();\n';
+            h += '        }\n';
+            h += '      }\n';
+            h += '    }, 500);\n';
+            h += '  },\n';
+            // Step 10: Final message
+            h += '  function(){\n';
+            h += '    tutArrow.style.display = "none";\n';
+            h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
+            h += '    tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px"; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.innerHTML = "That\'s it for the tutorial. You are all set and ready to use the app! Have fun and good luck with your studies. 🎉" + \'<br><button class="klr-tut-next" onclick="KLR.closeTutorial()">Got it! ✓</button>\';\n';
+            h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '    if (sa) {\n';
+            h += '      var sr = sa.getBoundingClientRect();\n';
+            h += '      tutMsg.style.top = (sr.top + sr.height / 2) + "px";\n';
+            h += '      tutMsg.style.left = (sr.left + sr.width / 2) + "px";\n';
+            h += '      tutMsg.style.transform = "translate(-50%, -50%)";\n';
+            h += '    } else {\n';
+            h += '      tutMsg.style.top = "50%"; tutMsg.style.left = "50%"; tutMsg.style.transform = "translate(-50%,-50%)";\n';
+            h += '    }\n';
+            h += '  }\n';
+            h += '];\n';
+            h += 'var tutArrow = null, tutMsg = null, tutHighlight = null, tutOverlay = null;\n';
+
+            h += 'function klrShowTutorial() {\n';
+            h += '  tutSwapIn();\n';
+            h += '  var ex = document.querySelector(".klr-tut-overlay"); if (ex) ex.remove();\n';
+            h += '  var ov = document.createElement("div"); ov.className = "klr-tut-overlay";\n';
+            h += '  ov.innerHTML = \'<div class="klr-tut-popup">\' +\n';
+            h += '    \'<div style="font-size:22px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">📖 Welcome!</div>\' +\n';
+            h += '    \'<div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:24px;">Welcome to the new Tuesday Reading prep. Let\\\'s walk you through how to use this app.</div>\' +\n';
+            h += '    \'<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">\' +\n';
+            h += '    \'<button onclick="KLR.startTutorial()" style="background:linear-gradient(135deg,#00cccc,#0099aa);color:#000;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;transition:transform 0.15s;">Let\\\'s Go!</button>\' +\n';
+            h += '    \'<button onclick="KLR.closeTutorial()" style="background:rgba(255,255,255,0.08);color:#999;border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;transition:all 0.15s;">Skip Tutorial</button>\' +\n';
+            h += '    \'</div></div>\';\n';
+            h += '  document.body.appendChild(ov);\n';
+            h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '  var popup = ov.querySelector(".klr-tut-popup");\n';
+            h += '  if (sa && popup) {\n';
+            h += '    var sr = sa.getBoundingClientRect();\n';
+            h += '    popup.style.top = (sr.top + sr.height/2) + "px";\n';
+            h += '    popup.style.left = (sr.left + sr.width/2) + "px";\n';
+            h += '    popup.style.transform = "translate(-50%,-50%)";\n';
+            h += '  }\n';
+            h += '  requestAnimationFrame(function(){ ov.classList.add("visible"); });\n';
+            h += '}\n';
+
+            h += 'function klrCloseTutorial() {\n';
+            h += '  tutActive = false;\n';
+            h += '  var ov = document.querySelector(".klr-tut-overlay");\n';
+            h += '  if (ov) { ov.classList.remove("visible"); setTimeout(function(){ if(ov.parentNode) ov.remove(); }, 300); }\n';
+            h += '  if (tutArrow) { tutArrow.remove(); tutArrow = null; }\n';
+            h += '  if (tutMsg) { tutMsg.remove(); tutMsg = null; }\n';
+            h += '  if (tutHighlight) { tutHighlight.remove(); tutHighlight = null; }\n';
+            h += '  if (tutOverlay) { tutOverlay.remove(); tutOverlay = null; }\n';
+            h += '  tutStep = -1;\n';
+            h += '  tutSwapOut();\n';
+            h += '  klrMode = "clear"; renderSlide(cur); renderDots();\n';
+            h += '}\n';
+
+            h += 'function klrStartTutorial() {\n';
+            h += '  tutActive = true;\n';
+            h += '  var ov = document.querySelector(".klr-tut-overlay");\n';
+            h += '  if (ov) { ov.classList.remove("visible"); setTimeout(function(){ if(ov.parentNode) ov.remove(); }, 300); }\n';
+            h += '  tutOverlay = document.createElement("div");\n';
+            h += '  tutOverlay.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:299998;pointer-events:none;";\n';
+            h += '  document.body.appendChild(tutOverlay);\n';
+            h += '  tutArrow = document.createElement("div");\n';
+            h += '  tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '  tutArrow.innerHTML = \'<img src="\' + ARROW_IMG + \'" alt="arrow">\';\n';
+            h += '  tutArrow.style.display = "none";\n';
+            h += '  document.body.appendChild(tutArrow);\n';
+            h += '  tutMsg = document.createElement("div");\n';
+            h += '  tutMsg.className = "klr-tut-msg";\n';
+            h += '  tutMsg.style.display = "none";\n';
+            h += '  document.body.appendChild(tutMsg);\n';
+            h += '  tutHighlight = document.createElement("div");\n';
+            h += '  tutHighlight.className = "klr-tut-highlight";\n';
+            h += '  tutHighlight.style.display = "none";\n';
+            h += '  document.body.appendChild(tutHighlight);\n';
+            h += '  tutStep = 0;\n';
+            h += '  setTimeout(function(){ klrRunTutStep(); }, 350);\n';
+            h += '}\n';
+
+            h += 'function klrTutPoint(selector, direction, message) {\n';
+            h += '  var el = typeof selector === "string" ? document.querySelector(selector) : selector;\n';
+            h += '  if (!el) { KLR.tutNext(); return; }\n';
+            h += '  var r = el.getBoundingClientRect();\n';
+            h += '  tutArrow.style.display = "block";\n';
+            h += '  tutArrow.className = "klr-tut-arrow point-" + direction;\n';
+            h += '  if (direction === "right") { tutArrow.style.top = (r.top + r.height/2 - 24) + "px"; tutArrow.style.left = Math.max(5, r.left - 60) + "px"; }\n';
+            h += '  else if (direction === "left") { tutArrow.style.top = (r.top + r.height/2 - 24) + "px"; tutArrow.style.left = (r.right + 12) + "px"; }\n';
+            h += '  else if (direction === "down") { tutArrow.style.top = (r.top - 60) + "px"; tutArrow.style.left = (r.left + r.width/2 - 24) + "px"; }\n';
+            h += '  else { tutArrow.style.top = (r.bottom + 12) + "px"; tutArrow.style.left = (r.left + r.width/2 - 24) + "px"; }\n';
+            h += '  klrTutMsgAbove(message + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\');\n';
+            h += '}\n';
+
+            // Show tutorial message above the sentence content
+            h += 'function klrTutMsgAbove(html) {\n';
+            h += '  tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
+            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px";\n';
+            h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.bottom = "auto";\n';
+            h += '  tutMsg.innerHTML = html;\n';
+            h += '  var contentEl = document.querySelector("#klrSlides .klr-content");\n';
+            h += '  if (contentEl) {\n';
+            h += '    var cr = contentEl.getBoundingClientRect();\n';
+            h += '    var msgH = tutMsg.offsetHeight || 120;\n';
+            h += '    tutMsg.style.top = Math.max(10, cr.top - msgH - 10) + "px";\n';
+            h += '  } else { tutMsg.style.top = "10px"; }\n';
+            h += '}\n';
+
+            // Show tutorial message below the slide area
+            h += 'function klrTutMsgBelow(html) {\n';
+            h += '  tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
+            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px";\n';
+            h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.top = "auto";\n';
+            h += '  tutMsg.innerHTML = html;\n';
+            h += '  var slideArea = document.querySelector("#klrn-reader .klr-slide-area");\n';
+            h += '  if (slideArea) {\n';
+            h += '    var sr = slideArea.getBoundingClientRect();\n';
+            h += '    tutMsg.style.bottom = Math.max(10, window.innerHeight - sr.bottom + 20) + "px";\n';
+            h += '  } else { tutMsg.style.bottom = "80px"; }\n';
+            h += '}\n';
+
+            h += 'function klrTutCenter(message, hasNext) {\n';
+            h += '  tutArrow.style.display = "none";\n';
+            h += '  tutMsg.style.display = "block";\n';
+            h += '  tutMsg.style.position = "fixed";\n';
+            h += '  tutMsg.style.maxWidth = "460px"; tutMsg.style.textAlign = "center"; tutMsg.style.zIndex = "300010";\n';
+            h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.bottom = "auto";\n';
+            h += '  tutMsg.innerHTML = message + (hasNext !== false ? \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\' : \'<br><button class="klr-tut-next" onclick="KLR.closeTutorial()">Got it! ✓</button>\');\n';
+            h += '  var contentEl = document.querySelector("#klrSlides .klr-content");\n';
+            h += '  if (contentEl) {\n';
+            h += '    var cr = contentEl.getBoundingClientRect();\n';
+            h += '    var msgH = tutMsg.offsetHeight || 150;\n';
+            h += '    var topPos = cr.top - msgH - 10;\n';
+            h += '    if (topPos < 10) topPos = 10;\n';
+            h += '    tutMsg.style.top = topPos + "px";\n';
+            h += '  } else {\n';
+            h += '    tutMsg.style.top = "10px";\n';
+            h += '  }\n';
+            h += '}\n';
+
+            h += 'function klrTutNext() {\n';
+            h += '  tutStep++;\n';
+            h += '  klrRunTutStep();\n';
+            h += '}\n';
+
+            h += 'function klrRunTutStep() {\n';
+            h += '  if (tutStep >= tutSteps.length) { KLR.closeTutorial(); return; }\n';
+            h += '  tutSteps[tutStep]();\n';
+            h += '}\n';
+
+            h += 'window.KLR = { go: function(d){ goTo(cur+d); }, goTo: goTo, setMode: klrSetMode, translate: klrTranslate, translateSentence: klrTranslateSentence, togglePlay: klrTogglePlay, setSpeed: klrSetSpeed, repeatSentence: klrRepeatSentence, explainParticle: klrExplainParticle, closeParticle: klrCloseParticle, openComp: klrOpenComp, closeComp: klrCloseComp, compListen: klrCompListen, compRecord: klrCompRecord, compPlayMine: klrCompPlayMine, showCompIntro: klrShowCompIntro, dismissCompIntro: klrDismissCompIntro, showTutorial: klrShowTutorial, closeTutorial: klrCloseTutorial, startTutorial: klrStartTutorial, tutNext: klrTutNext, tutPoint: klrTutPoint, tutCenter: klrTutCenter };\n';
             h += 'document.addEventListener("keydown",function(e){ if(e.key==="ArrowRight"){e.preventDefault();KLR.go(1);} if(e.key==="ArrowLeft"){e.preventDefault();KLR.go(-1);} });\n';
             h += 'document.addEventListener("click",function(e){ if(!e.target.closest(".klr-word") && !e.target.closest(".klr-tip")) hideTip(); });\n';
+            h += 'document.addEventListener("click",function(e){ var btn=e.target.closest(".klr-explain-btn"); if(btn){e.stopPropagation(); KLR.explainParticle(decodeURIComponent(btn.getAttribute("data-particle")),decodeURIComponent(btn.getAttribute("data-word")));} });\n';
 
             // Scale function: measures container, sets --s as ratio of container width to 760 (reference width)
             h += 'function klrScale() {\n';
@@ -10358,6 +11545,7 @@
 
             // Audio sync engine for export
             h += 'renderDots(); klrScale(); goTo(0);\n';
+            h += 'setTimeout(function(){ klrShowTutorial(); }, 500);\n';
 
             // Audio setup - src will be set separately to avoid huge string in JS parser
             
@@ -10385,7 +11573,8 @@
         var matWordCache = {};
         var matCurrentAudio = null;
 
-        function matExpandPreview() {
+        function matExpandPreview(e) {
+            if (e && (e.target.closest('.mat-sentence-actions') || e.target.closest('.mat-settings-wrap'))) return;
             if (matSlides.length === 0) return;
             if (matDisplayMode === 'recording') { matDisplayMode = 'clear'; matRenderSlideshow(); }
             matExpCurrentSlide = matCurrentSlide;
@@ -10427,11 +11616,16 @@
             html += '<div class="mat-expanded-content" style="font-size:' + nativeFs + 'px;">';
             for (var j = 0; j < s.sentences.length; j++) {
                 var hlClass = matGetSentenceHlClass(j);
-                html += '<div class="mat-expanded-sentence">';
+                var compClass = matDisplayMode === 'comparison' ? ' mat-comparison-sentence' : '';
+                var compClick = matDisplayMode === 'comparison' ? ' onclick="event.stopPropagation(); matOpenComparison(' + matExpCurrentSlide + ',' + j + ')"' : '';
+                html += '<div class="mat-expanded-sentence' + compClass + '"' + compClick + '>';
                 html += '<span class="mat-sentence-hl' + (hlClass ? ' ' + hlClass : '') + '">';
                 var words = s.sentences[j].split(/\s+/);
                 for (var w = 0; w < words.length; w++) {
                     if (!words[w]) continue;
+                    if (matDisplayMode === 'comparison') {
+                        html += '<span class="mat-sync-word" data-slide="' + matExpCurrentSlide + '" data-si="' + j + '" data-wi="' + w + '" id="matsw_' + matExpCurrentSlide + '_' + j + '_' + w + '" style="font-weight:700;padding:6px 8px;">' + escapeHtml(words[w]) + '</span> ';
+                    } else {
                     var wordId = 'matword_' + j + '_' + w;
                     html += '<span class="mat-word mat-sync-word" id="' + wordId + '" data-slide="' + matExpCurrentSlide + '" data-si="' + j + '" data-wi="' + w + '" data-word="' + escapeHtml(words[w]) + '" data-sentence="' + escapeHtml(s.sentences[j]) + '"';
                     html += ' onclick="event.stopPropagation(); matSpeakWord(this)"';
@@ -10445,7 +11639,9 @@
                         html += '<div class="mat-word-tip"><div style="color:#00ffff;font-size:22px;font-weight:700;margin-bottom:4px;">' + escapeHtml(words[w]) + '</div><div class="tip-loading">⏳ Loading...</div></div>';
                     }
                     html += '</span>';
+                    }
                 }
+                html += matBuildSentenceActions(matExpCurrentSlide, j, s.sentences[j]);
                 html += '</span>';
                 html += '</div>';
             }
@@ -10604,26 +11800,351 @@
 
         function matBuildTipHtml(word, info) {
             var html = '';
-            html += '<div style="color:#00ffff;font-size:22px;font-weight:700;margin-bottom:8px;">' + escapeHtml(word) + '</div>';
-            html += '<div style="color:#fff;font-size:18px;margin-bottom:8px;">🌐 ' + escapeHtml(info.english || '') + '</div>';
-            if (info.pos) html += '<div style="color:#ff00ff;font-size:15px;font-style:italic;margin-bottom:6px;">' + escapeHtml(info.pos) + '</div>';
-            if (info.particles) html += '<div style="color:#39ff14;font-size:14px;line-height:1.5;">🔗 ' + escapeHtml(info.particles) + '</div>';
-            if (info.dictionary_form) html += '<div style="color:#aaa;font-size:14px;line-height:1.5;">📖 Dictionary: ' + escapeHtml(info.dictionary_form) + '</div>';
-            if (info.conjugation) html += '<div style="color:#aaa;font-size:14px;line-height:1.5;">🔄 ' + escapeHtml(info.conjugation) + '</div>';
-            if (info.contraction) html += '<div style="color:#ffd700;font-size:14px;line-height:1.5;">✂️ ' + escapeHtml(info.contraction) + '</div>';
+            html += '<div class="tip-label" style="color:#00ffff;font-weight:700;">' + escapeHtml(word) + '</div>';
+            html += '<div class="tip-english" style="color:#fff;font-weight:700;">🌐 ' + escapeHtml(info.english || '') + '</div>';
+            if (info.pos) html += '<div class="tip-pos" style="color:#ff00ff;font-style:italic;">' + escapeHtml(info.pos) + '</div>';
+            if (info.particles) html += '<div class="tip-detail" style="color:#39ff14;">🔗 ' + escapeHtml(info.particles) + ' <button class="mat-particle-explain-btn" onclick="event.stopPropagation(); matExplainParticle(\'' + escapeHtml(info.particles).replace(/'/g, "\\'") + '\', \'' + escapeHtml(word).replace(/'/g, "\\'") + '\')">Explain this particle!</button></div>';
+            if (info.dictionary_form) html += '<div class="tip-detail" style="color:#aaa;">📖 Dictionary: ' + escapeHtml(info.dictionary_form) + '</div>';
+            if (info.conjugation) html += '<div class="tip-detail" style="color:#aaa;">🔄 ' + escapeHtml(info.conjugation) + '</div>';
+            if (info.contraction) html += '<div class="tip-detail" style="color:#ffd700;">✂️ ' + escapeHtml(info.contraction) + '</div>';
             return html;
         }
 
         function matFillTip(tipEl, word, info) {
             var html = '';
-            html += '<div class="tip-label" style="color:#00ffff;font-size:22px;font-weight:700;margin-bottom:8px;">' + escapeHtml(word) + '</div>';
-            html += '<div class="tip-english" style="color:#fff;font-size:18px;margin-bottom:8px;">🌐 ' + escapeHtml(info.english || '') + '</div>';
-            if (info.pos) html += '<div class="tip-pos" style="color:#ff00ff;font-size:15px;font-style:italic;margin-bottom:6px;">' + escapeHtml(info.pos) + '</div>';
-            if (info.particles) html += '<div class="tip-detail" style="color:#39ff14;font-size:14px;line-height:1.5;">🔗 ' + escapeHtml(info.particles) + '</div>';
-            if (info.dictionary_form) html += '<div class="tip-detail" style="color:#aaa;font-size:14px;line-height:1.5;">📖 Dictionary: ' + escapeHtml(info.dictionary_form) + '</div>';
-            if (info.conjugation) html += '<div class="tip-detail" style="color:#aaa;font-size:14px;line-height:1.5;">🔄 ' + escapeHtml(info.conjugation) + '</div>';
-            if (info.contraction) html += '<div class="tip-detail" style="color:#ffd700;font-size:14px;line-height:1.5;">✂️ ' + escapeHtml(info.contraction) + '</div>';
+            html += '<div class="tip-label" style="color:#00ffff;font-weight:700;">' + escapeHtml(word) + '</div>';
+            html += '<div class="tip-english" style="color:#fff;font-weight:700;">🌐 ' + escapeHtml(info.english || '') + '</div>';
+            if (info.pos) html += '<div class="tip-pos" style="color:#ff00ff;font-style:italic;">' + escapeHtml(info.pos) + '</div>';
+            if (info.particles) html += '<div class="tip-detail" style="color:#39ff14;">🔗 ' + escapeHtml(info.particles) + ' <button class="mat-particle-explain-btn" onclick="event.stopPropagation(); matExplainParticle(\'' + escapeHtml(info.particles).replace(/'/g, "\\'") + '\', \'' + escapeHtml(word).replace(/'/g, "\\'") + '\')">Explain this particle!</button></div>';
+            if (info.dictionary_form) html += '<div class="tip-detail" style="color:#aaa;">📖 Dictionary: ' + escapeHtml(info.dictionary_form) + '</div>';
+            if (info.conjugation) html += '<div class="tip-detail" style="color:#aaa;">🔄 ' + escapeHtml(info.conjugation) + '</div>';
+            if (info.contraction) html += '<div class="tip-detail" style="color:#ffd700;">✂️ ' + escapeHtml(info.contraction) + '</div>';
             tipEl.innerHTML = html;
+        }
+
+        var matParticleCache = {};
+        var MAT_PARTICLE_COLLECTION = 'particle_explanations';
+
+        function matBuildParticleHtml(info, particleText) {
+            var html = '<div class="pp-title">' + escapeHtml((info && info.particle) || particleText) + ' — ' + escapeHtml((info && info.name) || 'Particle') + '</div>';
+            if (info) {
+                if (info.korean_label) html += '<div class="pp-section" style="color:#c4a0d8;font-size:13px;margin-top:-8px;margin-bottom:14px;">' + escapeHtml(info.korean_label) + '</div>';
+                if (info.variants) html += '<div class="pp-section"><div class="pp-label">📋 FORMS</div><div style="color:#d4b896;">' + escapeHtml(info.variants) + '</div></div>';
+                if (info.explanation) html += '<div class="pp-section"><div class="pp-label">💡 WHAT IT DOES</div><div>' + escapeHtml(info.explanation) + '</div></div>';
+                if (info.example_kr) {
+                    html += '<div class="pp-section" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;">';
+                    html += '<div class="pp-label">📝 EXAMPLE</div>';
+                    html += '<div class="pp-korean">' + escapeHtml(info.example_kr) + '</div>';
+                    if (info.example_sov) html += '<div class="pp-sov">Yodafied: ' + escapeHtml(info.example_sov) + '</div>';
+                    if (info.example_eng) html += '<div class="pp-eng">ENG: ' + escapeHtml(info.example_eng) + '</div>';
+                    html += '</div>';
+                }
+            }
+            return html;
+        }
+
+        function matExplainParticle(particleText, word) {
+            var existing = document.querySelector('.mat-particle-overlay');
+            if (existing) existing.remove();
+
+            var overlay = document.createElement('div');
+            overlay.className = 'mat-particle-overlay';
+            overlay.innerHTML = '<div class="mat-particle-popup" style="position:relative;">' +
+                '<button class="pp-close" onclick="matCloseParticlePopup()">✕</button>' +
+                '<div class="pp-title">Particle Explanation</div>' +
+                '<div class="pp-section" style="color:#888;">⏳ Loading explanation...</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            requestAnimationFrame(function() { overlay.classList.add('visible'); });
+
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) matCloseParticlePopup();
+            });
+
+            var cacheKey = particleText + '|' + word;
+
+            // Check memory cache first
+            if (matParticleCache[cacheKey]) {
+                overlay.querySelector('.mat-particle-popup').innerHTML =
+                    '<button class="pp-close" onclick="matCloseParticlePopup()">✕</button>' + matParticleCache[cacheKey];
+                return;
+            }
+
+            // Check Firebase cache
+            var docId = cacheKey.replace(/[\/\s]/g, '_');
+            db.collection(MAT_PARTICLE_COLLECTION).doc(docId).get()
+            .then(function(doc) {
+                if (doc.exists) {
+                    var info = doc.data();
+                    var html = matBuildParticleHtml(info, particleText);
+                    matParticleCache[cacheKey] = html;
+                    var popup = overlay.querySelector('.mat-particle-popup');
+                    if (popup) popup.innerHTML = '<button class="pp-close" onclick="matCloseParticlePopup()">✕</button>' + html;
+                    return;
+                }
+                // Not cached — fetch from AI
+                return matFetchParticleAI(particleText, word, cacheKey, docId, overlay);
+            })
+            .catch(function() {
+                // Firestore error — try AI directly
+                matFetchParticleAI(particleText, word, cacheKey, docId, overlay);
+            });
+        }
+
+        function matFetchParticleAI(particleText, word, cacheKey, docId, overlay) {
+            var prompt = 'You are a Korean language teacher explaining a grammar particle to an English-speaking beginner. ' +
+                'The word is "' + word + '" and the particle/ending info is: "' + particleText + '". ' +
+                'IMPORTANT: In example sentences, write natural sentences only. Do NOT include grammar labels like [subject], [object], [verb], [topic] etc. Just write the plain sentence. ' +
+                'Reply ONLY with JSON (no markdown, no backticks): ' +
+                '{"particle":"the particle itself (e.g. 을/를)","name":"what it is in English (e.g. Object particle)","korean_label":"Korean name (e.g. 목적격 조사)","variants":"if it changes based on final consonant/vowel, explain when to use each form (e.g. 을 after consonant, 를 after vowel). If no variants, empty string.","explanation":"1-2 sentence simple explanation of what this particle does","example_kr":"one natural example sentence in Korean","example_sov":"English translation in Korean word order (like Yoda would say it)","example_eng":"English translation in normal word order"}';
+
+            return fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 400 })
+            }).then(function(r) { return r.json(); })
+            .then(function(data) {
+                var text = '';
+                if (typeof data === 'string') text = data;
+                else if (data.data) text = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                else if (data.text) text = data.text;
+                else if (data.result) text = data.result;
+                else if (data.response) text = data.response;
+                else if (data.content) text = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                else if (data.choices && data.choices[0]) text = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || '');
+                else text = JSON.stringify(data);
+                text = text.replace(/^```json\s*|```\s*$/g, '').trim();
+
+                var info;
+                try { info = JSON.parse(text); } catch(e) {
+                    var match = text.match(/\{[\s\S]*\}/);
+                    if (match) { try { info = JSON.parse(match[0]); } catch(e2) { info = null; } }
+                }
+
+                if (info) {
+                    // Save to Firebase
+                    try { db.collection(MAT_PARTICLE_COLLECTION).doc(docId).set(info); } catch(e) {}
+                }
+
+                var html = matBuildParticleHtml(info, particleText);
+                if (!info) html = '<div class="pp-title">' + escapeHtml(particleText) + '</div><div class="pp-section">' + escapeHtml(text) + '</div>';
+                matParticleCache[cacheKey] = html;
+                var popup = overlay.querySelector('.mat-particle-popup');
+                if (popup) popup.innerHTML = '<button class="pp-close" onclick="matCloseParticlePopup()">✕</button>' + html;
+            })
+            .catch(function(err) {
+                console.error('Particle explain error:', err);
+                var popup = overlay.querySelector('.mat-particle-popup');
+                if (popup) popup.querySelector('.pp-section').textContent = '(Failed to load explanation)';
+            });
+        }
+
+        function matCloseParticlePopup() {
+            var overlay = document.querySelector('.mat-particle-overlay');
+            if (overlay) {
+                overlay.classList.remove('visible');
+                setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 300);
+            }
+        }
+
+        // ==================== COMPARISON MODE ====================
+        var matCompRecording = null; // MediaRecorder
+        var matCompRecordedBlob = null;
+        var matCompRecordedUrl = null;
+        var matCompAudio = null; // for playback
+
+        function matOpenComparison(slideIdx, si) {
+            if (!matAudioSyncData) { alert('No audio loaded for comparison.'); return; }
+            var sentence = matSlides[slideIdx].sentences[si];
+            var timeRange = matGetSentenceTimeRange(slideIdx, si);
+            if (!timeRange) { alert('No timing data for this sentence.'); return; }
+
+            matCompRecordedBlob = null;
+            matCompRecordedUrl = null;
+
+            var existing = document.querySelector('.mat-comp-overlay');
+            if (existing) existing.remove();
+
+            var overlay = document.createElement('div');
+            overlay.className = 'mat-comp-overlay';
+            overlay.innerHTML = '<div class="mat-comp-popup">' +
+                '<button class="comp-close" onclick="matCloseComparison()">✕</button>' +
+                '<div class="comp-sentence">' + escapeHtml(sentence) + '</div>' +
+                '<div class="comp-section">' +
+                    '<div class="comp-label">Step 1: Listen to the native audio</div>' +
+                    '<button class="comp-btn comp-btn-listen" id="matCompListenBtn" onclick="matCompListen(' + slideIdx + ',' + si + ')">🔊 Listen</button>' +
+                '</div>' +
+                '<div class="comp-section">' +
+                    '<div class="comp-label">Step 2: Record yourself</div>' +
+                    '<button class="comp-btn comp-btn-record" id="matCompRecordBtn" onclick="matCompRecord()">🎤 Record</button>' +
+                '</div>' +
+                '<div class="comp-section" id="matCompPlaybackSection" style="display:none;">' +
+                    '<div class="comp-label">Step 3: Compare</div>' +
+                    '<div class="comp-vs">' +
+                        '<button class="comp-btn comp-btn-listen" onclick="matCompListen(' + slideIdx + ',' + si + ')">🔊 Native</button>' +
+                        '<span class="comp-vs-label">vs</span>' +
+                        '<button class="comp-btn comp-btn-play" id="matCompPlayMineBtn" onclick="matCompPlayMine()">🎧 Yours</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="comp-section" id="matCompFeedbackSection" style="display:none;">' +
+                    '<div class="comp-label">AI Feedback</div>' +
+                    '<div class="comp-feedback" id="matCompFeedback"><span class="comp-fb-loading">⏳ Analyzing pronunciation...</span></div>' +
+                '</div>' +
+                '</div>';
+
+            document.body.appendChild(overlay);
+            requestAnimationFrame(function() { overlay.classList.add('visible'); });
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) matCloseComparison();
+            });
+
+            // Store current sentence info for recording
+            overlay.dataset.slideIdx = slideIdx;
+            overlay.dataset.si = si;
+        }
+
+        function matCloseComparison() {
+            // Stop any playing audio
+            if (matCompAudio) { matCompAudio.pause(); matCompAudio = null; }
+            if (matCompRecording && matCompRecording.state === 'recording') {
+                matCompRecording.stop();
+            }
+            if (matAudioElement) matAudioElement.pause();
+            var overlay = document.querySelector('.mat-comp-overlay');
+            if (overlay) {
+                overlay.classList.remove('visible');
+                setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 300);
+            }
+        }
+
+        function matCompListen(slideIdx, si) {
+            if (!matAudioElement || !matAudioSyncData) return;
+            var timeRange = matGetSentenceTimeRange(slideIdx, si);
+            if (!timeRange) return;
+
+            var btn = document.getElementById('matCompListenBtn');
+            matAudioElement.pause();
+            matAudioElement.currentTime = timeRange.start;
+            matAudioElement.playbackRate = matPlaySpeed;
+            matAudioElement.play();
+            if (btn) btn.classList.add('playing');
+
+            var checkEnd = function() {
+                if (matAudioElement.currentTime >= timeRange.end) {
+                    matAudioElement.pause();
+                    if (btn) btn.classList.remove('playing');
+                } else if (!matAudioElement.paused) {
+                    requestAnimationFrame(checkEnd);
+                }
+            };
+            requestAnimationFrame(checkEnd);
+        }
+
+        function matCompRecord() {
+            var btn = document.getElementById('matCompRecordBtn');
+            if (matCompRecording && matCompRecording.state === 'recording') {
+                // Stop recording
+                matCompRecording.stop();
+                if (btn) { btn.innerHTML = '🎤 Record Again'; btn.classList.remove('recording'); }
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function(stream) {
+                var chunks = [];
+                matCompRecording = new MediaRecorder(stream);
+                matCompRecording.ondataavailable = function(e) { chunks.push(e.data); };
+                matCompRecording.onstop = function() {
+                    stream.getTracks().forEach(function(t) { t.stop(); });
+                    matCompRecordedBlob = new Blob(chunks, { type: 'audio/webm' });
+                    matCompRecordedUrl = URL.createObjectURL(matCompRecordedBlob);
+
+                    // Show playback section
+                    var playSection = document.getElementById('matCompPlaybackSection');
+                    if (playSection) playSection.style.display = 'block';
+
+                    // Get AI feedback
+                    matCompGetFeedback();
+                };
+                matCompRecording.start();
+                if (btn) { btn.innerHTML = '⏹ Stop Recording'; btn.classList.add('recording'); }
+            })
+            .catch(function(err) {
+                alert('Microphone access denied: ' + err.message);
+            });
+        }
+
+        function matCompPlayMine() {
+            if (!matCompRecordedUrl) return;
+            if (matCompAudio) { matCompAudio.pause(); }
+            var btn = document.getElementById('matCompPlayMineBtn');
+            matCompAudio = new Audio(matCompRecordedUrl);
+            if (btn) btn.classList.add('playing');
+            matCompAudio.onended = function() { if (btn) btn.classList.remove('playing'); };
+            matCompAudio.play();
+        }
+
+        function matCompGetFeedback() {
+            var overlay = document.querySelector('.mat-comp-overlay');
+            if (!overlay) return;
+            var slideIdx = parseInt(overlay.dataset.slideIdx);
+            var si = parseInt(overlay.dataset.si);
+            var sentence = matSlides[slideIdx].sentences[si];
+
+            var fbSection = document.getElementById('matCompFeedbackSection');
+            var fbEl = document.getElementById('matCompFeedback');
+            if (fbSection) fbSection.style.display = 'block';
+            if (fbEl) fbEl.innerHTML = '<span class="comp-fb-loading">⏳ Analyzing pronunciation...</span>';
+
+            var prompt = 'You are a Korean pronunciation coach helping an English-speaking student. ' +
+                'The student attempted to say: "' + sentence + '". ' +
+                'Based on common English speaker mistakes when pronouncing this Korean sentence, give specific pronunciation feedback. ' +
+                'Focus on: aspiration differences (ㅂ/ㅃ/ㅍ, ㄷ/ㄸ/ㅌ, ㄱ/ㄲ/ㅋ, ㅈ/ㅉ/ㅊ), tensification rules, liaison/linking between syllables, ' +
+                'vowel distinctions (ㅓ vs ㅗ, ㅡ vs ㅜ, ㅐ vs ㅔ), and any batchim (final consonant) rules that apply. ' +
+                'Be encouraging but specific. Keep it concise (3-5 bullet points max). Do NOT use [brackets] around words. ' +
+                'Reply ONLY with JSON: {"tips":[{"point":"short title","detail":"specific explanation"}]}';
+
+            fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 600 })
+            }).then(function(r) { return r.json(); })
+            .then(function(data) {
+                var text = '';
+                if (typeof data === 'string') text = data;
+                else if (data.data) text = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                else if (data.text) text = data.text;
+                else if (data.result) text = data.result;
+                else if (data.response) text = data.response;
+                else if (data.content) text = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                else if (data.choices && data.choices[0]) text = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || '');
+                else text = JSON.stringify(data);
+                text = text.replace(/^```json\s*|```\s*$/g, '').trim();
+
+                var info;
+                try { info = JSON.parse(text); } catch(e) {
+                    var match = text.match(/\{[\s\S]*\}/);
+                    if (match) { try { info = JSON.parse(match[0]); } catch(e2) { info = null; } }
+                }
+
+                if (fbEl) {
+                    if (info && info.tips && info.tips.length) {
+                        var html = '';
+                        for (var i = 0; i < info.tips.length; i++) {
+                            html += '<div style="margin-bottom:10px;">';
+                            html += '<span style="color:#e8c87a;font-weight:700;">' + escapeHtml(info.tips[i].point) + '</span>';
+                            html += '<div style="color:#ccc;font-size:13px;margin-top:2px;">' + escapeHtml(info.tips[i].detail) + '</div>';
+                            html += '</div>';
+                        }
+                        fbEl.innerHTML = html;
+                    } else {
+                        fbEl.innerHTML = '<div style="color:#ccc;">' + escapeHtml(text) + '</div>';
+                    }
+                }
+            })
+            .catch(function(err) {
+                if (fbEl) fbEl.innerHTML = '<div style="color:#888;">(Could not load feedback)</div>';
+            });
         }
 
         // Show expand hint after generating slides
@@ -25746,6 +27267,186 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                 studentTimezone.addEventListener('change', renderAvailabilityGrid);
             }
         });
+
+        // ---- TRANSCRIPT TIMING EDITOR ----
+        function matOpenTranscriptEditor() {
+            if (!matAudioSyncData || !matAudioSyncData.slideMap) { alert('No audio transcript loaded.'); return; }
+            var existing = document.getElementById('matTranscriptEditor');
+            if (existing) existing.remove();
+            matStopAudioSync();
+
+            var overlay = document.createElement('div');
+            overlay.id = 'matTranscriptEditor';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(5,5,18,0.97);z-index:200000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:Noto Sans KR,sans-serif;';
+
+            var map = matAudioSyncData.slideMap;
+            var html = '<div style="max-width:900px;width:100%;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;position:sticky;top:0;background:rgba(5,5,18,0.97);padding:10px 0;z-index:10;">';
+            html += '<h2 style="color:#fff;margin:0;font-size:18px;">✏️ Transcript Timing Editor</h2>';
+            html += '<div style="display:flex;gap:8px;">';
+            html += '<button onclick="matTranscriptTestAll()" style="background:#a855f7;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">▶ Test All</button>';
+            html += '<button onclick="matTranscriptStop()" style="background:#555;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">⏹ Stop</button>';
+            html += '<button onclick="matTranscriptCopyJSON()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">📋 Copy Timing JSON</button>';
+            html += '<button onclick="matTranscriptSave()" style="background:#39ff14;color:#000;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">💾 Save</button>';
+            html += '<button onclick="matTranscriptClose()" style="background:#ff4444;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">✕ Close</button>';
+            html += '</div></div>';
+            html += '<div style="color:#888;font-size:11px;margin-bottom:14px;">Click a word to hear it. Adjust start/end times (seconds). Shift-click to play from that word onward. The currently playing word highlights in cyan.</div>';
+
+            var lastSlide = -1, lastSi = -1;
+            for (var i = 0; i < map.length; i++) {
+                var w = map[i];
+                if (w.slideIdx !== lastSlide) {
+                    if (lastSi >= 0) html += '</div>';
+                    if (lastSlide >= 0) html += '</div>';
+                    html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;margin-bottom:10px;">';
+                    html += '<div style="color:#00ccff;font-weight:700;font-size:13px;margin-bottom:8px;">Slide ' + (w.slideIdx + 1) + '</div>';
+                    lastSlide = w.slideIdx;
+                    lastSi = -1;
+                }
+                if (w.si !== lastSi) {
+                    if (lastSi >= 0) html += '</div>';
+                    html += '<div style="margin-bottom:6px;padding:4px 0;' + (lastSi >= 0 ? 'border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;' : '') + '">';
+                    html += '<span style="color:#ff00ff;font-size:10px;font-weight:700;">S' + (w.si + 1) + '</span> ';
+                    html += '<span onclick="event.stopPropagation();matTranscriptPlaySentence(' + w.slideIdx + ',' + w.si + ')" style="cursor:pointer;font-size:10px;color:#a855f7;border:1px solid rgba(168,85,247,0.3);border-radius:4px;padding:1px 6px;margin-left:2px;" title="Test this sentence">▶</span> ';
+                    lastSi = w.si;
+                }
+                html += '<div class="te-word" data-te-wi="' + i + '" style="display:inline-flex;align-items:center;gap:3px;margin:2px 2px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 6px;cursor:pointer;transition:all 0.15s;" onclick="matTranscriptPlayWord(' + i + ', event)">';
+                html += '<span style="color:#fff;font-weight:700;font-size:13px;">' + escapeHtml(w.word) + '</span>';
+                html += '<input type="number" step="0.01" value="' + w.start.toFixed(2) + '" style="width:52px;background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.25);border-radius:3px;color:#0ff;font-size:10px;padding:2px 3px;text-align:center;" data-te-idx="' + i + '" data-te-field="start" onclick="event.stopPropagation()">';
+                html += '<span style="color:#444;font-size:9px;">→</span>';
+                html += '<input type="number" step="0.01" value="' + w.end.toFixed(2) + '" style="width:52px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:3px;color:#a855f7;font-size:10px;padding:2px 3px;text-align:center;" data-te-idx="' + i + '" data-te-field="end" onclick="event.stopPropagation()">';
+                html += '</div>';
+            }
+            if (lastSi >= 0) html += '</div>';
+            if (lastSlide >= 0) html += '</div>';
+            html += '</div>';
+
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+        }
+
+        var matTEPlayingRAF = null;
+        function matTranscriptPlayWord(idx, evt) {
+            if (!matAudioElement || !matAudioSyncData) return;
+            // Read current values from inputs
+            matTranscriptReadInputs();
+            var w = matAudioSyncData.slideMap[idx];
+            matAudioElement.currentTime = w.start;
+            matAudioElement.play();
+            // Shift-click: play from this word onward, otherwise just this word
+            var stopAt = (evt && evt.shiftKey) ? Infinity : w.end + 0.3;
+            matTEHighlightLoop(idx, stopAt);
+        }
+
+        function matTEHighlightLoop(startIdx, stopAt) {
+            if (matTEPlayingRAF) cancelAnimationFrame(matTEPlayingRAF);
+            var map = matAudioSyncData.slideMap;
+            function loop() {
+                var t = matAudioElement.currentTime;
+                if (matAudioElement.paused || t >= stopAt) {
+                    matAudioElement.pause();
+                    document.querySelectorAll('#matTranscriptEditor .te-word').forEach(function(el) {
+                        el.style.background = 'rgba(255,255,255,0.05)';
+                        el.style.borderColor = 'rgba(255,255,255,0.1)';
+                    });
+                    matTEPlayingRAF = null;
+                    return;
+                }
+                // Find current word
+                var curIdx = -1;
+                for (var i = 0; i < map.length; i++) {
+                    if (t >= map[i].start && t < map[i].end) { curIdx = i; break; }
+                }
+                document.querySelectorAll('#matTranscriptEditor .te-word').forEach(function(el) {
+                    var wi = parseInt(el.getAttribute('data-te-wi'));
+                    if (wi === curIdx) {
+                        el.style.background = 'rgba(0,255,255,0.2)';
+                        el.style.borderColor = 'rgba(0,255,255,0.5)';
+                    } else {
+                        el.style.background = 'rgba(255,255,255,0.05)';
+                        el.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                });
+                matTEPlayingRAF = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function matTranscriptReadInputs() {
+            var inputs = document.querySelectorAll('#matTranscriptEditor input[data-te-idx]');
+            inputs.forEach(function(input) {
+                var idx = parseInt(input.getAttribute('data-te-idx'));
+                var field = input.getAttribute('data-te-field');
+                var val = parseFloat(input.value);
+                if (!isNaN(val) && val >= 0) {
+                    matAudioSyncData.slideMap[idx][field] = val;
+                }
+            });
+        }
+
+        function matTranscriptTestAll() {
+            if (!matAudioElement) return;
+            matTranscriptReadInputs();
+            matAudioElement.currentTime = 0;
+            matAudioElement.play();
+            matTEHighlightLoop(0, Infinity);
+        }
+
+        function matTranscriptStop() {
+            if (matAudioElement) matAudioElement.pause();
+            if (matTEPlayingRAF) { cancelAnimationFrame(matTEPlayingRAF); matTEPlayingRAF = null; }
+            document.querySelectorAll('#matTranscriptEditor .te-word').forEach(function(el) {
+                el.style.background = 'rgba(255,255,255,0.05)';
+                el.style.borderColor = 'rgba(255,255,255,0.1)';
+            });
+        }
+
+        function matTranscriptSave() {
+            matTranscriptReadInputs();
+            matRenderSlideshow();
+            alert('Transcript timing updated! Use the main 💾 Save button to persist to cloud.');
+        }
+
+        function matTranscriptPlaySentence(slideIdx, si) {
+            if (!matAudioElement || !matAudioSyncData) return;
+            matTranscriptReadInputs();
+            var map = matAudioSyncData.slideMap;
+            var first = -1, last = -1;
+            for (var i = 0; i < map.length; i++) {
+                if (map[i].slideIdx === slideIdx && map[i].si === si) {
+                    if (first < 0) first = i;
+                    last = i;
+                }
+            }
+            if (first < 0) return;
+            matAudioElement.currentTime = map[first].start;
+            matAudioElement.play();
+            matTEHighlightLoop(first, map[last].end + 0.2);
+        }
+
+        function matTranscriptCopyJSON() {
+            if (!matAudioSyncData || !matAudioSyncData.slideMap) { alert('No timing data.'); return; }
+            var json = JSON.stringify(matAudioSyncData.slideMap.map(function(w) {
+                return { slideIdx: w.slideIdx, si: w.si, wi: w.wi, word: w.word, start: Math.round(w.start * 100) / 100, end: Math.round(w.end * 100) / 100 };
+            }));
+            navigator.clipboard.writeText(json).then(function() {
+                alert('Timing JSON copied to clipboard! (' + matAudioSyncData.slideMap.length + ' words)');
+            }).catch(function() {
+                // Fallback: show in a textarea
+                var ta = document.createElement('textarea');
+                ta.value = json;
+                ta.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80vw;height:60vh;z-index:999999;font-size:11px;background:#111;color:#0ff;border:2px solid #0ff;padding:10px;border-radius:8px;';
+                document.body.appendChild(ta);
+                ta.select();
+                alert('Copy the text manually (Ctrl+C), then click anywhere to close.');
+                ta.addEventListener('blur', function() { ta.remove(); });
+            });
+        }
+
+        function matTranscriptClose() {
+            matTranscriptStop();
+            document.getElementById('matTranscriptEditor').remove();
+        }
     </script>
 </body>
 </html>
