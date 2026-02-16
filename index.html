@@ -1298,8 +1298,7 @@
                     <button class="nav-tab" onclick="showAdminTab('materials')">📖 Materials</button>
                     <button class="nav-tab" onclick="showAdminTab('tuesdayreading')">📖 Tuesday Reading</button>
                     <button class="nav-tab" onclick="showAdminTab('slotmanager')">📅 Slot Manager</button>
-                    <button class="nav-tab" onclick="showAdminTab('suggestions')">💡 Suggestions</button>
-                    <button class="nav-tab" onclick="showAdminTab('ready')">✅ Ready</button>
+                    <button class="nav-tab" onclick="showAdminTab('oneclass')" style="border-color: #ff9800; color: #ff9800; background: rgba(255,152,0,0.2);">🎟️ 1 Class Pass</button>
                     <button class="nav-tab" onclick="showAdminTab('accounts')">👤 Account Creation</button>
                     <button class="nav-tab" onclick="showAdminTab('settings')">⚙️ Settings</button>
                 </div>
@@ -2029,63 +2028,6 @@
                     <div class="mat-expanded-hint">Click a word to hear it · Hover for translation</div>
                 </div>
 
-                <div id="adminTabSuggestions" class="tab-content">
-                    <div class="card">
-                        <h3>💡 Teacher Suggestions</h3>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Review and respond to suggestions from teachers.</p>
-                        <div id="adminSuggestionsContainer"><p style="color: #888; font-size: 12px;">No suggestions yet.</p></div>
-                    </div>
-                </div>
-
-                <!-- Ready Tab -->
-                <div id="adminTabReady" class="tab-content">
-                    <div class="card">
-                        <h3>✅ Ready for Account</h3>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Students who have completed Lesson 3 and requested their account. Check off students after creating their account.</p>
-                        
-                        <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn btn-info" onclick="loadReadyRequests()">🔄 Refresh Requests</button>
-                        </div>
-                        
-                        <!-- Dashboard Stats -->
-                        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
-                            <div style="background: rgba(0,255,255,0.2); border: 2px solid #00ffff; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
-                                <div style="font-size: 20px; color: #00ffff; font-weight: bold;" id="statTotalReady">0</div>
-                                <div style="font-size: 11px; color: #888;">TOTAL REQUESTS</div>
-                            </div>
-                            <div style="background: rgba(255,152,0,0.2); border: 2px solid #ff9800; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
-                                <div style="font-size: 20px; color: #ff9800; font-weight: bold;" id="statPendingReady">0</div>
-                                <div style="font-size: 11px; color: #888;">PENDING</div>
-                            </div>
-                            <div style="background: rgba(57,255,20,0.2); border: 2px solid #39ff14; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
-                                <div style="font-size: 20px; color: #39ff14; font-weight: bold;" id="statCompletedReady">0</div>
-                                <div style="font-size: 11px; color: #888;">COMPLETED</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Filter -->
-                        <div style="margin-bottom: 15px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
-                                <div style="flex: 1; min-width: 200px;">
-                                    <input type="text" id="readySearch" placeholder="🔍 Search by name or email..." oninput="filterReadyRequests()" style="width: 100%;">
-                                </div>
-                                <div>
-                                    <select id="readyFilter" onchange="filterReadyRequests()">
-                                        <option value="all">All Requests</option>
-                                        <option value="pending">Pending Only</option>
-                                        <option value="completed">Completed Only</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Ready List -->
-                        <div id="readyRequestsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px;">
-                            <p style="color: #888; font-size: 12px;">Click "Refresh Requests" to load student requests...</p>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Slot Manager Tab -->
                 <div id="adminTabSlotmanager" class="tab-content">
                     <div class="card">
@@ -2189,6 +2131,108 @@
                             <button class="btn btn-success" onclick="saveClassTemplate()">💾 Save Template</button>
                             <button class="btn btn-info" onclick="previewClassTemplate()">👁️ Preview</button>
                             <button class="btn btn-danger" onclick="deleteClassTemplate()" style="margin-left: auto;">🗑️ Delete Template</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1 Class Pass Tab -->
+                <div id="adminTabOneclass" class="tab-content">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                            <h3 style="color: #ff9800; border-bottom-color: #ff9800;">🎟️ 1 Class Pass Manager</h3>
+                            <button class="btn btn-sm" onclick="openCreateOneClassModal()" style="background: linear-gradient(135deg, #ff9800, #f57c00); color: #000;">+ New Class</button>
+                        </div>
+
+                        <!-- Summary Stats -->
+                        <div class="schedule-summary" style="margin-bottom: 20px;" id="oneClassStats">
+                            <div class="summary-box" style="border-color: #ff9800;"><div class="summary-number" id="ocStatTotal" style="color: #ff9800;">0</div><div class="summary-label">TOTAL CLASSES</div></div>
+                            <div class="summary-box" style="border-color: #39ff14;"><div class="summary-number" id="ocStatActive" style="color: #39ff14;">0</div><div class="summary-label">ACTIVE</div></div>
+                            <div class="summary-box" style="border-color: #ff3366;"><div class="summary-number" id="ocStatExpired" style="color: #ff3366;">0</div><div class="summary-label">EXPIRED</div></div>
+                            <div class="summary-box" style="border-color: #00ffff;"><div class="summary-number" id="ocStatStudents" style="color: #00ffff;">0</div><div class="summary-label">TOTAL STUDENTS</div></div>
+                            <div class="summary-box" style="border-color: #ff00ff;"><div class="summary-number" id="ocStatConverted" style="color: #ff00ff;">0</div><div class="summary-label">CONVERTED</div></div>
+                        </div>
+
+                        <!-- Conversions & Attendance Toggle -->
+                        <div style="margin-bottom: 18px;">
+                            <button class="btn btn-sm" onclick="toggleOCInsights()" id="ocInsightsToggle" style="background: rgba(255,0,255,0.2); color: #ff88ff; border: 1px solid rgba(255,0,255,0.4); width: 100%;">📊 Conversions & Attendance ▼</button>
+                            <div id="ocInsightsPanel" style="display: none; margin-top: 10px;">
+                                <!-- Tab switcher -->
+                                <div style="display: flex; gap: 5px; margin-bottom: 12px;">
+                                    <button class="btn btn-sm ocInsightTab active" onclick="switchOCInsightTab('perclass')" id="ocTabPerclass" style="flex: 1; font-size: 11px;">Per Class</button>
+                                    <button class="btn btn-sm ocInsightTab" onclick="switchOCInsightTab('cumulative')" id="ocTabCumulative" style="flex: 1; font-size: 11px;">Cumulative</button>
+                                </div>
+                                <div id="ocInsightsContent"></div>
+                            </div>
+                        </div>
+
+                        <!-- Classes List -->
+                        <div id="oneClassList"><p style="color: #888; font-size: 12px;">Loading...</p></div>
+                    </div>
+                </div>
+
+                <!-- 1 Class Pass Modals -->
+                <div class="modal-overlay" id="createOneClassModal">
+                    <div class="modal" style="max-width: 650px; max-height: 90vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeModal('createOneClassModal')">✕</button>
+                        <h3 class="modal-title" style="color: #ff9800;">🎟️ Create 1 Class Pass</h3>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="form-group">
+                                <label>Class Name *</label>
+                                <input type="text" id="ocClassName" placeholder="e.g. Beginner Trial Class">
+                            </div>
+                            <div class="form-group">
+                                <label>Date *</label>
+                                <input type="date" id="ocClassDate" style="color-scheme: dark; cursor: pointer;">
+                            </div>
+                            <div class="form-group">
+                                <label>Day</label>
+                                <select id="ocClassDay" onchange="onOCDayChange()">
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Friday">Friday</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Time (EST) *</label>
+                                <input type="text" id="ocClassTime" value="8:00 PM" readonly style="background: rgba(0,0,0,0.6); color: #ff9800; cursor: not-allowed;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Notes (optional)</label>
+                            <textarea id="ocClassNotes" rows="2" placeholder="Any extra notes..."></textarea>
+                        </div>
+
+                        <!-- Shopify Listing Preview -->
+                        <div style="background: rgba(255,152,0,0.1); border: 2px solid #ff9800; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <label style="color: #ff9800; font-weight: bold;">📋 Shopify Listing Preview</label>
+                                <button class="btn btn-sm" onclick="copyOneClassListing()" style="background: #39ff14; color: #000;">📋 Copy</button>
+                            </div>
+                            <pre id="ocListingPreview" style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 5px; white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow-y: auto; color: #e2e8f0;">Fill in the fields above to generate a listing...</pre>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="btn btn-success" onclick="saveOneClass()" style="flex: 1;">💾 Create Class</button>
+                            <button class="btn btn-secondary" onclick="closeModal('createOneClassModal')">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Student to 1 Class Pass Modal -->
+                <div class="modal-overlay" id="addOCStudentModal">
+                    <div class="modal" style="max-width: 500px;">
+                        <button class="modal-close" onclick="closeModal('addOCStudentModal')">✕</button>
+                        <h3 class="modal-title" style="color: #ff9800;">👤 Add Student</h3>
+                        <input type="hidden" id="ocStudentClassId">
+                        <input type="hidden" id="ocStudentEditId">
+                        <div class="form-group"><label>Full Name *</label><input type="text" id="ocStudentName" placeholder="Student name"></div>
+                        <div class="form-group"><label>Email</label><input type="email" id="ocStudentEmail" placeholder="student@email.com"></div>
+                        <div class="form-group"><label>Phone</label><input type="text" id="ocStudentPhone" placeholder="+1 234 567 8900"></div>
+                        <div class="form-group"><label>Discord Username</label><input type="text" id="ocStudentDiscord" placeholder="username#1234"></div>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="btn btn-success" onclick="saveOCStudent()" style="flex: 1;" id="ocStudentSaveBtn">➕ Add Student</button>
+                            <button class="btn btn-secondary" onclick="closeModal('addOCStudentModal')">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -2360,7 +2404,7 @@
                     <button class="nav-tab" onclick="showTeacherTab('attendance')">📊 Attendance</button>
                     <button class="nav-tab" onclick="showTeacherTab('completed')">✅ Completed</button>
                     <button class="nav-tab" onclick="showTeacherTab('materials')">📖 Materials</button>
-                    <button class="nav-tab" onclick="showTeacherTab('suggestions')">💡 Suggestions</button>
+
                 </div>
                 
                 <!-- Today Tab -->
@@ -2482,36 +2526,6 @@
                     </div>
                 </div>
                 
-                <div id="teacherTabSuggestions" class="tab-content">
-                    <div class="card">
-                        <h3>💡 Submit a Suggestion</h3>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Share your ideas to help improve our classes and system.</p>
-                        <div id="suggestionFormMessage"></div>
-                        <div class="form-group">
-                            <label>Suggestion Title</label>
-                            <input type="text" id="suggestionTitle" placeholder="Brief title for your suggestion">
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea id="suggestionDescription" rows="4" placeholder="Describe your suggestion in detail..." style="width: 100%; font-family: 'Noto Sans', sans-serif; font-size: 12px; padding: 10px; background: #1a1a2e; color: #fff; border: 2px solid #333; border-radius: 5px; resize: vertical;"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Priority Level</label>
-                            <div style="display: flex; gap: 10px; margin-top: 8px;">
-                                <button type="button" class="priority-btn" id="priorityHigh" onclick="selectPriority('high')">🔴 High</button>
-                                <button type="button" class="priority-btn" id="priorityMid" onclick="selectPriority('mid')">🟡 Mid</button>
-                                <button type="button" class="priority-btn" id="priorityLow" onclick="selectPriority('low')">🟢 Low</button>
-                            </div>
-                            <input type="hidden" id="suggestionPriority" value="">
-                        </div>
-                        <button class="btn btn-success" onclick="submitSuggestion()">📤 Submit Suggestion</button>
-                    </div>
-                    
-                    <div class="card" style="margin-top: 20px;">
-                        <h3>📋 My Previous Suggestions</h3>
-                        <div id="teacherSuggestionsContainer"><p style="color: #888; font-size: 12px;">No suggestions submitted yet.</p></div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -4536,11 +4550,10 @@
             if (tab === 'checkin') { console.log('Check-in tab opened'); updateCheckinWeekDisplay(); loadCheckinData(); }
             if (tab === 'outreach') { loadOutreachAnalytics(); }
             if (tab === 'movehistory') { loadMoveHistory(); }
-            if (tab === 'suggestions') loadAdminSuggestions();
             if (tab === 'proposals') { loadProposals(); renderAvailableStudentsForProposals(); }
-            if (tab === 'ready') loadReadyRequests();
             if (tab === 'dashboard') loadTeacherButtonsForAdmin();
             if (tab === 'slotmanager') initSlotManager();
+            if (tab === 'oneclass') loadOneClassPasses();
             if (tab === 'tuesdayreading') initTuesdayReadingTab();
             if (tab === 'accounts') {
                 // Smart loading - use cache if available, otherwise show load controls
@@ -4579,7 +4592,6 @@
             if (tab === 'materials') loadTeacherMaterials();
             if (tab === 'schedule') renderTeacherSchedule();
             if (tab === 'calendar') renderTeacherCalendar();
-            if (tab === 'suggestions') loadTeacherSuggestions();
             if (tab === 'today') loadTodayClasses();
             if (tab === 'completed') loadTeacherCompletedClasses();
         }
@@ -22834,196 +22846,6 @@ Return ONLY valid JSON (single object, not array):
             await reclassProposal(proposalId);
         }
 
-        // ==================== SUGGESTIONS ====================
-        
-        let selectedPriority = '';
-        
-        function selectPriority(priority) {
-            selectedPriority = priority;
-            document.getElementById('suggestionPriority').value = priority;
-            
-            // Update button styles
-            ['priorityHigh', 'priorityMid', 'priorityLow'].forEach(id => {
-                document.getElementById(id).classList.remove('selected');
-            });
-            
-            const btnId = priority === 'high' ? 'priorityHigh' : priority === 'mid' ? 'priorityMid' : 'priorityLow';
-            document.getElementById(btnId).classList.add('selected');
-        }
-        
-        async function submitSuggestion() {
-            const title = document.getElementById('suggestionTitle').value.trim();
-            const description = document.getElementById('suggestionDescription').value.trim();
-            const priority = document.getElementById('suggestionPriority').value;
-            
-            if (!title) { showMessage('suggestionFormMessage', 'Please enter a title', 'error'); return; }
-            if (!description) { showMessage('suggestionFormMessage', 'Please enter a description', 'error'); return; }
-            if (!priority) { showMessage('suggestionFormMessage', 'Please select a priority level', 'error'); return; }
-            
-            // Get teacher ID (stored as odId for teachers)
-            const teacherId = currentUser.odId || currentUser.id || currentUser.uid;
-            
-            try {
-                await db.collection('scheduler_suggestions').add({
-                    title,
-                    description,
-                    priority,
-                    status: 'pending',
-                    teacherId: teacherId,
-                    teacherName: currentUser.name,
-                    adminResponse: null,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    respondedAt: null
-                });
-                
-                showMessage('suggestionFormMessage', 'Suggestion submitted successfully!', 'success');
-                
-                // Reset form
-                document.getElementById('suggestionTitle').value = '';
-                document.getElementById('suggestionDescription').value = '';
-                document.getElementById('suggestionPriority').value = '';
-                selectedPriority = '';
-                ['priorityHigh', 'priorityMid', 'priorityLow'].forEach(id => {
-                    document.getElementById(id).classList.remove('selected');
-                });
-                
-                // Reload suggestions list
-                loadTeacherSuggestions();
-            } catch (e) {
-                showMessage('suggestionFormMessage', 'Error: ' + e.message, 'error');
-            }
-        }
-        
-        async function loadTeacherSuggestions() {
-            const container = document.getElementById('teacherSuggestionsContainer');
-            if (!container || !currentUser) return;
-            
-            // Get teacher ID (stored as odId for teachers)
-            const teacherId = currentUser.odId || currentUser.id || currentUser.uid;
-            
-            try {
-                const snap = await db.collection('scheduler_suggestions')
-                    .where('teacherId', '==', teacherId)
-                    .orderBy('createdAt', 'desc')
-                    .get();
-                
-                if (snap.empty) {
-                    container.innerHTML = '<p style="color: #888; font-size: 12px;">No suggestions submitted yet.</p>';
-                    return;
-                }
-                
-                container.innerHTML = snap.docs.map(doc => {
-                    const s = doc.data();
-                    const date = s.createdAt ? new Date(s.createdAt.toDate()).toLocaleDateString() : 'N/A';
-                    const priorityLabel = s.priority === 'high' ? '🔴 High' : s.priority === 'mid' ? '🟡 Mid' : '🟢 Low';
-                    const statusLabel = s.status === 'pending' ? 'Pending Review' : s.status === 'approved' ? 'Approved ✓' : 'Declined';
-                    
-                    return `
-                        <div class="suggestion-card priority-${s.priority}">
-                            <div class="suggestion-header">
-                                <div class="suggestion-title">${s.title}</div>
-                                <span class="suggestion-priority ${s.priority}">${priorityLabel}</span>
-                            </div>
-                            <div class="suggestion-body">${s.description}</div>
-                            <div class="suggestion-meta">
-                                <span>Submitted: ${date}</span>
-                                <span class="suggestion-status ${s.status}">${statusLabel}</span>
-                            </div>
-                            ${s.adminResponse ? `
-                                <div style="margin-top: 10px; padding: 10px; background: rgba(0,255,255,0.1); border-radius: 5px;">
-                                    <p style="font-size: 11px; color: #00ffff; margin-bottom: 5px;">📬 Admin Response:</p>
-                                    <p style="font-size: 12px; color: #ccc;">${s.adminResponse}</p>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error('Error loading teacher suggestions:', e);
-                container.innerHTML = '<p style="color: #ff3366; font-size: 12px;">Error loading suggestions.</p>';
-            }
-        }
-        
-        async function loadAdminSuggestions() {
-            const container = document.getElementById('adminSuggestionsContainer');
-            if (!container) return;
-            
-            try {
-                const snap = await db.collection('scheduler_suggestions')
-                    .orderBy('createdAt', 'desc')
-                    .get();
-                
-                if (snap.empty) {
-                    container.innerHTML = '<p style="color: #888; font-size: 12px;">No suggestions yet.</p>';
-                    return;
-                }
-                
-                container.innerHTML = snap.docs.map(doc => {
-                    const s = doc.data();
-                    const date = s.createdAt ? new Date(s.createdAt.toDate()).toLocaleDateString() : 'N/A';
-                    const priorityLabel = s.priority === 'high' ? '🔴 High' : s.priority === 'mid' ? '🟡 Mid' : '🟢 Low';
-                    const statusLabel = s.status === 'pending' ? 'Pending Review' : s.status === 'approved' ? 'Approved ✓' : 'Declined';
-                    
-                    return `
-                        <div class="suggestion-card priority-${s.priority}">
-                            <div class="suggestion-header">
-                                <div class="suggestion-title">${s.title}</div>
-                                <span class="suggestion-priority ${s.priority}">${priorityLabel}</span>
-                            </div>
-                            <div class="suggestion-body">${s.description}</div>
-                            <div class="suggestion-meta">
-                                <span>👨‍🏫 ${s.teacherName} • ${date}</span>
-                                <span class="suggestion-status ${s.status}">${statusLabel}</span>
-                            </div>
-                            ${s.status === 'pending' ? `
-                                <div class="suggestion-actions">
-                                    <button class="btn btn-sm btn-success" onclick="respondToSuggestion('${doc.id}', 'approved')">✓ Approve</button>
-                                    <button class="btn btn-sm btn-danger" onclick="respondToSuggestion('${doc.id}', 'declined')">✗ Decline</button>
-                                </div>
-                            ` : `
-                                ${s.adminResponse ? `
-                                    <div style="margin-top: 10px; padding: 10px; background: rgba(0,255,255,0.1); border-radius: 5px;">
-                                        <p style="font-size: 11px; color: #00ffff; margin-bottom: 5px;">📬 Your Response:</p>
-                                        <p style="font-size: 12px; color: #ccc;">${s.adminResponse}</p>
-                                    </div>
-                                ` : ''}
-                            `}
-                        </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error('Error loading admin suggestions:', e);
-                container.innerHTML = '<p style="color: #ff3366; font-size: 12px;">Error loading suggestions.</p>';
-            }
-        }
-        
-        async function respondToSuggestion(suggestionId, status) {
-            let adminResponse = '';
-            
-            if (status === 'approved') {
-                adminResponse = prompt('Add a message (optional):', 'Approved! We will work on this.');
-                if (adminResponse === null) return; // Cancelled
-                if (!adminResponse) adminResponse = 'Approved! We will work on this.';
-            } else {
-                adminResponse = prompt('Reason for declining:', 'After careful consideration, it would take too many resources for this.');
-                if (adminResponse === null) return; // Cancelled
-                if (!adminResponse) adminResponse = 'After careful consideration, it would take too many resources for this.';
-            }
-            
-            try {
-                await db.collection('scheduler_suggestions').doc(suggestionId).update({
-                    status,
-                    adminResponse,
-                    respondedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                loadAdminSuggestions();
-            } catch (e) {
-                console.error('Error responding to suggestion:', e);
-                alert('Error: ' + e.message);
-            }
-        }
-
         // ==================== VIDEO RECORDING ====================
         
         let mediaRecorder = null;
@@ -23166,192 +22988,529 @@ Return ONLY valid JSON (single object, not array):
             }
         }
 
-        // ==================== READY TAB FUNCTIONS ====================
-        
-        let allReadyRequests = [];
-        let filteredReadyRequests = [];
+        // ==================== 1 CLASS PASS FUNCTIONS ====================
 
-        async function loadReadyRequests() {
-            const listDiv = document.getElementById('readyRequestsList');
-            listDiv.innerHTML = '<p style="color: #00ffff; font-size: 13px;"><span style="display: inline-block; width: 12px; height: 12px; border: 2px solid #00ffff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span> Loading requests...</p>';
+        let oneClassData = [];
+
+        async function loadOneClassPasses() {
+            const listDiv = document.getElementById('oneClassList');
+            if (!listDiv) return;
+            listDiv.innerHTML = '<p style="color: #888; font-size: 12px;">Loading classes...</p>';
 
             try {
-                const snapshot = await db.collection('account_ready_requests')
-                    .orderBy('submittedAt', 'desc')
-                    .get();
-                
-                allReadyRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                filteredReadyRequests = [...allReadyRequests];
-                
-                updateReadyDashboard();
-                renderReadyRequests();
-                
+                const snap = await db.collection('one_class_passes').orderBy('classDate', 'desc').get();
+                oneClassData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderOneClassList();
+                updateOneClassStats();
             } catch (error) {
-                console.error('Error loading ready requests:', error);
-                listDiv.innerHTML = `<p style="color: #ff3366; font-size: 13px;">Error: ${error.message}</p>`;
+                console.error('Error loading 1 class passes:', error);
+                listDiv.innerHTML = `<p style="color: #ff3366;">Error: ${error.message}</p>`;
             }
         }
 
-        function updateReadyDashboard() {
-            const total = allReadyRequests.length;
-            const pending = allReadyRequests.filter(r => !r.checkedOff).length;
-            const completed = allReadyRequests.filter(r => r.checkedOff).length;
-            
-            document.getElementById('statTotalReady').textContent = total;
-            document.getElementById('statPendingReady').textContent = pending;
-            document.getElementById('statCompletedReady').textContent = completed;
+        let ocInsightTab = 'perclass';
+
+        function toggleOCInsights() {
+            const panel = document.getElementById('ocInsightsPanel');
+            const btn = document.getElementById('ocInsightsToggle');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.innerHTML = '📊 Conversions & Attendance ▲';
+                renderOCInsights();
+            } else {
+                panel.style.display = 'none';
+                btn.innerHTML = '📊 Conversions & Attendance ▼';
+            }
         }
 
-        function filterReadyRequests() {
-            const searchTerm = document.getElementById('readySearch').value.toLowerCase();
-            const filter = document.getElementById('readyFilter').value;
-
-            filteredReadyRequests = allReadyRequests.filter(r => {
-                const matchesSearch = (r.fullName || '').toLowerCase().includes(searchTerm) || 
-                                     (r.email || '').toLowerCase().includes(searchTerm);
-                
-                let matchesFilter = true;
-                if (filter === 'pending') matchesFilter = !r.checkedOff;
-                if (filter === 'completed') matchesFilter = r.checkedOff;
-
-                return matchesSearch && matchesFilter;
+        function switchOCInsightTab(tab) {
+            ocInsightTab = tab;
+            document.querySelectorAll('.ocInsightTab').forEach(t => {
+                t.classList.remove('active');
+                t.style.background = 'rgba(255,255,255,0.05)';
+                t.style.color = '#888';
+                t.style.border = '1px solid #444';
             });
-
-            renderReadyRequests();
+            const activeBtn = document.getElementById(tab === 'perclass' ? 'ocTabPerclass' : 'ocTabCumulative');
+            activeBtn.classList.add('active');
+            activeBtn.style.background = 'rgba(255,0,255,0.3)';
+            activeBtn.style.color = '#ff88ff';
+            activeBtn.style.border = '1px solid #ff00ff';
+            renderOCInsights();
         }
 
-        function renderReadyRequests() {
-            const listDiv = document.getElementById('readyRequestsList');
-
-            if (filteredReadyRequests.length === 0) {
-                listDiv.innerHTML = '<p style="font-size: 13px; color: #888; grid-column: 1/-1;">No requests found.</p>';
-                return;
-            }
+        function buildInsightBlock(label, students, isOverall) {
+            const total = students.length;
+            const attended = students.filter(s => s.attended).length;
+            const converted = students.filter(s => s.converted).length;
+            const convRate = total > 0 ? Math.round((converted / total) * 100) : 0;
+            const attRate = total > 0 ? Math.round((attended / total) * 100) : 0;
+            const rateColor = convRate >= 25 ? '#39ff14' : convRate >= 15 ? '#ffff00' : '#ff9800';
 
             let html = '';
-            filteredReadyRequests.forEach(r => {
-                const isChecked = r.checkedOff;
-                const borderColor = isChecked ? '#39ff14' : '#ff9800';
-                const statusBadge = isChecked 
-                    ? '<span style="background: #39ff14; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px;">✅ ACCOUNT CREATED</span>'
-                    : '<span style="background: #ff9800; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px;">⏳ PENDING</span>';
-                
-                const submittedDate = r.submittedAt ? new Date(r.submittedAt.toDate()).toLocaleString() : 'N/A';
-                
-                const checkboxChecked = isChecked ? 'checked' : '';
-                
-                html += `
-                    <div style="background: rgba(0,0,0,0.5); border: 2px solid ${borderColor}; border-radius: 8px; padding: 15px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" ${checkboxChecked} onchange="toggleReadyCheckbox('${r.id}', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
-                                <span style="color: #00ffff; font-size: 14px;">${r.fullName || 'Unknown'}</span>
-                            </div>
-                            ${statusBadge}
-                        </div>
-                        <div style="font-size: 12px; color: #888; margin-bottom: 5px;">📧 ${r.email || 'No email'}</div>
-                        <div style="font-size: 11px; color: #666; margin-bottom: 10px;">📅 Submitted: ${submittedDate}</div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-                            <button class="btn btn-info btn-sm" onclick="generatePasswordForReady('${r.id}')">
-                                🔑 PW GEN
-                            </button>
-                            <span id="pwDisplay_${r.id}" style="font-size: 13px; color: #39ff14; padding: 5px 10px; background: rgba(0,0,0,0.5); border-radius: 4px; display: none;"></span>
-                            <button class="btn btn-sm" style="background: #666;" onclick="copyReadyInfo('${escapeHtmlForAcct(r.fullName || '')}', '${escapeHtmlForAcct(r.email || '')}')">
-                                📋 COPY INFO
-                            </button>
-                            <button class="btn btn-success btn-sm" onclick="completeReadyRequest('${r.id}', '${escapeHtmlForAcct(r.fullName || '')}')">
-                                ✅ COMPLETE
-                            </button>
-                        </div>
+            if (label) {
+                html += `<div style="color: #ff9800; font-size: 13px; font-weight: 600; margin-bottom: 6px;">${label}</div>`;
+            }
+
+            html += `<div style="background: rgba(0,0,0,0.3); border: 1px solid ${rateColor}; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <span style="color: ${rateColor}; font-size: 20px; font-weight: 700;">${convRate}%</span>
+                        <span style="color: #888; font-size: 11px; margin-left: 5px;">conversion</span>
+                        <span style="color: #555; font-size: 10px; margin-left: 3px;">(${converted}/${total})</span>
                     </div>
-                `;
-            });
-            
-            listDiv.innerHTML = html;
+                    <div>
+                        <span style="color: #00ffff; font-size: 15px; font-weight: 600;">${attRate}%</span>
+                        <span style="color: #888; font-size: 11px; margin-left: 4px;">attendance</span>
+                        <span style="color: #555; font-size: 10px; margin-left: 3px;">(${attended}/${total})</span>
+                    </div>
+                </div>
+            </div>`;
+
+            // Suggestions
+            let suggestions = [];
+            if (convRate < 5 && total >= 5) {
+                suggestions.push({ icon: '🚨', color: '#ff3366', text: 'Conversion is very low. Consider significantly raising filter requirements — only allow students who have shown real commitment (e.g. completed homework, active in Discord, responded to outreach).' });
+            } else if (convRate < 10 && total >= 5) {
+                suggestions.push({ icon: '⚠️', color: '#ff9800', text: 'Conversion is below 10%. Try raising filter requirements — pre-screen students for genuine interest level before giving a free pass.' });
+            } else if (convRate < 15 && total >= 5) {
+                suggestions.push({ icon: '💡', color: '#ffff00', text: 'Conversion is below 15%. Consider tightening who qualifies for a class pass. Require a short application or intro message to filter out low-intent signups.' });
+            } else if (convRate >= 25 && total >= 3) {
+                suggestions.push({ icon: '🔥', color: '#39ff14', text: 'Excellent conversion rate! Your filtering and class quality are on point.' });
+            } else if (convRate >= 15 && total >= 3) {
+                suggestions.push({ icon: '👍', color: '#39ff14', text: 'Solid conversion rate — keep refining your follow-up process to push even higher.' });
+            }
+            if (attended > 0 && converted === 0 && total >= 3) {
+                suggestions.push({ icon: '🎯', color: '#00ffff', text: 'Students attended but none converted. Focus on post-class DM follow-up within 24hr with a special offer or next steps.' });
+            }
+
+            if (suggestions.length > 0) {
+                suggestions.forEach(s => {
+                    html += `<div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 5px;">
+                        <span style="font-size: 12px;">${s.icon}</span>
+                        <span style="color: ${s.color}; font-size: 11px; line-height: 1.4;">${s.text}</span>
+                    </div>`;
+                });
+            }
+
+            return html;
         }
 
-        async function completeReadyRequest(requestId, fullName) {
-            if (!confirm(`Mark "${fullName}" as complete and remove from the list?\n\nThis means the account has been created and this request is no longer needed.`)) {
+        function renderOCInsights() {
+            const container = document.getElementById('ocInsightsContent');
+            let html = '';
+
+            // Positive reminder — always show
+            html += `<div style="background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                <span style="font-size: 16px;">💰</span>
+                <div>
+                    <div style="color: #39ff14; font-weight: 600; font-size: 12px;">Remember! Even with 0% conversion, there's a 2x profit per hour.</div>
+                    <div style="color: #8aff8a; font-size: 11px; margin-top: 2px;">Every class pass sold is already profitable. Conversions are the cherry on top. 🍒</div>
+                </div>
+            </div>`;
+
+            if (ocInsightTab === 'cumulative') {
+                const allStudents = [];
+                oneClassData.forEach(c => (c.students || []).forEach(s => allStudents.push(s)));
+                if (allStudents.length === 0) {
+                    html += '<p style="color: #666; font-size: 12px; text-align: center;">No students yet.</p>';
+                } else {
+                    html += buildInsightBlock('All Classes Combined', allStudents, true);
+                }
+            } else {
+                // Per class
+                if (oneClassData.length === 0) {
+                    html += '<p style="color: #666; font-size: 12px; text-align: center;">No classes yet.</p>';
+                } else {
+                    oneClassData.forEach(c => {
+                        const students = c.students || [];
+                        const dateStr = c.classDate ? formatDateInEST(c.classDate, { month: 'short', day: 'numeric' }) : '';
+                        const label = `${escapeHtml(c.className || 'Untitled')}${dateStr ? ' — ' + dateStr : ''} (${students.length} students)`;
+                        if (students.length > 0) {
+                            html += `<div style="margin-bottom: 14px;">${buildInsightBlock(label, students, false)}</div>`;
+                        } else {
+                            html += `<div style="margin-bottom: 10px;">
+                                <div style="color: #ff9800; font-size: 13px; font-weight: 600;">${label}</div>
+                                <p style="color: #555; font-size: 11px; margin-top: 4px;">No students added yet.</p>
+                            </div>`;
+                        }
+                    });
+                }
+            }
+
+            container.innerHTML = html;
+        }
+
+        function updateOneClassStats() {
+            const now = new Date();
+            let totalStudents = 0;
+            let totalAttended = 0;
+            let converted = 0;
+            let active = 0;
+            let expired = 0;
+
+            oneClassData.forEach(c => {
+                const students = c.students || [];
+                totalStudents += students.length;
+                totalAttended += students.filter(s => s.attended).length;
+                converted += students.filter(s => s.converted).length;
+                const deadline = c.deadline ? new Date(c.deadline) : null;
+                if (deadline && deadline < now) { expired++; } else { active++; }
+            });
+
+            document.getElementById('ocStatTotal').textContent = oneClassData.length;
+            document.getElementById('ocStatActive').textContent = active;
+            document.getElementById('ocStatExpired').textContent = expired;
+            document.getElementById('ocStatStudents').textContent = totalStudents;
+            document.getElementById('ocStatConverted').textContent = converted;
+
+            // Refresh insights if panel is open
+            if (document.getElementById('ocInsightsPanel').style.display !== 'none') {
+                renderOCInsights();
+            }
+        }
+
+        function renderOneClassList() {
+            const listDiv = document.getElementById('oneClassList');
+            if (oneClassData.length === 0) {
+                listDiv.innerHTML = '<p style="color: #888; font-size: 13px; text-align: center; padding: 30px;">No classes created yet. Click "+ New Class" to get started.</p>';
                 return;
             }
 
+            const now = new Date();
+            listDiv.innerHTML = oneClassData.map(c => {
+                const students = c.students || [];
+                const attended = students.filter(s => s.attended).length;
+                const convertedCount = students.filter(s => s.converted).length;
+                const deadline = c.deadline ? new Date(c.deadline) : null;
+                const isExpired = deadline && deadline < now;
+                const borderColor = isExpired ? '#ff3366' : '#ff9800';
+                const classDateStr = c.classDate ? formatDateInEST(c.classDate, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'No date';
+                const deadlineStr = deadline ? formatDateInEST(c.deadline, { weekday: 'short', month: 'short', day: 'numeric' }) : 'N/A';
+                const timeConversions = convertTimeToAllZones(c.classTime || '8:30 PM');
+
+                // Calculate days until deadline
+                let daysLeft = null;
+                let deadlineBanner = '';
+                if (deadline) {
+                    const msLeft = deadline.getTime() - now.getTime();
+                    daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+                    
+                    if (isExpired) {
+                        deadlineBanner = `<div style="background: rgba(255,51,102,0.25); border: 2px solid #ff3366; border-radius: 8px; padding: 10px 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 22px;">🚫</span>
+                            <div>
+                                <div style="color: #ff3366; font-size: 14px; font-weight: 700;">DEADLINE PASSED — KICK STUDENTS OUT</div>
+                                <div style="color: #ff6688; font-size: 11px;">Deadline was ${deadlineStr}. Remove unconverted students now.</div>
+                            </div>
+                        </div>`;
+                    } else if (daysLeft <= 0) {
+                        deadlineBanner = `<div style="background: rgba(255,51,102,0.2); border: 2px solid #ff3366; border-radius: 8px; padding: 10px 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; animation: pulse 1.5s ease-in-out infinite;">
+                            <span style="font-size: 22px;">🔥</span>
+                            <div>
+                                <div style="color: #ff3366; font-size: 14px; font-weight: 700;">⚠️ DEADLINE IS TODAY — ${deadlineStr}</div>
+                                <div style="color: #ff6688; font-size: 11px;">Kick unconverted students out today!</div>
+                            </div>
+                        </div>`;
+                    } else if (daysLeft === 1) {
+                        deadlineBanner = `<div style="background: rgba(255,152,0,0.2); border: 2px solid #ff9800; border-radius: 8px; padding: 10px 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 22px;">⏰</span>
+                            <div>
+                                <div style="color: #ff9800; font-size: 14px; font-weight: 700;">1 DAY LEFT — Deadline: ${deadlineStr}</div>
+                                <div style="color: #ffbb55; font-size: 11px;">Follow up with students who haven't converted before time runs out.</div>
+                            </div>
+                        </div>`;
+                    } else if (daysLeft <= 2) {
+                        deadlineBanner = `<div style="background: rgba(255,255,0,0.1); border: 2px solid #ffff00; border-radius: 8px; padding: 10px 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 22px;">⏳</span>
+                            <div>
+                                <div style="color: #ffff00; font-size: 14px; font-weight: 700;">${daysLeft} DAYS LEFT — Deadline: ${deadlineStr}</div>
+                                <div style="color: #aaaa00; font-size: 11px;">Deadline approaching. Make sure to DM unconverted students.</div>
+                            </div>
+                        </div>`;
+                    }
+                }
+
+                let html = `<div style="background: rgba(0,0,0,0.4); border: 2px solid ${borderColor}; border-radius: 10px; padding: 18px; margin-bottom: 15px;">`;
+                html += deadlineBanner;
+                html += `<div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">`;
+                html += `<div>
+                    <div style="font-size: 16px; font-weight: 600; color: #ff9800;">${escapeHtml(c.className || 'Untitled')}</div>
+                    <div style="font-size: 12px; color: #888; margin-top: 4px;">📅 ${classDateStr} • ⏰ ${c.classTime || 'TBD'} EST</div>
+                    <div style="font-size: 11px; color: #666; margin-top: 2px;">👥 ${students.length} students • ✅ ${attended} attended • ⭐ ${convertedCount} converted</div>
+                </div>`;
+                html += `<div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <button class="btn btn-sm" onclick="openAddOCStudentModal('${c.id}')" style="background: #ff9800; color: #000; font-size: 11px;">+ Student</button>
+                    <button class="btn btn-sm" onclick="copyOneClassListingFromData('${c.id}')" style="background: #00ffff; color: #000; font-size: 11px;">📋 Listing</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteOneClass('${c.id}')" style="font-size: 11px;">🗑️</button>
+                </div>`;
+                html += `</div>`;
+
+                // Student list
+                if (students.length > 0) {
+                    html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 12px;">`;
+                    html += `<thead><tr style="border-bottom: 2px solid #ff9800;">
+                        <th style="text-align: left; padding: 6px; color: #ff9800;">Name</th>
+                        <th style="text-align: left; padding: 6px; color: #ff9800;">Email</th>
+                        <th style="text-align: left; padding: 6px; color: #ff9800;">Phone</th>
+                        <th style="text-align: left; padding: 6px; color: #ff9800;">Discord</th>
+                        <th style="text-align: center; padding: 6px; color: #ff9800;">Attended</th>
+                        <th style="text-align: center; padding: 6px; color: #ff9800;">Converted</th>
+                        <th style="text-align: center; padding: 6px; color: #ff9800;">Actions</th>
+                    </tr></thead><tbody>`;
+
+                    students.forEach((s, si) => {
+                        const attendIcon = s.attended ? '✅' : '❌';
+                        const attendColor = s.attended ? '#39ff14' : '#ff3366';
+                        const convertedTag = s.converted ? '<span style="background: #ff00ff; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px;">⭐ CONVERTED</span>' : '<span style="color: #666; font-size: 10px;">—</span>';
+
+                        html += `<tr style="border-bottom: 1px solid #333;">
+                            <td style="padding: 8px; color: #fff;">${escapeHtml(s.name)}</td>
+                            <td style="padding: 8px; color: #aaa;">${escapeHtml(s.email || '—')}</td>
+                            <td style="padding: 8px; color: #aaa;">${escapeHtml(s.phone || '—')}</td>
+                            <td style="padding: 8px; color: #aaa;">${escapeHtml(s.discord || '—')}</td>
+                            <td style="padding: 8px; text-align: center;">
+                                <button onclick="toggleOCAttendance('${c.id}', ${si})" style="background: none; border: none; cursor: pointer; font-size: 16px; color: ${attendColor};">${attendIcon}</button>
+                            </td>
+                            <td style="padding: 8px; text-align: center;">
+                                <button onclick="toggleOCConverted('${c.id}', ${si})" style="background: none; border: none; cursor: pointer;">${convertedTag}</button>
+                            </td>
+                            <td style="padding: 8px; text-align: center;">
+                                <button class="btn btn-sm" onclick="editOCStudent('${c.id}', ${si})" style="font-size: 10px; padding: 3px 8px; background: #555;">✏️</button>
+                                <button class="btn btn-sm" onclick="removeOCStudent('${c.id}', ${si})" style="font-size: 10px; padding: 3px 8px; background: #ff4444;">✕</button>
+                            </td>
+                        </tr>`;
+                    });
+
+                    html += `</tbody></table></div>`;
+                } else {
+                    html += `<p style="color: #666; font-size: 12px; text-align: center; padding: 10px;">No students added yet.</p>`;
+                }
+
+                html += `</div>`;
+                return html;
+            }).join('');
+        }
+
+        // Create One Class
+        function onOCDayChange() {
+            const day = document.getElementById('ocClassDay').value;
+            document.getElementById('ocClassTime').value = day === 'Tuesday' ? '8:00 PM' : '8:45 PM';
+            generateOneClassListing();
+        }
+
+        function buildOneClassListing(name, day, date, time) {
+            const dateStr = date ? formatDateInEST(date, { month: 'long', day: 'numeric' }) : '[Date]';
+            const tz = convertTimeToAllZones(time);
+
+            let daySpecific = '';
+            if (day === 'Tuesday') {
+                daySpecific = `\n✨ WHAT YOU'LL LEARN\nJoin our reading and pronunciation class! Want to improve your reading speed, batchim rules, or aspiration? We've got you.`;
+            } else if (day === 'Friday') {
+                daySpecific = `\n✨ WHAT YOU'LL LEARN\nVocabulary retention and memorization tips.`;
+            }
+
+            return `🎟️ ${name} — FREE 1 Class Pass
+
+📅 ${day}, ${dateStr}
+
+⏰ CLASS TIMES
+• Eastern (EST): ${time}
+• Central (CST): ${tz.CST}
+• Mountain (MST): ${tz.MST}
+• Pacific (PST): ${tz.PST}
+
+📋 DETAILS
+• One-time FREE trial class
+• Live interactive session via Zoom
+• No commitment required
+${daySpecific}
+
+🎓 Try Korean learning with KoreanLearnin!`;
+        }
+
+        function openCreateOneClassModal() {
+            document.getElementById('ocClassName').value = '';
+            document.getElementById('ocClassDate').value = '';
+            document.getElementById('ocClassDay').value = 'Tuesday';
+            document.getElementById('ocClassTime').value = '8:00 PM';
+            document.getElementById('ocClassNotes').value = '';
+            document.getElementById('ocListingPreview').textContent = 'Fill in the fields above to generate a listing...';
+            document.getElementById('createOneClassModal').classList.add('active');
+
+            // Auto-update listing on input
+            ['ocClassName', 'ocClassDate', 'ocClassDay'].forEach(id => {
+                document.getElementById(id).onchange = generateOneClassListing;
+                document.getElementById(id).oninput = generateOneClassListing;
+            });
+        }
+
+        function generateOneClassListing() {
+            const name = document.getElementById('ocClassName').value || '[Class Name]';
+            const date = document.getElementById('ocClassDate').value;
+            const time = document.getElementById('ocClassTime').value;
+            const day = document.getElementById('ocClassDay').value || 'Tuesday';
+
+            document.getElementById('ocListingPreview').textContent = buildOneClassListing(name, day, date, time);
+        }
+
+        function copyOneClassListing() {
+            const text = document.getElementById('ocListingPreview').textContent;
+            navigator.clipboard.writeText(text).then(() => alert('✅ Copied!')).catch(() => prompt('Copy:', text));
+        }
+
+        function copyOneClassListingFromData(classId) {
+            const c = oneClassData.find(x => x.id === classId);
+            if (!c) return;
+            const time = c.classTime || '8:00 PM';
+            const day = c.classDay || 'Tuesday';
+            const name = c.className || 'Trial Class';
+            const listing = buildOneClassListing(name, day, c.classDate, time);
+            navigator.clipboard.writeText(listing).then(() => alert('✅ Listing copied!')).catch(() => prompt('Copy:', listing));
+        }
+
+        async function saveOneClass() {
+            const className = document.getElementById('ocClassName').value.trim();
+            const classDate = document.getElementById('ocClassDate').value;
+            const classTime = document.getElementById('ocClassTime').value;
+            const classDay = document.getElementById('ocClassDay').value;
+            const notes = document.getElementById('ocClassNotes').value.trim();
+
+            if (!className) { alert('Please enter a class name.'); return; }
+            if (!classDate) { alert('Please select a date.'); return; }
+
+            // Deadline = 2 days after class begins
+            const deadlineDate = new Date(classDate + 'T12:00:00');
+            deadlineDate.setDate(deadlineDate.getDate() + 2);
+            const deadline = deadlineDate.toISOString().split('T')[0];
+
             try {
-                await db.collection('account_ready_requests').doc(requestId).delete();
-                
-                // Remove from local arrays
-                allReadyRequests = allReadyRequests.filter(r => r.id !== requestId);
-                filteredReadyRequests = filteredReadyRequests.filter(r => r.id !== requestId);
-                
-                updateReadyDashboard();
-                renderReadyRequests();
-                
-                alert(`✅ "${fullName}" has been removed from the Ready list.`);
-                
+                await db.collection('one_class_passes').add({
+                    className, classDate, classTime, classDay, notes, deadline,
+                    students: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                closeModal('createOneClassModal');
+                loadOneClassPasses();
+                alert('✅ Class created!');
             } catch (error) {
-                console.error('Error completing request:', error);
                 alert('Error: ' + error.message);
             }
         }
 
-        async function toggleReadyCheckbox(requestId, isChecked) {
+        async function deleteOneClass(classId) {
+            if (!confirm('Delete this class and all its students?')) return;
             try {
-                await db.collection('account_ready_requests').doc(requestId).update({
-                    checkedOff: isChecked,
-                    accountCreated: isChecked,
-                    accountCreatedAt: isChecked ? firebase.firestore.FieldValue.serverTimestamp() : null
-                });
-                
-                // Update local data
-                const request = allReadyRequests.find(r => r.id === requestId);
-                if (request) {
-                    request.checkedOff = isChecked;
-                    request.accountCreated = isChecked;
+                await db.collection('one_class_passes').doc(classId).delete();
+                loadOneClassPasses();
+            } catch (error) { alert('Error: ' + error.message); }
+        }
+
+        // Students
+        function openAddOCStudentModal(classId) {
+            document.getElementById('ocStudentClassId').value = classId;
+            document.getElementById('ocStudentEditId').value = '';
+            document.getElementById('ocStudentName').value = '';
+            document.getElementById('ocStudentEmail').value = '';
+            document.getElementById('ocStudentPhone').value = '';
+            document.getElementById('ocStudentDiscord').value = '';
+            document.getElementById('ocStudentSaveBtn').textContent = '➕ Add Student';
+            document.getElementById('addOCStudentModal').classList.add('active');
+        }
+
+        function editOCStudent(classId, studentIndex) {
+            const c = oneClassData.find(x => x.id === classId);
+            if (!c) return;
+            const s = c.students[studentIndex];
+            if (!s) return;
+
+            document.getElementById('ocStudentClassId').value = classId;
+            document.getElementById('ocStudentEditId').value = String(studentIndex);
+            document.getElementById('ocStudentName').value = s.name || '';
+            document.getElementById('ocStudentEmail').value = s.email || '';
+            document.getElementById('ocStudentPhone').value = s.phone || '';
+            document.getElementById('ocStudentDiscord').value = s.discord || '';
+            document.getElementById('ocStudentSaveBtn').textContent = '💾 Update Student';
+            document.getElementById('addOCStudentModal').classList.add('active');
+        }
+
+        async function saveOCStudent() {
+            const classId = document.getElementById('ocStudentClassId').value;
+            const editId = document.getElementById('ocStudentEditId').value;
+            const name = document.getElementById('ocStudentName').value.trim();
+
+            if (!name) { alert('Please enter a name.'); return; }
+
+            const studentData = {
+                name,
+                email: document.getElementById('ocStudentEmail').value.trim(),
+                phone: document.getElementById('ocStudentPhone').value.trim(),
+                discord: document.getElementById('ocStudentDiscord').value.trim(),
+                attended: false,
+                converted: false
+            };
+
+            try {
+                const docRef = db.collection('one_class_passes').doc(classId);
+                const doc = await docRef.get();
+                if (!doc.exists) { alert('Class not found.'); return; }
+
+                const data = doc.data();
+                const students = data.students || [];
+
+                if (editId !== '') {
+                    // Editing existing student — preserve attendance/converted state
+                    const idx = parseInt(editId);
+                    studentData.attended = students[idx]?.attended || false;
+                    studentData.converted = students[idx]?.converted || false;
+                    students[idx] = studentData;
+                } else {
+                    students.push(studentData);
                 }
-                
-                updateReadyDashboard();
-                renderReadyRequests();
-                
-            } catch (error) {
-                console.error('Error updating checkbox:', error);
-                alert('Error updating status: ' + error.message);
-            }
+
+                await docRef.update({ students });
+                closeModal('addOCStudentModal');
+                loadOneClassPasses();
+            } catch (error) { alert('Error: ' + error.message); }
         }
 
-        function generatePasswordForReady(requestId) {
-            // Generate a random password: 2 words + 2 numbers + 1 symbol
-            const words = ['Blue', 'Red', 'Green', 'Star', 'Moon', 'Sun', 'Fire', 'Ice', 'Wind', 'Rain', 'Cloud', 'Wave', 'Rock', 'Tree', 'Bird', 'Fish', 'Bear', 'Wolf', 'Lion', 'Tiger', 'Eagle', 'Hawk', 'Swift', 'Brave', 'Bold', 'Cool', 'Fast', 'Bright', 'Dark', 'Light'];
-            const symbols = ['!', '@', '#', '$', '%', '&', '*'];
-            
-            const word1 = words[Math.floor(Math.random() * words.length)];
-            const word2 = words[Math.floor(Math.random() * words.length)];
-            const num = Math.floor(Math.random() * 90) + 10; // 10-99
-            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-            
-            const password = `${word1}${word2}${num}${symbol}`;
-            
-            // Display the password
-            const pwDisplay = document.getElementById(`pwDisplay_${requestId}`);
-            pwDisplay.textContent = password;
-            pwDisplay.style.display = 'inline-block';
-            
-            // Copy to clipboard
-            navigator.clipboard.writeText(password).then(() => {
-                // Flash green to indicate copied
-                pwDisplay.style.background = 'rgba(57,255,20,0.3)';
-                setTimeout(() => {
-                    pwDisplay.style.background = 'rgba(0,0,0,0.5)';
-                }, 500);
-            });
+        async function removeOCStudent(classId, studentIndex) {
+            if (!confirm('Remove this student?')) return;
+            try {
+                const docRef = db.collection('one_class_passes').doc(classId);
+                const doc = await docRef.get();
+                const students = doc.data().students || [];
+                students.splice(studentIndex, 1);
+                await docRef.update({ students });
+                loadOneClassPasses();
+            } catch (error) { alert('Error: ' + error.message); }
         }
 
-        function copyReadyInfo(fullName, email) {
-            const info = `Name: ${fullName}\nEmail: ${email}`;
-            navigator.clipboard.writeText(info).then(() => {
-                alert('✅ Info copied to clipboard!');
-            });
+        // Attendance & Conversion toggles
+        async function toggleOCAttendance(classId, studentIndex) {
+            try {
+                const docRef = db.collection('one_class_passes').doc(classId);
+                const doc = await docRef.get();
+                const students = doc.data().students || [];
+                students[studentIndex].attended = !students[studentIndex].attended;
+                await docRef.update({ students });
+                loadOneClassPasses();
+            } catch (error) { alert('Error: ' + error.message); }
         }
 
-        // ==================== END READY TAB FUNCTIONS ====================
+        async function toggleOCConverted(classId, studentIndex) {
+            try {
+                const docRef = db.collection('one_class_passes').doc(classId);
+                const doc = await docRef.get();
+                const students = doc.data().students || [];
+                students[studentIndex].converted = !students[studentIndex].converted;
+                await docRef.update({ students });
+                loadOneClassPasses();
+            } catch (error) { alert('Error: ' + error.message); }
+        }
+
+        // ==================== END 1 CLASS PASS FUNCTIONS ====================
 
         // ==================== SLOT MANAGER FUNCTIONS ====================
         
