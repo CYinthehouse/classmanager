@@ -23352,12 +23352,15 @@ ${daySpecific}
             document.getElementById('ocClassDate').value = '';
             document.getElementById('ocClassDay').value = 'Tuesday';
             document.getElementById('ocClassTime').value = '8:00 PM';
+            document.getElementById('ocClassTime').readOnly = true;
+            document.getElementById('ocClassTime').style.cursor = 'not-allowed';
+            document.getElementById('ocClassTime').style.background = 'rgba(0,0,0,0.6)';
             document.getElementById('ocClassNotes').value = '';
             document.getElementById('ocListingPreview').textContent = 'Fill in the fields above to generate a listing...';
             document.getElementById('createOneClassModal').classList.add('active');
 
-            // Auto-update listing on input
-            ['ocClassName', 'ocClassDate', 'ocClassDay', 'ocClassTime'].forEach(id => {
+            // Auto-update listing on input (skip ocClassDay — handled by onOCDayChange)
+            ['ocClassName', 'ocClassDate', 'ocClassTime'].forEach(id => {
                 document.getElementById(id).onchange = generateOneClassListing;
                 document.getElementById(id).oninput = generateOneClassListing;
             });
