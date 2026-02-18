@@ -2190,6 +2190,7 @@
                                 <select id="ocClassDay" onchange="onOCDayChange()">
                                     <option value="Tuesday">Tuesday</option>
                                     <option value="Friday">Friday</option>
+                                    <option value="Sunday">Sunday</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -23295,7 +23296,22 @@ Return ONLY valid JSON (single object, not array):
         // Create One Class
         function onOCDayChange() {
             const day = document.getElementById('ocClassDay').value;
-            document.getElementById('ocClassTime').value = day === 'Tuesday' ? '8:00 PM' : '8:45 PM';
+            const timeInput = document.getElementById('ocClassTime');
+            if (day === 'Tuesday') {
+                timeInput.value = '8:00 PM';
+                timeInput.readOnly = true;
+                timeInput.style.cursor = 'not-allowed';
+                timeInput.style.background = 'rgba(0,0,0,0.6)';
+            } else if (day === 'Friday') {
+                timeInput.value = '8:45 PM';
+                timeInput.readOnly = true;
+                timeInput.style.cursor = 'not-allowed';
+                timeInput.style.background = 'rgba(0,0,0,0.6)';
+            } else {
+                timeInput.readOnly = false;
+                timeInput.style.cursor = 'text';
+                timeInput.style.background = '';
+            }
             generateOneClassListing();
         }
 
@@ -23308,6 +23324,8 @@ Return ONLY valid JSON (single object, not array):
                 daySpecific = `\n✨ WHAT YOU'LL LEARN\nJoin our reading and pronunciation class! Want to improve your reading speed, batchim rules, or aspiration? We've got you.`;
             } else if (day === 'Friday') {
                 daySpecific = `\n✨ WHAT YOU'LL LEARN\nVocabulary retention and memorization tips.`;
+            } else if (day === 'Sunday') {
+                daySpecific = `\n✨ WHAT YOU'LL LEARN\nJoin our reading and pronunciation class! Want to improve your reading speed, batchim rules, or aspiration? We've got you.`;
             }
 
             return `🎟️ ${name} — FREE 1 Class Pass
@@ -23339,7 +23357,7 @@ ${daySpecific}
             document.getElementById('createOneClassModal').classList.add('active');
 
             // Auto-update listing on input
-            ['ocClassName', 'ocClassDate', 'ocClassDay'].forEach(id => {
+            ['ocClassName', 'ocClassDate', 'ocClassDay', 'ocClassTime'].forEach(id => {
                 document.getElementById(id).onchange = generateOneClassListing;
                 document.getElementById(id).oninput = generateOneClassListing;
             });
