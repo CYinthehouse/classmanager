@@ -3404,6 +3404,14 @@
                     <input type="email" id="addActiveManualEmail" placeholder="student@email.com">
                 </div>
                 <div class="form-group">
+                    <label>Phone <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                    <input type="tel" id="addActiveManualPhone" placeholder="Phone number">
+                </div>
+                <div class="form-group">
+                    <label style="color: #7289da;">Discord <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                    <input type="text" id="addActiveManualDiscord" placeholder="Discord username">
+                </div>
+                <div class="form-group">
                     <label>Timezone <span style="color: #888; font-size: 11px;">(Optional)</span></label>
                     <input type="text" id="addActiveManualTimezone" placeholder="e.g. EST, PST, KST" value="EST">
                 </div>
@@ -5480,6 +5488,7 @@
                                 ${teacher ? `<div style="color: #39ff14; font-size: 12px;">👨‍🏫 ${teacher.name}</div><button class="btn btn-sm btn-warning" onclick="unassignTeacher('${c.id}')" style="margin-top: 5px;">Remove</button>` : `<div style="font-size: 11px; color: #888; margin-bottom: 5px;">Teachers:</div><div style="display: flex; gap: 5px; flex-wrap: wrap;">${available.length > 0 ? available.map(t => `<button class="assign-btn" onclick="assignTeacherToClass('${t.id}', '${c.id}')">${t.name}</button>`).join('') : '<span style="color: #ff3366; font-size: 11px;">None</span>'}</div>`}
                             </div>
                             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333; display: flex; gap: 5px;">
+                                <button class="btn btn-sm" onclick="openAddStudentToActiveClassFromClasses('${c.id}')" style="background: linear-gradient(135deg, #39ff14, #20c910); color: #000; font-weight: 700; font-size: 10px;">➕ Add</button>
                                 <button class="btn btn-sm btn-success" onclick="markCourseComplete('${c.id}')" style="flex: 1;">🎓 Complete</button>
                                 <button class="btn btn-sm btn-danger admin-delete-btn" onclick="deleteClass('${c.id}')" title="Delete Class" ${canDelete() ? '' : 'style="display:none;"'}>🗑️</button>
                             </div>
@@ -5497,6 +5506,7 @@
                     const startDate = ps.startDate ? new Date(ps.startDate + 'T00:00:00') : null;
                     const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const enrolledStudents = ps.enrolledStudents || [];
                     
                     // Calculate days until start
                     let daysUntilStart = '';
@@ -5511,6 +5521,25 @@
                         }
                     }
                     
+                    // Build student chips
+                    let studentChipsHtml = '';
+                    if (enrolledStudents.length > 0) {
+                        studentChipsHtml = `
+                            <div class="student-list">${enrolledStudents.map(s => {
+                                const sName = s.name || s.linkedName || 'Unknown';
+                                const isLinked = !!(s.odId || s.id);
+                                return `<div class="student-chip" style="border-color: ${isLinked ? '#ff9800' : '#666'};">${sName}${!isLinked ? ' <span style="font-size:9px;">⚠️</span>' : ''}</div>`;
+                            }).join('')}</div>
+                            <div style="margin-top: 5px; font-size: 11px; color: #888;">${enrolledStudents.length} student${enrolledStudents.length !== 1 ? 's' : ''} enrolled</div>
+                        `;
+                    } else {
+                        studentChipsHtml = `
+                            <div style="text-align: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px; margin-top: 10px;">
+                                <span style="color: #ff9800; font-size: 12px;">⏳ No students enrolled yet</span>
+                            </div>
+                        `;
+                    }
+                    
                     return `
                         <div class="class-card" style="border: 2px solid #ff9800; background: rgba(255,152,0,0.1);">
                             <div class="class-header">
@@ -5521,13 +5550,12 @@
                                 </div>
                                 <span class="level-badge level-${ps.classType}" style="border-color: #ff9800;">${classTypeName}</span>
                             </div>
-                            <div style="text-align: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px; margin-top: 10px;">
-                                <span style="color: #ff9800; font-size: 12px;">⏳ Pre-scheduled - No students yet</span>
-                            </div>
+                            ${studentChipsHtml}
                             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
                                 <div style="color: #39ff14; font-size: 12px;">👨‍🏫 ${ps.teacherName || 'Unassigned'}</div>
                             </div>
                             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333; display: flex; gap: 5px;">
+                                <button class="btn btn-sm btn-success" onclick="openAddStudentToPrescheduleFromClasses('${ps.id}')" style="font-size: 10px;">➕ Add Student</button>
                                 <button class="btn btn-sm btn-warning" onclick="convertPrescheduleToClass('${ps.id}')" style="flex: 1;">📚 Create Class</button>
                                 <button class="btn btn-sm btn-danger" onclick="deletePreschedule('${ps.id}')" title="Cancel Pre-schedule">❌</button>
                             </div>
@@ -24521,6 +24549,7 @@ ${daySpecific}
                 // Refresh the slot details view
                 updateSlotEnrolledStudentsList();
                 renderSlotGrid();
+                renderClasses();
                 
                 showToast(`✅ ${studentName} added!`, 'success');
                 
@@ -24556,6 +24585,27 @@ ${daySpecific}
         
         // ==================== ADD STUDENT TO ACTIVE CLASS (Slot Manager) ====================
         
+        // Bridge function: open add-student modal from Classes tab for an active class
+        function openAddStudentToActiveClassFromClasses(classId) {
+            const cls = allClasses.find(c => c.id === classId);
+            if (!cls) { alert('Class not found.'); return; }
+            
+            const teacher = allTeachers.find(t => t.id === cls.teacherId);
+            // Set selectedSlotInfo so the modal functions work
+            selectedSlotInfo = { day: cls.day, time: cls.time, class: cls, teacher: teacher, prescheduled: null };
+            openAddStudentToActiveClassModal();
+        }
+        
+        // Bridge function: open add-student modal from Classes tab for a prescheduled slot
+        function openAddStudentToPrescheduleFromClasses(prescheduleId) {
+            const ps = allPrescheduledSlots.find(p => p.id === prescheduleId);
+            if (!ps) { alert('Pre-scheduled slot not found.'); return; }
+            
+            const teacher = allTeachers.find(t => t.id === ps.teacherId);
+            selectedSlotInfo = { day: ps.day, time: ps.time, class: null, teacher: teacher, prescheduled: ps };
+            openAddStudentToSlotModal();
+        }
+        
         function openAddStudentToActiveClassModal() {
             if (!selectedSlotInfo?.class) {
                 alert('No active class selected.');
@@ -24578,6 +24628,8 @@ ${daySpecific}
             document.getElementById('addActiveSearchResults').innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search registered students...</p>';
             document.getElementById('addActiveManualName').value = '';
             document.getElementById('addActiveManualEmail').value = '';
+            document.getElementById('addActiveManualPhone').value = '';
+            document.getElementById('addActiveManualDiscord').value = '';
             document.getElementById('addActiveManualTimezone').value = 'EST';
             document.getElementById('addActiveManualRepeat').checked = false;
             
@@ -24740,9 +24792,13 @@ ${daySpecific}
                 
                 closeAddStudentToActiveClassModal();
                 
-                // Refresh slot details
+                // Refresh all views
                 openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
                 renderSlotGrid();
+                renderClasses();
+                renderLimboStudents();
+                updateDashboardStats();
+                if (typeof renderStudentsTable === 'function') renderStudentsTable();
                 
                 showToast(`✅ ${studentName} added to ${cls.day} @ ${cls.time}!`, 'success');
                 
@@ -24766,6 +24822,8 @@ ${daySpecific}
             }
             
             const email = document.getElementById('addActiveManualEmail').value.trim();
+            const phone = document.getElementById('addActiveManualPhone').value.trim();
+            const discord = document.getElementById('addActiveManualDiscord').value.trim();
             const timezone = document.getElementById('addActiveManualTimezone').value.trim() || 'Unknown';
             const isRepeat = document.getElementById('addActiveManualRepeat').checked;
             
@@ -24781,6 +24839,8 @@ ${daySpecific}
                 const studentData = {
                     name: name,
                     email: email || null,
+                    phoneNumber: phone || null,
+                    discord: discord || null,
                     timezone: timezone,
                     status: isRepeat ? 'assigned' : 'assigned',
                     classId: cls.id,
@@ -24824,9 +24884,13 @@ ${daySpecific}
                 
                 closeAddStudentToActiveClassModal();
                 
-                // Refresh slot details
+                // Refresh all views
                 openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
                 renderSlotGrid();
+                renderClasses();
+                renderLimboStudents();
+                updateDashboardStats();
+                if (typeof renderStudentsTable === 'function') renderStudentsTable();
                 
                 showToast(`✅ ${name} added to ${cls.day} @ ${cls.time}!`, 'success');
                 
