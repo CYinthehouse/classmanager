@@ -559,6 +559,9 @@
         .move-student-class { padding: 10px; margin: 5px 0; border: 2px solid #333; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .move-student-class:hover { border-color: #00ffff; background: rgba(0,255,255,0.1); }
         .move-student-class.selected { border-color: #39ff14; background: rgba(57,255,20,0.1); }
+        .addActiveClassTab { background: rgba(255,255,255,0.1); color: #888; border: 1px solid #444; border-radius: 6px; cursor: pointer; transition: all 0.2s; padding: 8px; }
+        .addActiveClassTab.active { background: #00ffff; color: #000; border-color: #00ffff; font-weight: 700; }
+        .addActiveClassTab:hover:not(.active) { background: rgba(255,255,255,0.15); color: #fff; }
         
         /* Calendar Class Picker */
         .calendar-class-option:hover { border-color: #39ff14 !important; background: rgba(57,255,20,0.2) !important; transform: scale(1.02); }
@@ -3252,7 +3255,8 @@
                         <tbody id="slotStudentRosterBody"></tbody>
                     </table>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-success" onclick="openAddStudentToActiveClassModal()" style="background: linear-gradient(135deg, #39ff14, #20c910); color: #000; font-weight: 700;">➕ Add Student</button>
                     <button class="btn btn-sm btn-info" onclick="copyStudentEmails()">📋 Copy Emails</button>
                     <button class="btn btn-sm btn-success" onclick="copyClassInfoEmail()">📧 Copy Class Info Email</button>
                 </div>
@@ -3353,6 +3357,65 @@
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-secondary" onclick="closeAddStudentToSlotModal()">Cancel</button>
                 <button class="btn btn-success" onclick="addStudentToSlotDirectly()" style="flex: 1;">✅ Add Student</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Student to Active Class Modal -->
+    <div class="modal-overlay" id="addStudentToActiveClassModal">
+        <div class="modal" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close" onclick="closeAddStudentToActiveClassModal()">✕</button>
+            <h3 class="modal-title" style="color: #39ff14;">➕ Add Student to Active Class</h3>
+            
+            <div style="background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <p style="font-size: 13px; color: #39ff14; margin: 0; font-weight: 600;" id="addActiveClassInfo">Saturday @ 8:30 PM EST</p>
+                <p style="font-size: 11px; color: #888; margin-top: 4px;" id="addActiveClassLevel">Beginner 1</p>
+                <p style="font-size: 11px; color: #888; margin-top: 2px;" id="addActiveClassStudentCount">3 students enrolled</p>
+            </div>
+            
+            <!-- Tab Toggle: Search Existing vs Add New -->
+            <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                <button class="btn btn-sm addActiveClassTab active" id="addActiveTabSearch" onclick="switchAddActiveClassTab('search')" style="flex: 1; font-size: 11px;">🔍 Search Existing Student</button>
+                <button class="btn btn-sm addActiveClassTab" id="addActiveTabManual" onclick="switchAddActiveClassTab('manual')" style="flex: 1; font-size: 11px;">✏️ Add Manually</button>
+            </div>
+            
+            <!-- Search Existing Student Panel -->
+            <div id="addActiveSearchPanel">
+                <div class="form-group">
+                    <label>Search by Name or Email</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="addActiveSearchInput" placeholder="Type to search..." style="flex: 1;" oninput="searchStudentsForActiveClass()">
+                        <button class="btn btn-info" onclick="searchStudentsForActiveClass()">🔍</button>
+                    </div>
+                </div>
+                <div id="addActiveSearchResults" style="max-height: 300px; overflow-y: auto; margin-top: 10px;">
+                    <p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search registered students...</p>
+                </div>
+            </div>
+            
+            <!-- Manual Add Panel (Hidden by default) -->
+            <div id="addActiveManualPanel" style="display: none;">
+                <div class="form-group">
+                    <label>Student Name *</label>
+                    <input type="text" id="addActiveManualName" placeholder="Enter student's name">
+                </div>
+                <div class="form-group">
+                    <label>Email <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                    <input type="email" id="addActiveManualEmail" placeholder="student@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Timezone <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                    <input type="text" id="addActiveManualTimezone" placeholder="e.g. EST, PST, KST" value="EST">
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                    <input type="checkbox" id="addActiveManualRepeat" style="width: auto;">
+                    <label for="addActiveManualRepeat" style="margin: 0; font-size: 12px; color: #00ffff;">Mark as Repeat Student <span style="color: #888;">(won't count toward enrollment)</span></label>
+                </div>
+                <button class="btn btn-success" onclick="addManualStudentToActiveClass()" style="width: 100%;">✅ Add Student to Class</button>
+            </div>
+            
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn btn-secondary" onclick="closeAddStudentToActiveClassModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -24489,6 +24552,288 @@ ${daySpecific}
         
         function closeAddStudentToSlotModal() {
             document.getElementById('addStudentToSlotModal').classList.remove('active');
+        }
+        
+        // ==================== ADD STUDENT TO ACTIVE CLASS (Slot Manager) ====================
+        
+        function openAddStudentToActiveClassModal() {
+            if (!selectedSlotInfo?.class) {
+                alert('No active class selected.');
+                return;
+            }
+            
+            const cls = selectedSlotInfo.class;
+            const levelName = LEVELS[cls.level] || cls.level || 'Unknown';
+            const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
+            const repeatCount = (cls.students || []).filter(s => s.tags && s.tags.includes('Repeat')).length;
+            const teacher = allTeachers.find(t => t.id === cls.teacherId);
+            
+            document.getElementById('addActiveClassInfo').textContent = `${cls.day} @ ${cls.time} EST — ${teacher?.name || 'No teacher'}`;
+            document.getElementById('addActiveClassLevel').textContent = levelName;
+            document.getElementById('addActiveClassStudentCount').textContent = `${studentCount} students enrolled${repeatCount > 0 ? ` (+${repeatCount} repeat)` : ''}`;
+            
+            // Reset to search tab
+            switchAddActiveClassTab('search');
+            document.getElementById('addActiveSearchInput').value = '';
+            document.getElementById('addActiveSearchResults').innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Enter a name or email to search registered students...</p>';
+            document.getElementById('addActiveManualName').value = '';
+            document.getElementById('addActiveManualEmail').value = '';
+            document.getElementById('addActiveManualTimezone').value = 'EST';
+            document.getElementById('addActiveManualRepeat').checked = false;
+            
+            document.getElementById('addStudentToActiveClassModal').classList.add('active');
+        }
+        
+        function closeAddStudentToActiveClassModal() {
+            document.getElementById('addStudentToActiveClassModal').classList.remove('active');
+        }
+        
+        function switchAddActiveClassTab(tab) {
+            document.getElementById('addActiveSearchPanel').style.display = tab === 'search' ? 'block' : 'none';
+            document.getElementById('addActiveManualPanel').style.display = tab === 'manual' ? 'block' : 'none';
+            document.getElementById('addActiveTabSearch').classList.toggle('active', tab === 'search');
+            document.getElementById('addActiveTabManual').classList.toggle('active', tab === 'manual');
+            
+            // Style active/inactive tabs
+            document.getElementById('addActiveTabSearch').style.background = tab === 'search' ? '#00ffff' : 'rgba(255,255,255,0.1)';
+            document.getElementById('addActiveTabSearch').style.color = tab === 'search' ? '#000' : '#888';
+            document.getElementById('addActiveTabManual').style.background = tab === 'manual' ? '#00ffff' : 'rgba(255,255,255,0.1)';
+            document.getElementById('addActiveTabManual').style.color = tab === 'manual' ? '#000' : '#888';
+        }
+        
+        function searchStudentsForActiveClass() {
+            const searchTerm = (document.getElementById('addActiveSearchInput').value || '').toLowerCase().trim();
+            const resultsContainer = document.getElementById('addActiveSearchResults');
+            
+            if (!searchTerm || searchTerm.length < 2) {
+                resultsContainer.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Type at least 2 characters to search...</p>';
+                return;
+            }
+            
+            const cls = selectedSlotInfo?.class;
+            if (!cls) return;
+            
+            const currentStudentIds = new Set((cls.students || []).map(s => s.id));
+            
+            // Search allStudents (scheduler_students collection)
+            const matches = allStudents.filter(s => {
+                if (currentStudentIds.has(s.id)) return false; // Already in this class
+                const name = (s.name || '').toLowerCase();
+                const email = (s.email || '').toLowerCase();
+                return name.includes(searchTerm) || email.includes(searchTerm);
+            });
+            
+            if (matches.length === 0) {
+                resultsContainer.innerHTML = `
+                    <p style="color: #888; font-size: 12px; text-align: center;">No matching students found for "${searchTerm}"</p>
+                    <button class="btn btn-info" onclick="switchAddActiveClassTab('manual')" style="width: 100%; margin-top: 10px;">✏️ Add Manually Instead</button>
+                `;
+                return;
+            }
+            
+            // Sort: pending/unassigned first, then by name
+            matches.sort((a, b) => {
+                const aStatus = a.status === 'pending' || !a.classId ? 0 : 1;
+                const bStatus = b.status === 'pending' || !b.classId ? 0 : 1;
+                if (aStatus !== bStatus) return aStatus - bStatus;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            
+            let html = '';
+            matches.slice(0, 20).forEach(s => {
+                const name = s.name || 'Unknown';
+                const email = s.email || 'No email';
+                const escapedName = name.replace(/'/g, "\\'");
+                const escapedEmail = email.replace(/'/g, "\\'");
+                const timezone = s.timezone || 'Unknown';
+                const isAssigned = s.classId && s.status !== 'pending';
+                const currentClass = isAssigned ? allClasses.find(c => c.id === s.classId) : null;
+                const currentClassInfo = currentClass ? `${currentClass.day} @ ${currentClass.time} - ${LEVELS[currentClass.level] || currentClass.level}` : '';
+                
+                const statusColor = isAssigned ? '#ff9800' : '#39ff14';
+                const statusLabel = isAssigned ? '⚠️ In another class' : '✅ Available';
+                
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid ${statusColor}30; border-radius: 6px; margin-bottom: 6px; transition: all 0.2s;"
+                         onmouseover="this.style.borderColor='${statusColor}'" onmouseout="this.style.borderColor='${statusColor}30'">
+                        <div style="flex: 1;">
+                            <div style="color: #fff; font-weight: 600; font-size: 13px;">${name}</div>
+                            <div style="color: #888; font-size: 11px;">${email}</div>
+                            <div style="font-size: 10px; color: ${statusColor};">${statusLabel}${currentClassInfo ? ` — ${currentClassInfo}` : ''}</div>
+                        </div>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-success btn-sm" onclick="confirmAddExistingStudentToActiveClass('${s.id}', '${escapedName}', '${timezone}', false)" 
+                                    style="padding: 4px 10px; font-size: 11px;" title="Add to class">➕</button>
+                            <button class="btn btn-sm" onclick="confirmAddExistingStudentToActiveClass('${s.id}', '${escapedName}', '${timezone}', true)" 
+                                    style="padding: 4px 10px; font-size: 11px; background: #00ffff; color: #000; border: none; border-radius: 4px;" title="Add as Repeat">🔄 Repeat</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            if (matches.length > 20) {
+                html += `<p style="color: #888; font-size: 11px; text-align: center; margin-top: 8px;">Showing first 20 of ${matches.length} results. Refine your search.</p>`;
+            }
+            
+            resultsContainer.innerHTML = html;
+        }
+        
+        async function confirmAddExistingStudentToActiveClass(studentId, studentName, timezone, asRepeat) {
+            const cls = selectedSlotInfo?.class;
+            if (!cls) return;
+            
+            const levelName = LEVELS[cls.level] || cls.level;
+            const actionText = asRepeat ? 'add as a REPEAT student' : 'add';
+            
+            if (!confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} "${studentName}" to ${cls.day} @ ${cls.time} (${levelName})?`)) return;
+            
+            try {
+                const student = allStudents.find(s => s.id === studentId);
+                const slot = `${cls.day}-${cls.time}`;
+                let rank = 3;
+                if (student?.availabilities) {
+                    for (let r = 1; r <= 3; r++) {
+                        if (student.availabilities[r] === slot) { rank = r; break; }
+                    }
+                }
+                
+                const newStudent = { 
+                    id: studentId, 
+                    name: studentName, 
+                    rank, 
+                    timezone: timezone || student?.timezone || 'Unknown'
+                };
+                
+                if (asRepeat) {
+                    newStudent.tags = ['Repeat'];
+                }
+                
+                const updatedStudents = [...(cls.students || []), newStudent];
+                await db.collection('scheduler_classes').doc(cls.id).update({ students: updatedStudents });
+                cls.students = updatedStudents;
+                
+                // Update student record to point to this class (unless repeat in another class)
+                if (!asRepeat) {
+                    await db.collection('scheduler_students').doc(studentId).update({ 
+                        classId: cls.id, 
+                        status: 'assigned' 
+                    });
+                    const idx = allStudents.findIndex(s => s.id === studentId);
+                    if (idx !== -1) {
+                        allStudents[idx].classId = cls.id;
+                        allStudents[idx].status = 'assigned';
+                    }
+                }
+                
+                // Log the action
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: studentName,
+                    fromClassId: null,
+                    fromClassInfo: asRepeat ? 'Added as Repeat' : 'Added directly',
+                    toClassId: cls.id,
+                    toClassInfo: `${cls.day} @ ${cls.time} - ${levelName}`,
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: asRepeat ? 'Added as repeat student via Slot Manager' : 'Added to active class via Slot Manager'
+                });
+                
+                closeAddStudentToActiveClassModal();
+                
+                // Refresh slot details
+                openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
+                renderSlotGrid();
+                
+                showToast(`✅ ${studentName} added to ${cls.day} @ ${cls.time}!`, 'success');
+                
+            } catch (e) {
+                console.error('Error adding student to active class:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+        
+        async function addManualStudentToActiveClass() {
+            const cls = selectedSlotInfo?.class;
+            if (!cls) {
+                alert('No active class selected.');
+                return;
+            }
+            
+            const name = document.getElementById('addActiveManualName').value.trim();
+            if (!name) {
+                alert('Please enter a student name.');
+                return;
+            }
+            
+            const email = document.getElementById('addActiveManualEmail').value.trim();
+            const timezone = document.getElementById('addActiveManualTimezone').value.trim() || 'Unknown';
+            const isRepeat = document.getElementById('addActiveManualRepeat').checked;
+            
+            // Check for duplicates
+            if ((cls.students || []).some(s => (s.name || '').toLowerCase() === name.toLowerCase())) {
+                if (!confirm(`A student named "${name}" is already in this class. Add anyway?`)) return;
+            }
+            
+            const levelName = LEVELS[cls.level] || cls.level;
+            
+            try {
+                // First, create a scheduler_student record so they exist in the system
+                const studentData = {
+                    name: name,
+                    email: email || null,
+                    timezone: timezone,
+                    status: isRepeat ? 'assigned' : 'assigned',
+                    classId: cls.id,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    addedManuallyToActiveClass: true
+                };
+                
+                const studentRef = await db.collection('scheduler_students').add(studentData);
+                const studentId = studentRef.id;
+                
+                // Add to local allStudents
+                allStudents.push({ id: studentId, ...studentData });
+                
+                const newStudent = { 
+                    id: studentId, 
+                    name: name, 
+                    rank: 3, 
+                    timezone: timezone 
+                };
+                
+                if (isRepeat) {
+                    newStudent.tags = ['Repeat'];
+                }
+                
+                const updatedStudents = [...(cls.students || []), newStudent];
+                await db.collection('scheduler_classes').doc(cls.id).update({ students: updatedStudents });
+                cls.students = updatedStudents;
+                
+                // Log the action
+                await db.collection('scheduler_move_history').add({
+                    studentId: studentId,
+                    studentName: name,
+                    fromClassId: null,
+                    fromClassInfo: isRepeat ? 'Manually added as Repeat' : 'Manually added',
+                    toClassId: cls.id,
+                    toClassInfo: `${cls.day} @ ${cls.time} - ${levelName}`,
+                    movedBy: currentUser?.email || currentUser?.name || 'Unknown',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    reason: isRepeat ? 'Manually added as repeat to active class via Slot Manager' : 'Manually added to active class via Slot Manager'
+                });
+                
+                closeAddStudentToActiveClassModal();
+                
+                // Refresh slot details
+                openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
+                renderSlotGrid();
+                
+                showToast(`✅ ${name} added to ${cls.day} @ ${cls.time}!`, 'success');
+                
+            } catch (e) {
+                console.error('Error manually adding student:', e);
+                alert('❌ Error: ' + e.message);
+            }
         }
         
         function updateSlotEnrolledStudentsList() {
