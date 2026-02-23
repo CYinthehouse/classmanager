@@ -409,6 +409,51 @@
         
         /* Rainbow cursor animation */
         @keyframes rainbow-cursor { 0% { background: #ff0000; } 16% { background: #ff8800; } 33% { background: #ffff00; } 50% { background: #00ff00; } 66% { background: #0088ff; } 83% { background: #8800ff; } 100% { background: #ff0000; } }
+
+        /* Drill + Homework Maker Styles */
+        .drill-sub-tab { background: transparent; transition: all 0.2s; }
+        .drill-sub-tab:hover { opacity: 0.8; }
+        .drill-sub-tab.active { font-weight: 700; }
+        .drill-sub-content { display: none; animation: fadeIn 0.3s ease; }
+        .drill-sub-content.active { display: block; }
+        .drill-type-btn, .drill-batch-btn, .drill-diff-btn, .hw-diff-btn { background: transparent; transition: all 0.2s; }
+        .drill-type-btn:hover, .drill-batch-btn:hover, .drill-diff-btn:hover, .hw-diff-btn:hover { opacity: 0.8; }
+        .drill-type-btn.active { background: rgba(255,0,255,0.2) !important; font-weight: 700; }
+        .drill-batch-btn.active { background: rgba(57,255,20,0.2) !important; font-weight: 700; }
+        .drill-diff-btn.active, .hw-diff-btn.active { font-weight: 700; }
+        #diffLevel1.active, #hwDiffLevel1.active { background: rgba(57,255,20,0.2) !important; }
+        #diffLevel2.active, #hwDiffLevel2.active { background: rgba(255,255,0,0.2) !important; }
+        .hw-pdf-tab { background: transparent; transition: all 0.2s; }
+        .hw-pdf-tab.active { font-weight: 700; background: rgba(255,255,255,0.1) !important; }
+        .saved-filter-btn { background: transparent; border: 1px solid #444; color: #888; transition: all 0.2s; }
+        .saved-filter-btn.active { background: rgba(0,255,255,0.2); border-color: #00ffff; color: #00ffff; }
+        .drill-sentence-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px; margin-bottom: 6px; background: rgba(0,0,0,0.3); border: 1px solid #333; border-radius: 6px; transition: all 0.2s; }
+        .drill-sentence-row:hover { border-color: #a855f7; background: rgba(168,85,247,0.05); }
+        .drill-sentence-num { color: #a855f7; font-weight: 700; min-width: 28px; font-size: 12px; padding-top: 2px; }
+        .drill-sentence-text { color: #fff; font-size: 13px; line-height: 1.5; flex: 1; }
+        .drill-sentence-grammar { color: #ff00ff; font-size: 10px; margin-top: 4px; }
+        .mixed-grammar-tag { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,0,0.15); border: 1px solid #ffff00; color: #ffff00; padding: 4px 10px; border-radius: 20px; font-size: 11px; margin-bottom: 4px; }
+        .mixed-grammar-tag .remove-tag { cursor: pointer; color: #ff3366; font-weight: 700; }
+        .hw-grammar-tag { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,152,0,0.15); border: 1px solid #ff9800; color: #ff9800; padding: 4px 10px; border-radius: 20px; font-size: 11px; }
+        .hw-grammar-tag .remove-tag { cursor: pointer; color: #ff3366; font-weight: 700; }
+        .noun-card { background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.25); border-radius: 6px; padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+        .noun-rank { color: #39ff14; font-weight: 700; min-width: 24px; }
+        .noun-word { color: #fff; }
+        .saved-item-card { background: rgba(0,0,0,0.4); border: 2px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 12px; transition: all 0.2s; }
+        .saved-item-card:hover { border-color: #00ffff; }
+        .saved-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+        .saved-item-type { font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 700; }
+        .saved-item-type.drill { background: rgba(168,85,247,0.2); color: #a855f7; border: 1px solid #a855f7; }
+        .saved-item-type.homework { background: rgba(255,152,0,0.2); color: #ff9800; border: 1px solid #ff9800; }
+        .saved-item-type.nouns { background: rgba(57,255,20,0.2); color: #39ff14; border: 1px solid #39ff14; }
+
+        /* Light mode overrides for drill maker */
+        body.light-mode .drill-sentence-row { background: rgba(0,0,0,0.05); border-color: #ccc; }
+        body.light-mode .drill-sentence-row:hover { background: rgba(168,85,247,0.1); }
+        body.light-mode .drill-sentence-text { color: #1a1a2e; }
+        body.light-mode .noun-card { background: rgba(57,255,20,0.1); border-color: rgba(57,255,20,0.4); }
+        body.light-mode .noun-word { color: #1a1a2e; }
+        body.light-mode .saved-item-card { background: rgba(255,255,255,0.8); }
         .rainbow-draw { animation: rainbow-cursor 2s linear infinite; }
         
         /* Schedule Calendar Styles */
@@ -1304,6 +1349,7 @@
                     <button class="nav-tab" onclick="showAdminTab('oneclass')" style="border-color: #ff9800; color: #ff9800; background: rgba(255,152,0,0.2);">🎟️ 1 Class Pass</button>
                     <button class="nav-tab" onclick="showAdminTab('accounts')">👤 Account Creation</button>
                     <button class="nav-tab" onclick="showAdminTab('settings')">⚙️ Settings</button>
+                    <button class="nav-tab" onclick="showAdminTab('drillmaker')" style="border-color: #a855f7; color: #a855f7; background: rgba(168,85,247,0.2);">🧠 Drill + HW</button>
                 </div>
 
                 <div id="adminTabDashboard" class="tab-content active">
@@ -2396,6 +2442,263 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ===================== DRILL + HOMEWORK MAKER TAB ===================== -->
+                <div id="adminTabDrillmaker" class="tab-content">
+                    
+                    <!-- Sub-navigation within Drill Maker -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <button class="btn btn-sm drill-sub-tab active" onclick="showDrillSubTab('drills')" style="border-color: #a855f7; color: #a855f7;">🎯 Drill Maker</button>
+                        <button class="btn btn-sm drill-sub-tab" onclick="showDrillSubTab('homework')" style="border-color: #ff9800; color: #ff9800;">📄 Homework Maker</button>
+                        <button class="btn btn-sm drill-sub-tab" onclick="showDrillSubTab('nouns')" style="border-color: #39ff14; color: #39ff14;">📝 Noun Generator</button>
+                        <button class="btn btn-sm drill-sub-tab" onclick="showDrillSubTab('saved')" style="border-color: #00ffff; color: #00ffff;">💾 Saved Drills</button>
+                    </div>
+
+                    <!-- ========== DRILL MAKER SUB-TAB ========== -->
+                    <div id="drillSubDrills" class="drill-sub-content active">
+                        <div class="card" style="border-color: #a855f7;">
+                            <h3 style="color: #a855f7; border-bottom-color: #a855f7;">🎯 Drill Maker</h3>
+                            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Generate phrase drills or full sentence drills using Korean grammar points. AI will create practice content based on your inputs.</p>
+
+                            <!-- Drill Type Selection -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Drill Type</label>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-sm drill-type-btn active" onclick="selectDrillType('phrase')" id="drillTypePhrase" style="border-color: #ff00ff;">🔹 Phrase Drill (Incomplete Sentences)</button>
+                                    <button class="btn btn-sm drill-type-btn" onclick="selectDrillType('full')" id="drillTypeFull" style="border-color: #00ffff;">🔹 Full Sentence Drill</button>
+                                </div>
+                                <p id="drillTypeDesc" style="font-size: 11px; color: #888; margin-top: 8px;">Chunk training / pattern training — outputs incomplete English phrases for students to complete in Korean.</p>
+                            </div>
+
+                            <!-- Batch Mode -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Batch Mode</label>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-sm drill-batch-btn active" onclick="selectBatchMode('fixed')" id="batchFixed" style="border-color: #39ff14;">1️⃣ Fixed Grammar (Single Point)</button>
+                                    <button class="btn btn-sm drill-batch-btn" onclick="selectBatchMode('mixed')" id="batchMixed" style="border-color: #ffff00;">2️⃣ Mixed Grammar (Rotating)</button>
+                                </div>
+                                <p id="batchDesc" style="font-size: 11px; color: #888; margin-top: 8px;">All sentences will use the same grammar structure.</p>
+                            </div>
+
+                            <!-- Grammar Points Input -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Grammar Point(s) <span style="color: #ff3366;">*</span></label>
+                                <input type="text" id="drillGrammar" placeholder="e.g. -(으)려고 하다" style="border-color: #a855f7;">
+                                <p style="font-size: 11px; color: #888; margin-top: 5px;" id="grammarHint">Enter one grammar point for Fixed mode.</p>
+                            </div>
+
+                            <!-- Additional Grammar (Mixed mode) -->
+                            <div id="mixedGrammarContainer" style="display: none;">
+                                <div class="form-group">
+                                    <label style="color: #ffff00;">Additional Grammar Points</label>
+                                    <div id="mixedGrammarList"></div>
+                                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                        <input type="text" id="mixedGrammarInput" placeholder="Add another grammar point..." style="border-color: #ffff00; flex: 1;">
+                                        <button class="btn btn-sm btn-warning" onclick="addMixedGrammar()">+ Add</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Difficulty Level -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Difficulty Level</label>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-sm drill-diff-btn active" onclick="selectDifficulty(1)" id="diffLevel1" style="border-color: #39ff14; color: #39ff14;">🟢 Level 1 — Simple</button>
+                                    <button class="btn btn-sm drill-diff-btn" onclick="selectDifficulty(2)" id="diffLevel2" style="border-color: #ffff00; color: #ffff00;">🟡 Level 2 — Complex</button>
+                                </div>
+                                <p id="diffDesc" style="font-size: 11px; color: #888; margin-top: 8px;">1 clause only. No conjunctions. No quoting. Simple subject + verb. e.g. "I eat breakfast."</p>
+                            </div>
+
+                            <!-- Scenario (Optional) -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Scenario / Topic <span style="color: #888; font-size: 11px;">(optional)</span></label>
+                                <input type="text" id="drillScenario" placeholder="e.g. Travel to Korea, Ordering food, Meeting friends..." style="border-color: #a855f7;">
+                            </div>
+
+                            <!-- Number of sentences -->
+                            <div class="form-group">
+                                <label style="color: #a855f7;">Number of Sentences</label>
+                                <select id="drillCount" style="border-color: #a855f7; width: auto; display: inline-block; min-width: 80px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="15">15</option>
+                                    <option value="20">20</option>
+                                    <option value="25">25</option>
+                                    <option value="30">30</option>
+                                </select>
+                            </div>
+
+                            <!-- Generate Button -->
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                                <button class="btn btn-primary" onclick="generateDrill()" id="generateDrillBtn" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7;">🧠 Generate Drill</button>
+                                <button class="btn btn-info btn-sm" onclick="clearDrillForm()">🗑️ Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Drill Output -->
+                        <div id="drillOutputCard" class="card" style="border-color: #a855f7; display: none;">
+                            <h3 style="color: #a855f7; border-bottom-color: #a855f7;">📋 Generated Drill</h3>
+                            <div id="drillOutputMeta" style="margin-bottom: 15px;"></div>
+                            <div id="drillOutputContent"></div>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                                <button class="btn btn-success btn-sm" onclick="saveDrill()">💾 Save Drill</button>
+                                <button class="btn btn-info btn-sm" onclick="copyDrillToClipboard()">📋 Copy</button>
+                                <button class="btn btn-warning btn-sm" onclick="duplicateDrill()">📑 Duplicate & Edit</button>
+                                <button class="btn btn-primary btn-sm" onclick="regenerateDrill()">🔄 Regenerate</button>
+                            </div>
+                        </div>
+
+                        <!-- Loading indicator -->
+                        <div id="drillLoadingIndicator" style="display: none; text-align: center; padding: 40px;">
+                            <div style="font-size: 30px; animation: spin 1s linear infinite; display: inline-block;">🧠</div>
+                            <p style="color: #a855f7; margin-top: 15px; font-size: 13px;">Generating drill with AI...</p>
+                        </div>
+                    </div>
+
+                    <!-- ========== HOMEWORK MAKER SUB-TAB ========== -->
+                    <div id="drillSubHomework" class="drill-sub-content" style="display: none;">
+                        <div class="card" style="border-color: #ff9800;">
+                            <h3 style="color: #ff9800; border-bottom-color: #ff9800;">📄 Homework Maker</h3>
+                            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Generate 4 structured PDFs: Translation Sheet, Student Production Sheet, Direct Answer Key, and Natural Answer Key.</p>
+
+                            <div class="form-group">
+                                <label style="color: #ff9800;">Topic / Scenario <span style="color: #ff3366;">*</span></label>
+                                <input type="text" id="hwScenario" placeholder="e.g. Traveling in Korea" style="border-color: #ff9800;">
+                            </div>
+
+                            <div class="form-group">
+                                <label style="color: #ff9800;">Grammar Point(s) <span style="color: #ff3366;">*</span></label>
+                                <input type="text" id="hwGrammar" placeholder="e.g. -(으)면" style="border-color: #ff9800;">
+                                <div id="hwGrammarTags" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
+                                <button class="btn btn-sm" onclick="addHWGrammarTag()" style="margin-top: 5px; border-color: #ff9800; color: #ff9800;">+ Add Grammar</button>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="color: #ff9800;">Difficulty Level</label>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-sm hw-diff-btn active" onclick="selectHWDifficulty(1)" id="hwDiffLevel1" style="border-color: #39ff14; color: #39ff14;">🟢 Level 1 — Simple</button>
+                                    <button class="btn btn-sm hw-diff-btn" onclick="selectHWDifficulty(2)" id="hwDiffLevel2" style="border-color: #ffff00; color: #ffff00;">🟡 Level 2 — Complex</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="color: #ff9800;">Number of Translation Sentences (PDF 1)</label>
+                                <select id="hwTransCount" style="border-color: #ff9800; width: auto; min-width: 80px;">
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="25">25</option>
+                                    <option value="30">30</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="color: #ff9800;">Student Production Count (PDF 2)</label>
+                                <select id="hwProdCount" style="border-color: #ff9800; width: auto; min-width: 80px;">
+                                    <option value="20">20</option>
+                                    <option value="30">30</option>
+                                    <option value="40">40</option>
+                                    <option value="50" selected>50</option>
+                                </select>
+                            </div>
+
+                            <!-- Use Noun List Toggle -->
+                            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                                <label style="color: #ff9800; margin-bottom: 0;">Use generated nouns?</label>
+                                <input type="checkbox" id="hwUseNouns" style="width: auto; margin: 0;">
+                                <span style="font-size: 11px; color: #888;">Pull from Noun Generator if available</span>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                                <button class="btn" onclick="generateHomework()" id="generateHWBtn" style="background: linear-gradient(135deg, #ff9800, #e68900); border-color: #ff9800; color: #000; font-weight: 700;">📄 Generate 4 PDFs</button>
+                            </div>
+                        </div>
+
+                        <!-- HW Output -->
+                        <div id="hwOutputCard" class="card" style="border-color: #ff9800; display: none;">
+                            <h3 style="color: #ff9800; border-bottom-color: #ff9800;">📄 Generated Homework</h3>
+                            <div id="hwOutputMeta" style="margin-bottom: 15px;"></div>
+                            
+                            <!-- PDF Preview Tabs -->
+                            <div style="display: flex; gap: 6px; margin-bottom: 15px; flex-wrap: wrap;">
+                                <button class="btn btn-sm hw-pdf-tab active" onclick="showHWPDF(1)" style="border-color: #a855f7;">📄 PDF 1: Translation</button>
+                                <button class="btn btn-sm hw-pdf-tab" onclick="showHWPDF(2)" style="border-color: #00ffff;">📄 PDF 2: Production</button>
+                                <button class="btn btn-sm hw-pdf-tab" onclick="showHWPDF(3)" style="border-color: #39ff14;">📄 PDF 3: Direct Key</button>
+                                <button class="btn btn-sm hw-pdf-tab" onclick="showHWPDF(4)" style="border-color: #ff00ff;">📄 PDF 4: Natural Key</button>
+                            </div>
+
+                            <div id="hwPDFPreview" style="background: rgba(0,0,0,0.5); border: 2px solid #333; border-radius: 8px; padding: 20px; max-height: 500px; overflow-y: auto;"></div>
+
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                                <button class="btn btn-success btn-sm" onclick="downloadAllHWPDFs()">📥 Download All 4 PDFs</button>
+                                <button class="btn btn-info btn-sm" onclick="downloadHWPDF(1)">📥 PDF 1</button>
+                                <button class="btn btn-info btn-sm" onclick="downloadHWPDF(2)">📥 PDF 2</button>
+                                <button class="btn btn-info btn-sm" onclick="downloadHWPDF(3)">📥 PDF 3</button>
+                                <button class="btn btn-info btn-sm" onclick="downloadHWPDF(4)">📥 PDF 4</button>
+                                <button class="btn btn-warning btn-sm" onclick="saveHomework()">💾 Save HW Set</button>
+                            </div>
+                        </div>
+
+                        <div id="hwLoadingIndicator" style="display: none; text-align: center; padding: 40px;">
+                            <div style="font-size: 30px; animation: spin 1s linear infinite; display: inline-block;">📄</div>
+                            <p style="color: #ff9800; margin-top: 15px; font-size: 13px;">Generating homework with AI... This may take a moment.</p>
+                            <div id="hwLoadingProgress" style="margin-top: 10px; font-size: 11px; color: #888;"></div>
+                        </div>
+                    </div>
+
+                    <!-- ========== NOUN GENERATOR SUB-TAB ========== -->
+                    <div id="drillSubNouns" class="drill-sub-content" style="display: none;">
+                        <div class="card" style="border-color: #39ff14;">
+                            <h3 style="color: #39ff14; border-bottom-color: #39ff14;">📝 Scenario-Based Noun Generator</h3>
+                            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Generate 50 nouns related to a scenario, sorted from most to least commonly used. Use them inside drills and homework.</p>
+
+                            <div class="form-group">
+                                <label style="color: #39ff14;">Scenario / Topic <span style="color: #ff3366;">*</span></label>
+                                <input type="text" id="nounScenario" placeholder="e.g. Travel to Korea, Hospital visit, School life..." style="border-color: #39ff14;">
+                            </div>
+
+                            <button class="btn" onclick="generateNouns()" id="generateNounBtn" style="background: linear-gradient(135deg, #39ff14, #2ecc40); border-color: #39ff14; color: #000; font-weight: 700;">📝 Generate 50 Nouns</button>
+                        </div>
+
+                        <!-- Noun Output -->
+                        <div id="nounOutputCard" class="card" style="border-color: #39ff14; display: none;">
+                            <h3 style="color: #39ff14; border-bottom-color: #39ff14;">📝 Generated Nouns <span id="nounScenarioLabel" style="color: #888; font-size: 11px;"></span></h3>
+                            <div id="nounOutputGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;"></div>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                                <button class="btn btn-success btn-sm" onclick="saveNounList()">💾 Save List</button>
+                                <button class="btn btn-info btn-sm" onclick="copyNounList()">📋 Copy All</button>
+                                <button class="btn btn-warning btn-sm" onclick="exportNounList()">📥 Export CSV</button>
+                                <button class="btn btn-primary btn-sm" onclick="useNounsInDrill()">🎯 Use in Drill</button>
+                            </div>
+                        </div>
+
+                        <div id="nounLoadingIndicator" style="display: none; text-align: center; padding: 40px;">
+                            <div style="font-size: 30px; animation: spin 1s linear infinite; display: inline-block;">📝</div>
+                            <p style="color: #39ff14; margin-top: 15px; font-size: 13px;">Generating nouns with AI...</p>
+                        </div>
+                    </div>
+
+                    <!-- ========== SAVED DRILLS SUB-TAB ========== -->
+                    <div id="drillSubSaved" class="drill-sub-content" style="display: none;">
+                        <div class="card" style="border-color: #00ffff;">
+                            <h3 style="color: #00ffff; border-bottom-color: #00ffff;">💾 Saved Drills & Homework</h3>
+                            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Manage your saved drill sets and homework packages.</p>
+                            
+                            <!-- Filter buttons -->
+                            <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                                <button class="btn btn-sm saved-filter-btn active" onclick="filterSaved('all')">All</button>
+                                <button class="btn btn-sm saved-filter-btn" onclick="filterSaved('drill')" style="border-color: #a855f7; color: #a855f7;">🎯 Drills</button>
+                                <button class="btn btn-sm saved-filter-btn" onclick="filterSaved('homework')" style="border-color: #ff9800; color: #ff9800;">📄 Homework</button>
+                                <button class="btn btn-sm saved-filter-btn" onclick="filterSaved('nouns')" style="border-color: #39ff14; color: #39ff14;">📝 Noun Lists</button>
+                            </div>
+
+                            <div id="savedDrillsContainer"><p style="color: #888; font-size: 12px;">No saved items yet. Generate a drill or homework to save it.</p></div>
+                        </div>
+                    </div>
+
+                </div>
+                <!-- ===================== END DRILL + HOMEWORK MAKER TAB ===================== -->
+
             </div>
 
             <!-- Teacher Dashboard -->
@@ -3725,11 +4028,8 @@
         // Parse a date string (YYYY-MM-DD) as EST midnight
         function parseESTDate(dateString) {
             if (!dateString) return null;
-            // Parse as EST by appending EST timezone offset
-            // Create date at midnight EST
-            const [year, month, day] = dateString.split('-').map(Number);
-            const date = new Date(dateString + 'T00:00:00-05:00'); // EST is UTC-5
-            return date;
+            // Parse as noon EST to avoid day-boundary timezone shifts
+            return new Date(dateString + 'T12:00:00-05:00');
         }
         
         // Format a date string (YYYY-MM-DD) for display in EST timezone
@@ -4634,6 +4934,7 @@
                 }
                 // If no cache, just show the load controls (don't auto-load)
             }
+            if (tab === 'drillmaker') { initDrillMaker(); }
         }
 
         // Teacher Dashboard
@@ -4859,7 +5160,7 @@
         
         function getWeekDateString(weekNum) {
             if (!schedulerSettings.startDate) return '';
-            const start = new Date(schedulerSettings.startDate + 'T00:00:00');
+            const start = parseLocalDate(schedulerSettings.startDate);
             const weekStart = new Date(start);
             weekStart.setDate(start.getDate() + (weekNum - 1) * 7);
             const weekEnd = new Date(weekStart);
@@ -5464,7 +5765,7 @@
                 html += activeClasses.map(c => {
                     const teacher = allTeachers.find(t => t.id === c.teacherId);
                     const available = getAvailableTeachers(c.day, c.time, c.id);
-                    const startDateStr = c.startDate ? new Date(c.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const startDateStr = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const canEditDate = currentUser?.role === 'admin' || currentUser?.role === 'support';
                     return `
                         <div class="class-card" ondragover="event.preventDefault()" ondrop="handleDrop(event, '${c.id}')">
@@ -5503,8 +5804,8 @@
                 html += '<div style="margin-top: 20px;"><h4 style="color: #ff9800; margin-bottom: 10px; font-size: 13px;">⏳ Pre-scheduled Classes</h4>';
                 html += '<div style="display: grid; gap: 10px;">';
                 html += allPrescheduledSlots.map(ps => {
-                    const startDate = ps.startDate ? new Date(ps.startDate + 'T00:00:00') : null;
-                    const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
+                    const startDate = ps.startDate ? parseLocalDate(ps.startDate) : null;
+                    const startDateStr = startDate ? formatDateInEST(ps.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
                     const enrolledStudents = ps.enrolledStudents || [];
                     
@@ -5903,7 +6204,7 @@
                     if (c.startDate) {
                         const classLevel = c.level;
                         const weeksInClass = getLevelWeeks(classLevel) || 6;
-                        const startDate = new Date(c.startDate);
+                        const startDate = parseLocalDate(c.startDate);
                         const endDate = new Date(startDate);
                         endDate.setDate(endDate.getDate() + (weeksInClass * 7));
                         
@@ -17888,6 +18189,38 @@ Return ONLY valid JSON (single object, not array):
                 alert('Error: ' + e.message);
             }
         }
+
+        // Complete class from Slot Manager — marks complete and refreshes slot grid
+        async function completeClassFromSlot(classId) {
+            const cls = allClasses.find(c => c.id === classId);
+            if (!cls) return;
+            
+            const levelName = LEVELS[cls.level] || cls.level;
+            const studentCount = (cls.students || []).length;
+            
+            if (!confirm(`✅ Complete this class?\n\n${cls.day} @ ${cls.time}\n${levelName} · ${studentCount} students\n\nThis will mark the class as completed and reopen the slot.`)) return;
+            
+            try {
+                await db.collection('scheduler_classes').doc(classId).update({
+                    status: 'completed',
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Update local data
+                const idx = allClasses.findIndex(c => c.id === classId);
+                if (idx !== -1) allClasses[idx].status = 'completed';
+                
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                renderClasses();
+                updateDashboardStats();
+                
+                alert(`✅ Class completed! ${cls.day} @ ${cls.time} slot is now open.`);
+            } catch (e) {
+                console.error('Error completing class from slot:', e);
+                alert('Error: ' + e.message);
+            }
+        }
         
         // Set 1-Year Academy status for a student
         async function setAcademyStatus(classId, studentId, status) {
@@ -22616,7 +22949,7 @@ Return ONLY valid JSON (single object, not array):
         function showDiscordNamesModal(proposal) {
             const students = proposal.students || [];
             const discordNames = students.map(s => s.discord || `${s.name} (no Discord)`).join('\n');
-            const startDate = new Date(proposal.proposedStartDate).toLocaleDateString('en-US', { 
+            const startDate = formatDateInEST(proposal.proposedStartDate, { 
                 weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' 
             });
             
@@ -22829,7 +23162,7 @@ Return ONLY valid JSON (single object, not array):
                 return;
             }
             
-            const startDateFormatted = new Date(proposal.proposedStartDate).toLocaleDateString('en-US', {
+            const startDateFormatted = formatDateInEST(proposal.proposedStartDate, {
                 weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
             });
             
@@ -23791,7 +24124,7 @@ ${daySpecific}
                 if (cls.status === 'completed') return;
                 
                 const key = `${cls.day}-${cls.time}`;
-                const startDate = cls.startDate ? new Date(cls.startDate) : null;
+                const startDate = cls.startDate ? parseLocalDate(cls.startDate) : null;
                 
                 let currentWeek = 0;
                 let weeksTotal = getLevelWeeks(cls.level) || 6;
@@ -23805,8 +24138,10 @@ ${daySpecific}
                 }
                 
                 let status = 'occupied';
-                if (currentWeek >= weeksTotal) {
+                if (currentWeek >= weeksTotal && cls.status === 'completed') {
                     status = 'available';
+                } else if (currentWeek >= weeksTotal) {
+                    status = 'completed-pending';
                 } else if (currentWeek >= weeksTotal - 1) {
                     status = 'ending';
                 }
@@ -23907,6 +24242,11 @@ ${daySpecific}
                         borderColor = '#39ff14';
                         statusText = 'Available';
                         statusIcon = '🟢';
+                    } else if (slot.status === 'completed-pending') {
+                        bgColor = 'rgba(168,85,247,0.2)';
+                        borderColor = '#a855f7';
+                        statusText = `Done · Week ${slot.week}/${slot.weeksTotal}`;
+                        statusIcon = '🟣';
                     } else if (slot.status === 'ending') {
                         bgColor = 'rgba(255,255,0,0.2)';
                         borderColor = '#ffff00';
@@ -24239,8 +24579,8 @@ ${daySpecific}
                     endDateDisplay = endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
                 }
                 
-                const statusColor = currentWeek >= weeksTotal ? '#39ff14' : (currentWeek >= weeksTotal - 1 ? '#ffff00' : '#ff3366');
-                const statusText = currentWeek >= weeksTotal ? 'Completed' : (currentWeek >= weeksTotal - 1 ? 'Ending Soon' : 'In Progress');
+                const statusColor = currentWeek >= weeksTotal ? '#a855f7' : (currentWeek >= weeksTotal - 1 ? '#ffff00' : '#ff3366');
+                const statusText = currentWeek >= weeksTotal ? 'Course Complete — Awaiting Confirmation' : (currentWeek >= weeksTotal - 1 ? 'Ending Soon' : 'In Progress');
                 
                 html = `
                     <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -24259,6 +24599,11 @@ ${daySpecific}
                         <div style="font-size: 13px;">
                             <strong>Students:</strong> ${(cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length}${(cls.students || []).some(s => s.tags && s.tags.includes('Repeat')) ? ' <span style="color:#00ffff; font-size:11px;">(+' + (cls.students || []).filter(s => s.tags && s.tags.includes('Repeat')).length + ' repeat)</span>' : ''}
                         </div>
+                        ${currentWeek >= weeksTotal ? `
+                        <div style="margin-top: 15px; padding: 12px; background: rgba(168,85,247,0.15); border: 2px solid #a855f7; border-radius: 8px; text-align: center;">
+                            <p style="color: #a855f7; font-size: 12px; margin-bottom: 10px;">🟣 This class has finished its ${weeksTotal}-week course. Mark it complete to reopen the slot.</p>
+                            <button class="btn" onclick="completeClassFromSlot('${cls.id}')" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7; color: #fff; font-weight: 700; width: 100%;">✅ Complete Class & Reopen Slot</button>
+                        </div>` : ''}
                     </div>
                 `;
                 
@@ -28345,6 +28690,780 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             matTranscriptStop();
             document.getElementById('matTranscriptEditor').remove();
         }
+
+        // =====================================================================
+        // DRILL + HOMEWORK MAKER — Full JavaScript
+        // =====================================================================
+
+        const AI_FUNCTION_URL = 'https://generateflashcardai-386010826708.us-central1.run.app';
+
+        // State
+        let drillState = {
+            type: 'phrase',       // 'phrase' or 'full'
+            batch: 'fixed',       // 'fixed' or 'mixed'
+            difficulty: 1,        // 1 or 2
+            mixedGrammars: [],
+            lastDrill: null,      // last generated drill data
+            lastDrillConfig: null // config used to generate
+        };
+        let hwState = {
+            difficulty: 1,
+            grammars: [],
+            data: null            // { sentences, answersDirect, answersNatural, config }
+        };
+        let nounState = {
+            lastNouns: [],
+            lastScenario: ''
+        };
+
+        function initDrillMaker() {
+            loadSavedDrills();
+        }
+
+        // ---- Sub-tab navigation ----
+        function showDrillSubTab(tab) {
+            document.querySelectorAll('.drill-sub-content').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
+            document.querySelectorAll('.drill-sub-tab').forEach(el => el.classList.remove('active'));
+            const panel = document.getElementById('drillSub' + tab.charAt(0).toUpperCase() + tab.slice(1));
+            if (panel) { panel.style.display = 'block'; panel.classList.add('active'); }
+            if (event && event.target) event.target.classList.add('active');
+            if (tab === 'saved') loadSavedDrills();
+        }
+
+        // ---- Drill type / batch / difficulty selection ----
+        function selectDrillType(type) {
+            drillState.type = type;
+            document.querySelectorAll('.drill-type-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(type === 'phrase' ? 'drillTypePhrase' : 'drillTypeFull').classList.add('active');
+            document.getElementById('drillTypeDesc').textContent = type === 'phrase'
+                ? 'Chunk training / pattern training — outputs incomplete English phrases for students to complete in Korean.'
+                : 'Sentence construction practice — outputs complete English sentences for students to translate into Korean.';
+        }
+
+        function selectBatchMode(mode) {
+            drillState.batch = mode;
+            document.querySelectorAll('.drill-batch-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(mode === 'fixed' ? 'batchFixed' : 'batchMixed').classList.add('active');
+            document.getElementById('batchDesc').textContent = mode === 'fixed'
+                ? 'All sentences will use the same grammar structure.'
+                : 'Grammar rotates per sentence from your list of grammar points.';
+            document.getElementById('mixedGrammarContainer').style.display = mode === 'mixed' ? 'block' : 'none';
+            document.getElementById('grammarHint').textContent = mode === 'fixed'
+                ? 'Enter one grammar point for Fixed mode.'
+                : 'Enter the primary grammar point. Add more below.';
+        }
+
+        function selectDifficulty(level) {
+            drillState.difficulty = level;
+            document.querySelectorAll('.drill-diff-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('diffLevel' + level).classList.add('active');
+            document.getElementById('diffDesc').textContent = level === 1
+                ? '1 clause only. No conjunctions. No quoting. Simple subject + verb. e.g. "I eat breakfast."'
+                : 'Minimum 2 clauses. Must include conjunction (because, if, when, but...) OR reported speech. e.g. "If it rains, I will stay home."';
+        }
+
+        function selectHWDifficulty(level) {
+            hwState.difficulty = level;
+            document.querySelectorAll('.hw-diff-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('hwDiffLevel' + level).classList.add('active');
+        }
+
+        // ---- Mixed grammar tags ----
+        function addMixedGrammar() {
+            const input = document.getElementById('mixedGrammarInput');
+            const val = input.value.trim();
+            if (!val) return;
+            if (drillState.mixedGrammars.includes(val)) { input.value = ''; return; }
+            drillState.mixedGrammars.push(val);
+            input.value = '';
+            renderMixedGrammarTags();
+        }
+
+        function removeMixedGrammar(idx) {
+            drillState.mixedGrammars.splice(idx, 1);
+            renderMixedGrammarTags();
+        }
+
+        function renderMixedGrammarTags() {
+            const container = document.getElementById('mixedGrammarList');
+            container.innerHTML = drillState.mixedGrammars.map((g, i) =>
+                `<span class="mixed-grammar-tag">${escapeHtml(g)} <span class="remove-tag" onclick="removeMixedGrammar(${i})">✕</span></span>`
+            ).join(' ');
+        }
+
+        // ---- HW grammar tags ----
+        function addHWGrammarTag() {
+            const input = document.getElementById('hwGrammar');
+            const val = input.value.trim();
+            if (!val) return;
+            if (hwState.grammars.includes(val)) { input.value = ''; return; }
+            hwState.grammars.push(val);
+            input.value = '';
+            renderHWGrammarTags();
+        }
+
+        function removeHWGrammarTag(idx) {
+            hwState.grammars.splice(idx, 1);
+            renderHWGrammarTags();
+        }
+
+        function renderHWGrammarTags() {
+            const container = document.getElementById('hwGrammarTags');
+            container.innerHTML = hwState.grammars.map((g, i) =>
+                `<span class="hw-grammar-tag">${escapeHtml(g)} <span class="remove-tag" onclick="removeHWGrammarTag(${i})">✕</span></span>`
+            ).join(' ');
+        }
+
+        // ---- Clear form ----
+        function clearDrillForm() {
+            document.getElementById('drillGrammar').value = '';
+            document.getElementById('drillScenario').value = '';
+            document.getElementById('drillCount').value = '10';
+            drillState.mixedGrammars = [];
+            renderMixedGrammarTags();
+            selectDrillType('phrase');
+            selectBatchMode('fixed');
+            selectDifficulty(1);
+            document.getElementById('drillOutputCard').style.display = 'none';
+        }
+
+        // ===================== AI CALL HELPERS =====================
+
+        async function callAI(systemPrompt, userPrompt, maxTokens = 2000) {
+            const response = await fetch(AI_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    model: 'gpt-4o',
+                    max_tokens: maxTokens,
+                    temperature: 0.7
+                })
+            });
+            const data = await response.json();
+            // Handle multiple response formats
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                return data.choices[0].message.content;
+            } else if (data.data) {
+                return typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+            } else if (data.text) {
+                return data.text;
+            } else if (data.result) {
+                return data.result;
+            } else if (data.response) {
+                return data.response;
+            }
+            throw new Error('Unexpected AI response format');
+        }
+
+        // ===================== DRILL GENERATION =====================
+
+        async function generateDrill() {
+            const grammar = document.getElementById('drillGrammar').value.trim();
+            if (!grammar) { alert('Please enter at least one grammar point.'); return; }
+
+            const scenario = document.getElementById('drillScenario').value.trim();
+            const count = parseInt(document.getElementById('drillCount').value);
+            const type = drillState.type;
+            const batch = drillState.batch;
+            const difficulty = drillState.difficulty;
+
+            // Build grammar list
+            let grammarList = [grammar];
+            if (batch === 'mixed') {
+                grammarList = [grammar, ...drillState.mixedGrammars];
+                if (grammarList.length < 2) { alert('Mixed mode needs at least 2 grammar points. Add more below.'); return; }
+            }
+
+            // Build prompt
+            const drillTypeDesc = type === 'phrase'
+                ? 'Generate INCOMPLETE English PHRASES (not full sentences). These are chunks/fragments for pattern training. Examples: "to meet my friend…", "in order to study Korean…", "because I want to travel…". Do NOT write complete sentences.'
+                : 'Generate COMPLETE English sentences that students will translate into Korean.';
+
+            const diffDesc = difficulty === 1
+                ? 'LEVEL 1: 1 clause only. No conjunctions (no "because", "if", "when", "but", "although"). No quoting/reported speech. Simple subject + verb structure. Example: "I eat breakfast.", "She studies Korean."'
+                : 'LEVEL 2: Minimum 2 clauses. MUST include at least one conjunction (because, if, when, but, although, etc.) OR reported speech (said that…, told me that…). Example: "If it rains, I will stay home.", "She said that she is busy."';
+
+            let batchInstruction = '';
+            if (batch === 'fixed') {
+                batchInstruction = `ALL ${count} sentences MUST use the grammar point: ${grammar}. Every single one must require this same structure.`;
+            } else {
+                batchInstruction = `Rotate through these grammar points, changing grammar per sentence: ${grammarList.join(', ')}. Tag each sentence with which grammar point it uses.`;
+            }
+
+            const scenarioInstruction = scenario ? `All sentences should be related to the scenario/topic: "${scenario}".` : 'Use varied everyday topics.';
+
+            const systemPrompt = `You are a Korean language teaching assistant specializing in creating practice drills. You create clear, natural English ${type === 'phrase' ? 'phrases' : 'sentences'} that are designed for Korean learners to practice translating or producing Korean using specific grammar patterns. Always output ONLY the numbered list. No preamble, no explanations.`;
+
+            const userPrompt = `Generate exactly ${count} ${type === 'phrase' ? 'English phrase fragments (incomplete sentences)' : 'complete English sentences'} for a Korean language drill.
+
+${drillTypeDesc}
+
+GRAMMAR: ${batchInstruction}
+
+DIFFICULTY: ${diffDesc}
+
+SCENARIO: ${scenarioInstruction}
+
+FORMAT: Return a numbered list. Each line format:
+${batch === 'mixed' ? '[number]. [sentence] {{grammar_point}}' : '[number]. [sentence]'}
+
+Generate exactly ${count} items. Nothing else.`;
+
+            // Show loading
+            document.getElementById('drillOutputCard').style.display = 'none';
+            document.getElementById('drillLoadingIndicator').style.display = 'block';
+            document.getElementById('generateDrillBtn').disabled = true;
+
+            try {
+                const result = await callAI(systemPrompt, userPrompt, 3000);
+                const sentences = parseDrillOutput(result, batch === 'mixed');
+
+                drillState.lastDrill = { sentences, raw: result };
+                drillState.lastDrillConfig = { type, batch, difficulty, grammar, grammarList, scenario, count };
+
+                renderDrillOutput(sentences);
+            } catch (err) {
+                console.error('Drill generation error:', err);
+                alert('Error generating drill: ' + err.message);
+            } finally {
+                document.getElementById('drillLoadingIndicator').style.display = 'none';
+                document.getElementById('generateDrillBtn').disabled = false;
+            }
+        }
+
+        function parseDrillOutput(text, isMixed) {
+            const lines = text.trim().split('\n').filter(l => l.trim());
+            return lines.map((line, i) => {
+                // Remove numbering
+                let cleaned = line.replace(/^\d+[\.\)\-]\s*/, '').trim();
+                let grammarTag = '';
+                if (isMixed) {
+                    const match = cleaned.match(/\{\{(.+?)\}\}/);
+                    if (match) {
+                        grammarTag = match[1].trim();
+                        cleaned = cleaned.replace(/\{\{.+?\}\}/, '').trim();
+                    }
+                }
+                return { num: i + 1, text: cleaned, grammar: grammarTag };
+            });
+        }
+
+        function renderDrillOutput(sentences) {
+            const config = drillState.lastDrillConfig;
+            const meta = document.getElementById('drillOutputMeta');
+            meta.innerHTML = `
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px;">
+                    <span style="background: rgba(168,85,247,0.2); border: 1px solid #a855f7; color: #a855f7; padding: 3px 8px; border-radius: 12px;">${config.type === 'phrase' ? '🔹 Phrase' : '🔹 Full Sentence'}</span>
+                    <span style="background: rgba(${config.batch === 'fixed' ? '57,255,20' : '255,255,0'},0.2); border: 1px solid ${config.batch === 'fixed' ? '#39ff14' : '#ffff00'}; color: ${config.batch === 'fixed' ? '#39ff14' : '#ffff00'}; padding: 3px 8px; border-radius: 12px;">${config.batch === 'fixed' ? '1️⃣ Fixed' : '2️⃣ Mixed'}: ${config.grammarList.join(', ')}</span>
+                    <span style="background: rgba(${config.difficulty === 1 ? '57,255,20' : '255,255,0'},0.15); border: 1px solid ${config.difficulty === 1 ? '#39ff14' : '#ffff00'}; color: ${config.difficulty === 1 ? '#39ff14' : '#ffff00'}; padding: 3px 8px; border-radius: 12px;">Level ${config.difficulty}</span>
+                    ${config.scenario ? `<span style="background: rgba(0,255,255,0.15); border: 1px solid #00ffff; color: #00ffff; padding: 3px 8px; border-radius: 12px;">📍 ${escapeHtml(config.scenario)}</span>` : ''}
+                </div>`;
+
+            const content = document.getElementById('drillOutputContent');
+            content.innerHTML = sentences.map(s => `
+                <div class="drill-sentence-row">
+                    <span class="drill-sentence-num">${s.num}.</span>
+                    <div>
+                        <div class="drill-sentence-text">${escapeHtml(s.text)}</div>
+                        ${s.grammar ? `<div class="drill-sentence-grammar">📌 ${escapeHtml(s.grammar)}</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('drillOutputCard').style.display = 'block';
+            document.getElementById('drillOutputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function regenerateDrill() { generateDrill(); }
+
+        function duplicateDrill() {
+            if (!drillState.lastDrillConfig) return;
+            const c = drillState.lastDrillConfig;
+            document.getElementById('drillGrammar').value = c.grammar;
+            document.getElementById('drillScenario').value = c.scenario || '';
+            document.getElementById('drillCount').value = c.count;
+            selectDrillType(c.type);
+            selectBatchMode(c.batch);
+            selectDifficulty(c.difficulty);
+            if (c.batch === 'mixed') {
+                drillState.mixedGrammars = c.grammarList.slice(1);
+                renderMixedGrammarTags();
+            }
+            document.getElementById('drillOutputCard').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function copyDrillToClipboard() {
+            if (!drillState.lastDrill) return;
+            const text = drillState.lastDrill.sentences.map(s => `${s.num}. ${s.text}${s.grammar ? ' [' + s.grammar + ']' : ''}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => alert('Drill copied to clipboard!'));
+        }
+
+        // ===================== SAVE / LOAD DRILLS =====================
+
+        async function saveDrill() {
+            if (!drillState.lastDrill || !drillState.lastDrillConfig) { alert('No drill to save.'); return; }
+            try {
+                const docData = {
+                    type: 'drill',
+                    drillType: drillState.lastDrillConfig.type,
+                    batch: drillState.lastDrillConfig.batch,
+                    difficulty: drillState.lastDrillConfig.difficulty,
+                    grammar: drillState.lastDrillConfig.grammar,
+                    grammarList: drillState.lastDrillConfig.grammarList,
+                    scenario: drillState.lastDrillConfig.scenario || '',
+                    count: drillState.lastDrillConfig.count,
+                    sentences: drillState.lastDrill.sentences,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentUser ? currentUser.name : 'admin'
+                };
+                await db.collection('saved_drills').add(docData);
+                alert('Drill saved successfully!');
+            } catch (err) {
+                console.error('Save drill error:', err);
+                alert('Error saving drill: ' + err.message);
+            }
+        }
+
+        async function saveHomework() {
+            if (!hwState.data) { alert('No homework to save.'); return; }
+            try {
+                const docData = {
+                    type: 'homework',
+                    scenario: hwState.data.config.scenario,
+                    grammarList: hwState.data.config.grammarList,
+                    difficulty: hwState.data.config.difficulty,
+                    sentences: hwState.data.sentences,
+                    answersDirect: hwState.data.answersDirect,
+                    answersNatural: hwState.data.answersNatural,
+                    productionCount: hwState.data.config.prodCount,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentUser ? currentUser.name : 'admin'
+                };
+                await db.collection('saved_drills').add(docData);
+                alert('Homework saved successfully!');
+            } catch (err) {
+                console.error('Save homework error:', err);
+                alert('Error saving: ' + err.message);
+            }
+        }
+
+        async function saveNounList() {
+            if (!nounState.lastNouns.length) { alert('No nouns to save.'); return; }
+            try {
+                const docData = {
+                    type: 'nouns',
+                    scenario: nounState.lastScenario,
+                    nouns: nounState.lastNouns,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentUser ? currentUser.name : 'admin'
+                };
+                await db.collection('saved_drills').add(docData);
+                alert('Noun list saved successfully!');
+            } catch (err) {
+                console.error('Save nouns error:', err);
+                alert('Error saving: ' + err.message);
+            }
+        }
+
+        async function loadSavedDrills(filterType = 'all') {
+            const container = document.getElementById('savedDrillsContainer');
+            container.innerHTML = '<p style="color: #888; font-size: 12px;">Loading...</p>';
+            try {
+                let query = db.collection('saved_drills').orderBy('createdAt', 'desc').limit(50);
+                if (filterType !== 'all') {
+                    query = db.collection('saved_drills').where('type', '==', filterType).orderBy('createdAt', 'desc').limit(50);
+                }
+                const snap = await query.get();
+                if (snap.empty) {
+                    container.innerHTML = '<p style="color: #888; font-size: 12px;">No saved items yet.</p>';
+                    return;
+                }
+                let html = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Unknown';
+                    const typeLabel = d.type === 'drill' ? '🎯 Drill' : d.type === 'homework' ? '📄 Homework' : '📝 Nouns';
+                    const typeClass = d.type;
+
+                    let details = '';
+                    if (d.type === 'drill') {
+                        details = `${d.drillType === 'phrase' ? 'Phrase' : 'Full Sentence'} · ${d.batch === 'fixed' ? 'Fixed' : 'Mixed'} · Level ${d.difficulty} · ${d.count} sentences · Grammar: ${(d.grammarList || [d.grammar]).join(', ')}`;
+                        if (d.scenario) details += ` · Scenario: ${d.scenario}`;
+                    } else if (d.type === 'homework') {
+                        details = `Grammar: ${(d.grammarList || []).join(', ')} · Level ${d.difficulty} · Scenario: ${d.scenario || 'N/A'}`;
+                    } else if (d.type === 'nouns') {
+                        details = `Scenario: ${d.scenario || 'N/A'} · ${(d.nouns || []).length} nouns`;
+                    }
+
+                    html += `
+                        <div class="saved-item-card">
+                            <div class="saved-item-header">
+                                <div>
+                                    <span class="saved-item-type ${typeClass}">${typeLabel}</span>
+                                    <span style="color: #888; font-size: 11px; margin-left: 8px;">${date}</span>
+                                    <span style="color: #555; font-size: 11px; margin-left: 5px;">by ${escapeHtml(d.createdBy || 'admin')}</span>
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn btn-sm btn-info" onclick="loadSavedItem('${doc.id}', '${d.type}')">📂 Load</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteSavedItem('${doc.id}')" style="padding: 4px 8px;">🗑️</button>
+                                </div>
+                            </div>
+                            <p style="font-size: 11px; color: #aaa;">${escapeHtml(details)}</p>
+                        </div>`;
+                });
+                container.innerHTML = html;
+            } catch (err) {
+                console.error('Load saved drills error:', err);
+                container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error loading: ${err.message}</p>`;
+            }
+        }
+
+        function filterSaved(type) {
+            document.querySelectorAll('.saved-filter-btn').forEach(b => b.classList.remove('active'));
+            if (event && event.target) event.target.classList.add('active');
+            loadSavedDrills(type);
+        }
+
+        async function loadSavedItem(docId, type) {
+            try {
+                const doc = await db.collection('saved_drills').doc(docId).get();
+                if (!doc.exists) { alert('Item not found.'); return; }
+                const d = doc.data();
+
+                if (type === 'drill') {
+                    showDrillSubTab('drills');
+                    drillState.lastDrill = { sentences: d.sentences, raw: '' };
+                    drillState.lastDrillConfig = {
+                        type: d.drillType, batch: d.batch, difficulty: d.difficulty,
+                        grammar: d.grammar, grammarList: d.grammarList || [d.grammar],
+                        scenario: d.scenario, count: d.count
+                    };
+                    renderDrillOutput(d.sentences);
+                } else if (type === 'homework') {
+                    showDrillSubTab('homework');
+                    hwState.data = { sentences: d.sentences, answersDirect: d.answersDirect, answersNatural: d.answersNatural, config: { scenario: d.scenario, grammarList: d.grammarList, difficulty: d.difficulty, prodCount: d.productionCount } };
+                    renderHWOutput();
+                } else if (type === 'nouns') {
+                    showDrillSubTab('nouns');
+                    nounState.lastNouns = d.nouns || [];
+                    nounState.lastScenario = d.scenario || '';
+                    renderNounOutput();
+                }
+            } catch (err) {
+                console.error('Load item error:', err);
+                alert('Error loading: ' + err.message);
+            }
+        }
+
+        async function deleteSavedItem(docId) {
+            if (!confirm('Delete this saved item?')) return;
+            try {
+                await db.collection('saved_drills').doc(docId).delete();
+                loadSavedDrills();
+            } catch (err) {
+                alert('Error deleting: ' + err.message);
+            }
+        }
+
+        // ===================== NOUN GENERATOR =====================
+
+        async function generateNouns() {
+            const scenario = document.getElementById('nounScenario').value.trim();
+            if (!scenario) { alert('Please enter a scenario.'); return; }
+
+            document.getElementById('nounOutputCard').style.display = 'none';
+            document.getElementById('nounLoadingIndicator').style.display = 'block';
+            document.getElementById('generateNounBtn').disabled = true;
+
+            const systemPrompt = 'You are a Korean language teaching assistant. Generate noun lists for language learning scenarios. Output ONLY a numbered list of 50 English nouns, one per line. No explanations. No preamble.';
+            const userPrompt = `Generate exactly 50 English nouns related to this scenario: "${scenario}"
+
+Rules:
+- Order from MOST commonly used to LEAST commonly used (based on natural language frequency and relevance to the scenario)
+- Nouns must directly relate to the scenario
+- Include both concrete and abstract nouns where appropriate
+- Make them practical and usable for sentence creation
+- Format: one noun per line, numbered 1-50
+- NO explanations, headers, or extra text
+
+Output:`;
+
+            try {
+                const result = await callAI(systemPrompt, userPrompt, 1500);
+                const nouns = result.trim().split('\n')
+                    .filter(l => l.trim())
+                    .map(l => l.replace(/^\d+[\.\)\-]\s*/, '').trim())
+                    .filter(n => n.length > 0)
+                    .slice(0, 50);
+
+                nounState.lastNouns = nouns;
+                nounState.lastScenario = scenario;
+                renderNounOutput();
+            } catch (err) {
+                console.error('Noun generation error:', err);
+                alert('Error generating nouns: ' + err.message);
+            } finally {
+                document.getElementById('nounLoadingIndicator').style.display = 'none';
+                document.getElementById('generateNounBtn').disabled = false;
+            }
+        }
+
+        function renderNounOutput() {
+            document.getElementById('nounScenarioLabel').textContent = `— ${nounState.lastScenario}`;
+            const grid = document.getElementById('nounOutputGrid');
+            grid.innerHTML = nounState.lastNouns.map((noun, i) =>
+                `<div class="noun-card"><span class="noun-rank">${i + 1}.</span><span class="noun-word">${escapeHtml(noun)}</span></div>`
+            ).join('');
+            document.getElementById('nounOutputCard').style.display = 'block';
+            document.getElementById('nounOutputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function copyNounList() {
+            if (!nounState.lastNouns.length) return;
+            const text = nounState.lastNouns.map((n, i) => `${i + 1}. ${n}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => alert('Noun list copied!'));
+        }
+
+        function exportNounList() {
+            if (!nounState.lastNouns.length) return;
+            const csv = 'Rank,Noun\n' + nounState.lastNouns.map((n, i) => `${i + 1},"${n}"`).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nouns_${nounState.lastScenario.replace(/\s+/g, '_')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function useNounsInDrill() {
+            if (!nounState.lastNouns.length) return;
+            showDrillSubTab('drills');
+            document.getElementById('drillScenario').value = nounState.lastScenario;
+            alert('Scenario set! The AI will use this topic context. Your noun list is also available for the Homework Maker.');
+        }
+
+        // ===================== HOMEWORK MAKER =====================
+
+        async function generateHomework() {
+            const scenario = document.getElementById('hwScenario').value.trim();
+            const grammarInput = document.getElementById('hwGrammar').value.trim();
+            const allGrammars = [...hwState.grammars];
+            if (grammarInput && !allGrammars.includes(grammarInput)) allGrammars.push(grammarInput);
+            if (!scenario) { alert('Please enter a topic/scenario.'); return; }
+            if (allGrammars.length === 0) { alert('Please enter at least one grammar point.'); return; }
+
+            const transCount = parseInt(document.getElementById('hwTransCount').value);
+            const prodCount = parseInt(document.getElementById('hwProdCount').value);
+            const difficulty = hwState.difficulty;
+            const useNouns = document.getElementById('hwUseNouns').checked && nounState.lastNouns.length > 0;
+
+            document.getElementById('hwOutputCard').style.display = 'none';
+            document.getElementById('hwLoadingIndicator').style.display = 'block';
+            document.getElementById('generateHWBtn').disabled = true;
+
+            const diffDesc = difficulty === 1
+                ? 'Level 1: 1 clause only, no conjunctions, simple subject+verb.'
+                : 'Level 2: Minimum 2 clauses, must include conjunction or reported speech.';
+
+            const nounContext = useNouns
+                ? `\nUse these scenario-related nouns where appropriate: ${nounState.lastNouns.slice(0, 30).join(', ')}`
+                : '';
+
+            const systemPrompt = 'You are an expert Korean language curriculum designer. You create structured homework exercises for Korean learners. Always respond in the exact JSON format requested. No markdown, no code fences, just raw JSON.';
+
+            try {
+                // Step 1: Generate English sentences + Direct answer key + Natural answer key
+                document.getElementById('hwLoadingProgress').textContent = 'Step 1/2: Generating sentences and translations...';
+
+                const step1Prompt = `Create a Korean homework exercise set.
+
+Topic: ${scenario}
+Grammar: ${allGrammars.join(', ')}
+Difficulty: ${diffDesc}
+Number of sentences: ${transCount}
+${nounContext}
+
+Generate ${transCount} English sentences about "${scenario}" that require the grammar point(s): ${allGrammars.join(', ')}
+
+For EACH sentence, provide:
+1. The English sentence
+2. A direct/strict Korean translation (strictly using the required grammar)
+3. A natural/appropriate Korean translation (natural-sounding Korean, may include variations)
+
+Return ONLY this JSON (no markdown, no code blocks):
+{"sentences":[{"en":"English sentence","ko_direct":"strict Korean","ko_natural":"natural Korean"}]}`;
+
+                const step1Result = await callAI(systemPrompt, step1Prompt, 4000);
+                let step1Data;
+                try {
+                    const cleaned = step1Result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                    step1Data = JSON.parse(cleaned);
+                } catch (parseErr) {
+                    console.error('JSON parse error:', parseErr, '\nRaw:', step1Result);
+                    throw new Error('AI returned invalid format. Please try again.');
+                }
+
+                document.getElementById('hwLoadingProgress').textContent = 'Step 2/2: Finalizing homework package...';
+
+                const sentences = step1Data.sentences || [];
+                hwState.data = {
+                    sentences: sentences.map(s => s.en),
+                    answersDirect: sentences.map(s => s.ko_direct),
+                    answersNatural: sentences.map(s => s.ko_natural),
+                    config: { scenario, grammarList: allGrammars, difficulty, transCount, prodCount }
+                };
+
+                renderHWOutput();
+            } catch (err) {
+                console.error('Homework generation error:', err);
+                alert('Error generating homework: ' + err.message);
+            } finally {
+                document.getElementById('hwLoadingIndicator').style.display = 'none';
+                document.getElementById('hwLoadingProgress').textContent = '';
+                document.getElementById('generateHWBtn').disabled = false;
+            }
+        }
+
+        let currentHWPDF = 1;
+
+        function renderHWOutput() {
+            if (!hwState.data) return;
+            const c = hwState.data.config;
+            document.getElementById('hwOutputMeta').innerHTML = `
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px;">
+                    <span style="background: rgba(255,152,0,0.2); border: 1px solid #ff9800; color: #ff9800; padding: 3px 8px; border-radius: 12px;">📍 ${escapeHtml(c.scenario)}</span>
+                    <span style="background: rgba(168,85,247,0.2); border: 1px solid #a855f7; color: #a855f7; padding: 3px 8px; border-radius: 12px;">Grammar: ${c.grammarList.join(', ')}</span>
+                    <span style="background: rgba(${c.difficulty === 1 ? '57,255,20' : '255,255,0'},0.15); border: 1px solid ${c.difficulty === 1 ? '#39ff14' : '#ffff00'}; color: ${c.difficulty === 1 ? '#39ff14' : '#ffff00'}; padding: 3px 8px; border-radius: 12px;">Level ${c.difficulty}</span>
+                    <span style="background: rgba(0,255,255,0.15); border: 1px solid #00ffff; color: #00ffff; padding: 3px 8px; border-radius: 12px;">${hwState.data.sentences.length} sentences</span>
+                </div>`;
+            document.getElementById('hwOutputCard').style.display = 'block';
+            showHWPDF(1);
+            document.getElementById('hwOutputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function showHWPDF(num) {
+            currentHWPDF = num;
+            document.querySelectorAll('.hw-pdf-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.hw-pdf-tab')[num - 1]?.classList.add('active');
+
+            const preview = document.getElementById('hwPDFPreview');
+            const d = hwState.data;
+            const c = d.config;
+
+            if (num === 1) {
+                // Translation Sheet
+                let html = `<div style="color: #ff9800; font-weight: 700; font-size: 14px; margin-bottom: 15px;">📄 PDF 1 — Translation Sheet (Student Version)</div>`;
+                html += `<p style="color: #888; font-size: 11px; margin-bottom: 10px;">Topic: ${escapeHtml(c.scenario)} · Grammar: ${c.grammarList.join(', ')} · Level ${c.difficulty}</p>`;
+                html += `<p style="color: #aaa; font-size: 12px; margin-bottom: 15px; font-style: italic;">Translate the following sentences into Korean using the required grammar.</p>`;
+                d.sentences.forEach((s, i) => {
+                    html += `<div class="drill-sentence-row"><span class="drill-sentence-num">${i + 1}.</span><div class="drill-sentence-text">${escapeHtml(s)}</div></div>`;
+                });
+                preview.innerHTML = html;
+            } else if (num === 2) {
+                // Production Sheet
+                let html = `<div style="color: #00ffff; font-weight: 700; font-size: 14px; margin-bottom: 15px;">📄 PDF 2 — Student Production Sheet</div>`;
+                html += `<p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">Write <strong style="color: #00ffff;">${c.prodCount}</strong> original Korean sentences about <strong style="color: #ff9800;">${escapeHtml(c.scenario)}</strong> using the grammar: <strong style="color: #a855f7;">${c.grammarList.join(', ')}</strong>.</p>`;
+                html += `<p style="color: #888; font-size: 11px; margin-bottom: 15px;">Difficulty: Level ${c.difficulty}${c.difficulty === 2 ? ' (use conjunctions or reported speech)' : ' (simple sentences)'}.</p>`;
+                for (let i = 1; i <= c.prodCount; i++) {
+                    html += `<div style="padding: 6px 10px; margin-bottom: 4px; border-bottom: 1px solid #222; font-size: 12px; color: #555;">${i}. _____________________________________________</div>`;
+                }
+                preview.innerHTML = html;
+            } else if (num === 3) {
+                // Direct Answer Key
+                let html = `<div style="color: #39ff14; font-weight: 700; font-size: 14px; margin-bottom: 15px;">📄 PDF 3 — Direct Answer Key</div>`;
+                html += `<p style="color: #888; font-size: 11px; margin-bottom: 10px;">Strict translations using required grammar.</p>`;
+                d.sentences.forEach((s, i) => {
+                    html += `<div class="drill-sentence-row">
+                        <span class="drill-sentence-num">${i + 1}.</span>
+                        <div>
+                            <div style="color: #888; font-size: 11px; margin-bottom: 3px;">${escapeHtml(s)}</div>
+                            <div class="drill-sentence-text" style="color: #39ff14;">${escapeHtml(d.answersDirect[i] || '—')}</div>
+                        </div>
+                    </div>`;
+                });
+                preview.innerHTML = html;
+            } else if (num === 4) {
+                // Natural Answer Key
+                let html = `<div style="color: #ff00ff; font-weight: 700; font-size: 14px; margin-bottom: 15px;">📄 PDF 4 — Natural / Appropriate Answer Key</div>`;
+                html += `<p style="color: #888; font-size: 11px; margin-bottom: 10px;">Natural Korean variations — contextually correct responses.</p>`;
+                d.sentences.forEach((s, i) => {
+                    html += `<div class="drill-sentence-row">
+                        <span class="drill-sentence-num">${i + 1}.</span>
+                        <div>
+                            <div style="color: #888; font-size: 11px; margin-bottom: 3px;">${escapeHtml(s)}</div>
+                            <div class="drill-sentence-text" style="color: #ff00ff;">${escapeHtml(d.answersNatural[i] || '—')}</div>
+                        </div>
+                    </div>`;
+                });
+                preview.innerHTML = html;
+            }
+        }
+
+        // ===================== PDF DOWNLOAD =====================
+
+        function generatePDFContent(pdfNum) {
+            const d = hwState.data;
+            const c = d.config;
+            let title = '', subtitle = '', lines = [];
+
+            if (pdfNum === 1) {
+                title = 'Translation Sheet — Student Version';
+                subtitle = `Topic: ${c.scenario} | Grammar: ${c.grammarList.join(', ')} | Level ${c.difficulty}`;
+                lines = d.sentences.map((s, i) => `${i + 1}. ${s}`);
+            } else if (pdfNum === 2) {
+                title = 'Student Production Sheet';
+                subtitle = `Write ${c.prodCount} original Korean sentences about "${c.scenario}" using: ${c.grammarList.join(', ')} (Level ${c.difficulty})`;
+                for (let i = 1; i <= c.prodCount; i++) lines.push(`${i}. ___________________________________________`);
+            } else if (pdfNum === 3) {
+                title = 'Direct Answer Key';
+                subtitle = `Strict Korean translations | Grammar: ${c.grammarList.join(', ')}`;
+                d.sentences.forEach((s, i) => {
+                    lines.push(`${i + 1}. ${s}`);
+                    lines.push(`   → ${d.answersDirect[i] || '—'}`);
+                    lines.push('');
+                });
+            } else if (pdfNum === 4) {
+                title = 'Natural Answer Key';
+                subtitle = `Natural Korean variations | Grammar: ${c.grammarList.join(', ')}`;
+                d.sentences.forEach((s, i) => {
+                    lines.push(`${i + 1}. ${s}`);
+                    lines.push(`   → ${d.answersNatural[i] || '—'}`);
+                    lines.push('');
+                });
+            }
+
+            return { title, subtitle, lines };
+        }
+
+        function downloadHWPDF(pdfNum) {
+            if (!hwState.data) { alert('No homework generated yet.'); return; }
+            const { title, subtitle, lines } = generatePDFContent(pdfNum);
+            const textContent = `${title}\n${subtitle}\n${'═'.repeat(60)}\n\n${lines.join('\n')}`;
+
+            // Download as a formatted text file (for easy printing)
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const safeName = hwState.data.config.scenario.replace(/[^a-zA-Z0-9]/g, '_');
+            a.download = `HW_PDF${pdfNum}_${safeName}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadAllHWPDFs() {
+            if (!hwState.data) { alert('No homework generated yet.'); return; }
+            for (let i = 1; i <= 4; i++) {
+                setTimeout(() => downloadHWPDF(i), i * 300);
+            }
+        }
     </script>
+
 </body>
 </html>
