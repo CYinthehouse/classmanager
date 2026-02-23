@@ -2441,6 +2441,19 @@
                             <button class="btn btn-danger admin-delete-btn" onclick="resetAllData()" id="resetAllDataBtn">⚠️ Reset ALL Data</button>
                         </div>
                     </div>
+                    
+                    <!-- Date Repair Section -->
+                    <div class="card" style="margin-top: 20px; border-color: #a855f7;">
+                        <h3 style="color: #a855f7; border-bottom-color: #a855f7;">🔧 Date Repair Tool</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Scans all classes and prescheduled slots for start dates that don't match their scheduled day (e.g. a Sunday class with a Monday start date). Fixes by shifting the date to the correct day of the week.</p>
+                        <div id="dateRepairMessage"></div>
+                        <div id="dateRepairPreview" style="display: none; margin-bottom: 15px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-info" onclick="scanDateMismatches()">🔍 Scan for Date Mismatches</button>
+                            <button class="btn" onclick="fixDateMismatches()" id="fixDatesBtn" disabled style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7; color: #fff; font-weight: 700;">🔧 Fix All Dates</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ===================== DRILL + HOMEWORK MAKER TAB ===================== -->
@@ -4037,8 +4050,17 @@
             if (!dateString) return 'Not set';
             const defaultOptions = { month: 'short', day: 'numeric', year: 'numeric' };
             const formatOptions = { ...defaultOptions, ...options, timeZone: 'America/New_York' };
-            const date = new Date(dateString + 'T12:00:00');
+            const date = new Date(dateString + 'T12:00:00-05:00'); // noon EST — no timezone shift
             return date.toLocaleDateString('en-US', formatOptions);
+        }
+
+        // Convert a Date object to YYYY-MM-DD in EST (safe — no UTC shift)
+        function toESTDateStr(date) {
+            if (!date) return '';
+            const parts = date.toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+            // parts = "MM/DD/YYYY"
+            const [m, d, y] = parts.split('/');
+            return `${y}-${m}-${d}`;
         }
         
         // Get start of today in EST (midnight)
@@ -6526,15 +6548,15 @@
                     
                     <div class="class-preview-date ${cls.startDate ? 'selected' : ''}">
                         <label>📅 Start Date:</label>
-                        <input type="date" value="${cls.startDate || ''}" onchange="setPreviewClassDate(${idx}, this.value)" ${status === 'pending' && cls.availableDate ? 'min="' + cls.availableDate.toISOString().split('T')[0] + '"' : ''}>
+                        <input type="date" value="${cls.startDate || ''}" onchange="setPreviewClassDate(${idx}, this.value)" ${status === 'pending' && cls.availableDate ? 'min="' + toESTDateStr(cls.availableDate) + '"' : ''}>
                     </div>
                     
                     ${status === 'pending' && cls.availableDate ? renderAvailableDateButton(cls, idx) : ''}
                     
                     <div class="saturday-quick-btns">
                         ${saturdays.map(sat => {
-                            const dateStr = sat.toISOString().split('T')[0];
-                            const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            const dateStr = toESTDateStr(sat);
+                            const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
                             const isSelected = cls.startDate === dateStr;
                             // For pending classes, disable dates before available date
                             const isDisabled = status === 'pending' && cls.availableDate && sat < cls.availableDate;
@@ -6561,8 +6583,8 @@
                 firstAvailableSaturday.setDate(availDate.getDate() + daysUntilSat);
             }
             
-            const dateStr = firstAvailableSaturday.toISOString().split('T')[0];
-            const label = firstAvailableSaturday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const dateStr = toESTDateStr(firstAvailableSaturday);
+            const label = firstAvailableSaturday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
             const isSelected = cls.startDate === dateStr;
             
             return '<div style="margin: 8px 0;">' +
@@ -6577,8 +6599,8 @@
         function getUpcomingSaturdaysHTML(proposalId, selectedDate) {
             const saturdays = getUpcomingSaturdays(5);
             return saturdays.map(sat => {
-                const dateStr = sat.toISOString().split('T')[0];
-                const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const dateStr = toESTDateStr(sat);
+                const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
                 const isSelected = selectedDate === dateStr;
                 return `<button type="button" class="saturday-quick-btn ${isSelected ? 'selected' : ''}" onclick="updateProposalDate('${proposalId}', '${dateStr}')">${label}</button>`;
             }).join('');
@@ -6981,8 +7003,8 @@
             const day = d.getDay();
             const daysToTuesday = (day < 2) ? (day + 5) : (day - 2);
             d.setDate(d.getDate() - daysToTuesday);
-            d.setHours(0, 0, 0, 0);
-            return d.toISOString().split('T')[0];
+            d.setHours(12, 0, 0, 0);
+            return toESTDateStr(d);
         }
         
         // Change week
@@ -7692,7 +7714,7 @@
                 for (let w = 0; w < numWeeks; w++) {
                     const weekEnd = new Date(weekStart);
                     weekEnd.setDate(weekEnd.getDate() + 6);
-                    const weekOf = weekStart.toISOString().split('T')[0];
+                    const weekOf = toESTDateStr(weekStart);
                     
                     // Get Monday's date for this week
                     const monday = new Date(weekStart);
@@ -18221,6 +18243,172 @@ Return ONLY valid JSON (single object, not array):
                 alert('Error: ' + e.message);
             }
         }
+
+        // ===================== DATE REPAIR TOOL =====================
+
+        const DAY_NAME_TO_NUM = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+        let dateMismatches = []; // stores found issues for fixing
+
+        async function scanDateMismatches() {
+            const msgEl = document.getElementById('dateRepairMessage');
+            const previewEl = document.getElementById('dateRepairPreview');
+            msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Scanning...</p>';
+            previewEl.style.display = 'none';
+            dateMismatches = [];
+
+            try {
+                // Scan scheduler_classes
+                const classSnap = await db.collection('scheduler_classes').get();
+                classSnap.forEach(doc => {
+                    const d = doc.data();
+                    if (!d.startDate || !d.day) return;
+                    const stored = parseLocalDate(d.startDate);
+                    if (!stored) return;
+                    const storedDayName = stored.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' });
+                    if (storedDayName !== d.day) {
+                        const corrected = findNearestCorrectDate(d.startDate, d.day);
+                        dateMismatches.push({
+                            collection: 'scheduler_classes',
+                            id: doc.id,
+                            day: d.day,
+                            time: d.time,
+                            level: d.level,
+                            storedDate: d.startDate,
+                            storedDayName,
+                            correctedDate: corrected,
+                            status: d.status
+                        });
+                    }
+                });
+
+                // Scan prescheduled_slots
+                const psSnap = await db.collection('prescheduled_slots').get();
+                psSnap.forEach(doc => {
+                    const d = doc.data();
+                    if (!d.startDate || !d.day) return;
+                    const stored = parseLocalDate(d.startDate);
+                    if (!stored) return;
+                    const storedDayName = stored.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' });
+                    if (storedDayName !== d.day) {
+                        const corrected = findNearestCorrectDate(d.startDate, d.day);
+                        dateMismatches.push({
+                            collection: 'prescheduled_slots',
+                            id: doc.id,
+                            day: d.day,
+                            time: d.time,
+                            level: d.classType,
+                            storedDate: d.startDate,
+                            storedDayName,
+                            correctedDate: corrected,
+                            status: 'prescheduled'
+                        });
+                    }
+                });
+
+                if (dateMismatches.length === 0) {
+                    msgEl.innerHTML = '<p style="color: #39ff14; font-size: 12px;">✅ No date mismatches found! All start dates match their scheduled days.</p>';
+                    document.getElementById('fixDatesBtn').disabled = true;
+                    return;
+                }
+
+                // Render preview
+                let html = `<p style="color: #ffff00; font-size: 12px; margin-bottom: 10px;">⚠️ Found ${dateMismatches.length} date mismatch(es):</p>`;
+                html += '<table style="width: 100%; font-size: 11px;"><thead><tr><th>Slot</th><th>Type</th><th>Stored Date</th><th>Actual Day</th><th>Corrected</th></tr></thead><tbody>';
+                dateMismatches.forEach(m => {
+                    const correctedDisplay = formatDateInEST(m.correctedDate, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                    html += `<tr>
+                        <td style="color: #fff;">${m.day} @ ${m.time}</td>
+                        <td>${m.collection === 'scheduler_classes' ? `<span style="color: #ff3366;">${m.status}</span>` : '<span style="color: #ff9800;">prescheduled</span>'}</td>
+                        <td style="color: #ff3366;">${m.storedDate} <span style="color: #888;">(${m.storedDayName})</span></td>
+                        <td style="color: #ffff00;">${m.day}</td>
+                        <td style="color: #39ff14;">${m.correctedDate} <span style="color: #888;">(${correctedDisplay})</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+
+                previewEl.innerHTML = html;
+                previewEl.style.display = 'block';
+                msgEl.innerHTML = `<p style="color: #ffff00; font-size: 12px;">⚠️ ${dateMismatches.length} mismatch(es) found. Review above and click "Fix All Dates" to correct them.</p>`;
+                document.getElementById('fixDatesBtn').disabled = false;
+
+            } catch (err) {
+                console.error('Date scan error:', err);
+                msgEl.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error scanning: ${err.message}</p>`;
+            }
+        }
+
+        function findNearestCorrectDate(dateStr, targetDayName) {
+            // Given a stored date string and the correct day name,
+            // find the nearest date (prefer going backward by 1 since the common bug shifts +1 day)
+            const targetDayNum = DAY_NAME_TO_NUM[targetDayName];
+            if (targetDayNum === undefined) return dateStr;
+
+            const stored = parseLocalDate(dateStr);
+            if (!stored) return dateStr;
+
+            const storedDayNum = stored.getDay();
+            
+            // Calculate how many days to shift backward and forward to hit the target day
+            let backShift = (storedDayNum - targetDayNum + 7) % 7;
+            let fwdShift = (targetDayNum - storedDayNum + 7) % 7;
+            
+            // Prefer the closest; if tied prefer backward (the bug typically shifts +1)
+            let bestShift;
+            if (backShift === 0) {
+                return dateStr; // already correct (shouldn't happen since we filtered)
+            } else if (backShift <= fwdShift) {
+                bestShift = -backShift;
+            } else {
+                bestShift = fwdShift;
+            }
+
+            const corrected = new Date(stored);
+            corrected.setDate(corrected.getDate() + bestShift);
+            return toESTDateStr(corrected);
+        }
+
+        async function fixDateMismatches() {
+            if (dateMismatches.length === 0) return;
+
+            if (!confirm(`Fix ${dateMismatches.length} date mismatch(es)?\n\nThis will update the startDate field in Firestore for each affected class/slot.`)) return;
+
+            const msgEl = document.getElementById('dateRepairMessage');
+            msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Fixing dates...</p>';
+            document.getElementById('fixDatesBtn').disabled = true;
+
+            let fixed = 0, errors = 0;
+
+            for (const m of dateMismatches) {
+                try {
+                    await db.collection(m.collection).doc(m.id).update({
+                        startDate: m.correctedDate
+                    });
+                    // Update local data
+                    if (m.collection === 'scheduler_classes') {
+                        const cls = allClasses.find(c => c.id === m.id);
+                        if (cls) cls.startDate = m.correctedDate;
+                    } else {
+                        const ps = allPrescheduledSlots.find(p => p.id === m.id);
+                        if (ps) ps.startDate = m.correctedDate;
+                    }
+                    fixed++;
+                } catch (err) {
+                    console.error(`Error fixing ${m.collection}/${m.id}:`, err);
+                    errors++;
+                }
+            }
+
+            msgEl.innerHTML = `<p style="color: #39ff14; font-size: 12px;">✅ Fixed ${fixed} date(s).${errors > 0 ? ` <span style="color: #ff3366;">${errors} error(s).</span>` : ''} Refreshing...</p>`;
+            dateMismatches = [];
+            document.getElementById('dateRepairPreview').style.display = 'none';
+
+            // Refresh data
+            await loadAllClasses();
+            await loadPrescheduledSlots();
+            renderSlotGrid();
+            renderClasses();
+            updateDashboardStats();
+        }
         
         // Set 1-Year Academy status for a student
         async function setAcademyStatus(classId, studentId, status) {
@@ -21952,15 +22140,15 @@ Return ONLY valid JSON (single object, not array):
             
             // Calculate weekly consistency
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayStr = today.toISOString().split('T')[0];
+            today.setHours(12, 0, 0, 0);
+            const todayStr = toESTDateStr(today);
             const studyLog = leitnerStats.studyLog || {};
             
             const last7Days = [];
             for (let i = 6; i >= 0; i--) {
                 const date = new Date(today);
                 date.setDate(date.getDate() - i);
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = toESTDateStr(date);
                 last7Days.push({ date: dateStr, count: studyLog[dateStr] || 0 });
             }
             const daysStudiedThisWeek = last7Days.filter(d => d.count > 0).length;
@@ -24699,9 +24887,9 @@ ${daySpecific}
             let count = 0;
             
             while (currentDate <= endDate && count < 5) {
-                const dateStr = currentDate.toISOString().split('T')[0];
-                const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = toESTDateStr(currentDate);
+                const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
+                const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
                 
                 optionsHtml += `
                     <button type="button" class="btn btn-sm date-option-btn" 
@@ -26868,9 +27056,9 @@ ${additionalText}
             let firstDateSelected = false;
             
             while (currentDate <= endDate && count < 5) {
-                const dateStr = currentDate.toISOString().split('T')[0];
-                const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = toESTDateStr(currentDate);
+                const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+                const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
                 
                 const isSelected = !firstDateSelected;
                 if (isSelected) {
