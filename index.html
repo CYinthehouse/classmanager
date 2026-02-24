@@ -1936,8 +1936,9 @@
                         <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Upload materials for Tuesday Reading Class. Select TEXT or IMAGE input. Up to 10 sets, each becomes a reading card.</p>
 
                         <!-- View Materials Button -->
-                        <div style="margin-bottom: 18px;">
+                        <div style="margin-bottom: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
                             <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
+                            <button class="btn" onclick="trImportFromMaterials()" style="background: linear-gradient(135deg, #0ea5e9, #38bdf8); border: 2px solid #38bdf8; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(56,189,248,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(56,189,248,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(56,189,248,0.3)'">📂 Import from Materials</button>
                         </div>
 
                         <!-- Input Mode Toggle -->
@@ -1966,6 +1967,25 @@
                         <div id="trAIProcessing" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255,0,255,0.1); border: 1px solid #ff00ff; border-radius: 8px; text-align: center;">
                             <div style="font-size: 14px; color: #ff00ff;">⏳ Generating English translations via AI...</div>
                             <div style="font-size: 11px; color: #888; margin-top: 5px;">This may take a moment</div>
+                        </div>
+
+                        <!-- Audio Aggregator: Listen All Voice Messages -->
+                        <div style="margin-top: 25px; padding: 20px; background: rgba(0,0,0,0.4); border: 2px solid #ff9800; border-radius: 12px;">
+                            <h3 style="color: #ff9800; font-size: 16px; margin: 0 0 12px 0; border-bottom: 1px solid rgba(255,152,0,0.3); padding-bottom: 8px;">🔊 Listen All Voice Messages</h3>
+                            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Listen to all student voice messages from every channel since your last check, combined into one audio at 2x speed with name announcements.</p>
+                            
+                            <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                                <button onclick="trListenAllChannels()" style="background: linear-gradient(135deg, #ff9800, #f57c00); border: 2px solid #ff9800; color: #000; font-size: 14px; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.25s; white-space: nowrap;" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 20px rgba(255,152,0,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='none'">🔊 Listen All</button>
+                                <button onclick="trManageAudioChannels()" style="background: rgba(255,152,0,0.2); border: 2px solid #ff9800; color: #ff9800; font-size: 12px; padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: all 0.25s;" title="Add/Remove Channels">⚙️</button>
+                            </div>
+
+                            <!-- Audio Processing Status -->
+                            <div id="trAudioStatus" style="display: none; margin-top: 12px; padding: 12px; background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); border-radius: 8px; text-align: center;">
+                                <div id="trAudioStatusText" style="font-size: 13px; color: #ff9800;">⏳ Fetching voice messages...</div>
+                            </div>
+
+                            <!-- Audio Players Container (one per channel) -->
+                            <div id="trAudioPlayersContainer" style="margin-top: 12px;"></div>
                         </div>
                     </div>
 
@@ -2002,9 +2022,11 @@
                                     <div class="mat-export-btns" id="matExportBtns" style="display: none;">
                                         <input type="file" id="matAudioFileInput" accept="audio/*" style="display:none;" onchange="matHandleAudioUpload(this)">
                                         <button class="mat-btn-export" onclick="document.getElementById('matAudioFileInput').click()" style="border-color: #a855f7; color: #a855f7;" id="matAudioUploadBtn">🎙️ Upload Audio</button>
-                                        <button class="mat-btn-export" onclick="matOpenTranscriptEditor()" style="border-color: #f59e0b; color: #f59e0b; display:none;" id="matEditTranscriptBtn">✏️ Edit Transcript</button>
+                                        <button class="mat-btn-export" onclick="matOpenTranscriptEditor()" style="border-color: #f59e0b; color: #f59e0b;" id="matEditTranscriptBtn">✏️ Edit Transcript</button>
                                         <button class="mat-btn-export mat-btn-pdf" onclick="matExportPDF()">📄 Export PDF</button>
                                         <button class="mat-btn-export mat-btn-html" onclick="matExportHTML()">🌐 Export HTML</button>
+                                        <button class="mat-btn-export" onclick="matPublishToWeb()" style="border-color: #3b82f6; color: #3b82f6;" id="matPublishBtn">📤 Publish to Web</button>
+                                        <button class="mat-btn-export" onclick="matManagePublished()" style="border-color: #f97316; color: #f97316;">🗂️ Manage Published</button>
                                     </div>
                                 </div>
                                 <div id="matSlideshowArea" style="cursor: pointer;" title="Click to expand">
@@ -8961,13 +8983,134 @@
 
         // LEFT side (Absolute Beginner / Novice) - 2 webhooks in sequence
         var TR_LEFT_SCENARIO_1 = 'https://hook.us1.make.com/ll6xp5y344i236cycriyi2ru85yvh1po';
-        var TR_LEFT_SCENARIO_2 = 'https://hook.us1.make.com/xdv7jd4rdg1d6etm4naj9w2cc4f1fynm';
+        var TR_LEFT_SCENARIO_2 = 'https://hook.us1.make.com/mwxxdekf1rzddk4jpfpqjvjkwoc4guet';
         // RIGHT side (Beginner and Up) - 2 webhooks in sequence
         var TR_RIGHT_SCENARIO_1 = 'https://hook.us1.make.com/2bg4hojfj0sqvdu7cgpjfrpjlu3dy4jk';
-        var TR_RIGHT_SCENARIO_2 = 'https://hook.us1.make.com/cci2q6g601th336qlnqgwls6ubkalxxh';
+        var TR_RIGHT_SCENARIO_2 = 'https://hook.us1.make.com/8aa4rj9paxkfy98pqntwogesr257mgq8';
         // Leaderboard - 2 webhooks in parallel
         var TR_LEADERBOARD_NOVICE = 'https://hook.us1.make.com/k7v6ihd0q43ydubdu4fp3ggpsqko2aba';
         var TR_LEADERBOARD_ADVANCED = 'https://hook.us1.make.com/15ltmrk4f3mubtkyc5pt07h2cjkblrjo';
+
+        function trImportFromMaterials() {
+            // Show a modal with the same saved materials list
+            var modal = document.createElement('div');
+            modal.id = 'trImportModal';
+            modal.className = 'modal-overlay active';
+            modal.innerHTML = '<div class="modal" style="max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">' +
+                '<button class="modal-close" onclick="document.getElementById(\'trImportModal\').remove()">×</button>' +
+                '<h3 style="color: #38bdf8; margin-bottom: 10px;">📂 Import from Materials Creator</h3>' +
+                '<p style="font-size: 12px; color: #888; margin-bottom: 12px;">Select a saved reading. Sentences will be auto-distributed into sets (2 sentences per set).</p>' +
+                '<div id="trImportList" style="flex: 1; overflow-y: auto; min-height: 100px;"><p style="color:#888; text-align:center;">Loading...</p></div></div>';
+            document.body.appendChild(modal);
+
+            db.collection(MAT_TEXTS_COLLECTION).orderBy('savedAt', 'desc').get()
+            .then(function(snap) {
+                var list = document.getElementById('trImportList');
+                if (!list) return;
+                if (snap.empty) {
+                    list.innerHTML = '<p style="color:#888; text-align:center;">No saved materials yet.</p>';
+                    return;
+                }
+                var html = '';
+                snap.forEach(function(doc) {
+                    var d = doc.data();
+                    var date = d.savedAt ? d.savedAt.toDate() : new Date();
+                    var dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    var preview = (d.text || '').substring(0, 100).replace(/\n/g, ' ');
+                    if ((d.text || '').length > 100) preview += '…';
+                    var slideCount = 0;
+                    try { if (d.slides) slideCount = JSON.parse(d.slides).length; } catch(e) {}
+
+                    html += '<div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 15px; margin-bottom:8px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor=\'#38bdf8\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.1)\'" onclick="trDoImport(\'' + doc.id + '\')">';
+                    html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">';
+                    html += '<span style="color:#fff; font-weight:600; font-size:14px;">' + matEscHtml(d.name || 'Untitled') + '</span>';
+                    html += '<span style="color:#666; font-size:11px;">' + dateStr + '</span>';
+                    html += '</div>';
+                    html += '<div style="color:#888; font-size:12px;">' + matEscHtml(preview) + '</div>';
+                    if (slideCount > 0) html += '<div style="margin-top:4px;"><span style="color:#2ecc71; font-size:11px;">🎬 ' + slideCount + ' slides</span></div>';
+                    html += '</div>';
+                });
+                list.innerHTML = html;
+            })
+            .catch(function(err) {
+                var list = document.getElementById('trImportList');
+                if (list) list.innerHTML = '<p style="color:#ff4757; text-align:center;">Error: ' + err.message + '</p>';
+            });
+        }
+
+        function trDoImport(docId) {
+            db.collection(MAT_TEXTS_COLLECTION).doc(docId).get()
+            .then(function(doc) {
+                if (!doc.exists) { alert('Not found.'); return; }
+                var data = doc.data();
+
+                // Extract all sentences from the slides
+                var allSentences = [];
+                if (data.slides) {
+                    try {
+                        var slides = JSON.parse(data.slides);
+                        for (var i = 0; i < slides.length; i++) {
+                            if (slides[i].sentences) {
+                                for (var j = 0; j < slides[i].sentences.length; j++) {
+                                    var s = slides[i].sentences[j].trim();
+                                    if (s) allSentences.push(s);
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                // Fallback: parse from raw text if no slides
+                if (allSentences.length === 0 && data.text) {
+                    var lines = data.text.split(/\n+/);
+                    for (var i = 0; i < lines.length; i++) {
+                        var s = lines[i].trim();
+                        if (s) allSentences.push(s);
+                    }
+                }
+
+                if (allSentences.length === 0) {
+                    alert('No sentences found in this material.');
+                    return;
+                }
+
+                // Distribute 2 sentences per set
+                trSets = [];
+                trInputMode = 'text';
+                var textBtn = document.getElementById('trModeTextBtn');
+                var imageBtn = document.getElementById('trModeImageBtn');
+                if (textBtn) textBtn.classList.add('tr-mode-active');
+                if (imageBtn) imageBtn.classList.remove('tr-mode-active');
+
+                for (var i = 0; i < allSentences.length; i += 2) {
+                    if (trSets.length >= TR_MAX_SETS) break;
+                    var text = allSentences[i];
+                    if (i + 1 < allSentences.length) {
+                        text += '\n' + allSentences[i + 1];
+                    }
+                    trSets.push({
+                        mode: 'text',
+                        text: text,
+                        imageUrl: '',
+                        extractedText: '',
+                        processing: false
+                    });
+                }
+
+                renderTRSets();
+                updateTRSetCounter();
+
+                // Close modal
+                var modal = document.getElementById('trImportModal');
+                if (modal) modal.remove();
+
+                alert('✅ Imported ' + allSentences.length + ' sentences into ' + trSets.length + ' sets (2 per set).' +
+                    (allSentences.length > TR_MAX_SETS * 2 ? '\n⚠️ Some sentences were trimmed (max ' + TR_MAX_SETS + ' sets).' : ''));
+            })
+            .catch(function(err) {
+                alert('Import failed: ' + err.message);
+            });
+        }
 
         function initTuesdayReadingTab() {
             // Auto-add first set if none exist
@@ -9655,6 +9798,182 @@
             var displayArea = document.getElementById('trCardsDisplayArea');
             if (displayArea) displayArea.style.display = 'none';
         }
+        // ==================== AUDIO AGGREGATOR (Listen All) ====================
+        
+        var TR_AUDIO_WEBHOOK = 'https://hook.us1.make.com/msracwuwai2efc1510tzq20bbhohfid7'; // Make.com webhook for audio aggregation
+        
+        // Channel management - stored in localStorage
+        function trGetAudioChannels() {
+            try {
+                var saved = localStorage.getItem('trAudioChannels');
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+            return [];
+            // Each channel: { id: 'discord_channel_id', name: 'Level 1 - Novice' }
+        }
+        
+        function trSaveAudioChannels(channels) {
+            localStorage.setItem('trAudioChannels', JSON.stringify(channels));
+        }
+        
+        function trPopulateChannelDropdown() {
+            var select = document.getElementById('trAudioChannelSelect');
+            if (!select) return;
+            var channels = trGetAudioChannels();
+            select.innerHTML = '<option value="">-- Select a channel --</option>';
+            channels.forEach(function(ch) {
+                var opt = document.createElement('option');
+                opt.value = ch.id;
+                opt.textContent = ch.name;
+                select.appendChild(opt);
+            });
+        }
+        
+        function trManageAudioChannels() {
+            var channels = trGetAudioChannels();
+            var html = '<div style="max-width:500px;width:100%;">';
+            html += '<h3 style="color:#ff9800;margin:0 0 15px 0;">⚙️ Manage Discord Channels</h3>';
+            html += '<p style="color:#888;font-size:12px;margin-bottom:15px;">Add your Discord class channels. Right-click a channel in Discord → Copy Channel ID.</p>';
+            
+            // Existing channels
+            html += '<div id="trChannelList" style="margin-bottom:15px;">';
+            if (channels.length === 0) {
+                html += '<p style="color:#666;font-size:12px;">No channels added yet.</p>';
+            } else {
+                channels.forEach(function(ch, idx) {
+                    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.2);border-radius:6px;">';
+                    html += '<span style="color:#ff9800;font-weight:600;flex:1;">' + escapeHtml(ch.name) + '</span>';
+                    html += '<span style="color:#888;font-size:11px;">' + ch.id + '</span>';
+                    html += '<button onclick="trRemoveAudioChannel(' + idx + ')" style="background:#ff3366;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;">✕</button>';
+                    html += '</div>';
+                });
+            }
+            html += '</div>';
+            
+            // Add new channel
+            html += '<div style="display:flex;gap:8px;margin-bottom:15px;">';
+            html += '<input type="text" id="trNewChannelName" placeholder="Channel name (e.g. Level 1)" style="flex:1;padding:8px;background:rgba(0,0,0,0.4);border:1px solid #ff9800;border-radius:6px;color:#fff;font-size:13px;">';
+            html += '<input type="text" id="trNewChannelId" placeholder="Discord Channel ID" style="flex:1;padding:8px;background:rgba(0,0,0,0.4);border:1px solid #ff9800;border-radius:6px;color:#fff;font-size:13px;">';
+            html += '<button onclick="trAddAudioChannel()" style="background:#ff9800;color:#000;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;">+ Add</button>';
+            html += '</div>';
+            
+            html += '<div style="text-align:right;"><button onclick="document.getElementById(\'trChannelModal\').remove()" style="background:#333;color:#fff;border:1px solid #555;padding:8px 20px;border-radius:6px;cursor:pointer;">Close</button></div>';
+            html += '</div>';
+            
+            var overlay = document.createElement('div');
+            overlay.id = 'trChannelModal';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:100000;display:flex;justify-content:center;align-items:center;padding:20px;';
+            overlay.innerHTML = '<div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:25px;max-width:550px;width:100%;">' + html + '</div>';
+            document.body.appendChild(overlay);
+        }
+        
+        function trAddAudioChannel() {
+            var name = document.getElementById('trNewChannelName').value.trim();
+            var id = document.getElementById('trNewChannelId').value.trim();
+            if (!name || !id) { alert('Please enter both a name and channel ID.'); return; }
+            
+            var channels = trGetAudioChannels();
+            channels.push({ id: id, name: name });
+            trSaveAudioChannels(channels);
+            trPopulateChannelDropdown();
+            
+            // Refresh the modal
+            document.getElementById('trChannelModal').remove();
+            trManageAudioChannels();
+        }
+        
+        function trRemoveAudioChannel(idx) {
+            var channels = trGetAudioChannels();
+            channels.splice(idx, 1);
+            trSaveAudioChannels(channels);
+            trPopulateChannelDropdown();
+            
+            // Refresh the modal
+            document.getElementById('trChannelModal').remove();
+            trManageAudioChannels();
+        }
+        
+        function trListenAllChannels() {
+            var channels = trGetAudioChannels();
+            if (channels.length === 0) { alert('No channels configured. Click ⚙️ to add Discord channels.'); return; }
+            
+            if (TR_AUDIO_WEBHOOK === 'YOUR_MAKE_WEBHOOK_URL_HERE') {
+                alert('Audio aggregation webhook URL not configured.');
+                return;
+            }
+            
+            var statusDiv = document.getElementById('trAudioStatus');
+            var statusText = document.getElementById('trAudioStatusText');
+            var playersContainer = document.getElementById('trAudioPlayersContainer');
+            
+            statusDiv.style.display = 'block';
+            statusText.innerHTML = '⏳ Fetching voice messages from <strong>' + channels.length + ' channels</strong>...';
+            statusText.style.color = '#ff9800';
+            playersContainer.innerHTML = '';
+            
+            var completed = 0;
+            var total = channels.length;
+            
+            channels.forEach(function(channel, index) {
+                // Create a player section for each channel
+                var sectionId = 'trAudioSection_' + index;
+                var playerHtml = '<div id="' + sectionId + '" style="margin-bottom: 12px; padding: 15px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,152,0,0.3); border-radius: 8px;">';
+                playerHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+                playerHtml += '<span style="color: #ff9800; font-size: 13px; font-weight: 700;">📡 ' + escapeHtml(channel.name) + '</span>';
+                playerHtml += '<span style="color: #888; font-size: 11px;">⏳ Loading...</span>';
+                playerHtml += '</div>';
+                playerHtml += '</div>';
+                playersContainer.insertAdjacentHTML('beforeend', playerHtml);
+                
+                fetch(TR_AUDIO_WEBHOOK, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        channel_id: channel.id,
+                        channel_name: channel.name
+                    })
+                })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Webhook returned ' + res.status);
+                    return res.json();
+                })
+                .then(function(result) {
+                    var section = document.getElementById(sectionId);
+                    if (!result.audio_url) {
+                        section.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                            '<span style="color: #ff9800; font-size: 13px; font-weight: 700;">📡 ' + escapeHtml(channel.name) + '</span>' +
+                            '<span style="color: #888; font-size: 11px;">📭 No new voice messages</span></div>';
+                    } else {
+                        section.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+                            '<span style="color: #ff9800; font-size: 13px; font-weight: 700;">📡 ' + escapeHtml(channel.name) + '</span>' +
+                            '<span style="color: #888; font-size: 11px;">🎤 ' + (result.clip_count || 0) + ' clips · ' + new Date().toLocaleTimeString() + '</span></div>' +
+                            '<audio controls style="width: 100%; border-radius: 6px;" src="' + result.audio_url + '"></audio>';
+                    }
+                    
+                    completed++;
+                    if (completed >= total) {
+                        statusDiv.style.display = 'none';
+                    } else {
+                        statusText.innerHTML = '⏳ ' + completed + '/' + total + ' channels loaded...';
+                    }
+                })
+                .catch(function(err) {
+                    var section = document.getElementById(sectionId);
+                    section.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                        '<span style="color: #ff9800; font-size: 13px; font-weight: 700;">📡 ' + escapeHtml(channel.name) + '</span>' +
+                        '<span style="color: #ff3366; font-size: 11px;">❌ ' + err.message + '</span></div>';
+                    
+                    completed++;
+                    if (completed >= total) {
+                        statusDiv.style.display = 'none';
+                    }
+                    console.error('Audio aggregation error for ' + channel.name + ':', err);
+                });
+            });
+        }
+        
+        // ==================== END AUDIO AGGREGATOR ====================
+
         // ==================== END TUESDAY READING CLASS ====================
 
         // ==================== MATERIALS CREATOR ====================
@@ -10542,6 +10861,98 @@
             input.value = '';
         }
 
+        function matOpenTranscriptPasteMode() {
+            var existing = document.getElementById('matTranscriptEditor');
+            if (existing) existing.remove();
+
+            var overlay = document.createElement('div');
+            overlay.id = 'matTranscriptEditor';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(5,5,18,0.97);z-index:200000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:20px;font-family:Noto Sans KR,sans-serif;';
+
+            var html = '<div style="max-width:700px;width:100%;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+            html += '<h2 style="color:#fff;margin:0;font-size:18px;">📋 Paste Timing JSON</h2>';
+            html += '<button onclick="document.getElementById(\'matTranscriptEditor\').remove()" style="background:#ff4444;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">✕ Close</button>';
+            html += '</div>';
+            html += '<p style="font-size:12px;color:#888;margin-bottom:12px;">No timing data loaded yet. Paste a JSON array of word timings below.<br>Each entry needs: <code style="color:#0ff;">slideIdx, si, wi, word, start, end</code></p>';
+            html += '<textarea id="matTimingJSONInput" rows="14" style="width:100%;font-size:11px;font-family:monospace;background:rgba(0,0,0,0.5);color:#0ff;border:2px solid #333;padding:12px;border-radius:8px;resize:vertical;" placeholder=\'[{"slideIdx":0,"si":0,"wi":0,"word":"코로나","start":0.5,"end":1.2}, ...]\'></textarea>';
+            html += '<div style="display:flex;gap:10px;margin-top:14px;">';
+            html += '<button onclick="matApplyTimingFromPaste()" style="flex:1;background:#39ff14;color:#000;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;">✅ Apply Timing</button>';
+            html += '</div></div>';
+
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+        }
+
+        function matTranscriptImportJSON() {
+            // Show paste modal inside the existing transcript editor
+            var modal = document.createElement('div');
+            modal.id = 'matTimingImportModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:300000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = '<div style="background:#1e2030;border:2px solid #f472b6;border-radius:16px;padding:28px;max-width:650px;width:90%;color:#ddd;font-family:Noto Sans KR,sans-serif;">' +
+                '<h3 style="color:#f472b6;margin:0 0 8px 0;font-size:16px;">📋 Paste Timing JSON</h3>' +
+                '<p style="font-size:11px;color:#888;margin-bottom:10px;">Paste JSON array. This will replace the current timing data.</p>' +
+                '<textarea id="matTimingJSONInput" rows="12" style="width:100%;font-size:11px;font-family:monospace;background:rgba(0,0,0,0.5);color:#0ff;border:1px solid #333;padding:10px;border-radius:8px;resize:vertical;" placeholder=\'[{"slideIdx":0,"si":0,"wi":0,"word":"코로나","start":0.5,"end":1.2}, ...]\'></textarea>' +
+                '<div style="display:flex;gap:10px;margin-top:12px;">' +
+                '<button onclick="matApplyTimingFromPaste()" style="flex:1;background:#39ff14;color:#000;border:none;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">✅ Apply & Reload Editor</button>' +
+                '<button onclick="document.getElementById(\'matTimingImportModal\').remove()" style="flex:1;background:rgba(255,255,255,0.1);color:#999;border:1px solid #444;padding:10px;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+        }
+
+        function matApplyTimingFromPaste() {
+            var input = document.getElementById('matTimingJSONInput');
+            if (!input) return;
+            var text = input.value.trim();
+            if (!text) { alert('Please paste the timing JSON.'); return; }
+
+            try {
+                var timingData = JSON.parse(text);
+                if (!Array.isArray(timingData) || timingData.length === 0) {
+                    throw new Error('Expected a non-empty JSON array.');
+                }
+
+                var first = timingData[0];
+                if (typeof first.slideIdx === 'undefined' || typeof first.start === 'undefined' || typeof first.end === 'undefined') {
+                    throw new Error('Each entry needs slideIdx, si, wi, word, start, and end fields.');
+                }
+
+                var slideMap = timingData.map(function(t) {
+                    return { slideIdx: t.slideIdx, si: t.si, wi: t.wi, word: t.word, start: t.start, end: t.end };
+                });
+
+                var maxEnd = 0;
+                for (var i = 0; i < timingData.length; i++) {
+                    if (timingData[i].end > maxEnd) maxEnd = timingData[i].end;
+                }
+
+                matAudioSyncData = {
+                    audioUrl: matAudioSyncData ? matAudioSyncData.audioUrl : null,
+                    words: timingData,
+                    slideMap: slideMap,
+                    duration: maxEnd
+                };
+
+                // Show Edit Transcript button
+                var editBtn = document.getElementById('matEditTranscriptBtn');
+                if (editBtn) editBtn.style.display = '';
+
+                // Close any import modal
+                var importModal = document.getElementById('matTimingImportModal');
+                if (importModal) importModal.remove();
+
+                // Close and reopen the transcript editor to show the new data
+                var editor = document.getElementById('matTranscriptEditor');
+                if (editor) editor.remove();
+
+                matRenderSlideshow();
+                matOpenTranscriptEditor();
+
+            } catch (e) {
+                alert('❌ Invalid JSON: ' + e.message);
+            }
+        }
+
         function matStripPuncSync(w) {
             return w.replace(/["""''()[\].,!?…·~\-\s]+/g, '');
         }
@@ -11098,7 +11509,7 @@
             h += '#klrn-reader .klr-sentence-actions { display: inline; white-space: nowrap; }\n';
             h += '#klrn-reader .klr-sentence-actions button { background: none; border: none; font-size: calc(17px * var(--s)); cursor: pointer; padding: 0 calc(1px * var(--s)); transition: transform 0.15s; vertical-align: middle; position: relative; top: -1px; }\n';
             h += '#klrn-reader .klr-sentence-actions button:hover { transform: scale(1.2); }\n';
-            h += '.klr-translate-tip { position: fixed; background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; border: 1.5px solid rgba(0,255,255,0.4); border-radius: 12px; padding: 14px 22px; font-size: 22px; font-family: "Noto Sans KR", sans-serif; font-weight: 600; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 100001; pointer-events: auto; opacity: 0; transition: opacity 0.25s ease; }\n';
+            h += '.klr-translate-tip { position: fixed; background: linear-gradient(135deg,#1a1a2e,#2d2748); color: #fff; border: 1.5px solid rgba(0,255,255,0.4); border-radius: calc(12px * var(--s)); padding: calc(14px * var(--s)) calc(22px * var(--s)); font-size: calc(22px * var(--s)); font-family: "Noto Sans KR", sans-serif; font-weight: 600; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 100001; pointer-events: auto; opacity: 0; transition: opacity 0.25s ease; }\n';
             h += '.klr-translate-tip.visible { opacity: 1; }\n';
             h += '#klrn-reader .klr-sentence-hl { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(4px * var(--s)); padding: calc(2px * var(--s)) calc(8px * var(--s)); border-radius: calc(8px * var(--s)); transition: background 0.4s ease; background: transparent; box-decoration-break: clone; -webkit-box-decoration-break: clone; }\n';
             h += '#klrn-reader .klr-sentence-hl.klr-hl-blue { background: rgba(59,130,246,0.22); }\n';
@@ -11171,23 +11582,36 @@
             h += '@keyframes klrCompPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }\n';
             h += '@keyframes klrBounce { 0%,20%,50%,80%,100% { transform: translate(0,0); } 40% { transform: translate(20px,0); } 60% { transform: translate(10px,0); } }\n';
             h += '.klr-tut-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 300000; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }\n';
-            h += '.klr-tut-overlay.visible { opacity: 1; pointer-events: auto; }\n';
-            h += '.klr-tut-popup { position: absolute; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(0,255,255,0.3); border-radius: 16px; padding: 32px 36px; max-width: 500px; width: 90vw; color: #ddd; font-family: "Noto Sans KR", sans-serif; box-shadow: 0 20px 60px rgba(0,0,0,0.7); text-align: center; transform: translateY(10px); transition: transform 0.3s ease; }\n';
+            h += '.klr-tut-overlay.visible { opacity: 1; pointer-events: none; }\n';
+            h += '.klr-tut-popup { position: absolute; background: linear-gradient(135deg, #1e2030, #262a3e); border: calc(2px * var(--s)) solid rgba(0,255,255,0.3); border-radius: calc(16px * var(--s)); padding: calc(32px * var(--s)) calc(36px * var(--s)); max-width: calc(500px * var(--s)); width: 90vw; color: #ddd; font-family: "Noto Sans KR", sans-serif; font-size: calc(14px * var(--s)); box-shadow: 0 20px 60px rgba(0,0,0,0.7); text-align: center; transform: translateY(10px); transition: transform 0.3s ease; pointer-events: auto; }\n';
             h += '.klr-tut-overlay.visible .klr-tut-popup { transform: translateY(0); }\n';
             h += '.klr-tut-arrow { position: fixed; z-index: 300001; pointer-events: none; animation: klrBounce 1.5s infinite; transition: top 0.4s ease, left 0.4s ease, right 0.4s ease, bottom 0.4s ease; }\n';
-            h += '.klr-tut-arrow img { width: 48px; height: auto; }\n';
+            h += '.klr-tut-arrow img { width: calc(48px * var(--s)); height: auto; }\n';
             h += '.klr-tut-arrow.point-down img { transform: rotate(90deg); }\n';
             h += '.klr-tut-arrow.point-up img { transform: rotate(270deg); }\n';
             h += '.klr-tut-arrow.point-left img { transform: rotate(180deg); }\n';
             h += '.klr-tut-arrow.point-right img { transform: rotate(0deg); }\n';
-            h += '.klr-tut-msg { position: fixed; z-index: 300001; background: linear-gradient(135deg, #1e2030, #262a3e); border: 2px solid rgba(0,255,255,0.3); border-radius: 14px; padding: 18px 24px; max-width: 340px; color: #ddd; font-family: "Noto Sans KR", sans-serif; font-size: 14px; line-height: 1.6; box-shadow: 0 12px 40px rgba(0,0,0,0.7); }\n';
-            h += '.klr-tut-msg .klr-tut-next { display: inline-block; margin-top: 12px; background: linear-gradient(135deg, #00cccc, #0099aa); color: #000; border: none; border-radius: 8px; padding: 8px 24px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: "Noto Sans KR", sans-serif; transition: transform 0.15s; }\n';
+            h += '.klr-tut-msg { position: fixed; z-index: 300001; background: linear-gradient(135deg, #1e2030, #262a3e); border: calc(2px * var(--s)) solid rgba(0,255,255,0.3); border-radius: calc(14px * var(--s)); padding: calc(18px * var(--s)) calc(24px * var(--s)); max-width: calc(340px * var(--s)); color: #ddd; font-family: "Noto Sans KR", sans-serif; font-size: calc(14px * var(--s)); line-height: 1.6; box-shadow: 0 12px 40px rgba(0,0,0,0.7); pointer-events: auto; }\n';
+            h += '.klr-tut-msg .klr-tut-next { display: inline-block; margin-top: calc(12px * var(--s)); background: linear-gradient(135deg, #00cccc, #0099aa); color: #000; border: none; border-radius: calc(8px * var(--s)); padding: calc(8px * var(--s)) calc(24px * var(--s)); font-size: calc(13px * var(--s)); font-weight: 700; cursor: pointer; font-family: "Noto Sans KR", sans-serif; transition: transform 0.15s; }\n';
             h += '.klr-tut-msg .klr-tut-next:hover { transform: scale(1.05); }\n';
             h += '.klr-tut-highlight { display: none !important; }\n';
             h += '#klrn-reader .klr-speed-row { display: flex; align-items: center; gap: 6px; padding: 7px 14px; color: #888; font-size: calc(11px * var(--s)); font-weight: 700; font-family: "Noto Sans KR", sans-serif; }\n';
             h += '#klrn-reader .klr-speed-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #aaa; font-size: calc(11px * var(--s)); font-weight: 700; padding: calc(3px * var(--s)) calc(8px * var(--s)); border-radius: 6px; cursor: pointer; transition: all 0.15s; font-family: "Noto Sans KR", sans-serif; }\n';
             h += '#klrn-reader .klr-speed-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }\n';
             h += '#klrn-reader .klr-speed-btn.active { background: rgba(0,255,255,0.15); border-color: rgba(0,255,255,0.5); color: #00ffff; }\n';
+            h += '@media (max-height: 550px), (max-width: 900px), (pointer: coarse) {\n';
+            h += '  #klrn-reader .klr-sentence-actions button { font-size: 10px !important; }\n';
+            h += '  #klrn-reader .klr-tip { font-size: 9px !important; padding: 6px 8px !important; min-width: 120px !important; max-width: 200px !important; border-width: 1px !important; border-radius: 8px !important; }\n';
+            h += '  #klrn-reader .klr-tip .klr-particles-line { font-size: 8px !important; }\n';
+            h += '  #klrn-reader .klr-tip .klr-meaning { font-size: 9px !important; }\n';
+            h += '  .klr-comp-popup { padding: 6px 8px !important; max-width: 200px !important; width: 70vw !important; }\n';
+            h += '  .klr-comp-popup div, .klr-comp-popup span, .klr-comp-popup button { font-size: 6px !important; line-height: 1.25 !important; }\n';
+            h += '  .klr-comp-popup button { padding: 3px 8px !important; border-radius: 5px !important; font-size: 7px !important; }\n';
+            h += '  .klr-comp-intro-popup { padding: 8px 10px !important; max-width: 200px !important; width: 70vw !important; }\n';
+            h += '  .klr-comp-intro-popup div, .klr-comp-intro-popup span { font-size: 6px !important; line-height: 1.25 !important; }\n';
+            h += '  .klr-comp-intro-popup button { padding: 3px 12px !important; font-size: 7px !important; }\n';
+            h += '  .klr-particle-overlay .klr-particle-popup { font-size: 9px !important; padding: 10px !important; max-width: 200px !important; }\n';
+            h += '}\n';
             h += '</style>\n';
 
             h += '<script>\n';
@@ -11219,6 +11643,7 @@
             h += '  var prev = klrMode;\n';
             h += '  klrMode = m;\n';
             h += '  var cb = document.getElementById("klrSToggle"); if (cb) cb.checked = false;\n';
+            h += '  if (m === "comparison" && tutActive && tutStep === 8) { tutMsg.style.display = "none"; tutArrow.style.display = "none"; KLR.tutNext(); return; }\n';
             h += '  if (m === "comparison" && prev !== "comparison") { klrShowCompIntro(); return; }\n';
             h += '  if (m === "comparison" || prev === "comparison") { renderSlide(cur); renderDots(); return; }\n';
             h += '  document.querySelectorAll("#klrn-reader .klr-sentence-hl").forEach(function(el) {\n';
@@ -11549,7 +11974,7 @@
             h += '  ov.innerHTML = \'<div class="klr-particle-popup"><button onclick="KLR.closeParticle()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button><div style="color:#e8c87a;font-size:22px;font-weight:700;margin-bottom:14px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">Particle Explanation</div><div style="color:#888;">⏳ Loading...</div></div>\';\n';
             h += '  document.body.appendChild(ov);\n';
             h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
-            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ pp.style.position="absolute"; pp.style.top=(sr.top+sr.height/2)+"px"; pp.style.left=(sr.left+sr.width/2)+"px"; pp.style.transform="translate(-50%,-50%)"; } }\n';
+            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ var _pt=sr.top+sr.height/2, _pl=sr.left+sr.width/2; if(_pt>0 && _pt<window.innerHeight && _pl>0 && _pl<window.innerWidth){ pp.style.position="absolute"; pp.style.top=_pt+"px"; pp.style.left=_pl+"px"; pp.style.transform="translate(-50%,-50%)"; } } }\n';
             h += '  requestAnimationFrame(function(){ ov.classList.add("visible"); });\n';
             h += '  ov.addEventListener("click", function(e){ if(e.target===ov) KLR.closeParticle(); });\n';
             h += '  var ck = particleText + "|" + word;\n';
@@ -11584,7 +12009,7 @@
             h += '  ov.innerHTML=\'<div class="klr-comp-intro-popup"><div style="font-size:20px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">🎙️ Comparison Mode</div><div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:22px;">Welcome to Comparison Mode. Here, you can record your voice to see how you compare to Mr. Calvin\\\'s recording. The goal here is to help you notice any subtle pronunciation mistakes you might be making. To begin, please click on any sentence.</div><button onclick="KLR.dismissCompIntro()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#000;border:none;border-radius:10px;padding:12px 40px;font-size:16px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;">OK</button></div>\';\n';
             h += '  document.body.appendChild(ov);\n';
             h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
-            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ pp.style.position="absolute"; pp.style.top=(sr.top+sr.height/2)+"px"; pp.style.left=(sr.left+sr.width/2)+"px"; pp.style.transform="translate(-50%,-50%)"; } }\n';
+            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ var _pt=sr.top+sr.height/2, _pl=sr.left+sr.width/2; if(_pt>0 && _pt<window.innerHeight && _pl>0 && _pl<window.innerWidth){ pp.style.position="absolute"; pp.style.top=_pt+"px"; pp.style.left=_pl+"px"; pp.style.transform="translate(-50%,-50%)"; } } }\n';
             h += '  requestAnimationFrame(function(){ov.classList.add("visible");});\n';
             h += '}\n';
             h += 'function klrDismissCompIntro() {\n';
@@ -11626,9 +12051,9 @@
             h += '  var btn=document.getElementById("klrCompRecordBtn");\n';
             h += '  if(klrCompRecording&&klrCompRecording.state==="recording"){klrCompRecording.stop();if(btn){btn.innerHTML="🎤 Record Again";btn.style.animation="none";}return;}\n';
             h += '  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){\n';
-            h += '    var chunks=[];klrCompRecording=new MediaRecorder(stream);\n';
+            h += '    var chunks=[];var compMime="";if(typeof MediaRecorder.isTypeSupported==="function"){if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")){compMime="audio/webm;codecs=opus";}else if(MediaRecorder.isTypeSupported("audio/webm")){compMime="audio/webm";}else if(MediaRecorder.isTypeSupported("audio/mp4")){compMime="audio/mp4";}else if(MediaRecorder.isTypeSupported("audio/aac")){compMime="audio/aac";}};var recOpts=compMime?{mimeType:compMime}:{};klrCompRecording=new MediaRecorder(stream,recOpts);\n';
             h += '    klrCompRecording.ondataavailable=function(e){chunks.push(e.data);};\n';
-            h += '    klrCompRecording.onstop=function(){stream.getTracks().forEach(function(t){t.stop();});klrCompBlob=new Blob(chunks,{type:"audio/webm"});klrCompUrl=URL.createObjectURL(klrCompBlob);var ps=document.getElementById("klrCompPlayback");if(ps)ps.style.display="block";klrCompGetFB();};\n';
+            h += '    klrCompRecording.onstop=function(){stream.getTracks().forEach(function(t){t.stop();});var blobType=compMime||"audio/webm";klrCompBlob=new Blob(chunks,{type:blobType});var reader=new FileReader();reader.onloadend=function(){klrCompUrl=reader.result;var ps=document.getElementById("klrCompPlayback");if(ps)ps.style.display="block";klrCompGetFB();};reader.readAsDataURL(klrCompBlob);};\n';
             h += '    klrCompRecording.start();if(btn){btn.innerHTML="⏹ Stop Recording";btn.style.animation="klrCompPulse 1s ease-in-out infinite";}\n';
             h += '  }).catch(function(err){alert("Microphone access denied: "+err.message);});\n';
             h += '}\n';
@@ -11676,25 +12101,52 @@
                 {"sentences":["제가 정신을 잃자, 누나는 스스로를 먼저 살려야겠다고 생각했대요.","엄마가 아는 순간 끝이니까요."]},
                 {"sentences":["그래서 누나는 그냥 모른 척하고 그냥 집으로 가버렸대요.","세상에!"]}
             ]) + ';\n';
-            h += 'var TUT_SLIDEMAP = [{"slideIdx":0,"si":0,"wi":0,"word":"제가","start":0,"end":0.11},{"slideIdx":0,"si":0,"wi":1,"word":"어렸을","start":0.51,"end":1.1},{"slideIdx":0,"si":0,"wi":2,"word":"때","start":1.1,"end":1.3},{"slideIdx":0,"si":0,"wi":3,"word":"자전거를","start":1.6,"end":2.04},{"slideIdx":0,"si":0,"wi":4,"word":"타면서","start":2.54,"end":3.52},{"slideIdx":0,"si":0,"wi":5,"word":"정신을","start":3.57,"end":4.69},{"slideIdx":0,"si":0,"wi":6,"word":"잃은","start":4.87,"end":5.48},{"slideIdx":0,"si":0,"wi":7,"word":"적이","start":5.48,"end":5.92},{"slideIdx":0,"si":0,"wi":8,"word":"있어요.","start":5.92,"end":7.26},{"slideIdx":0,"si":1,"wi":0,"word":"오늘은","start":7.38,"end":8.58},{"slideIdx":0,"si":1,"wi":1,"word":"제","start":8.58,"end":9.21},{"slideIdx":0,"si":1,"wi":2,"word":"어린시절에","start":9.21,"end":10.78},{"slideIdx":0,"si":1,"wi":3,"word":"있었던","start":10.78,"end":11.28},{"slideIdx":0,"si":1,"wi":4,"word":"이상한","start":11.28,"end":11.98},{"slideIdx":0,"si":1,"wi":5,"word":"이야기를","start":11.98,"end":12.46},{"slideIdx":0,"si":1,"wi":6,"word":"하나","start":12.46,"end":13.26},{"slideIdx":0,"si":1,"wi":7,"word":"공유하려고","start":13.26,"end":14.14},{"slideIdx":0,"si":1,"wi":8,"word":"해요.","start":14.14,"end":15.86},{"slideIdx":1,"si":0,"wi":0,"word":"어렸을","start":16.33,"end":16.98},{"slideIdx":1,"si":0,"wi":1,"word":"때","start":17.39,"end":17.88},{"slideIdx":1,"si":0,"wi":2,"word":"누나랑","start":17.88,"end":18.42},{"slideIdx":1,"si":0,"wi":3,"word":"같이","start":18.42,"end":19.14},{"slideIdx":1,"si":0,"wi":4,"word":"자전거를","start":19.14,"end":19.78},{"slideIdx":1,"si":0,"wi":5,"word":"타고","start":19.78,"end":20.2},{"slideIdx":1,"si":0,"wi":6,"word":"있었어요.","start":20.2,"end":21.41},{"slideIdx":1,"si":1,"wi":0,"word":"누나는","start":21.72,"end":22.74},{"slideIdx":1,"si":1,"wi":1,"word":"눈을","start":22.74,"end":23.32},{"slideIdx":1,"si":1,"wi":2,"word":"감고도","start":23.32,"end":24.46},{"slideIdx":1,"si":1,"wi":3,"word":"자전거를","start":24.46,"end":24.98},{"slideIdx":1,"si":1,"wi":4,"word":"5초동안","start":24.98,"end":26.18},{"slideIdx":1,"si":1,"wi":5,"word":"탈","start":26.18,"end":26.46},{"slideIdx":1,"si":1,"wi":6,"word":"수","start":26.46,"end":26.72},{"slideIdx":1,"si":1,"wi":7,"word":"있다고","start":26.72,"end":27.1},{"slideIdx":1,"si":1,"wi":8,"word":"말했지요.","start":27.1,"end":28.98},{"slideIdx":1,"si":2,"wi":0,"word":"\\u201c너는","start":28.98,"end":29.41},{"slideIdx":1,"si":2,"wi":1,"word":"이렇게","start":29.68,"end":30.21},{"slideIdx":1,"si":2,"wi":2,"word":"못","start":30.21,"end":30.35},{"slideIdx":1,"si":2,"wi":3,"word":"탈","start":30.35,"end":30.52},{"slideIdx":1,"si":2,"wi":4,"word":"걸!\\u201d","start":30.53,"end":31.34},{"slideIdx":2,"si":0,"wi":0,"word":"저는","start":31.34,"end":32.26},{"slideIdx":2,"si":0,"wi":1,"word":"승부욕이","start":32.26,"end":33.08},{"slideIdx":2,"si":0,"wi":2,"word":"강했어요.","start":33.08,"end":34.06},{"slideIdx":2,"si":1,"wi":0,"word":"그","start":34.43,"end":34.69},{"slideIdx":2,"si":1,"wi":1,"word":"말을","start":34.7,"end":35},{"slideIdx":2,"si":1,"wi":2,"word":"들은","start":35,"end":35.58},{"slideIdx":2,"si":1,"wi":3,"word":"저는","start":35.58,"end":36.07},{"slideIdx":2,"si":1,"wi":4,"word":"20초까지","start":36.08,"end":37.76},{"slideIdx":2,"si":1,"wi":5,"word":"탈","start":37.76,"end":38.04},{"slideIdx":2,"si":1,"wi":6,"word":"수","start":38.04,"end":38.3},{"slideIdx":2,"si":1,"wi":7,"word":"있다고","start":38.3,"end":38.72},{"slideIdx":2,"si":1,"wi":8,"word":"소리쳤어요.","start":38.72,"end":40.14},{"slideIdx":3,"si":0,"wi":0,"word":"누나는","start":40.4,"end":41.42},{"slideIdx":3,"si":0,"wi":1,"word":"자전거를","start":41.42,"end":41.98},{"slideIdx":3,"si":0,"wi":2,"word":"타면서","start":41.98,"end":42.92},{"slideIdx":3,"si":0,"wi":3,"word":"눈을","start":42.93,"end":43.7},{"slideIdx":3,"si":0,"wi":4,"word":"감은","start":43.7,"end":44.02},{"slideIdx":3,"si":0,"wi":5,"word":"것처럼","start":44.02,"end":44.5},{"slideIdx":3,"si":0,"wi":6,"word":"보였어요.","start":44.5,"end":45.66},{"slideIdx":3,"si":1,"wi":0,"word":"하지만","start":45.75,"end":46.68},{"slideIdx":3,"si":1,"wi":1,"word":"사실","start":46.68,"end":47.11},{"slideIdx":3,"si":1,"wi":2,"word":"눈을","start":47.12,"end":47.43},{"slideIdx":3,"si":1,"wi":3,"word":"완전히","start":47.44,"end":48},{"slideIdx":3,"si":1,"wi":4,"word":"감고","start":48.06,"end":48.68},{"slideIdx":3,"si":1,"wi":5,"word":"있지는","start":48.68,"end":49.04},{"slideIdx":3,"si":1,"wi":6,"word":"않았어요.","start":49.04,"end":49.97},{"slideIdx":3,"si":2,"wi":0,"word":"그때는","start":50,"end":51.3},{"slideIdx":3,"si":2,"wi":1,"word":"그","start":51.3,"end":51.6},{"slideIdx":3,"si":2,"wi":2,"word":"사실을","start":51.6,"end":52.04},{"slideIdx":3,"si":2,"wi":3,"word":"전혀","start":52.04,"end":52.48},{"slideIdx":3,"si":2,"wi":4,"word":"몰랐어요.","start":52.48,"end":54.49},{"slideIdx":4,"si":0,"wi":0,"word":"저는","start":54.84,"end":55.77},{"slideIdx":4,"si":0,"wi":1,"word":"누나보다","start":55.78,"end":56.53},{"slideIdx":4,"si":0,"wi":2,"word":"더","start":56.54,"end":56.8},{"slideIdx":4,"si":0,"wi":3,"word":"잘하고","start":56.81,"end":57.38},{"slideIdx":4,"si":0,"wi":4,"word":"싶었어요.","start":57.38,"end":58.12},{"slideIdx":4,"si":1,"wi":0,"word":"그래서","start":58.27,"end":59.22},{"slideIdx":4,"si":1,"wi":1,"word":"제","start":59.22,"end":60.04},{"slideIdx":4,"si":1,"wi":2,"word":"차례가","start":60.04,"end":60.44},{"slideIdx":4,"si":1,"wi":3,"word":"오자","start":60.44,"end":60.82},{"slideIdx":4,"si":1,"wi":4,"word":"진짜로","start":60.82,"end":61.6},{"slideIdx":4,"si":1,"wi":5,"word":"눈을","start":61.6,"end":62.1},{"slideIdx":4,"si":1,"wi":6,"word":"감고","start":62.1,"end":62.36},{"slideIdx":4,"si":1,"wi":7,"word":"자전거를","start":62.36,"end":62.84},{"slideIdx":4,"si":1,"wi":8,"word":"탔어요.","start":62.84,"end":63.97},{"slideIdx":4,"si":2,"wi":0,"word":"\\u201c누나!","start":64,"end":64.68},{"slideIdx":4,"si":2,"wi":1,"word":"나","start":64.68,"end":65.1},{"slideIdx":4,"si":2,"wi":2,"word":"보여?","start":65.1,"end":66.04},{"slideIdx":4,"si":2,"wi":3,"word":"나","start":66.04,"end":66.26},{"slideIdx":4,"si":2,"wi":4,"word":"보이냐고?!\\u201d","start":66.26,"end":67.51},{"slideIdx":5,"si":0,"wi":0,"word":"눈을","start":67.6,"end":68.52},{"slideIdx":5,"si":0,"wi":1,"word":"감았는데도","start":68.52,"end":69.3},{"slideIdx":5,"si":0,"wi":2,"word":"처음에는","start":69.3,"end":70.26},{"slideIdx":5,"si":0,"wi":3,"word":"괜찮은","start":70.26,"end":70.94},{"slideIdx":5,"si":0,"wi":4,"word":"것","start":70.94,"end":71.14},{"slideIdx":5,"si":0,"wi":5,"word":"같았어요.","start":71.14,"end":72.62},{"slideIdx":5,"si":1,"wi":0,"word":"얼굴에","start":72.65,"end":73.24},{"slideIdx":5,"si":1,"wi":1,"word":"시원한","start":73.24,"end":73.84},{"slideIdx":5,"si":1,"wi":2,"word":"바람이","start":73.84,"end":74.22},{"slideIdx":5,"si":1,"wi":3,"word":"스쳤고,","start":74.22,"end":75.2},{"slideIdx":5,"si":1,"wi":4,"word":"자전거도","start":75.2,"end":76.1},{"slideIdx":5,"si":1,"wi":5,"word":"잘","start":76.1,"end":76.44},{"slideIdx":5,"si":1,"wi":6,"word":"나아가는","start":76.44,"end":76.88},{"slideIdx":5,"si":1,"wi":7,"word":"것","start":76.88,"end":77.12},{"slideIdx":5,"si":1,"wi":8,"word":"같았거든요.","start":77.12,"end":78.25},{"slideIdx":5,"si":2,"wi":0,"word":"속으로","start":78.28,"end":79.22},{"slideIdx":5,"si":2,"wi":1,"word":"정말","start":79.22,"end":79.88},{"slideIdx":5,"si":2,"wi":2,"word":"신이","start":79.88,"end":80.26},{"slideIdx":5,"si":2,"wi":3,"word":"났어요.","start":80.26,"end":81.3},{"slideIdx":6,"si":0,"wi":0,"word":"제가","start":81.3,"end":82},{"slideIdx":6,"si":0,"wi":1,"word":"분명히","start":82,"end":83},{"slideIdx":6,"si":0,"wi":2,"word":"이겼다고","start":83,"end":83.4},{"slideIdx":6,"si":0,"wi":3,"word":"생각했어요.","start":83.4,"end":84.79},{"slideIdx":6,"si":1,"wi":0,"word":"\\u201c누나에게","start":84.83,"end":85.74},{"slideIdx":6,"si":1,"wi":1,"word":"자랑해야지!\\u201d","start":85.74,"end":87},{"slideIdx":6,"si":2,"wi":0,"word":"그","start":87.02,"end":87.58},{"slideIdx":6,"si":2,"wi":1,"word":"순간만큼은","start":87.59,"end":88.8},{"slideIdx":6,"si":2,"wi":2,"word":"아무","start":88.8,"end":89.09},{"slideIdx":6,"si":2,"wi":3,"word":"걱정도","start":89.1,"end":89.78},{"slideIdx":6,"si":2,"wi":4,"word":"없었어요.","start":89.78,"end":92.58},{"slideIdx":7,"si":0,"wi":0,"word":"그런데","start":92.6,"end":93.8},{"slideIdx":7,"si":0,"wi":1,"word":"갑자기","start":93.8,"end":94.38},{"slideIdx":7,"si":0,"wi":2,"word":"눈앞이","start":94.38,"end":95.34},{"slideIdx":7,"si":0,"wi":3,"word":"캄캄해지더니","start":95.34,"end":96.36},{"slideIdx":7,"si":0,"wi":4,"word":"모든","start":96.36,"end":97.28},{"slideIdx":7,"si":0,"wi":5,"word":"것이","start":97.29,"end":97.66},{"slideIdx":7,"si":0,"wi":6,"word":"멈췄어요.","start":97.66,"end":98.54},{"slideIdx":7,"si":1,"wi":0,"word":"제가","start":98.55,"end":98.99},{"slideIdx":7,"si":1,"wi":1,"word":"소나무에","start":99.08,"end":99.88},{"slideIdx":7,"si":1,"wi":2,"word":"그대로","start":99.88,"end":100.84},{"slideIdx":7,"si":1,"wi":3,"word":"부딪혀버린","start":100.84,"end":101.26},{"slideIdx":7,"si":1,"wi":4,"word":"거예요.","start":101.27,"end":102.35},{"slideIdx":7,"si":2,"wi":0,"word":"한","start":102.37,"end":102.92},{"slideIdx":7,"si":2,"wi":1,"word":"순간에","start":102.94,"end":103.37},{"slideIdx":7,"si":2,"wi":2,"word":"벌어진","start":103.38,"end":103.74},{"slideIdx":7,"si":2,"wi":3,"word":"일이었어요.","start":103.74,"end":105.7},{"slideIdx":8,"si":0,"wi":0,"word":"저는","start":105.76,"end":106.4},{"slideIdx":8,"si":0,"wi":1,"word":"나무","start":106.4,"end":106.7},{"slideIdx":8,"si":0,"wi":2,"word":"옆에","start":106.7,"end":107.06},{"slideIdx":8,"si":0,"wi":3,"word":"그대로","start":107.06,"end":107.38},{"slideIdx":8,"si":0,"wi":4,"word":"쓰러졌어요.","start":107.38,"end":108},{"slideIdx":8,"si":1,"wi":0,"word":"한참","start":109,"end":109.64},{"slideIdx":8,"si":1,"wi":1,"word":"뒤에","start":109.64,"end":110.16},{"slideIdx":8,"si":1,"wi":2,"word":"이웃이","start":110.16,"end":110.62},{"slideIdx":8,"si":1,"wi":3,"word":"저를","start":110.62,"end":110.86},{"slideIdx":8,"si":1,"wi":4,"word":"발견하고","start":110.86,"end":111.8},{"slideIdx":8,"si":1,"wi":5,"word":"집으로","start":111.8,"end":112.44},{"slideIdx":8,"si":1,"wi":6,"word":"데려다","start":112.44,"end":112.82},{"slideIdx":8,"si":1,"wi":7,"word":"주셨대요.","start":112.82,"end":114.7},{"slideIdx":9,"si":0,"wi":0,"word":"이모는","start":114.7,"end":115.7},{"slideIdx":9,"si":0,"wi":1,"word":"저를","start":115.7,"end":115.94},{"slideIdx":9,"si":0,"wi":2,"word":"보자마자","start":115.94,"end":116.84},{"slideIdx":9,"si":0,"wi":3,"word":"얼굴에","start":116.84,"end":117.36},{"slideIdx":9,"si":0,"wi":4,"word":"연고를","start":117.36,"end":117.84},{"slideIdx":9,"si":0,"wi":5,"word":"발라주셨어요.","start":117.84,"end":119},{"slideIdx":9,"si":1,"wi":0,"word":"그날은","start":119.2,"end":120.14},{"slideIdx":9,"si":1,"wi":1,"word":"너무","start":120.14,"end":120.36},{"slideIdx":9,"si":1,"wi":2,"word":"아파서","start":120.36,"end":121.06},{"slideIdx":9,"si":1,"wi":3,"word":"하루종일","start":121.06,"end":121.84},{"slideIdx":9,"si":1,"wi":4,"word":"소파에서","start":121.84,"end":122.42},{"slideIdx":9,"si":1,"wi":5,"word":"쉬어야","start":122.42,"end":122.88},{"slideIdx":9,"si":1,"wi":6,"word":"했어요.","start":122.88,"end":123.5},{"slideIdx":9,"si":2,"wi":0,"word":"그","start":123.9,"end":124.78},{"slideIdx":9,"si":2,"wi":1,"word":"후유증으로","start":124.78,"end":125.78},{"slideIdx":9,"si":2,"wi":2,"word":"아직까지","start":125.78,"end":126.6},{"slideIdx":9,"si":2,"wi":3,"word":"얼굴에","start":126.6,"end":126.94},{"slideIdx":9,"si":2,"wi":4,"word":"흉터가","start":126.94,"end":127.42},{"slideIdx":9,"si":2,"wi":5,"word":"남아있어요.","start":127.42,"end":128.3},{"slideIdx":10,"si":0,"wi":0,"word":"제가","start":128.31,"end":129.32},{"slideIdx":10,"si":0,"wi":1,"word":"스물여섯살이","start":129.32,"end":130.2},{"slideIdx":10,"si":0,"wi":2,"word":"되고","start":130.22,"end":130.86},{"slideIdx":10,"si":0,"wi":3,"word":"다시","start":130.84,"end":131.1},{"slideIdx":10,"si":0,"wi":4,"word":"그때","start":131.21,"end":131.4},{"slideIdx":10,"si":0,"wi":5,"word":"생각이","start":131.41,"end":131.6},{"slideIdx":10,"si":0,"wi":6,"word":"났어요…","start":131.61,"end":132},{"slideIdx":10,"si":1,"wi":0,"word":"\\u201c그런데","start":132.2,"end":133.78},{"slideIdx":10,"si":1,"wi":1,"word":"그때","start":133.78,"end":134.16},{"slideIdx":10,"si":1,"wi":2,"word":"누나도","start":134.16,"end":134.42},{"slideIdx":10,"si":1,"wi":3,"word":"같이","start":134.42,"end":135},{"slideIdx":10,"si":1,"wi":4,"word":"놀았는데,","start":135,"end":135.62},{"slideIdx":10,"si":1,"wi":5,"word":"누나는","start":135.62,"end":136.86},{"slideIdx":10,"si":1,"wi":6,"word":"어디","start":136.86,"end":137.26},{"slideIdx":10,"si":1,"wi":7,"word":"있었지?\\u201d","start":137.26,"end":138.2},{"slideIdx":10,"si":2,"wi":0,"word":"너무","start":138.25,"end":139.16},{"slideIdx":10,"si":2,"wi":1,"word":"궁금해서","start":139.16,"end":140.08},{"slideIdx":10,"si":2,"wi":2,"word":"누나한테","start":140.08,"end":140.78},{"slideIdx":10,"si":2,"wi":3,"word":"그때","start":140.78,"end":141.26},{"slideIdx":10,"si":2,"wi":4,"word":"왜","start":141.26,"end":142.12},{"slideIdx":10,"si":2,"wi":5,"word":"저를","start":142.12,"end":142.46},{"slideIdx":10,"si":2,"wi":6,"word":"도와주지","start":142.46,"end":143},{"slideIdx":10,"si":2,"wi":7,"word":"않았는지","start":143.03,"end":143.62},{"slideIdx":10,"si":2,"wi":8,"word":"물어봤어요.","start":143.64,"end":145},{"slideIdx":11,"si":0,"wi":0,"word":"사실","start":145.3,"end":145.7},{"slideIdx":11,"si":0,"wi":1,"word":"누나는","start":145.73,"end":146.12},{"slideIdx":11,"si":0,"wi":2,"word":"다","start":146.14,"end":146.6},{"slideIdx":11,"si":0,"wi":3,"word":"봤대요.","start":146.62,"end":147.6},{"slideIdx":11,"si":1,"wi":0,"word":"제","start":147.8,"end":148},{"slideIdx":11,"si":1,"wi":1,"word":"머리가","start":148.02,"end":148.24},{"slideIdx":11,"si":1,"wi":2,"word":"나무에","start":148.35,"end":149.1},{"slideIdx":11,"si":2,"wi":0,"word":"\\u201c와당탕탕!\\u201d","start":149.2,"end":150.68},{"slideIdx":12,"si":0,"wi":0,"word":"제가","start":150.7,"end":152.04},{"slideIdx":12,"si":0,"wi":1,"word":"정신을","start":152.06,"end":152.38},{"slideIdx":12,"si":0,"wi":2,"word":"잃자,","start":152.4,"end":153.06},{"slideIdx":12,"si":0,"wi":3,"word":"누나는","start":153.06,"end":154.1},{"slideIdx":12,"si":0,"wi":4,"word":"스스로를","start":154.1,"end":154.9},{"slideIdx":12,"si":0,"wi":5,"word":"먼저","start":154.9,"end":155.46},{"slideIdx":12,"si":0,"wi":6,"word":"살려야겠다고","start":155.46,"end":156.32},{"slideIdx":12,"si":0,"wi":7,"word":"생각했대요.","start":156.32,"end":157.3},{"slideIdx":12,"si":1,"wi":0,"word":"엄마가","start":157.33,"end":157.97},{"slideIdx":12,"si":1,"wi":1,"word":"아는","start":157.99,"end":158.22},{"slideIdx":12,"si":1,"wi":2,"word":"순간","start":158.24,"end":158.68},{"slideIdx":12,"si":1,"wi":3,"word":"끝이니까요.","start":158.69,"end":160.73},{"slideIdx":13,"si":0,"wi":0,"word":"그래서","start":160.9,"end":161.62},{"slideIdx":13,"si":0,"wi":1,"word":"누나는","start":161.62,"end":161.9},{"slideIdx":13,"si":0,"wi":2,"word":"그냥","start":161.92,"end":162.46},{"slideIdx":13,"si":0,"wi":3,"word":"모른","start":162.46,"end":162.82},{"slideIdx":13,"si":0,"wi":4,"word":"척하고","start":162.82,"end":163.34},{"slideIdx":13,"si":0,"wi":5,"word":"그냥","start":163.34,"end":164.1},{"slideIdx":13,"si":0,"wi":6,"word":"집으로","start":164.1,"end":164.52},{"slideIdx":13,"si":0,"wi":7,"word":"가버렸대요.","start":164.52,"end":165.7},{"slideIdx":13,"si":1,"wi":0,"word":"세상에!","start":165.8,"end":168}];\n';
+            h += 'var _TC = ';
+            h += '[[0,0,0,"제가",0,0.11],[0,0,1,"어렸을",0.51,1.1],[0,0,2,"때",1.1,1.3],[0,0,3,"자전거를",1.6,2.04],[0,0,4,"타면서",2.54,3.52],[0,0,5,"정신을",3.57,4.69],[0,0,6,"잃은",4.87,5.48],[0,0,7,"적이",5.48,5.92],[0,0,8,"있어요.",5.92,7.26],[0,1,0,"오늘은",7.38,8.58],[0,1,1,"제",8.58,9.21],[0,1,2,"어린시절에",9.21,10.78],[0,1,3,"있었던",10.78,11.28],[0,1,4,"이상한",11.28,11.98],[0,1,5,"이야기를",11.98,12.46],[0,1,6,"하나",12.46,13.26],[0,1,7,"공유하려고",13.26,14.14],[0,1,8,"해요.",14.14,15.86],[1,0,0,"어렸을",16.33,16.98],[1,0,1,"때",17.39,17.88],[1,0,2,"누나랑"';
+            h += ',17.88,18.42],[1,0,3,"같이",18.42,19.14],[1,0,4,"자전거를",19.14,19.78],[1,0,5,"타고",19.78,20.2],[1,0,6,"있었어요.",20.2,21.41],[1,1,0,"누나는",21.72,22.74],[1,1,1,"눈을",22.74,23.32],[1,1,2,"감고도",23.32,24.46],[1,1,3,"자전거를",24.46,24.98],[1,1,4,"5초동안",24.98,26.18],[1,1,5,"탈",26.18,26.46],[1,1,6,"수",26.46,26.72],[1,1,7,"있다고",26.72,27.1],[1,1,8,"말했지요.",27.1,28.98],[1,2,0,"“너는",28.98,29.41],[1,2,1,"이렇게",29.68,30.21],[1,2,2,"못",30.21,30.35],[1,2,3,"탈",30.35,30.52],[1,2,4,"걸!”",30.53,31.34],[2,0,0,"저는",31.34,32.26],[';
+            h += '2,0,1,"승부욕이",32.26,33.08],[2,0,2,"강했어요.",33.08,34.06],[2,1,0,"그",34.43,34.69],[2,1,1,"말을",34.7,35],[2,1,2,"들은",35,35.58],[2,1,3,"저는",35.58,36.07],[2,1,4,"20초까지",36.08,37.76],[2,1,5,"탈",37.76,38.04],[2,1,6,"수",38.04,38.3],[2,1,7,"있다고",38.3,38.72],[2,1,8,"소리쳤어요.",38.72,40.14],[3,0,0,"누나는",40.4,41.42],[3,0,1,"자전거를",41.42,41.98],[3,0,2,"타면서",41.98,42.92],[3,0,3,"눈을",42.93,43.7],[3,0,4,"감은",43.7,44.02],[3,0,5,"것처럼",44.02,44.5],[3,0,6,"보였어요.",44.5,45.66],[3,1,0,"하지만",45.75,46.68],[3,1,1,"사실",46.68,47.';
+            h += '11],[3,1,2,"눈을",47.12,47.43],[3,1,3,"완전히",47.44,48],[3,1,4,"감고",48.06,48.68],[3,1,5,"있지는",48.68,49.04],[3,1,6,"않았어요.",49.04,49.97],[3,2,0,"그때는",50,51.3],[3,2,1,"그",51.3,51.6],[3,2,2,"사실을",51.6,52.04],[3,2,3,"전혀",52.04,52.48],[3,2,4,"몰랐어요.",52.48,54.49],[4,0,0,"저는",54.84,55.77],[4,0,1,"누나보다",55.78,56.53],[4,0,2,"더",56.54,56.8],[4,0,3,"잘하고",56.81,57.38],[4,0,4,"싶었어요.",57.38,58.12],[4,1,0,"그래서",58.27,59.22],[4,1,1,"제",59.22,60.04],[4,1,2,"차례가",60.04,60.44],[4,1,3,"오자",60.44,60.82],[4,1,4,"진짜로",60.8';
+            h += '2,61.6],[4,1,5,"눈을",61.6,62.1],[4,1,6,"감고",62.1,62.36],[4,1,7,"자전거를",62.36,62.84],[4,1,8,"탔어요.",62.84,63.97],[4,2,0,"“누나!",64,64.68],[4,2,1,"나",64.68,65.1],[4,2,2,"보여?",65.1,66.04],[4,2,3,"나",66.04,66.26],[4,2,4,"보이냐고?!”",66.26,67.51],[5,0,0,"눈을",67.6,68.52],[5,0,1,"감았는데도",68.52,69.3],[5,0,2,"처음에는",69.3,70.26],[5,0,3,"괜찮은",70.26,70.94],[5,0,4,"것",70.94,71.14],[5,0,5,"같았어요.",71.14,72.62],[5,1,0,"얼굴에",72.65,73.24],[5,1,1,"시원한",73.24,73.84],[5,1,2,"바람이",73.84,74.22],[5,1,3,"스쳤고,",74.22,75.2],[5,1,4';
+            h += ',"자전거도",75.2,76.1],[5,1,5,"잘",76.1,76.44],[5,1,6,"나아가는",76.44,76.88],[5,1,7,"것",76.88,77.12],[5,1,8,"같았거든요.",77.12,78.25],[5,2,0,"속으로",78.28,79.22],[5,2,1,"정말",79.22,79.88],[5,2,2,"신이",79.88,80.26],[5,2,3,"났어요.",80.26,81.3],[6,0,0,"제가",81.3,82],[6,0,1,"분명히",82,83],[6,0,2,"이겼다고",83,83.4],[6,0,3,"생각했어요.",83.4,84.79],[6,1,0,"“누나에게",84.83,85.74],[6,1,1,"자랑해야지!”",85.74,87],[6,2,0,"그",87.02,87.58],[6,2,1,"순간만큼은",87.59,88.8],[6,2,2,"아무",88.8,89.09],[6,2,3,"걱정도",89.1,89.78],[6,2,4,"없었어요.",89.78,92.58],[';
+            h += '7,0,0,"그런데",92.6,93.8],[7,0,1,"갑자기",93.8,94.38],[7,0,2,"눈앞이",94.38,95.34],[7,0,3,"캄캄해지더니",95.34,96.36],[7,0,4,"모든",96.36,97.28],[7,0,5,"것이",97.29,97.66],[7,0,6,"멈췄어요.",97.66,98.54],[7,1,0,"제가",98.55,98.99],[7,1,1,"소나무에",99.08,99.88],[7,1,2,"그대로",99.88,100.84],[7,1,3,"부딪혀버린",100.84,101.26],[7,1,4,"거예요.",101.27,102.35],[7,2,0,"한",102.37,102.92],[7,2,1,"순간에",102.94,103.37],[7,2,2,"벌어진",103.38,103.74],[7,2,3,"일이었어요.",103.74,105.7],[8,0,0,"저는",105.76,106.4],[8,0,1,"나무",106.4,106.7],[8,0,2,"옆에",106.7,';
+            h += '107.06],[8,0,3,"그대로",107.06,107.38],[8,0,4,"쓰러졌어요.",107.38,108],[8,1,0,"한참",109,109.64],[8,1,1,"뒤에",109.64,110.16],[8,1,2,"이웃이",110.16,110.62],[8,1,3,"저를",110.62,110.86],[8,1,4,"발견하고",110.86,111.8],[8,1,5,"집으로",111.8,112.44],[8,1,6,"데려다",112.44,112.82],[8,1,7,"주셨대요.",112.82,114.7],[9,0,0,"이모는",114.7,115.7],[9,0,1,"저를",115.7,115.94],[9,0,2,"보자마자",115.94,116.84],[9,0,3,"얼굴에",116.84,117.36],[9,0,4,"연고를",117.36,117.84],[9,0,5,"발라주셨어요.",117.84,119],[9,1,0,"그날은",119.2,120.14],[9,1,1,"너무",120.14,120.36';
+            h += '],[9,1,2,"아파서",120.36,121.06],[9,1,3,"하루종일",121.06,121.84],[9,1,4,"소파에서",121.84,122.42],[9,1,5,"쉬어야",122.42,122.88],[9,1,6,"했어요.",122.88,123.5],[9,2,0,"그",123.9,124.78],[9,2,1,"후유증으로",124.78,125.78],[9,2,2,"아직까지",125.78,126.6],[9,2,3,"얼굴에",126.6,126.94],[9,2,4,"흉터가",126.94,127.42],[9,2,5,"남아있어요.",127.42,128.3],[10,0,0,"제가",128.31,129.32],[10,0,1,"스물여섯살이",129.32,130.2],[10,0,2,"되고",130.22,130.86],[10,0,3,"다시",130.84,131.1],[10,0,4,"그때",131.21,131.4],[10,0,5,"생각이",131.41,131.6],[10,0,6,"났어요…",131.';
+            h += '61,132],[10,1,0,"“그런데",132.2,133.78],[10,1,1,"그때",133.78,134.16],[10,1,2,"누나도",134.16,134.42],[10,1,3,"같이",134.42,135],[10,1,4,"놀았는데,",135,135.62],[10,1,5,"누나는",135.62,136.86],[10,1,6,"어디",136.86,137.26],[10,1,7,"있었지?”",137.26,138.2],[10,2,0,"너무",138.25,139.16],[10,2,1,"궁금해서",139.16,140.08],[10,2,2,"누나한테",140.08,140.78],[10,2,3,"그때",140.78,141.26],[10,2,4,"왜",141.26,142.12],[10,2,5,"저를",142.12,142.46],[10,2,6,"도와주지",142.46,143],[10,2,7,"않았는지",143.03,143.62],[10,2,8,"물어봤어요.",143.64,145],[11,0,0,"';
+            h += '사실",145.3,145.7],[11,0,1,"누나는",145.73,146.12],[11,0,2,"다",146.14,146.6],[11,0,3,"봤대요.",146.62,147.6],[11,1,0,"제",147.8,148],[11,1,1,"머리가",148.02,148.24],[11,1,2,"나무에",148.35,149.1],[11,2,0,"“와당탕탕!”",149.2,150.68],[12,0,0,"제가",150.7,152.04],[12,0,1,"정신을",152.06,152.38],[12,0,2,"잃자,",152.4,153.06],[12,0,3,"누나는",153.06,154.1],[12,0,4,"스스로를",154.1,154.9],[12,0,5,"먼저",154.9,155.46],[12,0,6,"살려야겠다고",155.46,156.32],[12,0,7,"생각했대요.",156.32,157.3],[12,1,0,"엄마가",157.33,157.97],[12,1,1,"아는",157.99,158.22],';
+            h += '[12,1,2,"순간",158.24,158.68],[12,1,3,"끝이니까요.",158.69,160.73],[13,0,0,"그래서",160.9,161.62],[13,0,1,"누나는",161.62,161.9],[13,0,2,"그냥",161.92,162.46],[13,0,3,"모른",162.46,162.82],[13,0,4,"척하고",162.82,163.34],[13,0,5,"그냥",163.34,164.1],[13,0,6,"집으로",164.1,164.52],[13,0,7,"가버렸대요.",164.52,165.7],[13,1,0,"세상에!",165.8,168]]';
+            h += ';\n';
+            h += 'var TUT_SLIDEMAP = _TC.map(function(a){return {slideIdx:a[0],si:a[1],wi:a[2],word:a[3],start:a[4],end:a[5]};});\n';
             h += 'var REAL_SLIDES = null, REAL_AUDIO = null, REAL_SLIDEMAP = null, REAL_TOTAL = null;\n';
             h += 'function tutSwapIn() {\n';
-            h += '  REAL_SLIDES = slides; REAL_AUDIO = klrAudioUrl; REAL_SLIDEMAP = klrSlideMap; REAL_TOTAL = totalSlides;\n';
+            h += '  console.log("tutSwapIn called");\n';
+            h += '  console.log("klrAudioUrl defined?", typeof klrAudioUrl !== "undefined");\n';
+            h += '  console.log("klrSlideMap defined?", typeof klrSlideMap !== "undefined");\n';
+            h += '  console.log("klrAudioEl defined?", typeof klrAudioEl !== "undefined");\n';
+            h += '  console.log("klrInitAudio defined?", typeof klrInitAudio !== "undefined");\n';
+            h += '  try {\n';
+            h += '  REAL_SLIDES = slides; REAL_AUDIO = typeof klrAudioUrl !== "undefined" ? klrAudioUrl : null; REAL_SLIDEMAP = typeof klrSlideMap !== "undefined" ? klrSlideMap : null; REAL_TOTAL = totalSlides;\n';
             h += '  slides = TUT_SLIDES; totalSlides = TUT_SLIDES.length;\n';
             h += '  klrAudioUrl = TUT_AUDIO; klrSlideMap = TUT_SLIDEMAP;\n';
-            h += '  if (klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
-            h += '  klrInitAudio();\n';
+            h += '  if (typeof klrAudioEl !== "undefined" && klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
+            h += '  if (typeof klrInitAudio === "function") klrInitAudio();\n';
             h += '  cur = 0; renderSlide(cur); renderDots();\n';
+            h += '  console.log("tutSwapIn complete");\n';
+            h += '  } catch(e) { console.error("tutSwapIn ERROR:", e); }\n';
             h += '}\n';
             h += 'function tutSwapOut() {\n';
+            h += '  console.log("tutSwapOut called");\n';
+            h += '  try {\n';
             h += '  if (REAL_SLIDES) {\n';
             h += '    slides = REAL_SLIDES; totalSlides = REAL_TOTAL;\n';
-            h += '    klrAudioUrl = REAL_AUDIO; klrSlideMap = REAL_SLIDEMAP;\n';
-            h += '    if (klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
-            h += '    if (klrAudioUrl) klrInitAudio();\n';
+            h += '    if (typeof klrAudioUrl !== "undefined") klrAudioUrl = REAL_AUDIO;\n';
+            h += '    if (typeof klrSlideMap !== "undefined") klrSlideMap = REAL_SLIDEMAP;\n';
+            h += '    if (typeof klrAudioEl !== "undefined" && klrAudioEl) { klrAudioEl.pause(); klrAudioEl = null; }\n';
+            h += '    if (REAL_AUDIO && typeof klrInitAudio === "function") klrInitAudio();\n';
             h += '    REAL_SLIDES = null;\n';
             h += '  }\n';
             h += '  cur = 0; renderSlide(cur); renderDots();\n';
+            h += '  console.log("tutSwapOut complete");\n';
+            h += '  } catch(e) { console.error("tutSwapOut ERROR:", e); }\n';
             h += '}\n';
 
             // Tutorial system
@@ -11818,12 +12270,11 @@
             h += '    var msg = "In the settings menu, you will see several different Modes.<br><br><b style=\\"color:#6ea8fe;\\">Normal Mode</b> highlights the first sentence only (for Absolute Beginners and Novices). <b style=\\"color:#c084fc;\\">Hard Mode</b> highlights ALL sentences in purple and red (for Beginners and up).<br><br><b>Clear Highlight</b> removes all highlights. You can also adjust the <b>Speed</b> of the audio here.";\n';
             h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
             h += '    tutMsg.style.textAlign = "center"; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
             h += '    tutMsg.innerHTML = msg + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\';\n';
-            // Find the settings menu left edge
             h += '    var settingsMenu = document.querySelector("#klrSlides .klr-settings-menu");\n';
             h += '    var menuLeft = window.innerWidth;\n';
             h += '    if (settingsMenu) { var smr = settingsMenu.getBoundingClientRect(); if (smr.width > 0) menuLeft = smr.left; }\n';
-            // Width: wide enough to reduce height, but leave gap before menu
             h += '    var msgW = Math.min(720, menuLeft - 40);\n';
             h += '    if (msgW < 300) msgW = 300;\n';
             h += '    tutMsg.style.maxWidth = msgW + "px";\n';
@@ -11834,17 +12285,27 @@
             h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
             h += '    if (sa) {\n';
             h += '      var sr = sa.getBoundingClientRect();\n';
-            h += '      tutMsg.style.top = (sr.top + 5) + "px";\n';
+            h += '      if (sr.top > 0 && sr.top < window.innerHeight) { tutMsg.style.top = (sr.top + 5) + "px"; }\n';
+            h += '      else { tutMsg.style.top = "10px"; }\n';
             h += '    } else { tutMsg.style.top = "10px"; }\n';
             h += '  },\n';
             // Step 8: Comparison mode explanation
             h += '  function(){\n';
             h += '    var cb = document.getElementById("klrSToggle"); if (cb) cb.checked = false;\n';
-            h += '    tutArrow.style.display = "none";\n';
+            h += '    var gear = document.querySelector("#klrSlides .klr-settings-btn");\n';
+            h += '    if (gear) {\n';
+            h += '      var r = gear.getBoundingClientRect();\n';
+            h += '      tutArrow.style.display = "block";\n';
+            h += '      tutArrow.className = "klr-tut-arrow point-right";\n';
+            h += '      tutArrow.style.top = (r.top + r.height/2 - 24) + "px";\n';
+            h += '      tutArrow.style.left = Math.max(5, r.left - 60) + "px";\n';
+            h += '      function onGearStep8() { gear.removeEventListener("click", onGearStep8); tutArrow.style.display = "none"; }\n';
+            h += '      gear.addEventListener("click", onGearStep8);\n';
+            h += '    } else { tutArrow.style.display = "none"; }\n';
             h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
             h += '    tutMsg.style.textAlign = "center"; tutMsg.style.bottom = "auto";\n';
-            h += '    tutMsg.innerHTML = "Lastly, you will see <b style=\\"color:#4ade80;\\">Comparison Mode</b>. In Comparison Mode, you can record your voice to see how you compare to Mr. Calvin\'s recording. Let\'s try it!" + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\';\n';
-            // Same positioning as step 7: center between left edge and where settings menu was
+            h += '    tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
+            h += '    tutMsg.innerHTML = "Lastly, you will see <b style=\\"color:#4ade80;\\">Comparison Mode</b>. In Comparison Mode, you can record your voice to see how you compare to Mr. Calvin\'s recording. Let\'s try it!";\n';
             h += '    var settingsMenu = document.querySelector("#klrSlides .klr-settings-menu");\n';
             h += '    var menuLeft = window.innerWidth;\n';
             h += '    if (settingsMenu) { var smr = settingsMenu.getBoundingClientRect(); if (smr.width > 0) menuLeft = smr.left; }\n';
@@ -11856,7 +12317,8 @@
             h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
             h += '    if (sa) {\n';
             h += '      var sr = sa.getBoundingClientRect();\n';
-            h += '      tutMsg.style.top = (sr.top + 5) + "px";\n';
+            h += '      if (sr.top > 0 && sr.top < window.innerHeight) { tutMsg.style.top = (sr.top + 5) + "px"; }\n';
+            h += '      else { tutMsg.style.top = "10px"; }\n';
             h += '    } else { tutMsg.style.top = "10px"; }\n';
             h += '  },\n';
             // Step 9: Switch to comparison mode and let them use it
@@ -11889,14 +12351,20 @@
             h += '  function(){\n';
             h += '    tutArrow.style.display = "none";\n';
             h += '    tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
-            h += '    tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px"; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = ""; tutMsg.style.bottom = "auto";\n';
+            h += '    tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
             h += '    tutMsg.innerHTML = "That\'s it for the tutorial. You are all set and ready to use the app! Have fun and good luck with your studies. 🎉" + \'<br><button class="klr-tut-next" onclick="KLR.closeTutorial()">Got it! ✓</button>\';\n';
             h += '    var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
             h += '    if (sa) {\n';
             h += '      var sr = sa.getBoundingClientRect();\n';
-            h += '      tutMsg.style.top = (sr.top + sr.height / 2) + "px";\n';
-            h += '      tutMsg.style.left = (sr.left + sr.width / 2) + "px";\n';
-            h += '      tutMsg.style.transform = "translate(-50%, -50%)";\n';
+            h += '      var _pt = sr.top + sr.height / 2, _pl = sr.left + sr.width / 2;\n';
+            h += '      if (_pt > 0 && _pt < window.innerHeight && _pl > 0 && _pl < window.innerWidth) {\n';
+            h += '        tutMsg.style.top = _pt + "px";\n';
+            h += '        tutMsg.style.left = _pl + "px";\n';
+            h += '        tutMsg.style.transform = "translate(-50%, -50%)";\n';
+            h += '      } else {\n';
+            h += '        tutMsg.style.top = "50%"; tutMsg.style.left = "50%"; tutMsg.style.transform = "translate(-50%,-50%)";\n';
+            h += '      }\n';
             h += '    } else {\n';
             h += '      tutMsg.style.top = "50%"; tutMsg.style.left = "50%"; tutMsg.style.transform = "translate(-50%,-50%)";\n';
             h += '    }\n';
@@ -11911,18 +12379,25 @@
             h += '  ov.innerHTML = \'<div class="klr-tut-popup">\' +\n';
             h += '    \'<div style="font-size:22px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">📖 Welcome!</div>\' +\n';
             h += '    \'<div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:24px;">Welcome to the new Tuesday Reading prep. Let\\\'s walk you through how to use this app.</div>\' +\n';
+            h += '    \'<div class="klr-tut-landscape-hint" style="display:none;color:#f59e0b;font-size:12px;line-height:1.5;margin-bottom:16px;padding:8px 12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;">📱 Please use <b>Landscape mode</b> (turn your phone sideways) for the best experience.</div>\' +\n';
             h += '    \'<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">\' +\n';
             h += '    \'<button onclick="KLR.startTutorial()" style="background:linear-gradient(135deg,#00cccc,#0099aa);color:#000;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;transition:transform 0.15s;">Let\\\'s Go!</button>\' +\n';
             h += '    \'<button onclick="KLR.closeTutorial()" style="background:rgba(255,255,255,0.08);color:#999;border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 32px;font-size:15px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;transition:all 0.15s;">Skip Tutorial</button>\' +\n';
             h += '    \'</div></div>\';\n';
             h += '  document.body.appendChild(ov);\n';
+            h += '  var lhint = ov.querySelector(".klr-tut-landscape-hint");\n';
+            h += '  if (lhint && ("ontouchstart" in window || navigator.maxTouchPoints > 0)) { lhint.style.display = "block"; }\n';
             h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
             h += '  var popup = ov.querySelector(".klr-tut-popup");\n';
             h += '  if (sa && popup) {\n';
             h += '    var sr = sa.getBoundingClientRect();\n';
-            h += '    popup.style.top = (sr.top + sr.height/2) + "px";\n';
-            h += '    popup.style.left = (sr.left + sr.width/2) + "px";\n';
-            h += '    popup.style.transform = "translate(-50%,-50%)";\n';
+            h += '    var pt = sr.top + sr.height/2, pl = sr.left + sr.width/2;\n';
+            h += '    console.log("Tutorial popup positioning:", {slideArea: {top: sr.top, left: sr.left, width: sr.width, height: sr.height}, popupTop: pt, popupLeft: pl, vpW: window.innerWidth, vpH: window.innerHeight});\n';
+            h += '    if (pt > 0 && pt < window.innerHeight && pl > 0 && pl < window.innerWidth) {\n';
+            h += '      popup.style.top = pt + "px";\n';
+            h += '      popup.style.left = pl + "px";\n';
+            h += '      popup.style.transform = "translate(-50%,-50%)";\n';
+            h += '    }\n';
             h += '  }\n';
             h += '  requestAnimationFrame(function(){ ov.classList.add("visible"); });\n';
             h += '}\n';
@@ -11968,39 +12443,46 @@
             h += '  var el = typeof selector === "string" ? document.querySelector(selector) : selector;\n';
             h += '  if (!el) { KLR.tutNext(); return; }\n';
             h += '  var r = el.getBoundingClientRect();\n';
-            h += '  tutArrow.style.display = "block";\n';
+            h += '  var _inView = r.top > 0 && r.top < window.innerHeight && r.left > 0 && r.left < window.innerWidth;\n';
+            h += '  tutArrow.style.display = _inView ? "block" : "none";\n';
             h += '  tutArrow.className = "klr-tut-arrow point-" + direction;\n';
+            h += '  if (_inView) {\n';
             h += '  if (direction === "right") { tutArrow.style.top = (r.top + r.height/2 - 24) + "px"; tutArrow.style.left = Math.max(5, r.left - 60) + "px"; }\n';
             h += '  else if (direction === "left") { tutArrow.style.top = (r.top + r.height/2 - 24) + "px"; tutArrow.style.left = (r.right + 12) + "px"; }\n';
             h += '  else if (direction === "down") { tutArrow.style.top = (r.top - 60) + "px"; tutArrow.style.left = (r.left + r.width/2 - 24) + "px"; }\n';
             h += '  else { tutArrow.style.top = (r.bottom + 12) + "px"; tutArrow.style.left = (r.left + r.width/2 - 24) + "px"; }\n';
+            h += '  }\n';
             h += '  klrTutMsgAbove(message + \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\');\n';
             h += '}\n';
 
             // Show tutorial message above the sentence content
             h += 'function klrTutMsgAbove(html) {\n';
             h += '  tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
-            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px";\n';
+            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = ""; tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
             h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.bottom = "auto";\n';
             h += '  tutMsg.innerHTML = html;\n';
             h += '  var contentEl = document.querySelector("#klrSlides .klr-content");\n';
             h += '  if (contentEl) {\n';
             h += '    var cr = contentEl.getBoundingClientRect();\n';
             h += '    var msgH = tutMsg.offsetHeight || 120;\n';
-            h += '    tutMsg.style.top = Math.max(10, cr.top - msgH - 10) + "px";\n';
+            h += '    var _t = cr.top - msgH - 10;\n';
+            h += '    if (cr.top > window.innerHeight || cr.top < 0) _t = 10;\n';
+            h += '    tutMsg.style.top = Math.max(10, _t) + "px";\n';
             h += '  } else { tutMsg.style.top = "10px"; }\n';
             h += '}\n';
 
             // Show tutorial message below the slide area
             h += 'function klrTutMsgBelow(html) {\n';
             h += '  tutMsg.style.display = "block"; tutMsg.style.position = "fixed"; tutMsg.style.zIndex = "300010";\n';
-            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = "460px";\n';
+            h += '  tutMsg.style.textAlign = "center"; tutMsg.style.maxWidth = ""; tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
             h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.top = "auto";\n';
             h += '  tutMsg.innerHTML = html;\n';
             h += '  var slideArea = document.querySelector("#klrn-reader .klr-slide-area");\n';
             h += '  if (slideArea) {\n';
             h += '    var sr = slideArea.getBoundingClientRect();\n';
-            h += '    tutMsg.style.bottom = Math.max(10, window.innerHeight - sr.bottom + 20) + "px";\n';
+            h += '    var _b = window.innerHeight - sr.bottom + 20;\n';
+            h += '    if (sr.bottom > window.innerHeight || sr.bottom < 0) _b = 80;\n';
+            h += '    tutMsg.style.bottom = Math.max(10, _b) + "px";\n';
             h += '  } else { tutMsg.style.bottom = "80px"; }\n';
             h += '}\n';
 
@@ -12008,7 +12490,8 @@
             h += '  tutArrow.style.display = "none";\n';
             h += '  tutMsg.style.display = "block";\n';
             h += '  tutMsg.style.position = "fixed";\n';
-            h += '  tutMsg.style.maxWidth = "460px"; tutMsg.style.textAlign = "center"; tutMsg.style.zIndex = "300010";\n';
+            h += '  tutMsg.style.maxWidth = ""; tutMsg.style.textAlign = "center"; tutMsg.style.zIndex = "300010";\n';
+            h += '  tutMsg.style.fontSize = ""; tutMsg.style.padding = ""; tutMsg.style.lineHeight = "";\n';
             h += '  tutMsg.style.left = "50%"; tutMsg.style.transform = "translateX(-50%)"; tutMsg.style.bottom = "auto";\n';
             h += '  tutMsg.innerHTML = message + (hasNext !== false ? \'<br><button class="klr-tut-next" onclick="KLR.tutNext()">OK</button>\' : \'<br><button class="klr-tut-next" onclick="KLR.closeTutorial()">Got it! ✓</button>\');\n';
             h += '  var contentEl = document.querySelector("#klrSlides .klr-content");\n';
@@ -12016,6 +12499,7 @@
             h += '    var cr = contentEl.getBoundingClientRect();\n';
             h += '    var msgH = tutMsg.offsetHeight || 150;\n';
             h += '    var topPos = cr.top - msgH - 10;\n';
+            h += '    if (cr.top > window.innerHeight || cr.top < 0) topPos = 10;\n';
             h += '    if (topPos < 10) topPos = 10;\n';
             h += '    tutMsg.style.top = topPos + "px";\n';
             h += '  } else {\n';
@@ -12044,8 +12528,11 @@
             h += '  var w = el.offsetWidth;\n';
             h += '  var s = w / 760;\n';
             h += '  el.style.setProperty("--s", Math.max(0.4, Math.min(s, 2.5)));\n';
+            h += '  document.documentElement.style.setProperty("--s", Math.max(0.4, Math.min(s, 2.5)));\n';
             h += '}\n';
             h += 'window.addEventListener("resize", klrScale);\n';
+            h += 'var _tutResizeTimer = null;\n';
+            h += 'window.addEventListener("resize", function() { clearTimeout(_tutResizeTimer); _tutResizeTimer = setTimeout(function() { klrScale(); requestAnimationFrame(function() { requestAnimationFrame(function() { if (tutActive && tutStep >= 0 && tutStep < tutSteps.length) klrRunTutStep(); }); }); }, 300); });\n';
 
             // Audio sync engine for export
             h += 'renderDots(); klrScale(); goTo(0);\n';
@@ -12072,6 +12559,222 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
+
+        // ---- PUBLISH TO WEB ----
+        function matPublishToWeb() {
+            if (matSlides.length === 0) { alert('No slides to publish.'); return; }
+
+            // Prompt for a week label
+            var today = new Date();
+            var defaultLabel = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+            var label = prompt('Enter a label for this reading (e.g. week date):', defaultLabel);
+            if (!label) return;
+
+            // Sanitize label for filename
+            var safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
+            var fileName = 'reading_exports/' + safeLabel + '.html';
+
+            var btn = document.getElementById('matPublishBtn');
+            var origText = btn.textContent;
+            btn.textContent = '⏳ Publishing...';
+            btn.disabled = true;
+
+            // Build the HTML the same way as export
+            db.collection(MAT_PARTICLE_COLLECTION).get()
+            .then(function(snap) {
+                var particleData = {};
+                snap.forEach(function(doc) {
+                    particleData[doc.id] = doc.data();
+                });
+                return matBuildPublishHTML(particleData);
+            })
+            .catch(function() {
+                return matBuildPublishHTML({});
+            })
+            .then(function(htmlContent) {
+                // Upload to Firebase Storage
+                var storageRef = firebase.storage().ref(fileName);
+                var blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                return storageRef.put(blob, { contentType: 'text/html; charset=utf-8', cacheControl: 'public, max-age=3600' });
+            })
+            .then(function(snapshot) {
+                return snapshot.ref.getDownloadURL();
+            })
+            .then(function(downloadUrl) {
+                btn.textContent = '✅ Published!';
+                btn.disabled = false;
+                setTimeout(function() { btn.textContent = origText; }, 3000);
+
+                // Show the URL and Tevello embed code
+                var embedUrl = downloadUrl;
+                var iframeCode = '<iframe src="' + embedUrl + '" width="100%" height="800" style="border:none; border-radius:12px;" allow="microphone; autoplay" allowfullscreen></iframe>';
+
+                // Show modal with URL and iframe code
+                var modal = document.createElement('div');
+                modal.id = 'matPublishSuccessModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:999999;display:flex;align-items:center;justify-content:center;';
+                modal.innerHTML = '<div style="background:#1e2030;border:2px solid rgba(0,255,255,0.3);border-radius:16px;padding:32px;max-width:600px;width:90%;color:#ddd;font-family:Noto Sans KR,sans-serif;">' +
+                    '<div style="font-size:20px;font-weight:700;color:#4ade80;margin-bottom:16px;">✅ Published Successfully!</div>' +
+                    '<div style="margin-bottom:12px;font-size:13px;color:#999;">Direct URL:</div>' +
+                    '<input type="text" value="' + embedUrl.replace(/"/g, '&quot;') + '" readonly style="width:100%;padding:10px;background:#111;color:#0ff;border:1px solid #333;border-radius:8px;font-size:12px;margin-bottom:16px;" onclick="this.select()">' +
+                    '<div style="margin-bottom:12px;font-size:13px;color:#999;">Tevello iframe embed code:</div>' +
+                    '<textarea readonly style="width:100%;height:80px;padding:10px;background:#111;color:#0ff;border:1px solid #333;border-radius:8px;font-size:11px;resize:none;margin-bottom:16px;" onclick="this.select()">' + iframeCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>' +
+                    '<div style="display:flex;gap:12px;justify-content:center;">' +
+                    '<button onclick="navigator.clipboard.writeText(\'' + embedUrl.replace(/'/g, "\\'") + '\');this.textContent=\'✅ Copied!\';setTimeout(function(){this.textContent=\'📋 Copy URL\';}.bind(this),2000);" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;">📋 Copy URL</button>' +
+                    '<button onclick="document.getElementById(\'matPublishSuccessModal\').remove();" style="background:rgba(255,255,255,0.1);color:#999;border:1px solid #444;border-radius:8px;padding:10px 24px;font-size:13px;cursor:pointer;">Close</button>' +
+                    '</div></div>';
+                document.body.appendChild(modal);
+
+                // Also save the URL to Firestore for reference
+                db.collection('published_readings').doc(safeLabel).set({
+                    url: downloadUrl,
+                    label: label,
+                    fileName: fileName,
+                    publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    slideCount: matSlides.length
+                });
+            })
+            .catch(function(err) {
+                console.error('Publish error:', err);
+                btn.textContent = origText;
+                btn.disabled = false;
+                alert('Publish failed: ' + err.message);
+            });
+        }
+
+        function matBuildPublishHTML(particleData) {
+            // Reuse the same HTML building logic as matBuildExportHTML
+            // but return the HTML string instead of downloading
+            var fs = parseInt(document.getElementById('matFontSize').value) || 30;
+            var totalSlides = matSlides.length;
+            var cacheJSON = JSON.stringify(matWordCache || {});
+            var slidesJSON = JSON.stringify(matSlides.map(function(s) { return { sentences: s.sentences }; }));
+            var particleJSON = JSON.stringify(particleData);
+
+            // We need to build the same h string as matBuildExportHTML
+            // To avoid duplicating 1000+ lines, we'll capture it by temporarily overriding the download part
+            return new Promise(function(resolve) {
+                // Save original function behavior
+                var origBuild = matBuildExportHTML;
+                
+                // Temporarily monkey-patch to capture HTML instead of downloading
+                var capturedHTML = null;
+                matBuildExportHTML = function(pd) {
+                    // Run original to build h, but intercept the Blob creation
+                    var origBlob = window.Blob;
+                    var origCreateElement = document.createElement.bind(document);
+                    
+                    // Override Blob to capture content
+                    window.Blob = function(parts, opts) {
+                        capturedHTML = parts[0];
+                        return new origBlob(parts, opts);
+                    };
+                    
+                    // Override createElement to prevent download
+                    var origAppendChild = document.body.appendChild.bind(document.body);
+                    var origRemoveChild = document.body.removeChild.bind(document.body);
+                    document.body.appendChild = function(el) { if (el.tagName === 'A' && el.download) return el; return origAppendChild(el); };
+                    document.body.removeChild = function(el) { if (el.tagName === 'A' && el.download) return el; return origRemoveChild(el); };
+                    
+                    origBuild(pd);
+                    
+                    // Restore
+                    window.Blob = origBlob;
+                    document.body.appendChild = origAppendChild;
+                    document.body.removeChild = origRemoveChild;
+                    matBuildExportHTML = origBuild;
+                };
+                
+                matBuildExportHTML(particleData);
+                resolve(capturedHTML);
+            });
+        }
+
+        // ---- MANAGE PUBLISHED READINGS ----
+        function matManagePublished() {
+            var modal = document.createElement('div');
+            modal.id = 'matPublishManager';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = '<div style="background:#1e2030;border:2px solid rgba(249,115,22,0.4);border-radius:16px;padding:28px;max-width:650px;width:92%;max-height:80vh;color:#ddd;font-family:Noto Sans KR,sans-serif;display:flex;flex-direction:column;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+                '<div style="font-size:18px;font-weight:700;color:#f97316;">🗂️ Published Readings</div>' +
+                '<button onclick="document.getElementById(\'matPublishManager\').remove();" style="background:none;border:none;color:#666;font-size:20px;cursor:pointer;">✕</button>' +
+                '</div>' +
+                '<div id="matPublishList" style="flex:1;overflow-y:auto;min-height:100px;"><div style="text-align:center;color:#666;padding:20px;">Loading...</div></div>' +
+                '</div>';
+            document.body.appendChild(modal);
+
+            // Load from Firestore
+            db.collection('published_readings').orderBy('publishedAt', 'desc').get()
+            .then(function(snap) {
+                var list = document.getElementById('matPublishList');
+                if (snap.empty) {
+                    list.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">No published readings yet.</div>';
+                    return;
+                }
+                var html = '';
+                snap.forEach(function(doc) {
+                    var d = doc.data();
+                    var date = d.publishedAt ? new Date(d.publishedAt.seconds * 1000).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}) : 'Unknown date';
+                    html += '<div id="pub_' + doc.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+                        '<div style="flex:1;min-width:0;">' +
+                        '<div style="font-weight:600;color:#e2e8f0;font-size:14px;">' + (d.label || doc.id) + '</div>' +
+                        '<div style="font-size:11px;color:#666;margin-top:2px;">' + date + ' · ' + (d.slideCount || '?') + ' slides</div>' +
+                        '</div>' +
+                        '<button onclick="matCopyPublishedUrl(\'' + (d.url || '').replace(/'/g, "\\'") + '\', this)" style="background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">📋 URL</button>' +
+                        '<button onclick="matDeletePublished(\'' + doc.id + '\', \'' + (d.fileName || '').replace(/'/g, "\\'") + '\')" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;">🗑️</button>' +
+                        '</div>';
+                });
+                list.innerHTML = html;
+            })
+            .catch(function(err) {
+                document.getElementById('matPublishList').innerHTML = '<div style="text-align:center;color:#f87171;padding:20px;">Error loading: ' + err.message + '</div>';
+            });
+        }
+
+        function matCopyPublishedUrl(url, btn) {
+            navigator.clipboard.writeText(url).then(function() {
+                var orig = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(function() { btn.textContent = orig; }, 1500);
+            }).catch(function() {
+                prompt('Copy this URL:', url);
+            });
+        }
+
+        function matDeletePublished(docId, fileName) {
+            if (!confirm('Delete "' + docId + '"?\n\nThis will remove the file from Firebase Storage and the Firestore record.')) return;
+
+            var promises = [];
+
+            // Delete from Storage
+            if (fileName) {
+                promises.push(
+                    firebase.storage().ref(fileName).delete().catch(function(e) {
+                        console.warn('Storage delete failed (may already be gone):', e.message);
+                    })
+                );
+            }
+
+            // Delete from Firestore
+            promises.push(db.collection('published_readings').doc(docId).delete());
+
+            Promise.all(promises).then(function() {
+                var row = document.getElementById('pub_' + docId);
+                if (row) {
+                    row.style.transition = 'opacity 0.3s, max-height 0.3s';
+                    row.style.opacity = '0';
+                    row.style.maxHeight = '0';
+                    row.style.overflow = 'hidden';
+                    row.style.padding = '0';
+                    setTimeout(function() { row.remove(); }, 300);
+                }
+            }).catch(function(err) {
+                alert('Delete failed: ' + err.message);
+            });
+        }
+
+
         // ---- EXPANDED PREVIEW MODE ----
         var matExpCurrentSlide = 0;
         var matWordCache = {};
@@ -28701,7 +29404,11 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
 
         // ---- TRANSCRIPT TIMING EDITOR ----
         function matOpenTranscriptEditor() {
-            if (!matAudioSyncData || !matAudioSyncData.slideMap) { alert('No audio transcript loaded.'); return; }
+            if (!matAudioSyncData || !matAudioSyncData.slideMap) {
+                // No timing data yet — show paste-only mode
+                matOpenTranscriptPasteMode();
+                return;
+            }
             var existing = document.getElementById('matTranscriptEditor');
             if (existing) existing.remove();
             matStopAudioSync();
@@ -28714,9 +29421,10 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             var html = '<div style="max-width:900px;width:100%;">';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;position:sticky;top:0;background:rgba(5,5,18,0.97);padding:10px 0;z-index:10;">';
             html += '<h2 style="color:#fff;margin:0;font-size:18px;">✏️ Transcript Timing Editor</h2>';
-            html += '<div style="display:flex;gap:8px;">';
+            html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
             html += '<button onclick="matTranscriptTestAll()" style="background:#a855f7;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">▶ Test All</button>';
             html += '<button onclick="matTranscriptStop()" style="background:#555;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">⏹ Stop</button>';
+            html += '<button onclick="matTranscriptImportJSON()" style="background:#f472b6;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">📋 Paste Timing JSON</button>';
             html += '<button onclick="matTranscriptCopyJSON()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">📋 Copy Timing JSON</button>';
             html += '<button onclick="matTranscriptSave()" style="background:#39ff14;color:#000;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">💾 Save</button>';
             html += '<button onclick="matTranscriptClose()" style="background:#ff4444;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">✕ Close</button>';
