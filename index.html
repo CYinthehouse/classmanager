@@ -1939,6 +1939,7 @@
                         <div style="margin-bottom: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
                             <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
                             <button class="btn" onclick="trImportFromMaterials()" style="background: linear-gradient(135deg, #0ea5e9, #38bdf8); border: 2px solid #38bdf8; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(56,189,248,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(56,189,248,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(56,189,248,0.3)'">📂 Import from Materials</button>
+                            <button class="btn" onclick="openKahootMaker()" style="background: linear-gradient(135deg, #ff00ff, #cc00cc); border: 2px solid #ff00ff; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(255,0,255,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(255,0,255,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(255,0,255,0.3)'">🎮 Quiz Game</button>
                         </div>
 
                         <!-- Input Mode Toggle -->
@@ -30359,7 +30360,865 @@ Return ONLY this JSON (no markdown, no code blocks):
                 setTimeout(() => downloadHWPDF(i), i * 300);
             }
         }
+
+
+        // ═══════════════════════════════════════════════════
+        // 🎮 QUIZ GAME — KoreanLearnin Reading Game
+        // ═══════════════════════════════════════════════════
+        // Uses same sets as Tuesday Reading Cards
+        // LEFT = Beginner (1st sentence only), RIGHT = Advanced Beginner (all sentences)
+        // Speech grading via make.com webhooks (same as existing TR flow)
+        // Students join via external URL — no login required
+        // ═══════════════════════════════════════════════════
+
+        var QUIZ_GAME_COLLECTION = 'quiz_game_sessions';
+        var QUIZ_GAME_PLAYERS_SUB = 'players'; // subcollection
+
+        var quizGameState = {
+            sessionId: null,
+            sets: [],          // Array of { sentences: [{korean, english}], setIndex }
+            currentRound: -1,  // -1 = not started
+            roundTime: 60,     // seconds per round
+            status: 'setup',   // setup | lobby | playing | round_result | finished
+            unsubscribe: null  // Firestore listener
+        };
+
+        function openKahootMaker() {
+            document.getElementById('quizGameOverlay').style.display = 'flex';
+            quizGameRenderSetup();
+        }
+
+        function closeKahootMaker() {
+            document.getElementById('quizGameOverlay').style.display = 'none';
+            if (quizGameState.unsubscribe) {
+                quizGameState.unsubscribe();
+                quizGameState.unsubscribe = null;
+            }
+        }
+
+        // ── SETUP VIEW ──────────────────────────────────────
+        function quizGameRenderSetup() {
+            quizGameState.status = 'setup';
+            var setupEl = document.getElementById('quizGameSetupView');
+            var lobbyEl = document.getElementById('quizGameLobbyView');
+            var gameEl = document.getElementById('quizGamePlayView');
+            setupEl.style.display = 'block';
+            lobbyEl.style.display = 'none';
+            gameEl.style.display = 'none';
+
+            // Load sets from the Tuesday Reading trSets
+            quizGameLoadSets();
+        }
+
+        function quizGameLoadSets() {
+            var container = document.getElementById('quizGameSetsPreview');
+            // Save textareas first
+            for (var i = 0; i < trSets.length; i++) {
+                if (trSets[i].mode === 'text') {
+                    var el = document.getElementById('trTextarea' + i);
+                    if (el) trSets[i].text = el.value;
+                }
+            }
+
+            // Build sets
+            quizGameState.sets = [];
+            for (var i = 0; i < trSets.length; i++) {
+                var sentences = getTRSentencesFromSet(trSets[i]);
+                if (sentences.length > 0) {
+                    quizGameState.sets.push({
+                        setIndex: i,
+                        sentences: sentences.map(function(s) { return { korean: s, english: '' }; })
+                    });
+                }
+            }
+
+            if (quizGameState.sets.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:30px;">' +
+                    '<p style="color:#888; font-size:13px;">No sets loaded yet.</p>' +
+                    '<p style="color:#666; font-size:12px; margin-top:8px;">Go back and add sets in the Tuesday Reading tab (TEXT or IMAGE input), then come back here.</p>' +
+                    '</div>';
+                return;
+            }
+
+            var html = '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#00ffff; margin-bottom:12px;">' + quizGameState.sets.length + ' ROUNDS LOADED</div>';
+            for (var i = 0; i < quizGameState.sets.length; i++) {
+                var s = quizGameState.sets[i];
+                html += '<div style="background:rgba(0,0,0,0.4); border:2px solid rgba(0,255,255,0.15); border-radius:8px; padding:12px; margin-bottom:8px;">';
+                html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
+                html += '<span style="font-weight:700; color:#ff00ff; font-size:12px;">Round ' + (i + 1) + '</span>';
+                html += '<span style="font-size:11px; color:#888;">' + s.sentences.length + ' sentence' + (s.sentences.length > 1 ? 's' : '') + '</span>';
+                html += '</div>';
+                html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">';
+                // Left side preview
+                html += '<div style="background:rgba(0,255,255,0.05); border:1px solid rgba(0,255,255,0.2); border-radius:6px; padding:8px;">';
+                html += '<div style="font-size:10px; color:#00ffff; margin-bottom:4px; font-weight:600;">🌱 BEGINNER (1st only)</div>';
+                html += '<div style="font-size:12px; color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div>';
+                html += '</div>';
+                // Right side preview
+                html += '<div style="background:rgba(255,0,255,0.05); border:1px solid rgba(255,0,255,0.2); border-radius:6px; padding:8px;">';
+                html += '<div style="font-size:10px; color:#ff00ff; margin-bottom:4px; font-weight:600;">🌟 ADVANCED (' + s.sentences.length + ' sentences)</div>';
+                for (var j = 0; j < s.sentences.length; j++) {
+                    html += '<div style="font-size:12px; color:#fff; margin-bottom:2px;">' + escapeHtml(s.sentences[j].korean) + '</div>';
+                }
+                html += '</div>';
+                html += '</div></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        // ── CREATE GAME SESSION ────────────────────────────
+        async function quizGameCreateSession() {
+            if (quizGameState.sets.length === 0) {
+                alert('No sets loaded. Add sets in the Tuesday Reading tab first.');
+                return;
+            }
+
+            var roundTime = parseInt(document.getElementById('quizGameRoundTime').value) || 60;
+            quizGameState.roundTime = roundTime;
+
+            var createBtn = document.getElementById('quizGameCreateBtn');
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<span class="quiz-loading-dots">⏳ CREATING</span>';
+
+            try {
+                // First get translations for all sentences
+                var allKorean = [];
+                for (var i = 0; i < quizGameState.sets.length; i++) {
+                    for (var j = 0; j < quizGameState.sets[i].sentences.length; j++) {
+                        allKorean.push(quizGameState.sets[i].sentences[j].korean);
+                    }
+                }
+
+                // AI translation (same endpoint as Generate Reading Cards)
+                var aiUrl = 'https://generateflashcardai-386010826708.us-central1.run.app';
+                var translationPrompt = 'Translate each Korean sentence below into natural, conversational English. Return ONLY a valid JSON array where each element is an object with "korean" and "english" keys. No markdown, no backticks, no explanation.\n\nSentences:\n' + allKorean.join('\n');
+
+                var aiResp = await fetch(aiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: translationPrompt, max_tokens: 2000 })
+                });
+                var aiData = await aiResp.json();
+                var resultText = aiData.text || aiData.result || aiData.response || JSON.stringify(aiData);
+                var translations = [];
+                var jsonMatch = resultText.match(/\[[\s\S]*?\]/);
+                if (jsonMatch) {
+                    try { translations = JSON.parse(jsonMatch[0]); } catch(e) {}
+                }
+
+                // Map translations back
+                var tIdx = 0;
+                for (var i = 0; i < quizGameState.sets.length; i++) {
+                    for (var j = 0; j < quizGameState.sets[i].sentences.length; j++) {
+                        if (tIdx < translations.length && translations[tIdx]) {
+                            quizGameState.sets[i].sentences[j].english = translations[tIdx].english || '';
+                        }
+                        tIdx++;
+                    }
+                }
+
+                // Generate a short room code
+                var roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+                // Create Firestore session
+                var sessionData = {
+                    roomCode: roomCode,
+                    status: 'lobby', // lobby | playing | round_result | finished
+                    currentRound: -1,
+                    totalRounds: quizGameState.sets.length,
+                    roundTime: roundTime,
+                    roundStartedAt: null,
+                    sets: quizGameState.sets.map(function(s) {
+                        return {
+                            setIndex: s.setIndex,
+                            sentences: s.sentences
+                        };
+                    }),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                var docRef = await db.collection(QUIZ_GAME_COLLECTION).add(sessionData);
+                quizGameState.sessionId = docRef.id;
+                quizGameState.status = 'lobby';
+
+                // Generate student URL — use actual page URL base
+                var pageUrl = window.location.href.split('?')[0].split('#')[0];
+                var studentUrl = pageUrl + '?quizgame=' + roomCode;
+
+                // Also store the room code in Firestore for manual join
+                await db.collection(QUIZ_GAME_COLLECTION).doc(docRef.id).update({
+                    studentUrl: studentUrl
+                });
+
+                // Show lobby view
+                quizGameShowLobby(roomCode, studentUrl);
+
+            } catch(err) {
+                console.error('Create quiz game error:', err);
+                alert('Error creating game: ' + err.message);
+            } finally {
+                createBtn.disabled = false;
+                createBtn.innerHTML = '🎮 CREATE GAME';
+            }
+        }
+
+        // ── LOBBY VIEW (Admin) ─────────────────────────────
+        function quizGameShowLobby(roomCode, studentUrl) {
+            var setupEl = document.getElementById('quizGameSetupView');
+            var lobbyEl = document.getElementById('quizGameLobbyView');
+            setupEl.style.display = 'none';
+            lobbyEl.style.display = 'block';
+
+            var html = '<div style="text-align:center; margin-bottom:20px;">';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#888; margin-bottom:8px;">ROOM CODE</div>';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:36px; color:#00ffff; text-shadow:0 0 20px #00ffff; letter-spacing:8px; margin-bottom:12px;">' + roomCode + '</div>';
+            html += '<div style="background:rgba(0,0,0,0.4); border:2px solid rgba(255,0,255,0.3); border-radius:8px; padding:12px; margin-bottom:16px; word-break:break-all;">';
+            html += '<div style="font-size:11px; color:#888; margin-bottom:4px;">Student Link (share this):</div>';
+            html += '<a href="' + studentUrl + '" target="_blank" style="font-size:13px; color:#ff00ff; text-decoration:underline; word-break:break-all; display:block; margin-bottom:6px;">' + studentUrl + '</a>';
+            html += '<div style="display:flex; gap:8px; margin-top:8px;">';
+            html += '<button onclick="navigator.clipboard.writeText(\'' + studentUrl + '\');this.textContent=\'✅ Copied!\';setTimeout(()=>{this.textContent=\'📋 Copy Link\'},2000)" style="background:rgba(255,0,255,0.15); border:2px solid #ff00ff; color:#ff00ff; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; transition:all 0.2s;">📋 Copy Link</button>';
+            html += '<button onclick="window.open(\'' + studentUrl + '\',\'_blank\')" style="background:rgba(0,255,255,0.15); border:2px solid #00ffff; color:#00ffff; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; transition:all 0.2s;">🔗 Open in New Tab</button>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div style="font-size:12px; color:#888; margin-bottom:6px;">⏱️ Round time: <strong style="color:#00ffff;">' + quizGameState.roundTime + 's</strong> &bull; Rounds: <strong style="color:#ff00ff;">' + quizGameState.sets.length + '</strong></div>';
+            html += '</div>';
+
+            // Players list
+            html += '<div style="margin-bottom:16px;">';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#ff00ff; margin-bottom:10px;">WAITING ROOM</div>';
+            html += '<div id="quizGamePlayersContainer" style="min-height:60px; background:rgba(0,0,0,0.3); border:2px solid rgba(0,255,255,0.1); border-radius:10px; padding:12px; display:flex; flex-wrap:wrap; gap:10px; align-content:flex-start;">';
+            html += '<p style="color:#888; font-size:12px; width:100%; text-align:center;">Waiting for students to join...</p>';
+            html += '</div></div>';
+
+            // Start Game button
+            html += '<div style="text-align:center;">';
+            html += '<button id="quizGameStartBtn" onclick="quizGameStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px 48px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:12px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.boxShadow=\'0 0 35px rgba(255,0,255,0.6)\'" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'0 0 25px rgba(255,0,255,0.4)\'">▶ START ROUND 1</button>';
+            html += '</div>';
+
+            lobbyEl.innerHTML = html;
+
+            // Listen for players joining
+            quizGameListenForPlayers();
+        }
+
+        function quizGameListenForPlayers() {
+            if (quizGameState.unsubscribe) quizGameState.unsubscribe();
+
+            quizGameState.unsubscribe = db.collection(QUIZ_GAME_COLLECTION)
+                .doc(quizGameState.sessionId)
+                .collection(QUIZ_GAME_PLAYERS_SUB)
+                .onSnapshot(function(snap) {
+                    var container = document.getElementById('quizGamePlayersContainer');
+                    if (!container) return;
+                    if (snap.empty) {
+                        container.innerHTML = '<p style="color:#888; font-size:12px; width:100%; text-align:center;">Waiting for students to join...</p>';
+                        return;
+                    }
+                    var html = '';
+                    snap.forEach(function(doc) {
+                        var p = doc.data();
+                        var levelColor = p.level === 'beginner' ? '#00ffff' : '#ff00ff';
+                        var levelLabel = p.level === 'beginner' ? 'BEG' : 'ADV';
+                        html += '<div style="background:rgba(0,0,0,0.5); border:2px solid ' + levelColor + '; border-radius:10px; padding:8px 14px; display:flex; align-items:center; gap:8px; box-shadow:0 0 10px ' + levelColor + '33;">';
+                        html += '<span style="font-size:22px;">' + (p.emoji || '😊') + '</span>';
+                        html += '<div>';
+                        html += '<div style="font-size:13px; font-weight:700; color:#fff;">' + escapeHtml(p.name || 'Student') + '</div>';
+                        html += '<div style="font-size:9px; color:' + levelColor + '; font-family:\'Press Start 2P\';">' + levelLabel + '</div>';
+                        html += '</div></div>';
+                    });
+                    container.innerHTML = html;
+                });
+        }
+
+        // ── GAME CONTROL (Admin) ───────────────────────────
+        async function quizGameStartRound() {
+            var nextRound = (quizGameState.currentRound || -1) + 1;
+            if (nextRound >= quizGameState.sets.length) {
+                quizGameFinish();
+                return;
+            }
+
+            quizGameState.currentRound = nextRound;
+
+            // Update Firestore
+            await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
+                status: 'playing',
+                currentRound: nextRound,
+                roundStartedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            quizGameShowAdminRound(nextRound);
+        }
+
+        function quizGameShowAdminRound(roundIdx) {
+            var lobbyEl = document.getElementById('quizGameLobbyView');
+            var gameEl = document.getElementById('quizGamePlayView');
+            lobbyEl.style.display = 'none';
+            gameEl.style.display = 'block';
+
+            var set = quizGameState.sets[roundIdx];
+            var timeLeft = quizGameState.roundTime;
+
+            var html = '';
+            // Header
+            html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#888;">ROUND ' + (roundIdx + 1) + ' OF ' + quizGameState.sets.length + '</div>';
+            html += '<div id="quizAdminTimer" style="font-family:\'Press Start 2P\'; font-size:24px; color:#00ffff; text-shadow:0 0 15px #00ffff;">' + timeLeft + '</div>';
+            html += '</div>';
+
+            // Timer bar
+            html += '<div style="width:100%; background:rgba(255,255,255,0.05); border:2px solid rgba(0,255,255,0.2); border-radius:20px; height:10px; margin-bottom:20px; overflow:hidden;">';
+            html += '<div id="quizAdminTimerBar" style="width:100%; height:100%; background:linear-gradient(90deg,#00ffff,#ff00ff); border-radius:20px; transition:width ' + timeLeft + 's linear; box-shadow:0 0 10px rgba(0,255,255,0.5);"></div>';
+            html += '</div>';
+
+            // Two-column card display (same as Reading Cards)
+            html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">';
+
+            // LEFT - Beginner
+            html += '<div style="background:rgba(0,0,0,0.5); border:3px solid #00ffff; border-radius:12px; padding:20px; box-shadow:0 0 20px rgba(0,255,255,0.15);">';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#00ffff; text-align:center; margin-bottom:14px;">🌱 BEGINNER</div>';
+            html += '<div style="font-size:22px; color:#fff; text-align:center; line-height:1.6; padding:10px;">' + escapeHtml(set.sentences[0].korean) + '</div>';
+            if (set.sentences[0].english) {
+                html += '<div style="font-size:13px; color:#888; text-align:center; margin-top:10px;">' + escapeHtml(set.sentences[0].english) + '</div>';
+            }
+            html += '</div>';
+
+            // RIGHT - Advanced
+            html += '<div style="background:rgba(0,0,0,0.5); border:3px solid #ff00ff; border-radius:12px; padding:20px; box-shadow:0 0 20px rgba(255,0,255,0.15);">';
+            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff; text-align:center; margin-bottom:14px;">🌟 ADVANCED</div>';
+            for (var j = 0; j < set.sentences.length; j++) {
+                html += '<div style="font-size:' + (set.sentences.length > 2 ? '18' : '22') + 'px; color:#fff; text-align:center; line-height:1.6; padding:6px 10px;">' + escapeHtml(set.sentences[j].korean) + '</div>';
+                if (set.sentences[j].english) {
+                    html += '<div style="font-size:12px; color:#888; text-align:center; margin-bottom:10px;">' + escapeHtml(set.sentences[j].english) + '</div>';
+                }
+            }
+            html += '</div>';
+            html += '</div>';
+
+            // Check buttons (same make.com webhook flow as existing TR)
+            html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">';
+            html += '<button id="quizCheckBegBtn" onclick="quizGameCheck(\'novice\', ' + roundIdx + ')" style="background:rgba(0,255,255,0.1); border:3px solid #00ffff; color:#00ffff; padding:14px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:10px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background=\'rgba(0,255,255,0.2)\'" onmouseout="this.style.background=\'rgba(0,255,255,0.1)\'">✅ CHECK BEGINNERS</button>';
+            html += '<button id="quizCheckAdvBtn" onclick="quizGameCheck(\'beginner\', ' + roundIdx + ')" style="background:rgba(255,0,255,0.1); border:3px solid #ff00ff; color:#ff00ff; padding:14px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:10px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background=\'rgba(255,0,255,0.2)\'" onmouseout="this.style.background=\'rgba(255,0,255,0.1)\'">✅ CHECK ADVANCED</button>';
+            html += '</div>';
+
+            // End Round / Next Round / Leaderboard buttons
+            html += '<div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">';
+            html += '<button id="quizEndRoundBtn" onclick="quizGameEndRound()" style="background:linear-gradient(135deg,#ff9800,#f44336); border:2px solid #ff9800; color:#fff; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">⏹ END ROUND</button>';
+            if (roundIdx + 1 < quizGameState.sets.length) {
+                html += '<button onclick="quizGameStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:2px solid #ff00ff; color:#fff; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">➜ NEXT ROUND</button>';
+            }
+            html += '<button onclick="quizGamePostLeaderboard()" style="background:linear-gradient(135deg,#FFD700,#FFA500); border:2px solid #FFD700; color:#000; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">🏆 LEADERBOARD</button>';
+            html += '<button onclick="quizGameFinish()" style="background:rgba(255,255,255,0.1); border:2px solid #888; color:#888; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">🏁 END GAME</button>';
+            html += '</div>';
+
+            gameEl.innerHTML = html;
+
+            // Start timer
+            requestAnimationFrame(function() {
+                var bar = document.getElementById('quizAdminTimerBar');
+                if (bar) bar.style.width = '0%';
+            });
+
+            clearInterval(quizGameState.timer);
+            quizGameState.timer = setInterval(function() {
+                timeLeft--;
+                var timerEl = document.getElementById('quizAdminTimer');
+                if (timerEl) {
+                    timerEl.textContent = timeLeft;
+                    if (timeLeft <= 10) { timerEl.style.color = '#ff00ff'; timerEl.style.textShadow = '0 0 15px #ff00ff'; }
+                }
+                if (timeLeft <= 0) {
+                    clearInterval(quizGameState.timer);
+                    quizGameEndRound();
+                }
+            }, 1000);
+        }
+
+        // ── CHECK (uses same make.com webhooks as existing TR) ──
+        function quizGameCheck(side, roundIdx) {
+            var set = quizGameState.sets[roundIdx];
+            if (!set) return;
+
+            var scenario1Url = (side === 'novice') ? TR_LEFT_SCENARIO_1 : TR_RIGHT_SCENARIO_1;
+            var scenario2Url = (side === 'novice') ? TR_LEFT_SCENARIO_2 : TR_RIGHT_SCENARIO_2;
+
+            var sentences = [];
+            if (side === 'novice') {
+                sentences.push(set.sentences[0]);
+            } else {
+                sentences = set.sentences;
+            }
+
+            var btnId = (side === 'novice') ? 'quizCheckBegBtn' : 'quizCheckAdvBtn';
+            var btn = document.getElementById(btnId);
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ FETCHING...'; }
+
+            // Step 1: Fetch transcripts
+            fetch(scenario1Url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'fetch_transcripts', timestamp: new Date().toISOString() })
+            })
+            .then(function(r) {
+                if (!r.ok) throw new Error('Fetch failed (' + r.status + ')');
+                return r.text().catch(function() { return ''; });
+            })
+            .then(function() {
+                if (btn) btn.innerHTML = '⏳ PROCESSING...';
+                return new Promise(function(resolve) { setTimeout(resolve, 5000); });
+            })
+            .then(function() {
+                if (btn) btn.innerHTML = '⏳ GRADING...';
+                var koreanText = sentences.map(function(s) { return s.korean; }).join('\n');
+                var englishText = sentences.map(function(s) { return s.english; }).join('\n');
+                return fetch(scenario2Url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'check_answer',
+                        korean_sentence: koreanText,
+                        english_translation: englishText,
+                        card_index: roundIdx,
+                        side: side,
+                        points: 10,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+            })
+            .then(function(r) {
+                if (r.ok) return r.json().catch(function() { return {}; });
+                throw new Error('Grading failed (' + r.status + ')');
+            })
+            .then(function(result) {
+                var matchCount = result.matched_count || result.matchedCount || 0;
+                if (btn) { btn.innerHTML = '✅ ' + matchCount + ' MATCHED'; btn.style.borderColor = '#00ff88'; btn.style.color = '#00ff88'; }
+
+                // Update scores in Firestore for student view
+                if (result.students && quizGameState.sessionId) {
+                    result.students.forEach(function(s) {
+                        // Find player by name and update their score
+                        db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId)
+                            .collection(QUIZ_GAME_PLAYERS_SUB)
+                            .where('name', '==', s.name)
+                            .get().then(function(snap) {
+                                snap.forEach(function(doc) {
+                                    var currentScore = doc.data().score || 0;
+                                    doc.ref.update({ score: currentScore + (s.points || 10) });
+                                });
+                            });
+                    });
+                }
+
+                setTimeout(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = (side === 'novice') ? '✅ CHECK BEGINNERS' : '✅ CHECK ADVANCED';
+                        btn.style.borderColor = (side === 'novice') ? '#00ffff' : '#ff00ff';
+                        btn.style.color = (side === 'novice') ? '#00ffff' : '#ff00ff';
+                    }
+                }, 4000);
+            })
+            .catch(function(err) {
+                console.error('Quiz check error:', err);
+                if (btn) { btn.innerHTML = '❌ ERROR'; btn.style.borderColor = '#ff4444'; btn.style.color = '#ff4444'; }
+                setTimeout(function() {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = (side === 'novice') ? '✅ CHECK BEGINNERS' : '✅ CHECK ADVANCED';
+                        btn.style.borderColor = (side === 'novice') ? '#00ffff' : '#ff00ff';
+                        btn.style.color = (side === 'novice') ? '#00ffff' : '#ff00ff';
+                    }
+                }, 3000);
+            });
+        }
+
+        async function quizGameEndRound() {
+            clearInterval(quizGameState.timer);
+            if (quizGameState.sessionId) {
+                await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
+                    status: 'round_result'
+                });
+            }
+            var timerEl = document.getElementById('quizAdminTimer');
+            if (timerEl) { timerEl.textContent = "TIME'S UP"; timerEl.style.fontSize = '14px'; }
+        }
+
+        async function quizGamePostLeaderboard() {
+            // Uses same leaderboard webhooks as existing TR
+            var btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ POSTING...';
+
+            try {
+                await Promise.all([
+                    fetch(TR_LEADERBOARD_NOVICE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'post_leaderboard', timestamp: new Date().toISOString() })
+                    }),
+                    fetch(TR_LEADERBOARD_ADVANCED, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'post_leaderboard', timestamp: new Date().toISOString() })
+                    })
+                ]);
+
+                // Also update Firestore leaderboard for student view
+                if (quizGameState.sessionId) {
+                    var playersSnap = await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId)
+                        .collection(QUIZ_GAME_PLAYERS_SUB)
+                        .orderBy('score', 'desc').get();
+
+                    var beginnerBoard = [];
+                    var advancedBoard = [];
+                    playersSnap.forEach(function(doc) {
+                        var p = doc.data();
+                        var entry = { name: p.name, emoji: p.emoji, score: p.score || 0 };
+                        if (p.level === 'beginner') beginnerBoard.push(entry);
+                        else advancedBoard.push(entry);
+                    });
+
+                    await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
+                        leaderboard_beginner: beginnerBoard,
+                        leaderboard_advanced: advancedBoard,
+                        status: 'round_result'
+                    });
+                }
+
+                btn.innerHTML = '✅ POSTED!';
+                btn.style.background = 'linear-gradient(135deg, #39ff14, #00cc00)';
+                setTimeout(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '🏆 LEADERBOARD';
+                    btn.style.background = 'linear-gradient(135deg,#FFD700,#FFA500)';
+                }, 4000);
+            } catch(err) {
+                console.error('Leaderboard error:', err);
+                btn.innerHTML = '❌ ERROR';
+                setTimeout(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '🏆 LEADERBOARD';
+                    btn.style.background = 'linear-gradient(135deg,#FFD700,#FFA500)';
+                }, 3000);
+            }
+        }
+
+        async function quizGameFinish() {
+            clearInterval(quizGameState.timer);
+            if (quizGameState.sessionId) {
+                await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
+                    status: 'finished'
+                });
+            }
+            if (quizGameState.unsubscribe) {
+                quizGameState.unsubscribe();
+                quizGameState.unsubscribe = null;
+            }
+            alert('🏁 Game finished! Students will see the final leaderboard.');
+            quizGameState.sessionId = null;
+            quizGameState.currentRound = -1;
+            quizGameRenderSetup();
+        }
+
+        // ── STUDENT PAGE GENERATOR ─────────────────────────
+        // When ?quizgame=ROOMCODE is in URL, redirect to student view
+        (function checkQuizGameJoin() {
+            var params = new URLSearchParams(window.location.search);
+            var roomCode = params.get('quizgame');
+            if (roomCode) {
+                document.addEventListener('DOMContentLoaded', function() {
+                    quizGameStudentInit(roomCode);
+                });
+            }
+        })();
+
+        function quizGameStudentInit(roomCode) {
+            // Hide entire admin UI
+            document.body.innerHTML = '';
+            document.body.style.cssText = 'margin:0; padding:0; min-height:100vh; background:#0a0a15; font-family:"Noto Sans",sans-serif; color:#fff; overflow-x:hidden;';
+
+            // Add Press Start 2P font
+            var fontLink = document.createElement('link');
+            fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+            fontLink.rel = 'stylesheet';
+            document.head.appendChild(fontLink);
+
+            // Inject student app
+            var app = document.createElement('div');
+            app.id = 'quizStudentApp';
+            app.style.cssText = 'max-width:600px; margin:0 auto; padding:20px; min-height:100vh;';
+            document.body.appendChild(app);
+
+            app.innerHTML = '<div style="text-align:center; padding:40px 20px;">' +
+                '<div style="font-size:40px; margin-bottom:12px;">🎮</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:14px; color:#00ffff; text-shadow:0 0 10px #00ffff; margin-bottom:6px;">QUIZ GAME</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff; margin-bottom:30px;">KoreanLearnin</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#888; margin-bottom:6px;">ROOM CODE</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:24px; color:#00ffff; text-shadow:0 0 15px #00ffff; letter-spacing:6px; margin-bottom:30px;">' + roomCode.toUpperCase() + '</div>' +
+                '<div style="background:rgba(0,0,0,0.5); border:3px solid #ff00ff; border-radius:16px; padding:24px; max-width:350px; margin:0 auto;">' +
+                '<div style="margin-bottom:16px;">' +
+                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:4px; font-weight:600; text-align:left;">YOUR NAME</label>' +
+                    '<input type="text" id="qsPlayerName" placeholder="Enter your name" maxlength="20" style="width:100%; padding:12px; background:rgba(0,0,0,0.5); border:2px solid #ff00ff; border-radius:8px; color:#fff; font-size:15px; outline:none;" onfocus="this.style.borderColor=\'#00ffff\';this.style.boxShadow=\'0 0 15px rgba(0,255,255,0.3)\'" onblur="this.style.borderColor=\'#ff00ff\';this.style.boxShadow=\'none\'">' +
+                '</div>' +
+                '<div style="margin-bottom:16px;">' +
+                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:8px; font-weight:600; text-align:left;">CHOOSE EMOJI</label>' +
+                    '<div id="qsEmojiGrid" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;"></div>' +
+                '</div>' +
+                '<div style="margin-bottom:20px;">' +
+                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:8px; font-weight:600; text-align:left;">YOUR LEVEL</label>' +
+                    '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">' +
+                        '<button id="qsLevelBeg" onclick="qsSelectLevel(\'beginner\')" class="qs-level-btn qs-level-active" style="background:rgba(0,255,255,0.15); border:3px solid #00ffff; color:#00ffff; padding:14px 10px; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; transition:all 0.2s;">🌱 Beginner</button>' +
+                        '<button id="qsLevelAdv" onclick="qsSelectLevel(\'advanced\')" class="qs-level-btn" style="background:rgba(0,0,0,0.3); border:3px solid #555; color:#888; padding:14px 10px; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; transition:all 0.2s;">🌟 Advanced</button>' +
+                    '</div>' +
+                '</div>' +
+                '<button onclick="qsJoinGame(\'' + roomCode + '\')" style="width:100%; background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:11px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.03)\'" onmouseout="this.style.transform=\'scale(1)\'">JOIN GAME</button>' +
+                '</div></div>';
+
+            // Populate emoji grid
+            var emojis = ['😊','😎','🤓','🥳','😺','🐶','🦊','🐻','🐸','🐱','🦁','🐰','🐼','🦋','🌟','🔥','💎','🎵','🍀','⚡'];
+            var emojiGrid = document.getElementById('qsEmojiGrid');
+            window._qsSelectedEmoji = '😊';
+            emojis.forEach(function(e, i) {
+                var btn = document.createElement('button');
+                btn.textContent = e;
+                btn.style.cssText = 'width:40px; height:40px; font-size:22px; border-radius:8px; border:2px solid ' + (i === 0 ? '#ff00ff' : '#333') + '; background:' + (i === 0 ? 'rgba(255,0,255,0.2)' : 'rgba(0,0,0,0.3)') + '; cursor:pointer; transition:all 0.15s;';
+                btn.onclick = function() {
+                    document.querySelectorAll('#qsEmojiGrid button').forEach(function(b) {
+                        b.style.borderColor = '#333';
+                        b.style.background = 'rgba(0,0,0,0.3)';
+                    });
+                    this.style.borderColor = '#ff00ff';
+                    this.style.background = 'rgba(255,0,255,0.2)';
+                    window._qsSelectedEmoji = e;
+                };
+                emojiGrid.appendChild(btn);
+            });
+
+            window._qsSelectedLevel = 'beginner';
+        }
+
+        function qsSelectLevel(level) {
+            window._qsSelectedLevel = level;
+            var begBtn = document.getElementById('qsLevelBeg');
+            var advBtn = document.getElementById('qsLevelAdv');
+            if (level === 'beginner') {
+                begBtn.style.borderColor = '#00ffff'; begBtn.style.color = '#00ffff'; begBtn.style.background = 'rgba(0,255,255,0.15)';
+                advBtn.style.borderColor = '#555'; advBtn.style.color = '#888'; advBtn.style.background = 'rgba(0,0,0,0.3)';
+            } else {
+                advBtn.style.borderColor = '#ff00ff'; advBtn.style.color = '#ff00ff'; advBtn.style.background = 'rgba(255,0,255,0.15)';
+                begBtn.style.borderColor = '#555'; begBtn.style.color = '#888'; begBtn.style.background = 'rgba(0,0,0,0.3)';
+            }
+        }
+
+        async function qsJoinGame(roomCode) {
+            var name = (document.getElementById('qsPlayerName').value || '').trim();
+            if (!name) { alert('Please enter your name.'); return; }
+
+            var emoji = window._qsSelectedEmoji || '😊';
+            var level = window._qsSelectedLevel || 'beginner';
+
+            var app = document.getElementById('quizStudentApp');
+            app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">⏳</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#00ffff;">JOINING GAME...</div></div>';
+
+            try {
+                // Find the game session by room code
+                var snap = await db.collection(QUIZ_GAME_COLLECTION).where('roomCode', '==', roomCode.toUpperCase()).limit(1).get();
+                if (snap.empty) {
+                    app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">❌</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff;">GAME NOT FOUND</div><p style="color:#888; margin-top:12px;">Check the room code and try again.</p></div>';
+                    return;
+                }
+
+                var sessionDoc = snap.docs[0];
+                var sessionId = sessionDoc.id;
+
+                // Add player
+                await db.collection(QUIZ_GAME_COLLECTION).doc(sessionId)
+                    .collection(QUIZ_GAME_PLAYERS_SUB).add({
+                        name: name,
+                        emoji: emoji,
+                        level: level,
+                        score: 0,
+                        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                // Show waiting room and listen for game state
+                qsShowWaitingRoom(sessionId, name, emoji, level);
+
+            } catch(err) {
+                console.error('Join game error:', err);
+                app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">❌</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff;">ERROR</div><p style="color:#888; margin-top:12px;">' + err.message + '</p></div>';
+            }
+        }
+
+        function qsShowWaitingRoom(sessionId, playerName, playerEmoji, playerLevel) {
+            var app = document.getElementById('quizStudentApp');
+
+            app.innerHTML = '<div style="text-align:center; padding:30px 10px;">' +
+                '<div style="font-size:40px; margin-bottom:8px;">🎮</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:12px; color:#00ffff; text-shadow:0 0 10px #00ffff; margin-bottom:20px;">WAITING ROOM</div>' +
+                '<div style="font-size:36px; margin-bottom:4px;">' + playerEmoji + '</div>' +
+                '<div style="font-size:16px; font-weight:700; color:#fff; margin-bottom:4px;">' + escapeHtml(playerName) + '</div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:' + (playerLevel === 'beginner' ? '#00ffff' : '#ff00ff') + '; margin-bottom:24px;">' + (playerLevel === 'beginner' ? '🌱 BEGINNER' : '🌟 ADVANCED') + '</div>' +
+                '<div id="qsPlayersWaiting" style="background:rgba(0,0,0,0.4); border:2px solid rgba(0,255,255,0.15); border-radius:12px; padding:16px; margin-bottom:20px; min-height:60px;">' +
+                '<p style="color:#888; font-size:12px;">Waiting for others...</p></div>' +
+                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#888;" id="qsStatusText">Waiting for teacher to start...</div>' +
+                '<div id="qsGameArea"></div>' +
+                '</div>';
+
+            // Listen for other players
+            db.collection(QUIZ_GAME_COLLECTION).doc(sessionId)
+                .collection(QUIZ_GAME_PLAYERS_SUB)
+                .onSnapshot(function(snap) {
+                    var container = document.getElementById('qsPlayersWaiting');
+                    if (!container) return;
+                    var html = '';
+                    snap.forEach(function(doc) {
+                        var p = doc.data();
+                        var lc = p.level === 'beginner' ? '#00ffff' : '#ff00ff';
+                        html += '<span style="display:inline-block; margin:4px; padding:6px 10px; background:rgba(0,0,0,0.4); border:2px solid ' + lc + '; border-radius:8px; font-size:13px;">' + (p.emoji || '😊') + ' ' + escapeHtml(p.name || '') + '</span>';
+                    });
+                    container.innerHTML = html || '<p style="color:#888; font-size:12px;">No players yet...</p>';
+                });
+
+            // Listen for game state changes
+            db.collection(QUIZ_GAME_COLLECTION).doc(sessionId).onSnapshot(function(doc) {
+                if (!doc.exists) return;
+                var data = doc.data();
+                var statusEl = document.getElementById('qsStatusText');
+                var gameArea = document.getElementById('qsGameArea');
+                if (!gameArea) return;
+
+                if (data.status === 'playing') {
+                    var set = data.sets[data.currentRound];
+                    if (!set) return;
+
+                    // Show the sentence(s) for this player's level
+                    var sentences = [];
+                    if (playerLevel === 'beginner') {
+                        sentences = [set.sentences[0]];
+                    } else {
+                        sentences = set.sentences;
+                    }
+
+                    var levelColor = playerLevel === 'beginner' ? '#00ffff' : '#ff00ff';
+                    var levelLabel = playerLevel === 'beginner' ? '🌱 BEGINNER' : '🌟 ADVANCED';
+
+                    var h = '<div style="margin-top:20px; background:rgba(0,0,0,0.5); border:3px solid ' + levelColor + '; border-radius:14px; padding:24px; box-shadow:0 0 25px ' + levelColor + '22;">';
+                    h += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:' + levelColor + '; text-align:center; margin-bottom:4px;">ROUND ' + (data.currentRound + 1) + ' OF ' + data.totalRounds + '</div>';
+                    h += '<div style="font-family:\'Press Start 2P\'; font-size:8px; color:#888; text-align:center; margin-bottom:16px;">' + levelLabel + '</div>';
+
+                    for (var i = 0; i < sentences.length; i++) {
+                        h += '<div style="font-size:22px; color:#fff; text-align:center; line-height:1.7; margin-bottom:8px;">' + escapeHtml(sentences[i].korean) + '</div>';
+                        if (sentences[i].english) {
+                            h += '<div style="font-size:12px; color:#888; text-align:center; margin-bottom:12px;">' + escapeHtml(sentences[i].english) + '</div>';
+                        }
+                    }
+
+                    h += '<div style="text-align:center; margin-top:16px; font-family:\'Press Start 2P\'; font-size:9px; color:#888;">🎙️ Read aloud now!</div>';
+                    h += '</div>';
+
+                    gameArea.innerHTML = h;
+                    if (statusEl) { statusEl.textContent = '🔴 ROUND IN PROGRESS'; statusEl.style.color = '#ff00ff'; }
+
+                } else if (data.status === 'round_result') {
+                    if (statusEl) { statusEl.textContent = '⏸ ROUND ENDED'; statusEl.style.color = '#FFD700'; }
+
+                    // Show leaderboard if available
+                    if (data.leaderboard_beginner || data.leaderboard_advanced) {
+                        var board = playerLevel === 'beginner' ? (data.leaderboard_beginner || []) : (data.leaderboard_advanced || []);
+                        var h = '<div style="margin-top:20px; background:rgba(0,0,0,0.5); border:3px solid #FFD700; border-radius:14px; padding:20px;">';
+                        h += '<div style="font-family:\'Press Start 2P\'; font-size:11px; color:#FFD700; text-align:center; margin-bottom:14px;">🏆 LEADERBOARD</div>';
+                        if (board.length === 0) {
+                            h += '<p style="text-align:center; color:#888;">No scores yet.</p>';
+                        }
+                        for (var i = 0; i < board.length; i++) {
+                            var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+                            var isMe = board[i].name === playerName;
+                            h += '<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #333;' + (isMe ? 'background:rgba(255,0,255,0.1);border-radius:6px;' : '') + '">';
+                            h += '<span style="color:#fff;">' + medal + ' ' + (board[i].emoji || '') + ' ' + escapeHtml(board[i].name) + (isMe ? ' ⬅️' : '') + '</span>';
+                            h += '<span style="color:#FFD700; font-weight:700;">' + (board[i].score || 0) + '</span>';
+                            h += '</div>';
+                        }
+                        h += '</div>';
+                        gameArea.innerHTML = h;
+                    }
+
+                } else if (data.status === 'finished') {
+                    if (statusEl) { statusEl.textContent = '🏁 GAME OVER'; statusEl.style.color = '#00ff88'; }
+                    gameArea.innerHTML = '<div style="margin-top:20px; text-align:center; padding:30px;"><div style="font-size:50px;">🏁</div><div style="font-family:\'Press Start 2P\'; font-size:14px; color:#00ffff; margin-top:12px;">GAME OVER</div><p style="color:#888; margin-top:8px;">Thanks for playing!</p></div>';
+
+                } else if (data.status === 'lobby') {
+                    if (statusEl) { statusEl.textContent = 'Waiting for teacher to start...'; statusEl.style.color = '#888'; }
+                    gameArea.innerHTML = '';
+                }
+            });
+        }
     </script>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 🎮 QUIZ GAME OVERLAY (Admin — KoreanLearnin)          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center; padding:20px;">
+    <div style="background:rgba(0,0,0,0.85); border:3px solid #00ffff; border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 0 40px rgba(0,255,255,0.3), 0 0 80px rgba(255,0,255,0.1);">
+
+        <!-- Header -->
+        <div style="background:rgba(0,0,0,0.6); border-bottom:3px solid #ff00ff; padding:18px 24px; border-radius:13px 13px 0 0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <span style="font-size:28px;">🎮</span>
+                <div>
+                    <div style="font-family:'Press Start 2P'; font-size:12px; color:#00ffff; text-shadow:0 0 10px #00ffff;">QUIZ GAME</div>
+                    <div style="font-size:11px; color:#888; margin-top:4px;">Speech-based reading game &bull; Uses Tuesday Reading sets</div>
+                </div>
+            </div>
+            <button onclick="closeKahootMaker()" style="background:rgba(255,0,255,0.2); border:2px solid #ff00ff; color:#ff00ff; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,0,255,0.4)'" onmouseout="this.style.background='rgba(255,0,255,0.2)'">✕</button>
+        </div>
+
+        <!-- Setup View -->
+        <div id="quizGameSetupView" style="padding:24px;">
+            <!-- Round Time Setting -->
+            <div style="margin-bottom:20px;">
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px; text-shadow:0 0 8px rgba(255,0,255,0.5);">⏱️ ROUND TIME</div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="number" id="quizGameRoundTime" value="60" min="5" max="600" style="background:rgba(0,0,0,0.5); color:#fff; border:2px solid #ff00ff; border-radius:8px; padding:10px 16px; font-size:16px; width:100px; text-align:center; outline:none;" onfocus="this.style.borderColor='#00ffff';this.style.boxShadow='0 0 15px rgba(0,255,255,0.3)'" onblur="this.style.borderColor='#ff00ff';this.style.boxShadow='none'">
+                    <span style="font-size:13px; color:#888;">seconds</span>
+                </div>
+            </div>
+
+            <!-- Sets Preview -->
+            <div style="margin-bottom:20px;">
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px; text-shadow:0 0 8px rgba(255,0,255,0.5);">📋 ROUNDS (from Tuesday Reading sets)</div>
+                <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:2px solid rgba(0,255,255,0.2); border-radius:10px; padding:12px; background:rgba(0,0,0,0.3);">
+                    <p style="color:#888; font-size:13px;">Loading sets...</p>
+                </div>
+                <p style="font-size:11px; color:#555; margin-top:6px;">💡 Sets are loaded from the Tuesday Reading tab above. Add/edit sets there, then come back.</p>
+            </div>
+
+            <!-- Create Game -->
+            <div style="text-align:center;">
+                <button id="quizGameCreateBtn" onclick="quizGameCreateSession()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px 48px; border-radius:12px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 0 35px rgba(255,0,255,0.6)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 25px rgba(255,0,255,0.4)'">🎮 CREATE GAME</button>
+                <p style="font-size:11px; color:#555; margin-top:8px;">Creates a game room &amp; generates a student join link</p>
+            </div>
+        </div>
+
+        <!-- Lobby View (after game created, before start) -->
+        <div id="quizGameLobbyView" style="display:none; padding:24px;"></div>
+
+        <!-- Play View (active rounds) -->
+        <div id="quizGamePlayView" style="display:none; padding:24px;"></div>
+    </div>
+</div>
+
+<style>
+    .quiz-loading-dots::after {
+        content: '';
+        animation: quizDots 1.5s infinite;
+    }
+    @keyframes quizDots {
+        0% { content: '.'; }
+        33% { content: '..'; }
+        66% { content: '...'; }
+    }
+</style>
 
 </body>
 </html>
