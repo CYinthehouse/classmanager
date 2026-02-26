@@ -30879,16 +30879,52 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
                 var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
 
+                // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
+                async function blobToWavBase64(blob) {
+                    var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                    var arrayBuf=await blob.arrayBuffer();
+                    var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+                    var numChannels=1; // mono
+                    var sampleRate=audioBuf.sampleRate;
+                    var samples=audioBuf.getChannelData(0);
+                    // Downsample to 16kHz if needed to keep size small
+                    if(sampleRate>16000){
+                        var ratio=sampleRate/16000;
+                        var newLen=Math.floor(samples.length/ratio);
+                        var downsampled=new Float32Array(newLen);
+                        for(var i=0;i<newLen;i++){downsampled[i]=samples[Math.floor(i*ratio)];}
+                        samples=downsampled;sampleRate=16000;
+                    }
+                    // Build WAV
+                    var bufLen=44+samples.length*2;
+                    var wavBuf=new ArrayBuffer(bufLen);
+                    var view=new DataView(wavBuf);
+                    function writeStr(o,s){for(var i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));}
+                    writeStr(0,'RIFF');view.setUint32(4,bufLen-8,true);writeStr(8,'WAVE');
+                    writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
+                    view.setUint16(22,numChannels,true);view.setUint32(24,sampleRate,true);
+                    view.setUint32(28,sampleRate*numChannels*2,true);view.setUint16(32,numChannels*2,true);
+                    view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,samples.length*2,true);
+                    for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+                    // Convert to base64
+                    var bytes=new Uint8Array(wavBuf);
+                    var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+                    return btoa(binary);
+                }
+
+                var wavBase64;
+                try{wavBase64=await blobToWavBase64(qs.localBlob);}catch(wavErr){console.error('WAV conversion failed:',wavErr);wavBase64=null;}
+
                 // Send audio directly to GPT-4o for phonetic-accurate transcription + grading
                 // This bypasses Whisper which normalizes pronunciation errors away
-                var reader=new FileReader();
-                var audioBase64=await new Promise(function(resolve){
-                    reader.onloadend=function(){resolve(reader.result);};
-                    reader.readAsDataURL(qs.localBlob);
-                });
+                var transcript='';
+                var grade={score:0,feedback:'Could not grade.',transcript:''};
+                var audioGradingWorked=false;
 
+                if(wavBase64){
                 var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED: "'+expectedKorean+'"\n\nI am sending you their audio recording. Listen carefully and transcribe EXACTLY what you hear — phonetically accurate in Hangul.\n\nCRITICAL TRANSCRIPTION RULES:\n- Transcribe what you ACTUALLY HEAR, not what was expected.\n- If the student said ㅋ instead of ㄱ, write ㅋ (e.g. 코양이 NOT 고양이).\n- Be extremely sensitive to: ㄱ/ㅋ/ㄲ, ㅂ/ㅍ/ㅃ, ㄷ/ㅌ/ㄸ, ㅈ/ㅊ/ㅉ, ㅅ/ㅆ distinctions.\n- If a word sounds English (e.g. "center" instead of 센터), write it in English.\n- If vowels are wrong (ㅓ vs ㅗ, ㅐ vs ㅔ), transcribe the vowel you actually heard.\n- Do NOT auto-correct to the expected text. Do NOT assume they said it correctly.\n\nGRADING RULES:\n- 0% if entire speech is in English or non-Korean.\n- Score proportionally for partially correct readings.\n- Each wrong consonant type (plain/aspirated/tense) is a meaningful deduction.\n- Missing or added words reduce the score.\n- English words mixed in reduce proportionally but don\'t make it 0%.\n\nFEEDBACK:\n- Name specific words that were wrong.\n- For consonant errors explain: "You said 코 (aspirated ㅋ) instead of 고 (plain ㄱ)".\n- Be encouraging but honest.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"exactly what you heard phonetically in Hangul, with English words left as English"}';
 
+                try{
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({
@@ -30896,7 +30932,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                             role:'user',
                             content:[
                                 {type:'text',text:gradePrompt},
-                                {type:'input_audio',input_audio:{data:audioBase64.split(',')[1],format:ext==='mp4'?'mp4':'webm'}}
+                                {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
                             ]
                         }],
                         model:'gpt-4o-audio-preview',
@@ -30908,10 +30944,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var rt=aiData.data||aiData.text||aiData.result||aiData.response||'';
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
                 rt=rt.replace(/^```json\s*|```\s*$/g,'').trim();
-                var transcript='';
-                var grade={score:50,feedback:'',transcript:''};
-                var audioGradingWorked=false;
                 try{var parsed=JSON.parse(rt);if(parsed.score!==undefined){grade=parsed;transcript=parsed.transcript||'';audioGradingWorked=true;}}catch(e){var m=rt.match(/{[\s\S]*}/);if(m)try{var p2=JSON.parse(m[0]);if(p2.score!==undefined){grade=p2;transcript=p2.transcript||'';audioGradingWorked=true;}}catch(e2){}}
+                }catch(audioErr){console.error('GPT-4o audio grading failed:',audioErr);}
+                }// end if wavBase64
 
                 // Fallback: if GPT-4o audio didn't work (proxy may not support it), use Whisper + ChatGPT text grading
                 if(!audioGradingWorked){
@@ -30923,7 +30958,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     transcript=(whisperData.text||whisperData.words?.map(function(w){return w.word;}).join(' ')||'').trim();
 
                     statusEl.textContent='⏳ Grading (fallback)...';
-                    var fallbackPrompt='You are a strict Korean pronunciation grading system.\n\nEXPECTED: "'+expectedKorean+'"\nWHISPER TRANSCRIPT: "'+transcript+'"\n\nNOTE: Whisper often auto-corrects pronunciation. Be skeptical — if the transcript matches expected text too closely but this is a beginner student, the actual pronunciation was likely worse than Whisper shows.\n\nGRADING RULES:\n- 0% if entire transcript is English/non-Korean.\n- Score proportionally. Each correct word contributes evenly.\n- English words mixed in reduce score proportionally.\n- If transcript is suspiciously identical to expected, score no higher than 70% (Whisper likely auto-corrected).\n\nReply ONLY with JSON: {"score":NUMBER_0_TO_100,"feedback":"feedback","transcript":"'+transcript.replace(/"/g,'\\"')+'"}';
+                    var fallbackPrompt='You are a VERY strict Korean pronunciation grading system.\n\nEXPECTED: "'+expectedKorean+'"\nWHISPER TRANSCRIPT: "'+transcript+'"\n\nCOMPARE the transcript to the expected text WORD BY WORD.\n\nSCORING METHOD:\n1. Count total expected Korean words.\n2. For each expected word, check if the transcript contains that EXACT word (or very close variant like spacing differences).\n3. Score = (matched words / total expected words) * 100.\n4. Words in English in the transcript count as WRONG (0 points for that word).\n5. Random gibberish, unrelated Korean words, or nonsense = 0 points for those words.\n6. If NONE of the expected words appear in the transcript, score is 0.\n7. If the transcript is completely unrelated to the expected text, score is 0.\n\nEXAMPLES:\n- Expected "고양이를 좋아해요" but transcript is "I love cats hello" → 0% (all English)\n- Expected "고양이를 좋아해요" but transcript is "고양이를 hello" → ~33% (1 of 3 words)\n- Expected "고양이를 좋아해요" but transcript is "고양이를 좋아해요" → 100%\n\nReply ONLY with JSON: {"score":NUMBER_0_TO_100,"feedback":"specific feedback about what matched and what did not","transcript":"'+transcript.replace(/"/g,'\\"')+'"}';
                     var fbResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
                         body:JSON.stringify({prompt:fallbackPrompt,max_tokens:500})
@@ -30937,7 +30972,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
 
                 // 4. Save submission to Firestore
-                var finalScore = typeof grade.score === 'number' ? grade.score : 50;
+                var finalScore = typeof grade.score === 'number' ? grade.score : 0;
                 var finalFeedback = grade.feedback || '';
                 var finalTranscript = grade.transcript || transcript || '';
                 var points = Math.round(finalScore / 10);
