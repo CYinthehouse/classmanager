@@ -30386,11 +30386,37 @@ Return ONLY this JSON (no markdown, no code blocks):
             timer: null
         };
 
-        var sparkleSVG='<svg class="sparkle-svg" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><path d="M93.781 51.578C95 50.969 96 49.359 96 48c0-1.375-1-2.969-2.219-3.578 0 0-22.868-1.514-31.781-10.422-8.915-8.91-10.438-31.781-10.438-31.781C50.969 1 49.375 0 48 0s-2.969 1-3.594 2.219c0 0-1.5 22.87-10.406 31.781-8.908 8.913-31.781 10.422-31.781 10.422C1 45.031 0 46.625 0 48c0 1.359 1 2.969 2.219 3.578 0 0 22.873 1.51 31.781 10.422 8.906 8.911 10.406 31.781 10.406 31.781C45.031 95 46.625 96 48 96s2.969-1 3.562-2.219c0 0 1.523-22.871 10.438-31.781 8.913-8.908 31.781-10.422 31.781-10.422Z" fill="#000"/></svg>';
+        var sparkleSVG='<svg class="sparkle-svg" viewBox="0 0 96 96"';
+        // Helper to render emoji - handles both GIF URLs and text emojis
+        function renderEmoji(val,size){
+            size=size||24;
+            if(!val&&val!==0) return '';
+            // If it's a number (index into emojis array)
+            if(typeof val==='number'&&typeof emojis!=='undefined'&&emojis[val]){var u=emojis[val].replace(/&/g,'&amp;');return '<img src="'+u+'" style="width:'+size+'px;height:'+size+'px;object-fit:contain;border-radius:3px;vertical-align:middle;">';}
+            // If it's a URL
+            if(typeof val==='string'&&val.startsWith('http')){var u2=val.replace(/&/g,'&amp;');return '<img src="'+u2+'" style="width:'+size+'px;height:'+size+'px;object-fit:contain;border-radius:3px;vertical-align:middle;">';}
+            // Otherwise text emoji
+            return '<span style="font-size:'+size+'px;line-height:1;vertical-align:middle;">'+val+'</span>';
+        }
+        var sparkleSVG='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" style="position:absolute;width:18px;height:18px;pointer-events:none;z-index:3;transform:translate(-50%,-50%) scale(0);"><path d="M93.781 51.578C95 50.969 96 49.359 96 48c0-1.375-1-2.969-2.219-3.578 0 0-22.868-1.514-31.781-10.422-8.915-8.91-10.438-31.781-10.438-31.781C50.969 1 49.375 0 48 0s-2.969 1-3.594 2.219c0 0-1.5 22.87-10.406 31.781-8.908 8.913-31.781 10.422-31.781 10.422C1 45.031 0 46.625 0 48c0 1.359 1 2.969 2.219 3.578 0 0 22.873 1.51 31.781 10.422 8.906 8.911 10.406 31.781 10.406 31.781C45.031 95 46.625 96 48 96s2.969-1 3.562-2.219c0 0 1.523-22.871 10.438-31.781 8.913-8.908 31.781-10.422 31.781-10.422Z" fill="rgba(255,255,255,0.85)"/></svg>';
         function addSparkles(btn){
             if(!btn||btn.classList.contains('sparkle-btn'))return;
             btn.classList.add('sparkle-btn');
-            for(var i=0;i<5;i++) btn.insertAdjacentHTML('beforeend',sparkleSVG);
+            btn.style.position='relative';btn.style.overflow='visible';
+            // Position each sparkle differently
+            var positions=[{t:'10%',l:'-5%'},{t:'85%',l:'10%'},{t:'25%',l:'50%'},{t:'75%',l:'85%'},{t:'15%',l:'105%'}];
+            var delays=[1,2,3,2,4];
+            var scales=[1.1,1.25,1.1,0.9,0.8];
+            for(var i=0;i<5;i++){
+                var div=document.createElement('span');
+                div.innerHTML=sparkleSVG;
+                var svg=div.firstChild;
+                svg.style.top=positions[i].t;
+                svg.style.left=positions[i].l;
+                svg.dataset.delay=delays[i];
+                svg.dataset.scale=scales[i];
+                btn.appendChild(svg);
+            }
         }
 
         function openKahootMaker() {
@@ -30540,7 +30566,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var h='';
                 snap.forEach(function(d){var p=d.data();var lc=p.level==='beginner'?'#8bb4d6':'#c4a0e8';var ll=p.level==='beginner'?'BEG':'ADV';
                 h+='<div style="background:rgba(0,0,0,0.5);border:2px solid '+lc+';border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 0 10px '+lc+'33;">';
-                h+='<span style="font-size:22px;">'+(p.emoji||'😊')+'</span><div><div style="font-size:13px;font-weight:700;color:#fff;">'+escapeHtml(p.name||'Student')+'</div>';
+                h+='<span>'+renderEmoji(p.emoji,28)+'</span><div><div style="font-size:13px;font-weight:700;color:#fff;">'+escapeHtml(p.name||'Student')+'</div>';
                 h+='<div style="font-size:9px;color:'+lc+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';">'+ll+'</div></div></div>';});
                 box.innerHTML=h;
             });
@@ -30628,7 +30654,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 subs.forEach(function(s){
                     var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
-                    lh+='<span style="font-size:18px;">'+(s.emoji||'😊')+'</span>';
+                    lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
                     lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
                     if(s.audioUrl) lh+='<audio controls preload="none" style="height:32px;max-width:200px;" src="'+s.audioUrl+'"></audio>';
@@ -30680,7 +30706,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 (d.leaderboard_beginner||[]).forEach(function(p,i){
                     var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
                     h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
-                    h+='<span style="color:#fff;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+'</span>';
+                    h+='<span style="color:#fff;">'+medal+' '+renderEmoji(p.emoji,20)+' '+escapeHtml(p.name)+'</span>';
                     h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
                 });
                 if(!(d.leaderboard_beginner||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
@@ -30690,7 +30716,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 (d.leaderboard_advanced||[]).forEach(function(p,i){
                     var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
                     h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
-                    h+='<span style="color:#fff;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+'</span>';
+                    h+='<span style="color:#fff;">'+medal+' '+renderEmoji(p.emoji,20)+' '+escapeHtml(p.name)+'</span>';
                     h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
                 });
                 if(!(d.leaderboard_advanced||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
@@ -30719,7 +30745,37 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(rc) document.addEventListener('DOMContentLoaded',function(){qsInit(rc);});
         })();
 
-        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:'😊', playerLevel:'beginner', localBlob:null };
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'beginner', localBlob:null };
+        var emojis=[
+'https://www.dropbox.com/scl/fi/dvki6jr4vougyhqh2euaa/_FO2BAC315742-final-1.gif?rlkey=tnrie3eu2d0gwmfmix9dstmfg&st=wj02p5wq&dl=1',
+'https://www.dropbox.com/scl/fi/ebgp46m47sbwrzt48nutf/Eating-crazy.gif?rlkey=qzgx54jtnxva6ahr1wlhsfrzs&st=u14ec51o&dl=1',
+'https://www.dropbox.com/scl/fi/d09bmyq3ujoswnyo078ls/Focus-focus.gif?rlkey=efvm3h7o5311wkkb9iiksntj2&st=uc75ppu4&dl=1',
+'https://www.dropbox.com/scl/fi/o92r5vv7hyf6fxmhoakip/Give-me-the-notes.gif?rlkey=ha6nb9d8dfpwt1ys42ewyx78g&st=sxk3ufqv&dl=1',
+'https://www.dropbox.com/scl/fi/rzvpnypli5h3d1ydbqfm0/Good-luck-on-your-quiz.gif?rlkey=zkdw2l52wiv8l77t231luqs08&st=5p440bhs&dl=1',
+'https://www.dropbox.com/scl/fi/lvhznzgpuwong3ud4ymqt/I-have-an-exam-tomorrow.gif?rlkey=oig2dagcc1uxu0xxiz29vla2x&st=mczw97og&dl=1',
+'https://www.dropbox.com/scl/fi/scgpqa8wpzxm6m51c8xuu/I-have-too-much-homework.gif?rlkey=j8b9el0yj2b5a401azmjg5xqo&st=et7mfq4z&dl=1',
+'https://www.dropbox.com/scl/fi/1wcnjo9eomyvkm9n9qu6k/I-love-studying.gif?rlkey=05hy7xik8j39werht095jb6d7&st=oimmydqf&dl=1',
+'https://www.dropbox.com/scl/fi/fzb02qn1c1l89log9mwoo/If-hard-lets-study-together.gif?rlkey=glo3bc57fr228ghwnea1x3c3w&st=ngqhtbe3&dl=1',
+'https://www.dropbox.com/scl/fi/hp6ygalqwghfdugtydgmk/I-want-to-study-with-you.gif?rlkey=naqjx82hwuqkxvw2ecjisxs95&st=2tup9fag&dl=1',
+'https://www.dropbox.com/scl/fi/geka7m1ultk194rvnei6y/Its-study-time-now.gif?rlkey=16vw3t1kywnjx9mxnwdvk8w81&st=0j8f46ok&dl=1',
+'https://www.dropbox.com/scl/fi/2ikr4ijyw60p26536myp2/Lets-all-study-together.gif?rlkey=6tr3een8q1987qgxvw296q1tg&st=eu5p3rxr&dl=1',
+'https://www.dropbox.com/scl/fi/72dp3a76vczu4zv547qkl/Lets-go-study-now.gif?rlkey=jsxrugitencpvshyhw0zr25t1&st=p5uldifo&dl=1',
+'https://www.dropbox.com/scl/fi/kdjaue6vdaypjol413jft/Lets-take-a-short-break.gif?rlkey=zxznwrlbizgltl00fk1bx1i8p&st=zjej6t54&dl=1',
+'https://www.dropbox.com/scl/fi/xzdcsii42kjon7td450na/More-Coffee.gif?rlkey=gt5yp0terpbp718x4w7vpo5yi&st=ou7iho2b&dl=1',
+'https://www.dropbox.com/scl/fi/t5cj8d3ii12589dbn0iwk/My-head-hurts.gif?rlkey=7fgpdsjko34e1r7fr1grwyb9q&st=as1tnyc4&dl=1',
+'https://www.dropbox.com/scl/fi/7z2vfbhkt6a2efuev19nb/Recommend-me-the-study-music.gif?rlkey=xuv0ao2s7q19hv0rvv3dt6zn1&st=u774ywcv&dl=1',
+'https://www.dropbox.com/scl/fi/kbbh2o0oi4idnkei5n0g6/No.gif?rlkey=lyph2ej9ehsrg1gwg2thb9lte&st=1ysj9i80&dl=1',
+'https://www.dropbox.com/scl/fi/5h3r3l53eyir5pu8oa23e/Sleep.gif?rlkey=fuzjunf3al3r3xf4i64staczg&st=3j6aiws3&dl=1',
+'https://www.dropbox.com/scl/fi/yt3syg1afnb9hovgy9gt8/Study-time.gif?rlkey=lpw53m9b66d17pk8ul3ss9qbe&st=b1a1jk78&dl=1',
+'https://www.dropbox.com/scl/fi/0fm6xtumn0qa5flfjvdot/Study-hard-again-today.gif?rlkey=h469g2hkl6uzbti93fr9drxmn&st=y7urp14q&dl=1',
+'https://www.dropbox.com/scl/fi/yyol3zagijf1l0q2q5zo1/Suddenly-Angry.gif?rlkey=rs6acovfo458q17pgriojaw7w&st=usuhrcdc&dl=1',
+'https://www.dropbox.com/scl/fi/qvwsu2acnojj46vhxfvol/Suspicious-Smile.gif?rlkey=k3cc5pfs6o2fywobcytenk7sz&st=ktcidsxp&dl=1',
+'https://www.dropbox.com/scl/fi/6tsa1logp63klaui47uqc/Tell-me-the-study-magic.gif?rlkey=giid1j3f2t36yz37s5uzdvkcg&st=3aoedpb5&dl=1',
+'https://www.dropbox.com/scl/fi/mlnu4rrhv00o5r272qddw/Want-to-study-together-at-school.gif?rlkey=g0jied9af7q1rzs02k87l56re&st=ilz3vhnv&dl=1',
+'https://www.dropbox.com/scl/fi/tgcw9snu7yys62rmny0lz/What.gif?rlkey=4ldyhnnbxale3y6li15iwltbj&st=c42x8zzh&dl=1',
+'https://www.dropbox.com/scl/fi/z4cqg35dc6n0zx6nyjelb/Youre-the-star-of-studying.gif?rlkey=6v30xqj4d92by9unrm8kptni0&st=gxvetoog&dl=1',
+'https://www.dropbox.com/scl/fi/n5wbcz35gsqpv25tbmv11/Kickballs.gif?rlkey=mzc3otvmh2363eheb2ns4np52&st=wl7dzqvr&dl=1'
+];
 
         function qsInit(roomCode) {
             document.body.innerHTML='';
@@ -30727,8 +30783,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(!document.querySelector('link[href*="Press+Start+2P"]')){var fl=document.createElement('link');fl.href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';fl.rel='stylesheet';document.head.appendChild(fl);}
             var app=document.createElement('div');app.id='qsApp';app.style.cssText='max-width:500px;margin:0 auto;padding:20px;min-height:100vh;';
             document.body.appendChild(app);
-            var emojis=['😊','😎','🤓','🥳','😺','🐶','🦊','🐻','🐸','🐱','🦁','🐰','🐼','🦋','🌟','🔥','💎','🎵','🍀','⚡'];
-            var eh='';emojis.forEach(function(e,i){eh+='<button onclick="qsPickEmoji(\''+e+'\',this)" style="width:40px;height:40px;font-size:22px;border-radius:8px;border:1px solid '+(i===0?'#ff7777':'rgba(255,255,255,0.1)')+';background:'+(i===0?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;">'+e+'</button>';});
+            // emojis defined globally as qsEmojis
+            var eh='';emojis.forEach(function(e,i){var safeSrc=e.replace(/&/g,'&amp;');eh+='<button onclick="qsPickEmoji('+i+',this)" style="width:48px;height:48px;padding:2px;border-radius:8px;border:1px solid '+(i===0?'#ff7777':'rgba(255,255,255,0.1)')+';background:'+(i===0?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;"><img src="'+safeSrc+'" style="width:40px;height:40px;object-fit:contain;border-radius:4px;"></button>';});
             app.innerHTML='<div style="text-align:center;padding:30px 10px;">'+
                 '<div style="font-size:36px;margin-bottom:8px;">🎮</div>'+
                 '<div style="font-family:\'Press Start 2P\';font-size:16px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;color:#41c0ff;margin-bottom:4px;">QUIZ GAME</div>'+
@@ -30750,7 +30806,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsPickEmoji(e,btn){
             qs.playerEmoji=e;
-            document.querySelectorAll('#qsEmojiGrid button').forEach(function(b){b.style.borderColor='#333';b.style.background='rgba(0,0,0,0.3)';});
+            document.querySelectorAll('#qsEmojiGrid button').forEach(function(b){b.style.borderColor='rgba(255,255,255,0.1)';b.style.background='rgba(255,255,255,0.06)';});
             btn.style.borderColor='#ff7777';btn.style.background='rgba(124,58,237,0.2)';
         }
         function qsPickLevel(lv){
@@ -30771,7 +30827,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(snap.empty){app.innerHTML='<div style="text-align:center;padding:60px;"><div style="font-size:30px;">❌</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#e87777;margin-top:12px;">GAME NOT FOUND</div></div>';return;}
                 qs.sessionId=snap.docs[0].id;
                 var pDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).add({
-                    name:name,emoji:qs.playerEmoji,level:qs.playerLevel,score:0,
+                    name:name,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),level:qs.playerLevel,score:0,
                     joinedAt:firebase.firestore.FieldValue.serverTimestamp()
                 });
                 qs.playerId=pDoc.id;
@@ -30785,7 +30841,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
                 '<div id="qsWaitingHeader" style="font-size:36px;margin-bottom:6px;">🎮</div>'+
                 '<div id="qsWaitingTitle" style="font-family:\'Press Start 2P\';font-size:11px;color:#41c0ff;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:16px;">WAITING ROOM</div>'+
-                '<div id="qsPlayerEmoji" style="font-size:32px;margin-bottom:4px;">'+qs.playerEmoji+'</div>'+
+                '<div id="qsPlayerEmoji" style="margin-bottom:4px;">'+renderEmoji(qs.playerEmoji,40)+'</div>'+
                 '<div id="qsPlayerName" style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
                 '<div id="qsPlayerLevel" style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
                 '<div id="qsPlayers" style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:12px;padding:14px;margin-bottom:16px;min-height:50px;"></div>'+
@@ -30795,7 +30851,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).onSnapshot(function(snap){
                 var el=document.getElementById('qsPlayers');if(!el)return;
                 var h='';snap.forEach(function(d){var p=d.data();var c=p.level==='beginner'?'#8bb4d6':'#c4a0e8';
-                h+='<span style="display:inline-block;margin:3px;padding:5px 9px;background:rgba(0,0,0,0.4);border:2px solid '+c+';border-radius:8px;font-size:12px;">'+(p.emoji||'😊')+' '+escapeHtml(p.name||'')+'</span>';});
+                h+='<span style="display:inline-block;margin:3px;padding:5px 9px;background:rgba(0,0,0,0.4);border:2px solid '+c+';border-radius:8px;font-size:12px;">'+renderEmoji(p.emoji,18)+' '+escapeHtml(p.name||'')+'</span>';});
                 el.innerHTML=h||'<p style="color:#888;font-size:12px;">...</p>';
             });
             // Listen game state
@@ -30984,7 +31040,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var points = Math.round(finalScore / 10);
 
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
-                    playerId:qs.playerId, playerName:qs.playerName, emoji:qs.playerEmoji,
+                    playerId:qs.playerId, playerName:qs.playerName, emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
                     level:qs.playerLevel, round:gameData.currentRound,
                     audioUrl:audioUrl, transcript:finalTranscript,
                     score:points, gradeScore:finalScore, feedback:finalFeedback,
@@ -31077,7 +31133,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
                 var isMe=p.name===qs.playerName;
                 h+='<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #333;'+(isMe?'background:rgba(255,0,255,0.1);border-radius:6px;':'')+'">';
-                h+='<span style="color:#fff;font-size:14px;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+(isMe?' ⬅️':'')+'</span>';
+                h+='<span style="color:#fff;font-size:14px;">'+medal+' '+renderEmoji(p.emoji,18)+' '+escapeHtml(p.name)+(isMe?' ⬅️':'')+'</span>';
                 h+='<span style="color:#FFD700;font-weight:700;font-size:14px;">'+p.score+'</span></div>';
             });
             h+='</div>';
@@ -31152,29 +31208,21 @@ Return ONLY this JSON (no markdown, no code blocks):
         transform: scale(0.98) !important;
     }
     .sparkle-btn .sparkle-svg {
-        position: absolute;
-        z-index: 3;
-        width: 18px;
-        height: 18px;
-        pointer-events: none;
-        transform: translate(-50%, -50%) scale(0);
-    }
-    .sparkle-btn .sparkle-svg path {
-        fill: rgba(255,255,255,0.85);
+        opacity: 0;
     }
     .sparkle-btn:hover .sparkle-svg {
-        animation: qgSparkle 0.75s calc(var(--spark-delay, 0) * 0.15s) both;
+        animation: qgSparkle 0.75s both;
     }
+    .sparkle-btn:hover .sparkle-svg:nth-of-type(1) { animation-delay: 0.15s; }
+    .sparkle-btn:hover .sparkle-svg:nth-of-type(2) { animation-delay: 0.3s; }
+    .sparkle-btn:hover .sparkle-svg:nth-of-type(3) { animation-delay: 0.45s; }
+    .sparkle-btn:hover .sparkle-svg:nth-of-type(4) { animation-delay: 0.3s; }
+    .sparkle-btn:hover .sparkle-svg:nth-of-type(5) { animation-delay: 0.6s; }
     @keyframes qgSparkle {
         0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-        50% { transform: translate(-50%, -50%) scale(var(--spark-scale, 1)); opacity: 1; }
+        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
         100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
     }
-    .sparkle-btn .sparkle-svg:nth-child(1) { top: 10%; left: 0%; --spark-scale: 1.1; --spark-delay: 1; }
-    .sparkle-btn .sparkle-svg:nth-child(2) { top: 80%; left: 15%; --spark-scale: 1.25; --spark-delay: 2; }
-    .sparkle-btn .sparkle-svg:nth-child(3) { top: 30%; left: 50%; --spark-scale: 1.1; --spark-delay: 3; }
-    .sparkle-btn .sparkle-svg:nth-child(4) { top: 70%; left: 80%; --spark-scale: 0.9; --spark-delay: 2; }
-    .sparkle-btn .sparkle-svg:nth-child(5) { top: 20%; left: 100%; --spark-scale: 0.8; --spark-delay: 4; }
 
     /* Glare sweep on hover */
     .sparkle-btn::after {
