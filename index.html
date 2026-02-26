@@ -30879,67 +30879,93 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
                 var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
 
-                // Step 1: Transcribe with Whisper
-                var formData=new FormData();
-                formData.append('audio',qs.localBlob,'recording.'+ext);
-                var whisperResp=await fetch('https://whisper-proxy-386010826708.us-central1.run.app',{method:'POST',body:formData});
-                var whisperData=await whisperResp.json();
-                var transcript=(whisperData.text||whisperData.words?.map(function(w){return w.word;}).join(' ')||'').trim();
-                console.log('Whisper transcript:', transcript);
+                // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
+                async function blobToWavBase64(blob) {
+                    var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                    var arrayBuf=await blob.arrayBuffer();
+                    var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+                    var samples=audioBuf.getChannelData(0);
+                    var sampleRate=audioBuf.sampleRate;
+                    // Downsample to 16kHz to keep size small
+                    if(sampleRate>16000){
+                        var ratio=sampleRate/16000;
+                        var newLen=Math.floor(samples.length/ratio);
+                        var downsampled=new Float32Array(newLen);
+                        for(var i=0;i<newLen;i++){downsampled[i]=samples[Math.floor(i*ratio)];}
+                        samples=downsampled;sampleRate=16000;
+                    }
+                    var bufLen=44+samples.length*2;
+                    var wavBuf=new ArrayBuffer(bufLen);
+                    var view=new DataView(wavBuf);
+                    function writeStr(o,s){for(var i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));}
+                    writeStr(0,'RIFF');view.setUint32(4,bufLen-8,true);writeStr(8,'WAVE');
+                    writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
+                    view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);
+                    view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);
+                    view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,samples.length*2,true);
+                    for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+                    var bytes=new Uint8Array(wavBuf);
+                    var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+                    return btoa(binary);
+                }
 
-                // Step 2: Grade with ChatGPT using messages format (more reliable than prompt format)
-                statusEl.textContent='⏳ Grading...';
-                var gradeSystemMsg='You are a strict Korean pronunciation grader. You MUST reply with ONLY a JSON object, no other text. Format: {"score":NUMBER,"feedback":"TEXT","transcript":"TEXT"}';
-                var gradeUserMsg='EXPECTED: '+expectedKorean+'\nSTUDENT SAID: '+transcript+'\n\nCompare word by word. Count expected words. For each expected word, check if student said it correctly.\nScore = (correct words / total expected words) × 100, rounded to nearest integer.\nEnglish words = wrong. Missing words = wrong. Wrong Korean words = wrong.\nGive specific feedback naming which words were wrong and what they said instead.\nKeep the transcript exactly as provided - do not modify it.';
+                var wavBase64=await blobToWavBase64(qs.localBlob);
 
-                var gradeResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                // Send audio directly to GPT-4o-audio-preview for phonetic transcription + grading
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED: "'+expectedKorean+'"\n\nI am sending you their audio recording. Listen carefully and transcribe EXACTLY what you hear — phonetically accurate in Hangul.\n\nCRITICAL TRANSCRIPTION RULES:\n- Transcribe what you ACTUALLY HEAR, not what was expected.\n- If the student said ㅋ instead of ㄱ, write ㅋ (e.g. 코양이 NOT 고양이).\n- Be extremely sensitive to: ㄱ/ㅋ/ㄲ, ㅂ/ㅍ/ㅃ, ㄷ/ㅌ/ㄸ, ㅈ/ㅊ/ㅉ, ㅅ/ㅆ distinctions.\n- If a word sounds English (e.g. "center" instead of 센터), write it in English.\n- If vowels are wrong (ㅓ vs ㅗ, ㅐ vs ㅔ), transcribe the vowel you actually heard.\n- Do NOT auto-correct to the expected text. Do NOT assume they said it correctly.\n\nGRADING RULES:\n- 0% if entire speech is in English or non-Korean.\n- Compare word by word. Score = (correct words / total expected words) × 100.\n- Each wrong consonant type (plain/aspirated/tense) means that word is WRONG.\n- Missing or added words reduce the score.\n- English words mixed in count as wrong for that word but don\'t make entire score 0%.\n\nFEEDBACK:\n- Name specific words that were wrong.\n- For consonant errors explain: "You said 코 (aspirated ㅋ) instead of 고 (plain ㄱ)".\n- Be encouraging but honest.\n\nReply ONLY with valid JSON, no other text:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"exactly what you heard"}';
+
+                var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({
-                        messages:[
-                            {role:'system',content:gradeSystemMsg},
-                            {role:'user',content:gradeUserMsg}
-                        ],
-                        model:'gpt-4o',
-                        max_tokens:500,
+                        messages:[{
+                            role:'user',
+                            content:[
+                                {type:'text',text:gradePrompt},
+                                {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
+                            ]
+                        }],
+                        model:'gpt-4o-audio-preview',
+                        max_tokens:800,
                         temperature:0.1
                     })
                 });
-                var gradeData=await gradeResp.json();
-                console.log('Grade raw response:', JSON.stringify(gradeData).substring(0,500));
+                var aiData=await aiResp.json();
+                console.log('GPT-4o audio response:', JSON.stringify(aiData).substring(0,500));
 
+                // Parse response — proxy returns {success:true, data:...}
                 var rt='';
-                if(gradeData.data && typeof gradeData.data==='string') rt=gradeData.data;
-                else if(gradeData.text) rt=gradeData.text;
-                else if(gradeData.result) rt=gradeData.result;
-                else if(gradeData.response) rt=gradeData.response;
-                else if(gradeData.choices && gradeData.choices[0]){
-                    var msg=gradeData.choices[0].message||gradeData.choices[0];
-                    rt=msg.content||msg.text||'';
+                if(aiData.data && typeof aiData.data==='string') rt=aiData.data;
+                else if(aiData.data && typeof aiData.data==='object') rt=JSON.stringify(aiData.data);
+                else if(aiData.choices && aiData.choices[0]){
+                    var msg=aiData.choices[0].message||aiData.choices[0];
+                    if(msg.audio && msg.audio.transcript) rt=msg.audio.transcript;
+                    else if(msg.content) rt=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
                 }
-                else rt=JSON.stringify(gradeData);
+                else rt=JSON.stringify(aiData);
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
-                console.log('Grade extracted text:', rt.substring(0,300));
+                console.log('Extracted text:', rt.substring(0,300));
 
                 rt=rt.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-                var grade={score:0,feedback:'Grading failed. Please try again.',transcript:transcript};
+                var grade={score:0,feedback:'Grading failed.',transcript:''};
+                var transcript='';
                 try{
                     var parsed=JSON.parse(rt);
                     grade=parsed;
-                    grade.transcript=transcript; // always use Whisper transcript
+                    transcript=parsed.transcript||'';
                 }catch(e){
-                    console.log('JSON parse failed, trying regex');
                     var m=rt.match(/{[\s\S]*}/);
-                    if(m)try{grade=JSON.parse(m[0]);grade.transcript=transcript;}catch(e2){
-                        // Last resort: extract score with regex
-                        var scoreMatch=rt.match(/"score"\s*:\s*(\d+)/);
-                        var feedbackMatch=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        if(scoreMatch){
-                            grade.score=parseInt(scoreMatch[1]);
-                            if(feedbackMatch)grade.feedback=feedbackMatch[1].replace(/\\"/g,'"');
-                        }
+                    if(m)try{grade=JSON.parse(m[0]);transcript=grade.transcript||'';}catch(e2){}
+                    if(!transcript){
+                        // Extract fields individually as last resort
+                        var sm=rt.match(/"score"\s*:\s*(\d+)/);
+                        var fm=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        var tm=rt.match(/"transcript"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        if(sm)grade.score=parseInt(sm[1]);
+                        if(fm)grade.feedback=fm[1];
+                        if(tm){grade.transcript=tm[1];transcript=tm[1];}
                     }
                 }
-                console.log('Final grade:', grade.score, grade.feedback);
+                console.log('Final grade:', grade.score, '/', transcript);
 
                 // 4. Save submission to Firestore
                 var finalScore = typeof grade.score === 'number' ? grade.score : 0;
