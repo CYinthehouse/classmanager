@@ -1139,7 +1139,7 @@
         .mat-slide-korean .mat-sentence-hl.mat-hl-red { background: rgba(239, 68, 68, 0.22); }
         /* Pronunciation mode */
         .mat-slide-number { position: absolute; bottom: 12px; right: 18px; font-size: 13px; color: #000; opacity: 0.3; z-index: 2; }
-        .mat-audio-play-btn { position: absolute; bottom: 12px; left: 18px; z-index: 10; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; border: 2px solid #000; border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .mat-audio-play-btn { position: absolute; bottom: 12px; left: 18px; z-index: 10; background: linear-gradient(135deg, #a855f7, #ff7777); color: #fff; border: 2px solid #000; border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .mat-audio-play-btn:hover { transform: scale(1.15); }
         .mat-audio-play-btn.playing { background: linear-gradient(135deg, #ef4444, #dc2626); animation: matPulsePlay 1s ease-in-out infinite; }
         @keyframes matPulsePlay { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
@@ -1939,7 +1939,7 @@
 
                         <!-- View Materials Button -->
                         <div style="margin-bottom: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
+                            <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #ff7777, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
                             <button class="btn" onclick="trImportFromMaterials()" style="background: linear-gradient(135deg, #0ea5e9, #38bdf8); border: 2px solid #38bdf8; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(56,189,248,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(56,189,248,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(56,189,248,0.3)'">📂 Import from Materials</button>
                         </div>
 
@@ -2476,7 +2476,7 @@
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <button class="btn btn-info" onclick="scanDateMismatches()">🔍 Scan for Date Mismatches</button>
-                            <button class="btn" onclick="fixDateMismatches()" id="fixDatesBtn" disabled style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7; color: #fff; font-weight: 700;">🔧 Fix All Dates</button>
+                            <button class="btn" onclick="fixDateMismatches()" id="fixDatesBtn" disabled style="background: linear-gradient(135deg, #a855f7, #ff7777); border-color: #a855f7; color: #fff; font-weight: 700;">🔧 Fix All Dates</button>
                         </div>
                     </div>
                 </div>
@@ -2568,7 +2568,7 @@
 
                             <!-- Generate Button -->
                             <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                                <button class="btn btn-primary" onclick="generateDrill()" id="generateDrillBtn" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7;">🧠 Generate Drill</button>
+                                <button class="btn btn-primary" onclick="generateDrill()" id="generateDrillBtn" style="background: linear-gradient(135deg, #a855f7, #ff7777); border-color: #a855f7;">🧠 Generate Drill</button>
                                 <button class="btn btn-info btn-sm" onclick="clearDrillForm()">🗑️ Clear</button>
                             </div>
                         </div>
@@ -10580,7 +10580,7 @@
             html += '<div class="mat-slide-nav" onclick="event.stopPropagation()">';
             html += '<button onclick="event.stopPropagation(); matPrevSlide()" id="matPrevBtn">&#9664; Prev</button>';
             if (matAudioSyncData) {
-                html += '<button onclick="event.stopPropagation(); matToggleAudioPlayAll()" id="matAudioPlayAllBtn" style="background:linear-gradient(135deg,#a855f7,#7c3aed); border-color:#a855f7; color:#fff; padding:6px 14px;">&#9654; Play All</button>';
+                html += '<button onclick="event.stopPropagation(); matToggleAudioPlayAll()" id="matAudioPlayAllBtn" style="background:linear-gradient(135deg,#a855f7,#ff7777); border-color:#a855f7; color:#fff; padding:6px 14px;">&#9654; Play All</button>';
             }
             html += '<span id="matSlideIndicator">' + (matCurrentSlide + 1) + ' / ' + matSlides.length + '</span>';
             html += '<button onclick="event.stopPropagation(); matNextSlide()" id="matNextBtn">Next &#9654;</button>';
@@ -11561,7 +11561,7 @@
             h += '#klrn-reader .klr-dots { display: flex; gap: 6px; justify-content: center; padding: 4px 0 12px; }\n';
             h += '#klrn-reader .klr-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,0,255,0.25); border: 1px solid rgba(255,0,255,0.4); cursor: pointer; transition: all 0.2s; }\n';
             h += '#klrn-reader .klr-dot.active { background: #ff00ff; box-shadow: 0 0 8px rgba(255,0,255,0.5); }\n';
-            h += '#klrn-reader .klr-play-btn { position: absolute; bottom: calc(12px * var(--s)); left: calc(18px * var(--s)); z-index: 10; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; border: 2px solid #000; border-radius: 50%; width: calc(36px * var(--s)); height: calc(36px * var(--s)); font-size: calc(16px * var(--s)); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }\n';
+            h += '#klrn-reader .klr-play-btn { position: absolute; bottom: calc(12px * var(--s)); left: calc(18px * var(--s)); z-index: 10; background: linear-gradient(135deg, #a855f7, #ff7777); color: #fff; border: 2px solid #000; border-radius: 50%; width: calc(36px * var(--s)); height: calc(36px * var(--s)); font-size: calc(16px * var(--s)); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }\n';
             h += '#klrn-reader .klr-play-btn:hover { transform: scale(1.15); }\n';
             h += '#klrn-reader .klr-play-btn.playing { background: linear-gradient(135deg, #ef4444, #dc2626); }\n';
             h += '#klrn-reader .klr-word.klr-highlight { background: #3b82f6 !important; color: #fff !important; border-radius: 6px; padding: 1px 4px; }\n';
@@ -25496,7 +25496,7 @@ ${daySpecific}
                         ${currentWeek >= weeksTotal ? `
                         <div style="margin-top: 15px; padding: 12px; background: rgba(168,85,247,0.15); border: 2px solid #a855f7; border-radius: 8px; text-align: center;">
                             <p style="color: #a855f7; font-size: 12px; margin-bottom: 10px;">🟣 This class has finished its ${weeksTotal}-week course. Mark it complete to reopen the slot.</p>
-                            <button class="btn" onclick="completeClassFromSlot('${cls.id}')" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #a855f7; color: #fff; font-weight: 700; width: 100%;">✅ Complete Class & Reopen Slot</button>
+                            <button class="btn" onclick="completeClassFromSlot('${cls.id}')" style="background: linear-gradient(135deg, #a855f7, #ff7777); border-color: #a855f7; color: #fff; font-weight: 700; width: 100%;">✅ Complete Class & Reopen Slot</button>
                         </div>` : ''}
                     </div>
                 `;
@@ -30425,7 +30425,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 container.innerHTML = '<div style="text-align:center;padding:30px;"><p style="color:#888;font-size:13px;">No sets loaded yet.</p><p style="color:#666;font-size:12px;margin-top:8px;">Add sets in the Tuesday Reading tab (TEXT or IMAGE input), then come back.</p></div>';
                 return;
             }
-            var html = '<div style="font-family:\'Press Start 2P\';font-size:9px;color:#b0b0b0;margin-bottom:12px;">' + qg.sets.length + ' ROUNDS LOADED</div>';
+            var html = '<div style="font-family:\'Press Start 2P\';font-size:9px;color:#41c0ff;margin-bottom:12px;">' + qg.sets.length + ' ROUNDS LOADED</div>';
             for (var i = 0; i < qg.sets.length; i++) {
                 var s = qg.sets[i];
                 html += '<div style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:8px;">';
@@ -30434,10 +30434,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                 html += '<span style="font-size:11px;color:#888;">' + s.sentences.length + ' sentence' + (s.sentences.length>1?'s':'') + '</span></div>';
                 html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
                 html += '<div style="background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.2);border-radius:6px;padding:8px;">';
-                html += '<div style="font-size:10px;color:#8bb4d6;margin-bottom:4px;font-weight:600;">🌱 BEG (1st only)</div>';
+                html += '<div style="font-size:10px;color:#41c0ff;margin-bottom:4px;font-weight:600;">🌱 BEG (1st only)</div>';
                 html += '<div style="font-size:12px;color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div></div>';
                 html += '<div style="background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);border-radius:6px;padding:8px;">';
-                html += '<div style="font-size:10px;color:#c4a0e8;margin-bottom:4px;font-weight:600;">🌟 ADV (' + s.sentences.length + ')</div>';
+                html += '<div style="font-size:10px;color:#ff7777;margin-bottom:4px;font-weight:600;">🌟 ADV (' + s.sentences.length + ')</div>';
                 for (var j = 0; j < s.sentences.length; j++) html += '<div style="font-size:12px;color:#fff;margin-bottom:2px;">' + escapeHtml(s.sentences[j].korean) + '</div>';
                 html += '</div></div></div>';
             }
@@ -30497,20 +30497,20 @@ Return ONLY this JSON (no markdown, no code blocks):
             el.style.display = 'block';
             var h = '<div style="text-align:center;margin-bottom:20px;">';
             h += '<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;margin-bottom:8px;">ROOM CODE</div>';
-            h += '<div style="font-family:\'Press Start 2P\';font-size:36px;color:#e0e0e0;letter-spacing:8px;margin-bottom:12px;">' + roomCode + '</div>';
+            h += '<div style="font-family:\'Press Start 2P\';font-size:36px;color:#41c0ff;letter-spacing:8px;margin-bottom:12px;">' + roomCode + '</div>';
             h += '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:8px;word-break:break-all;">';
             h += '<div style="font-size:11px;color:#888;margin-bottom:4px;">Student Link:</div>';
-            h += '<a href="' + studentUrl + '" target="_blank" style="font-size:13px;color:#a78bfa;text-decoration:underline;word-break:break-all;display:block;margin-bottom:6px;">' + studentUrl + '</a>';
+            h += '<a href="' + studentUrl + '" target="_blank" style="font-size:13px;color:#41c0ff;text-decoration:underline;word-break:break-all;display:block;margin-bottom:6px;">' + studentUrl + '</a>';
             h += '<div style="display:flex;gap:8px;margin-top:8px;">';
             h += '<button onclick="navigator.clipboard.writeText(\'' + studentUrl + '\');this.textContent=\'✅ Copied!\';setTimeout(()=>{this.textContent=\'📋 Copy\'},2000)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;">📋 Copy</button>';
             h += '<button onclick="window.open(\'' + studentUrl + '\',\'_blank\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;">🔗 Open</button></div>';
             h += '<div id="qgQRCode" style="margin-top:12px;display:flex;justify-content:center;"></div>';
             h += '</div>';
             h += '<div style="font-size:12px;color:#888;">⏱️ <strong style="color:#ccc;">' + qg.roundTime + 's</strong> per round &bull; <strong style="color:#ccc;">' + qg.sets.length + '</strong> rounds</div></div>';
-            h += '<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#b0b0b0;margin-bottom:10px;">WAITING ROOM</div>';
-            h += '<div id="qgPlayersBox" style="min-height:60px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;">';
+            h += '<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;margin-bottom:10px;">WAITING ROOM</div>';
+            h += '<div id="qgPlayersBox" style="min-height:60px;background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:10px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;">';
             h += '<p style="color:#888;font-size:12px;width:100%;text-align:center;">Waiting for students...</p></div></div>';
-            h += '<div style="text-align:center;"><button id="qgStartBtn" onclick="qgStartRound()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:none;color:#fff;padding:16px 48px;border-radius:10px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.opacity=\'0.9\'" onmouseout="this.style.transform=\'scale(1)\';this.style.opacity=\'1\'">▶ START ROUND 1</button></div>';
+            h += '<div style="text-align:center;"><button id="qgStartBtn" onclick="qgStartRound()" style="background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;padding:16px 48px;border-radius:10px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.opacity=\'0.9\'" onmouseout="this.style.transform=\'scale(1)\';this.style.opacity=\'1\'">▶ START ROUND 1</button></div>';
             el.innerHTML = h;
             // QR code
             setTimeout(function(){
@@ -30557,18 +30557,18 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;">ROUND '+(ri+1)+' / '+qg.sets.length+'</div>';
             h+='<div id="qgTimer" style="font-family:\'Press Start 2P\';font-size:24px;color:#e0e0e0;">'+tl+'</div></div>';
             h+='<div style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;height:10px;margin-bottom:20px;overflow:hidden;">';
-            h+='<div id="qgTimerBar" style="width:100%;height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:20px;transition:width '+tl+'s linear;"></div></div>';
+            h+='<div id="qgTimerBar" style="width:100%;height:100%;background:linear-gradient(90deg,#41c0ff,#ff7777);border-radius:20px;transition:width '+tl+'s linear;"></div></div>';
             // Two columns
             h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">';
             // Left - Beginner
-            h+='<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;">';
-            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#8bb4d6;text-align:center;margin-bottom:14px;">🌱 BEGINNER</div>';
+            h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#41c0ff;text-align:center;margin-bottom:14px;">🌱 BEGINNER</div>';
             h+='<div style="font-size:22px;color:#fff;text-align:center;line-height:1.6;padding:10px;">'+escapeHtml(set.sentences[0].korean)+'</div>';
             if(set.sentences[0].english) h+='<div style="font-size:13px;color:#888;text-align:center;margin-top:10px;">'+escapeHtml(set.sentences[0].english)+'</div>';
             h+='</div>';
             // Right - Advanced
-            h+='<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;">';
-            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#c4a0e8;text-align:center;margin-bottom:14px;">🌟 ADVANCED</div>';
+            h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#ff7777;text-align:center;margin-bottom:14px;">🌟 ADVANCED</div>';
             for(var j=0;j<set.sentences.length;j++){
                 h+='<div style="font-size:'+(set.sentences.length>2?'18':'22')+'px;color:#fff;text-align:center;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
                 if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
@@ -30576,14 +30576,14 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='</div></div>';
             // Submission tracker
             h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;margin-bottom:8px;">📊 SUBMISSIONS</div>';
-            h+='<div id="qgSubTracker" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
+            h+='<div id="qgSubTracker" style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:8px;padding:12px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
             // Listen All
-            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#d4a06a;margin-bottom:8px;">🔊 LISTEN ALL</div>';
-            h+='<div id="qgListenAll" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;font-size:12px;color:#888;">Recordings will appear here as students submit...</div></div>';
+            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;margin-bottom:8px;">🔊 LISTEN ALL</div>';
+            h+='<div id="qgListenAll" style="background:rgba(255,119,119,0.03);border:1px solid rgba(255,119,119,0.12);border-radius:8px;padding:12px;font-size:12px;color:#888;">Recordings will appear here as students submit...</div></div>';
             // Buttons
             h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
-            if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:none;color:#fff;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➜ NEXT ROUND</button>';
+            if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➜ NEXT ROUND</button>';
             h+='<button onclick="qgShowLeaderboardAdmin()" style="background:linear-gradient(135deg,#f0c040,#d4a017);border:none;color:#1a1a2e;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏆 LEADERBOARD</button>';
             h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
             el.innerHTML=h;
@@ -30613,7 +30613,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Tracker
                 var begSubs=subs.filter(function(s){return s.level==='beginner';});
                 var advSubs=subs.filter(function(s){return s.level==='advanced';});
-                tracker.innerHTML='<span style="color:#8bb4d6;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#c4a0e8;">🌟 Advanced: '+advSubs.length+' submitted</span>';
+                tracker.innerHTML='<span style="color:#41c0ff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff7777;">🌟 Advanced: '+advSubs.length+' submitted</span>';
                 // Listen All - audio players
                 var lh='';
                 subs.forEach(function(s){
@@ -30667,7 +30667,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<div style="font-family:\'Press Start 2P\';font-size:14px;color:#FFD700;text-align:center;margin-bottom:20px;">🏆 LEADERBOARD</div>';
                 h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
                 // Beginner
-                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#8bb4d6;margin-bottom:10px;text-align:center;">🌱 BEGINNER</div>';
+                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#41c0ff;margin-bottom:10px;text-align:center;">🌱 BEGINNER</div>';
                 (d.leaderboard_beginner||[]).forEach(function(p,i){
                     var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
                     h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
@@ -30677,7 +30677,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(!(d.leaderboard_beginner||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
                 h+='</div>';
                 // Advanced
-                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#c4a0e8;margin-bottom:10px;text-align:center;">🌟 ADVANCED</div>';
+                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;margin-bottom:10px;text-align:center;">🌟 ADVANCED</div>';
                 (d.leaderboard_advanced||[]).forEach(function(p,i){
                     var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
                     h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
@@ -30719,12 +30719,12 @@ Return ONLY this JSON (no markdown, no code blocks):
             var app=document.createElement('div');app.id='qsApp';app.style.cssText='max-width:500px;margin:0 auto;padding:20px;min-height:100vh;';
             document.body.appendChild(app);
             var emojis=['😊','😎','🤓','🥳','😺','🐶','🦊','🐻','🐸','🐱','🦁','🐰','🐼','🦋','🌟','🔥','💎','🎵','🍀','⚡'];
-            var eh='';emojis.forEach(function(e,i){eh+='<button onclick="qsPickEmoji(\''+e+'\',this)" style="width:40px;height:40px;font-size:22px;border-radius:8px;border:1px solid '+(i===0?'#7c3aed':'rgba(255,255,255,0.1)')+';background:'+(i===0?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;">'+e+'</button>';});
+            var eh='';emojis.forEach(function(e,i){eh+='<button onclick="qsPickEmoji(\''+e+'\',this)" style="width:40px;height:40px;font-size:22px;border-radius:8px;border:1px solid '+(i===0?'#ff7777':'rgba(255,255,255,0.1)')+';background:'+(i===0?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;">'+e+'</button>';});
             app.innerHTML='<div style="text-align:center;padding:30px 10px;">'+
                 '<div style="font-size:36px;margin-bottom:8px;">🎮</div>'+
-                '<div style="font-family:\'Press Start 2P\';font-size:12px;color:#e0e0e0;margin-bottom:4px;">QUIZ GAME</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:12px;color:#41c0ff;margin-bottom:4px;">QUIZ GAME</div>'+
                 '<div style="font-family:\'Press Start 2P\';font-size:9px;color:#aaa;margin-bottom:24px;">KoreanLearnin</div>'+
-                '<div style="font-family:\'Press Start 2P\';font-size:20px;color:#e0e0e0;letter-spacing:6px;margin-bottom:24px;">'+roomCode.toUpperCase()+'</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:20px;color:#41c0ff;letter-spacing:6px;margin-bottom:24px;">'+roomCode.toUpperCase()+'</div>'+
                 '<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:20px;text-align:left;">'+
                 '<div style="margin-bottom:14px;"><label style="font-size:11px;color:#ccc;display:block;margin-bottom:4px;font-weight:600;">YOUR NAME</label>'+
                 '<input type="text" id="qsName" placeholder="Enter your name" maxlength="20" style="width:100%;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:15px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor=\'rgba(255,255,255,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.2)\'"></div>'+
@@ -30734,20 +30734,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
                 '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:12px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;">🌱 Beginner</button>'+
                 '<button id="qsLvlA" onclick="qsPickLevel(\'advanced\')" style="background:rgba(0,0,0,0.3);border:3px solid #555;color:#888;padding:12px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;">🌟 Advanced</button></div></div>'+
-                '<button onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#7c3aed,#6d28d9);border:none;color:#fff;padding:14px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">JOIN GAME</button>'+
+                '<button onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;padding:14px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">JOIN GAME</button>'+
                 '</div></div>';
         }
 
         function qsPickEmoji(e,btn){
             qs.playerEmoji=e;
             document.querySelectorAll('#qsEmojiGrid button').forEach(function(b){b.style.borderColor='#333';b.style.background='rgba(0,0,0,0.3)';});
-            btn.style.borderColor='#7c3aed';btn.style.background='rgba(124,58,237,0.2)';
+            btn.style.borderColor='#ff7777';btn.style.background='rgba(124,58,237,0.2)';
         }
         function qsPickLevel(lv){
             qs.playerLevel=lv;
             var b=document.getElementById('qsLvlB'),a=document.getElementById('qsLvlA');
-            if(lv==='beginner'){b.style.borderColor='#7c3aed';b.style.color='#ccc';b.style.background='rgba(124,58,237,0.15)';a.style.borderColor='rgba(255,255,255,0.1)';a.style.color='#888';a.style.background='rgba(255,255,255,0.06)';}
-            else{a.style.borderColor='#7c3aed';a.style.color='#ccc';a.style.background='rgba(124,58,237,0.15)';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='#888';b.style.background='rgba(255,255,255,0.06)';}
+            if(lv==='beginner'){b.style.borderColor='#ff7777';b.style.color='#ccc';b.style.background='rgba(124,58,237,0.15)';a.style.borderColor='rgba(255,255,255,0.1)';a.style.color='#888';a.style.background='rgba(255,255,255,0.06)';}
+            else{a.style.borderColor='#ff7777';a.style.color='#ccc';a.style.background='rgba(124,58,237,0.15)';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='#888';b.style.background='rgba(255,255,255,0.06)';}
         }
 
         async function qsJoin(roomCode) {
@@ -30774,7 +30774,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
             app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
                 '<div id="qsWaitingHeader" style="font-size:36px;margin-bottom:6px;">🎮</div>'+
-                '<div id="qsWaitingTitle" style="font-family:\'Press Start 2P\';font-size:11px;color:#e0e0e0;margin-bottom:16px;">WAITING ROOM</div>'+
+                '<div id="qsWaitingTitle" style="font-family:\'Press Start 2P\';font-size:11px;color:#41c0ff;margin-bottom:16px;">WAITING ROOM</div>'+
                 '<div id="qsPlayerEmoji" style="font-size:32px;margin-bottom:4px;">'+qs.playerEmoji+'</div>'+
                 '<div id="qsPlayerName" style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
                 '<div id="qsPlayerLevel" style="font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
@@ -31076,7 +31076,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsShowFinished(area,status) {
             if(status){status.textContent='🏁 GAME OVER';status.style.color='#00ff88';}
-            area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">🏁</div><div style="font-family:\'Press Start 2P\';font-size:14px;color:#e0e0e0;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
+            area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">🏁</div><div style="font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
         }
 
     </script>
@@ -31085,34 +31085,34 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; justify-content:center; align-items:center; padding:20px;">
-    <div style="background:#1a1a2e; border:1px solid rgba(255,255,255,0.1); border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
         <!-- Header -->
-        <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
+        <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
                 <span style="font-size:28px;">🎮</span>
                 <div>
-                    <div style="font-family:'Press Start 2P'; font-size:12px; color:#e0e0e0;">QUIZ GAME</div>
+                    <div style="font-family:'Press Start 2P'; font-size:12px; color:#41c0ff;">QUIZ GAME</div>
 
                 </div>
             </div>
-            <button onclick="closeKahootMaker()" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#aaa; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.15)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.color='#aaa'">✕</button>
+            <button onclick="closeKahootMaker()" style="background:rgba(255,119,119,0.1); border:1px solid rgba(255,119,119,0.3); color:#ff7777; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.background='rgba(255,119,119,0.2)';this.style.color='#ff7777'" onmouseout="this.style.background='rgba(255,119,119,0.1)';this.style.color='#ff7777'">✕</button>
         </div>
         <!-- Setup -->
         <div id="quizGameSetupView" style="padding:24px;">
             <div style="margin-bottom:20px;">
-                <div style="font-family:'Press Start 2P'; font-size:9px; color:#b0b0b0; margin-bottom:10px;">⏱️ ROUND TIME</div>
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff7777; margin-bottom:10px;">⏱️ ROUND TIME</div>
                 <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="number" id="quizGameRoundTime" value="60" min="5" max="600" style="background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:10px 16px; font-size:16px; width:100px; text-align:center; outline:none;" onfocus="this.style.borderColor='rgba(255,255,255,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+                    <input type="number" id="quizGameRoundTime" value="60" min="5" max="600" style="background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(65,192,255,0.3); border-radius:8px; padding:10px 16px; font-size:16px; width:100px; text-align:center; outline:none;" onfocus="this.style.borderColor='rgba(255,255,255,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
                     <span style="font-size:13px; color:#888;">seconds</span>
                 </div>
             </div>
             <div style="margin-bottom:20px;">
-                <div style="font-family:'Press Start 2P'; font-size:9px; color:#b0b0b0; margin-bottom:10px;">📋 ROUNDS (from Tuesday Reading sets)</div>
-                <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px; background:rgba(255,255,255,0.04);"><p style="color:#888;">Loading...</p></div>
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#41c0ff; margin-bottom:10px;">📋 ROUNDS (from Tuesday Reading sets)</div>
+                <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:1px solid rgba(65,192,255,0.15); border-radius:10px; padding:12px; background:rgba(65,192,255,0.03);"><p style="color:#888;">Loading...</p></div>
 
             </div>
             <div style="text-align:center;">
-                <button id="quizGameCreateBtn" onclick="qgCreateSession()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); border:none; color:#fff; padding:16px 48px; border-radius:12px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)';this.style.opacity='0.9'" onmouseout="this.style.transform='scale(1)';this.style.opacity='1'">🎮 CREATE GAME</button>
+                <button id="quizGameCreateBtn" onclick="qgCreateSession()" style="background:linear-gradient(135deg,#ff7777,#e85555); border:none; color:#fff; padding:16px 48px; border-radius:12px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)';this.style.opacity='0.9'" onmouseout="this.style.transform='scale(1)';this.style.opacity='1'">🎮 CREATE GAME</button>
 
             </div>
         </div>
