@@ -30773,11 +30773,11 @@ Return ONLY this JSON (no markdown, no code blocks):
             var app=document.getElementById('qsApp');
             var lc=qs.playerLevel==='beginner'?'#00ffff':'#ff00ff';
             app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
-                '<div style="font-size:36px;margin-bottom:6px;">🎮</div>'+
-                '<div style="font-family:\'Press Start 2P\';font-size:11px;color:#00ffff;text-shadow:0 0 10px #00ffff;margin-bottom:16px;">WAITING ROOM</div>'+
-                '<div style="font-size:32px;margin-bottom:4px;">'+qs.playerEmoji+'</div>'+
-                '<div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
-                '<div style="font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
+                '<div id="qsWaitingHeader" style="font-size:36px;margin-bottom:6px;">🎮</div>'+
+                '<div id="qsWaitingTitle" style="font-family:\'Press Start 2P\';font-size:11px;color:#00ffff;text-shadow:0 0 10px #00ffff;margin-bottom:16px;">WAITING ROOM</div>'+
+                '<div id="qsPlayerEmoji" style="font-size:32px;margin-bottom:4px;">'+qs.playerEmoji+'</div>'+
+                '<div id="qsPlayerName" style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
+                '<div id="qsPlayerLevel" style="font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
                 '<div id="qsPlayers" style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:12px;padding:14px;margin-bottom:16px;min-height:50px;"></div>'+
                 '<div id="qsStatus" style="font-family:\'Press Start 2P\';font-size:9px;color:#888;">Waiting for teacher...</div>'+
                 '<div id="qsGameArea"></div></div>';
@@ -30795,13 +30795,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var area=document.getElementById('qsGameArea');
                 if(!area)return;
                 if(d.status==='playing') qsShowRound(d,area,status);
-                else if(d.status==='round_result') qsShowResult(d,area,status);
-                else if(d.status==='finished') qsShowFinished(area,status);
-                else if(d.status==='lobby'){if(status)status.textContent='Waiting for teacher...';area.innerHTML='';}
+                else if(d.status==='round_result') { ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';}); qsShowResult(d,area,status); }
+                else if(d.status==='finished') { ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';}); qsShowFinished(area,status); }
+                else if(d.status==='lobby'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='';});if(status){status.textContent='Waiting for teacher...';status.style.color='#888';}area.innerHTML='';}
             });
         }
 
         function qsShowRound(d,area,status) {
+            // Hide waiting room elements once game starts
+            ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){
+                var el=document.getElementById(id);if(el)el.style.display='none';
+            });
             if(status){status.textContent='🔴 ROUND '+(d.currentRound+1)+' — READ ALOUD!';status.style.color='#ff00ff';}
             var set=d.sets[d.currentRound]; if(!set)return;
             var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
@@ -30894,14 +30898,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                 rt=rt.replace(/^```json\s*|```\s*$/g,'').trim();
                 var grade={score:50,feedback:'',transcript:transcript};
                 try{var parsed=JSON.parse(rt);grade=parsed;}catch(e){var m=rt.match(/{[\s\S]*}/);if(m)try{grade=JSON.parse(m[0]);}catch(e2){}}
-                var points=Math.round((grade.score||0)/10);
 
                 // 4. Save submission to Firestore
+                var finalScore = typeof grade.score === 'number' ? grade.score : 50;
+                var finalFeedback = grade.feedback || '';
+                var finalTranscript = grade.transcript || transcript || '';
+                var points = Math.round(finalScore / 10);
+
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
                     playerId:qs.playerId, playerName:qs.playerName, emoji:qs.playerEmoji,
                     level:qs.playerLevel, round:gameData.currentRound,
-                    audioUrl:audioUrl, transcript:grade.transcript||transcript,
-                    score:points, gradeScore:grade.score, feedback:grade.feedback||'',
+                    audioUrl:audioUrl, transcript:finalTranscript,
+                    score:points, gradeScore:finalScore, feedback:finalFeedback,
                     expectedKorean:expectedKorean, submittedAt:firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -30911,7 +30919,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
 
                 // 6. Show feedback popup
-                qsShowFeedback(grade,points,audioUrl,expectedSentences);
+                qsShowFeedback({score:finalScore,feedback:finalFeedback,transcript:finalTranscript},points,audioUrl,expectedSentences);
 
             } catch(err){
                 console.error('Submit error:',err);
