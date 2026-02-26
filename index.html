@@ -30881,14 +30881,15 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var formData=new FormData();
                 formData.append('audio',qs.localBlob,'recording.'+ext);
-                formData.append('prompt',expectedKorean);
+                // Do NOT pass prompt/expected text — it biases Whisper to hallucinate Korean even if student spoke English
+                // Let Whisper transcribe exactly what it hears
                 var whisperResp=await fetch('https://whisper-proxy-386010826708.us-central1.run.app',{method:'POST',body:formData});
                 var whisperData=await whisperResp.json();
                 var transcript=(whisperData.text||whisperData.words?.map(function(w){return w.word;}).join(' ')||'').trim();
 
                 statusEl.textContent='⏳ Grading...';
                 // 3. Grade with ChatGPT
-                var gradePrompt='You are grading a Korean language student\'s reading. They were supposed to read:\n"'+expectedKorean+'"\n\nThey actually said (from speech recognition):\n"'+transcript+'"\n\nGrade their accuracy 0-100. Give specific feedback on pronunciation. Reply ONLY with JSON: {"score":NUMBER,"feedback":"short encouraging feedback with specific tips","transcript":"what they said"}';
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system designed for English-speaking learners.\n\nEXPECTED: "'+expectedKorean+'"\nACTUAL (from Whisper speech recognition): "'+transcript+'"\n\nGRADING RULES:\n- If the ENTIRE transcript is in English or a non-Korean language, score is 0.\n- If some words are Korean and some are English, score based on the Korean portion only. Do not give 0 just because a few English words slipped in.\n- Compare word by word. Each correct word contributes to the score proportionally.\n- Missing words and added words reduce the score.\n\nPRONUNCIATION SENSITIVITY — this is critical:\n- Be extremely sensitive to aspirated/tense/plain consonant distinctions:\n  ㄱ vs ㅋ vs ㄲ (e.g. 고양이 vs 코양이 vs 꼬양이 — these are DIFFERENT)\n  ㅂ vs ㅍ vs ㅃ (e.g. 밥 vs 팝 vs 빱)\n  ㄷ vs ㅌ vs ㄸ (e.g. 달 vs 탈 vs 딸)\n  ㅈ vs ㅊ vs ㅉ (e.g. 자 vs 차 vs 짜)\n  ㅅ vs ㅆ (e.g. 사 vs 싸)\n- If Whisper transcribed a word with the wrong consonant type (e.g. 코양이 instead of 고양이), that is a real pronunciation error — do NOT assume it was correct. Report it as-is.\n- Vowel errors like ㅓ vs ㅗ, ㅐ vs ㅔ also matter.\n- Batchim errors matter (e.g. dropping final consonants).\n\nFEEDBACK:\n- Be specific: name the exact words that were wrong and what they said vs what was expected.\n- For consonant errors, explain the distinction (e.g. "You said 코 (aspirated ㅋ) instead of 고 (plain ㄱ)").\n- Be encouraging but honest.\n\nReply ONLY with valid JSON: {"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"exactly what Whisper heard — do NOT correct or clean it up"}';
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({prompt:gradePrompt,max_tokens:500})
