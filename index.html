@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- QR Code generator for Quiz Game -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -30361,863 +30363,694 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
         }
 
-
         // ═══════════════════════════════════════════════════
         // 🎮 QUIZ GAME — KoreanLearnin Reading Game
-        // ═══════════════════════════════════════════════════
         // Uses same sets as Tuesday Reading Cards
-        // LEFT = Beginner (1st sentence only), RIGHT = Advanced Beginner (all sentences)
-        // Speech grading via make.com webhooks (same as existing TR flow)
-        // Students join via external URL — no login required
+        // LEFT = Beginner (1st sentence), RIGHT = Advanced (all)
+        // Speech grading: MediaRecorder → Whisper → ChatGPT
+        // No Discord. No Make.com. All Cloud Functions.
         // ═══════════════════════════════════════════════════
 
         var QUIZ_GAME_COLLECTION = 'quiz_game_sessions';
-        var QUIZ_GAME_PLAYERS_SUB = 'players'; // subcollection
+        var QUIZ_PLAYERS_SUB = 'players';
+        var QUIZ_SUBS_SUB = 'submissions';
 
-        var quizGameState = {
+        var qg = {
             sessionId: null,
-            sets: [],          // Array of { sentences: [{korean, english}], setIndex }
-            currentRound: -1,  // -1 = not started
-            roundTime: 60,     // seconds per round
-            status: 'setup',   // setup | lobby | playing | round_result | finished
-            unsubscribe: null  // Firestore listener
+            sets: [],
+            currentRound: -1,
+            roundTime: 60,
+            status: 'setup',
+            unsubSession: null,
+            unsubPlayers: null,
+            timer: null
         };
 
         function openKahootMaker() {
             document.getElementById('quizGameOverlay').style.display = 'flex';
-            quizGameRenderSetup();
+            qgRenderSetup();
         }
-
         function closeKahootMaker() {
             document.getElementById('quizGameOverlay').style.display = 'none';
-            if (quizGameState.unsubscribe) {
-                quizGameState.unsubscribe();
-                quizGameState.unsubscribe = null;
-            }
+            clearInterval(qg.timer);
+            if (qg.unsubSession) { qg.unsubSession(); qg.unsubSession = null; }
+            if (qg.unsubPlayers) { qg.unsubPlayers(); qg.unsubPlayers = null; }
         }
 
-        // ── SETUP VIEW ──────────────────────────────────────
-        function quizGameRenderSetup() {
-            quizGameState.status = 'setup';
-            var setupEl = document.getElementById('quizGameSetupView');
-            var lobbyEl = document.getElementById('quizGameLobbyView');
-            var gameEl = document.getElementById('quizGamePlayView');
-            setupEl.style.display = 'block';
-            lobbyEl.style.display = 'none';
-            gameEl.style.display = 'none';
-
-            // Load sets from the Tuesday Reading trSets
-            quizGameLoadSets();
+        // ── SETUP ───────────────────────────────────────────
+        function qgRenderSetup() {
+            qg.status = 'setup';
+            document.getElementById('quizGameSetupView').style.display = 'block';
+            document.getElementById('quizGameLobbyView').style.display = 'none';
+            document.getElementById('quizGamePlayView').style.display = 'none';
+            qgLoadSets();
         }
 
-        function quizGameLoadSets() {
+        function qgLoadSets() {
             var container = document.getElementById('quizGameSetsPreview');
-            // Save textareas first
             for (var i = 0; i < trSets.length; i++) {
                 if (trSets[i].mode === 'text') {
                     var el = document.getElementById('trTextarea' + i);
                     if (el) trSets[i].text = el.value;
                 }
             }
-
-            // Build sets
-            quizGameState.sets = [];
+            qg.sets = [];
             for (var i = 0; i < trSets.length; i++) {
                 var sentences = getTRSentencesFromSet(trSets[i]);
                 if (sentences.length > 0) {
-                    quizGameState.sets.push({
-                        setIndex: i,
-                        sentences: sentences.map(function(s) { return { korean: s, english: '' }; })
-                    });
+                    qg.sets.push({ setIndex: i, sentences: sentences.map(function(s) { return { korean: s, english: '' }; }) });
                 }
             }
-
-            if (quizGameState.sets.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:30px;">' +
-                    '<p style="color:#888; font-size:13px;">No sets loaded yet.</p>' +
-                    '<p style="color:#666; font-size:12px; margin-top:8px;">Go back and add sets in the Tuesday Reading tab (TEXT or IMAGE input), then come back here.</p>' +
-                    '</div>';
+            if (qg.sets.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:30px;"><p style="color:#888;font-size:13px;">No sets loaded yet.</p><p style="color:#666;font-size:12px;margin-top:8px;">Add sets in the Tuesday Reading tab (TEXT or IMAGE input), then come back.</p></div>';
                 return;
             }
-
-            var html = '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#00ffff; margin-bottom:12px;">' + quizGameState.sets.length + ' ROUNDS LOADED</div>';
-            for (var i = 0; i < quizGameState.sets.length; i++) {
-                var s = quizGameState.sets[i];
-                html += '<div style="background:rgba(0,0,0,0.4); border:2px solid rgba(0,255,255,0.15); border-radius:8px; padding:12px; margin-bottom:8px;">';
-                html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">';
-                html += '<span style="font-weight:700; color:#ff00ff; font-size:12px;">Round ' + (i + 1) + '</span>';
-                html += '<span style="font-size:11px; color:#888;">' + s.sentences.length + ' sentence' + (s.sentences.length > 1 ? 's' : '') + '</span>';
-                html += '</div>';
-                html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">';
-                // Left side preview
-                html += '<div style="background:rgba(0,255,255,0.05); border:1px solid rgba(0,255,255,0.2); border-radius:6px; padding:8px;">';
-                html += '<div style="font-size:10px; color:#00ffff; margin-bottom:4px; font-weight:600;">🌱 BEGINNER (1st only)</div>';
-                html += '<div style="font-size:12px; color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div>';
-                html += '</div>';
-                // Right side preview
-                html += '<div style="background:rgba(255,0,255,0.05); border:1px solid rgba(255,0,255,0.2); border-radius:6px; padding:8px;">';
-                html += '<div style="font-size:10px; color:#ff00ff; margin-bottom:4px; font-weight:600;">🌟 ADVANCED (' + s.sentences.length + ' sentences)</div>';
-                for (var j = 0; j < s.sentences.length; j++) {
-                    html += '<div style="font-size:12px; color:#fff; margin-bottom:2px;">' + escapeHtml(s.sentences[j].korean) + '</div>';
-                }
-                html += '</div>';
-                html += '</div></div>';
+            var html = '<div style="font-family:\'Press Start 2P\';font-size:9px;color:#00ffff;margin-bottom:12px;">' + qg.sets.length + ' ROUNDS LOADED</div>';
+            for (var i = 0; i < qg.sets.length; i++) {
+                var s = qg.sets[i];
+                html += '<div style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:8px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+                html += '<span style="font-weight:700;color:#ff00ff;font-size:12px;">Round ' + (i+1) + '</span>';
+                html += '<span style="font-size:11px;color:#888;">' + s.sentences.length + ' sentence' + (s.sentences.length>1?'s':'') + '</span></div>';
+                html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+                html += '<div style="background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.2);border-radius:6px;padding:8px;">';
+                html += '<div style="font-size:10px;color:#00ffff;margin-bottom:4px;font-weight:600;">🌱 BEG (1st only)</div>';
+                html += '<div style="font-size:12px;color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div></div>';
+                html += '<div style="background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);border-radius:6px;padding:8px;">';
+                html += '<div style="font-size:10px;color:#ff00ff;margin-bottom:4px;font-weight:600;">🌟 ADV (' + s.sentences.length + ')</div>';
+                for (var j = 0; j < s.sentences.length; j++) html += '<div style="font-size:12px;color:#fff;margin-bottom:2px;">' + escapeHtml(s.sentences[j].korean) + '</div>';
+                html += '</div></div></div>';
             }
             container.innerHTML = html;
         }
 
-        // ── CREATE GAME SESSION ────────────────────────────
-        async function quizGameCreateSession() {
-            if (quizGameState.sets.length === 0) {
-                alert('No sets loaded. Add sets in the Tuesday Reading tab first.');
-                return;
-            }
-
+        // ── CREATE SESSION ──────────────────────────────────
+        async function qgCreateSession() {
+            if (qg.sets.length === 0) { alert('No sets loaded.'); return; }
             var roundTime = parseInt(document.getElementById('quizGameRoundTime').value) || 60;
-            quizGameState.roundTime = roundTime;
-
-            var createBtn = document.getElementById('quizGameCreateBtn');
-            createBtn.disabled = true;
-            createBtn.innerHTML = '<span class="quiz-loading-dots">⏳ CREATING</span>';
-
+            if (roundTime < 5) roundTime = 5;
+            if (roundTime > 600) roundTime = 600;
+            qg.roundTime = roundTime;
+            var btn = document.getElementById('quizGameCreateBtn');
+            btn.disabled = true; btn.innerHTML = '<span class="quiz-loading-dots">⏳ CREATING</span>';
             try {
-                // First get translations for all sentences
-                var allKorean = [];
-                for (var i = 0; i < quizGameState.sets.length; i++) {
-                    for (var j = 0; j < quizGameState.sets[i].sentences.length; j++) {
-                        allKorean.push(quizGameState.sets[i].sentences[j].korean);
-                    }
-                }
-
-                // AI translation (same endpoint as Generate Reading Cards)
+                // Translate all sentences
+                var allK = [];
+                for (var i = 0; i < qg.sets.length; i++)
+                    for (var j = 0; j < qg.sets[i].sentences.length; j++)
+                        allK.push(qg.sets[i].sentences[j].korean);
                 var aiUrl = 'https://generateflashcardai-386010826708.us-central1.run.app';
-                var translationPrompt = 'Translate each Korean sentence below into natural, conversational English. Return ONLY a valid JSON array where each element is an object with "korean" and "english" keys. No markdown, no backticks, no explanation.\n\nSentences:\n' + allKorean.join('\n');
-
-                var aiResp = await fetch(aiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: translationPrompt, max_tokens: 2000 })
-                });
+                var prompt = 'Translate each Korean sentence below into natural English. Return ONLY a JSON array: [{"korean":"...","english":"..."}]. No markdown.\n\n' + allK.join('\n');
+                var aiResp = await fetch(aiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:prompt,max_tokens:2000}) });
                 var aiData = await aiResp.json();
-                var resultText = aiData.text || aiData.result || aiData.response || JSON.stringify(aiData);
-                var translations = [];
-                var jsonMatch = resultText.match(/\[[\s\S]*?\]/);
-                if (jsonMatch) {
-                    try { translations = JSON.parse(jsonMatch[0]); } catch(e) {}
-                }
-
-                // Map translations back
-                var tIdx = 0;
-                for (var i = 0; i < quizGameState.sets.length; i++) {
-                    for (var j = 0; j < quizGameState.sets[i].sentences.length; j++) {
-                        if (tIdx < translations.length && translations[tIdx]) {
-                            quizGameState.sets[i].sentences[j].english = translations[tIdx].english || '';
-                        }
-                        tIdx++;
+                var rt = aiData.text||aiData.result||aiData.response||JSON.stringify(aiData);
+                var translations = []; var jm = rt.match(/\[[\s\S]*?\]/); if(jm) try{translations=JSON.parse(jm[0]);}catch(e){}
+                var ti = 0;
+                for (var i = 0; i < qg.sets.length; i++)
+                    for (var j = 0; j < qg.sets[i].sentences.length; j++) {
+                        if (ti < translations.length && translations[ti]) qg.sets[i].sentences[j].english = translations[ti].english||'';
+                        ti++;
                     }
-                }
-
-                // Generate a short room code
-                var roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-                // Create Firestore session
-                var sessionData = {
-                    roomCode: roomCode,
-                    status: 'lobby', // lobby | playing | round_result | finished
-                    currentRound: -1,
-                    totalRounds: quizGameState.sets.length,
-                    roundTime: roundTime,
+                var roomCode = Math.random().toString(36).substring(2,8).toUpperCase();
+                var doc = await db.collection(QUIZ_GAME_COLLECTION).add({
+                    roomCode: roomCode, status:'lobby', currentRound:-1,
+                    totalRounds: qg.sets.length, roundTime: roundTime,
                     roundStartedAt: null,
-                    sets: quizGameState.sets.map(function(s) {
-                        return {
-                            setIndex: s.setIndex,
-                            sentences: s.sentences
-                        };
-                    }),
+                    sets: qg.sets.map(function(s){return{setIndex:s.setIndex,sentences:s.sentences};}),
+                    leaderboard_beginner:[], leaderboard_advanced:[],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-
-                var docRef = await db.collection(QUIZ_GAME_COLLECTION).add(sessionData);
-                quizGameState.sessionId = docRef.id;
-                quizGameState.status = 'lobby';
-
-                // Generate student URL — use actual page URL base
+                });
+                qg.sessionId = doc.id;
                 var pageUrl = window.location.href.split('?')[0].split('#')[0];
                 var studentUrl = pageUrl + '?quizgame=' + roomCode;
-
-                // Also store the room code in Firestore for manual join
-                await db.collection(QUIZ_GAME_COLLECTION).doc(docRef.id).update({
-                    studentUrl: studentUrl
-                });
-
-                // Show lobby view
-                quizGameShowLobby(roomCode, studentUrl);
-
+                await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({studentUrl:studentUrl});
+                qgShowLobby(roomCode, studentUrl);
             } catch(err) {
-                console.error('Create quiz game error:', err);
-                alert('Error creating game: ' + err.message);
-            } finally {
-                createBtn.disabled = false;
-                createBtn.innerHTML = '🎮 CREATE GAME';
-            }
+                console.error('Create error:', err); alert('Error: ' + err.message);
+            } finally { btn.disabled = false; btn.innerHTML = '🎮 CREATE GAME'; }
         }
 
-        // ── LOBBY VIEW (Admin) ─────────────────────────────
-        function quizGameShowLobby(roomCode, studentUrl) {
-            var setupEl = document.getElementById('quizGameSetupView');
-            var lobbyEl = document.getElementById('quizGameLobbyView');
-            setupEl.style.display = 'none';
-            lobbyEl.style.display = 'block';
-
-            var html = '<div style="text-align:center; margin-bottom:20px;">';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#888; margin-bottom:8px;">ROOM CODE</div>';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:36px; color:#00ffff; text-shadow:0 0 20px #00ffff; letter-spacing:8px; margin-bottom:12px;">' + roomCode + '</div>';
-            html += '<div style="background:rgba(0,0,0,0.4); border:2px solid rgba(255,0,255,0.3); border-radius:8px; padding:12px; margin-bottom:16px; word-break:break-all;">';
-            html += '<div style="font-size:11px; color:#888; margin-bottom:4px;">Student Link (share this):</div>';
-            html += '<a href="' + studentUrl + '" target="_blank" style="font-size:13px; color:#ff00ff; text-decoration:underline; word-break:break-all; display:block; margin-bottom:6px;">' + studentUrl + '</a>';
-            html += '<div style="display:flex; gap:8px; margin-top:8px;">';
-            html += '<button onclick="navigator.clipboard.writeText(\'' + studentUrl + '\');this.textContent=\'✅ Copied!\';setTimeout(()=>{this.textContent=\'📋 Copy Link\'},2000)" style="background:rgba(255,0,255,0.15); border:2px solid #ff00ff; color:#ff00ff; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; transition:all 0.2s;">📋 Copy Link</button>';
-            html += '<button onclick="window.open(\'' + studentUrl + '\',\'_blank\')" style="background:rgba(0,255,255,0.15); border:2px solid #00ffff; color:#00ffff; padding:6px 14px; border-radius:6px; font-size:11px; cursor:pointer; transition:all 0.2s;">🔗 Open in New Tab</button>';
-            html += '</div>';
-            html += '</div>';
-            html += '<div style="font-size:12px; color:#888; margin-bottom:6px;">⏱️ Round time: <strong style="color:#00ffff;">' + quizGameState.roundTime + 's</strong> &bull; Rounds: <strong style="color:#ff00ff;">' + quizGameState.sets.length + '</strong></div>';
-            html += '</div>';
-
-            // Players list
-            html += '<div style="margin-bottom:16px;">';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#ff00ff; margin-bottom:10px;">WAITING ROOM</div>';
-            html += '<div id="quizGamePlayersContainer" style="min-height:60px; background:rgba(0,0,0,0.3); border:2px solid rgba(0,255,255,0.1); border-radius:10px; padding:12px; display:flex; flex-wrap:wrap; gap:10px; align-content:flex-start;">';
-            html += '<p style="color:#888; font-size:12px; width:100%; text-align:center;">Waiting for students to join...</p>';
-            html += '</div></div>';
-
-            // Start Game button
-            html += '<div style="text-align:center;">';
-            html += '<button id="quizGameStartBtn" onclick="quizGameStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px 48px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:12px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\';this.style.boxShadow=\'0 0 35px rgba(255,0,255,0.6)\'" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'0 0 25px rgba(255,0,255,0.4)\'">▶ START ROUND 1</button>';
-            html += '</div>';
-
-            lobbyEl.innerHTML = html;
-
-            // Listen for players joining
-            quizGameListenForPlayers();
+        // ── LOBBY ───────────────────────────────────────────
+        function qgShowLobby(roomCode, studentUrl) {
+            document.getElementById('quizGameSetupView').style.display = 'none';
+            var el = document.getElementById('quizGameLobbyView');
+            el.style.display = 'block';
+            var h = '<div style="text-align:center;margin-bottom:20px;">';
+            h += '<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;margin-bottom:8px;">ROOM CODE</div>';
+            h += '<div style="font-family:\'Press Start 2P\';font-size:36px;color:#00ffff;text-shadow:0 0 20px #00ffff;letter-spacing:8px;margin-bottom:12px;">' + roomCode + '</div>';
+            h += '<div style="background:rgba(0,0,0,0.4);border:2px solid rgba(255,0,255,0.3);border-radius:8px;padding:12px;margin-bottom:8px;word-break:break-all;">';
+            h += '<div style="font-size:11px;color:#888;margin-bottom:4px;">Student Link:</div>';
+            h += '<a href="' + studentUrl + '" target="_blank" style="font-size:13px;color:#ff00ff;text-decoration:underline;word-break:break-all;display:block;margin-bottom:6px;">' + studentUrl + '</a>';
+            h += '<div style="display:flex;gap:8px;margin-top:8px;">';
+            h += '<button onclick="navigator.clipboard.writeText(\'' + studentUrl + '\');this.textContent=\'✅ Copied!\';setTimeout(()=>{this.textContent=\'📋 Copy\'},2000)" style="background:rgba(255,0,255,0.15);border:2px solid #ff00ff;color:#ff00ff;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;">📋 Copy</button>';
+            h += '<button onclick="window.open(\'' + studentUrl + '\',\'_blank\')" style="background:rgba(0,255,255,0.15);border:2px solid #00ffff;color:#00ffff;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;">🔗 Open</button></div>';
+            h += '<div id="qgQRCode" style="margin-top:12px;display:flex;justify-content:center;"></div>';
+            h += '</div>';
+            h += '<div style="font-size:12px;color:#888;">⏱️ <strong style="color:#00ffff;">' + qg.roundTime + 's</strong> per round &bull; <strong style="color:#ff00ff;">' + qg.sets.length + '</strong> rounds</div></div>';
+            h += '<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff00ff;margin-bottom:10px;">WAITING ROOM</div>';
+            h += '<div id="qgPlayersBox" style="min-height:60px;background:rgba(0,0,0,0.3);border:2px solid rgba(0,255,255,0.1);border-radius:10px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;">';
+            h += '<p style="color:#888;font-size:12px;width:100%;text-align:center;">Waiting for students...</p></div></div>';
+            h += '<div style="text-align:center;"><button id="qgStartBtn" onclick="qgStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc);border:3px solid #ff00ff;color:#fff;padding:16px 48px;border-radius:10px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;box-shadow:0 0 25px rgba(255,0,255,0.4);transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">▶ START ROUND 1</button></div>';
+            el.innerHTML = h;
+            // QR code
+            setTimeout(function(){
+                var qrC = document.getElementById('qgQRCode');
+                if(qrC && typeof QRCode!=='undefined'){ qrC.innerHTML=''; new QRCode(qrC,{text:studentUrl,width:160,height:160,colorDark:'#ff00ff',colorLight:'#0a0a15',correctLevel:QRCode.CorrectLevel.M});
+                var img=qrC.querySelector('img');if(img){img.style.borderRadius='10px';img.style.border='3px solid #ff00ff';img.style.boxShadow='0 0 20px rgba(255,0,255,0.3)';}
+                var cv=qrC.querySelector('canvas');if(cv){cv.style.borderRadius='10px';cv.style.border='3px solid #ff00ff';cv.style.boxShadow='0 0 20px rgba(255,0,255,0.3)';}}
+            },100);
+            qgListenPlayers();
         }
 
-        function quizGameListenForPlayers() {
-            if (quizGameState.unsubscribe) quizGameState.unsubscribe();
-
-            quizGameState.unsubscribe = db.collection(QUIZ_GAME_COLLECTION)
-                .doc(quizGameState.sessionId)
-                .collection(QUIZ_GAME_PLAYERS_SUB)
-                .onSnapshot(function(snap) {
-                    var container = document.getElementById('quizGamePlayersContainer');
-                    if (!container) return;
-                    if (snap.empty) {
-                        container.innerHTML = '<p style="color:#888; font-size:12px; width:100%; text-align:center;">Waiting for students to join...</p>';
-                        return;
-                    }
-                    var html = '';
-                    snap.forEach(function(doc) {
-                        var p = doc.data();
-                        var levelColor = p.level === 'beginner' ? '#00ffff' : '#ff00ff';
-                        var levelLabel = p.level === 'beginner' ? 'BEG' : 'ADV';
-                        html += '<div style="background:rgba(0,0,0,0.5); border:2px solid ' + levelColor + '; border-radius:10px; padding:8px 14px; display:flex; align-items:center; gap:8px; box-shadow:0 0 10px ' + levelColor + '33;">';
-                        html += '<span style="font-size:22px;">' + (p.emoji || '😊') + '</span>';
-                        html += '<div>';
-                        html += '<div style="font-size:13px; font-weight:700; color:#fff;">' + escapeHtml(p.name || 'Student') + '</div>';
-                        html += '<div style="font-size:9px; color:' + levelColor + '; font-family:\'Press Start 2P\';">' + levelLabel + '</div>';
-                        html += '</div></div>';
-                    });
-                    container.innerHTML = html;
-                });
-        }
-
-        // ── GAME CONTROL (Admin) ───────────────────────────
-        async function quizGameStartRound() {
-            var nextRound = (quizGameState.currentRound || -1) + 1;
-            if (nextRound >= quizGameState.sets.length) {
-                quizGameFinish();
-                return;
-            }
-
-            quizGameState.currentRound = nextRound;
-
-            // Update Firestore
-            await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
-                status: 'playing',
-                currentRound: nextRound,
-                roundStartedAt: firebase.firestore.FieldValue.serverTimestamp()
+        function qgListenPlayers() {
+            if(qg.unsubPlayers) qg.unsubPlayers();
+            qg.unsubPlayers = db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).onSnapshot(function(snap){
+                var box = document.getElementById('qgPlayersBox');
+                if(!box) return;
+                if(snap.empty){box.innerHTML='<p style="color:#888;font-size:12px;width:100%;text-align:center;">Waiting for students...</p>';return;}
+                var h='';
+                snap.forEach(function(d){var p=d.data();var lc=p.level==='beginner'?'#00ffff':'#ff00ff';var ll=p.level==='beginner'?'BEG':'ADV';
+                h+='<div style="background:rgba(0,0,0,0.5);border:2px solid '+lc+';border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 0 10px '+lc+'33;">';
+                h+='<span style="font-size:22px;">'+(p.emoji||'😊')+'</span><div><div style="font-size:13px;font-weight:700;color:#fff;">'+escapeHtml(p.name||'Student')+'</div>';
+                h+='<div style="font-size:9px;color:'+lc+';font-family:\'Press Start 2P\';">'+ll+'</div></div></div>';});
+                box.innerHTML=h;
             });
-
-            quizGameShowAdminRound(nextRound);
         }
 
-        function quizGameShowAdminRound(roundIdx) {
-            var lobbyEl = document.getElementById('quizGameLobbyView');
-            var gameEl = document.getElementById('quizGamePlayView');
-            lobbyEl.style.display = 'none';
-            gameEl.style.display = 'block';
-
-            var set = quizGameState.sets[roundIdx];
-            var timeLeft = quizGameState.roundTime;
-
-            var html = '';
-            // Header
-            html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#888;">ROUND ' + (roundIdx + 1) + ' OF ' + quizGameState.sets.length + '</div>';
-            html += '<div id="quizAdminTimer" style="font-family:\'Press Start 2P\'; font-size:24px; color:#00ffff; text-shadow:0 0 15px #00ffff;">' + timeLeft + '</div>';
-            html += '</div>';
-
-            // Timer bar
-            html += '<div style="width:100%; background:rgba(255,255,255,0.05); border:2px solid rgba(0,255,255,0.2); border-radius:20px; height:10px; margin-bottom:20px; overflow:hidden;">';
-            html += '<div id="quizAdminTimerBar" style="width:100%; height:100%; background:linear-gradient(90deg,#00ffff,#ff00ff); border-radius:20px; transition:width ' + timeLeft + 's linear; box-shadow:0 0 10px rgba(0,255,255,0.5);"></div>';
-            html += '</div>';
-
-            // Two-column card display (same as Reading Cards)
-            html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">';
-
-            // LEFT - Beginner
-            html += '<div style="background:rgba(0,0,0,0.5); border:3px solid #00ffff; border-radius:12px; padding:20px; box-shadow:0 0 20px rgba(0,255,255,0.15);">';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#00ffff; text-align:center; margin-bottom:14px;">🌱 BEGINNER</div>';
-            html += '<div style="font-size:22px; color:#fff; text-align:center; line-height:1.6; padding:10px;">' + escapeHtml(set.sentences[0].korean) + '</div>';
-            if (set.sentences[0].english) {
-                html += '<div style="font-size:13px; color:#888; text-align:center; margin-top:10px;">' + escapeHtml(set.sentences[0].english) + '</div>';
-            }
-            html += '</div>';
-
-            // RIGHT - Advanced
-            html += '<div style="background:rgba(0,0,0,0.5); border:3px solid #ff00ff; border-radius:12px; padding:20px; box-shadow:0 0 20px rgba(255,0,255,0.15);">';
-            html += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff; text-align:center; margin-bottom:14px;">🌟 ADVANCED</div>';
-            for (var j = 0; j < set.sentences.length; j++) {
-                html += '<div style="font-size:' + (set.sentences.length > 2 ? '18' : '22') + 'px; color:#fff; text-align:center; line-height:1.6; padding:6px 10px;">' + escapeHtml(set.sentences[j].korean) + '</div>';
-                if (set.sentences[j].english) {
-                    html += '<div style="font-size:12px; color:#888; text-align:center; margin-bottom:10px;">' + escapeHtml(set.sentences[j].english) + '</div>';
-                }
-            }
-            html += '</div>';
-            html += '</div>';
-
-            // Check buttons (same make.com webhook flow as existing TR)
-            html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">';
-            html += '<button id="quizCheckBegBtn" onclick="quizGameCheck(\'novice\', ' + roundIdx + ')" style="background:rgba(0,255,255,0.1); border:3px solid #00ffff; color:#00ffff; padding:14px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:10px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background=\'rgba(0,255,255,0.2)\'" onmouseout="this.style.background=\'rgba(0,255,255,0.1)\'">✅ CHECK BEGINNERS</button>';
-            html += '<button id="quizCheckAdvBtn" onclick="quizGameCheck(\'beginner\', ' + roundIdx + ')" style="background:rgba(255,0,255,0.1); border:3px solid #ff00ff; color:#ff00ff; padding:14px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:10px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background=\'rgba(255,0,255,0.2)\'" onmouseout="this.style.background=\'rgba(255,0,255,0.1)\'">✅ CHECK ADVANCED</button>';
-            html += '</div>';
-
-            // End Round / Next Round / Leaderboard buttons
-            html += '<div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">';
-            html += '<button id="quizEndRoundBtn" onclick="quizGameEndRound()" style="background:linear-gradient(135deg,#ff9800,#f44336); border:2px solid #ff9800; color:#fff; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">⏹ END ROUND</button>';
-            if (roundIdx + 1 < quizGameState.sets.length) {
-                html += '<button onclick="quizGameStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:2px solid #ff00ff; color:#fff; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">➜ NEXT ROUND</button>';
-            }
-            html += '<button onclick="quizGamePostLeaderboard()" style="background:linear-gradient(135deg,#FFD700,#FFA500); border:2px solid #FFD700; color:#000; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">🏆 LEADERBOARD</button>';
-            html += '<button onclick="quizGameFinish()" style="background:rgba(255,255,255,0.1); border:2px solid #888; color:#888; padding:12px 28px; border-radius:8px; font-family:\'Press Start 2P\'; font-size:9px; cursor:pointer; transition:all 0.2s;">🏁 END GAME</button>';
-            html += '</div>';
-
-            gameEl.innerHTML = html;
-
-            // Start timer
-            requestAnimationFrame(function() {
-                var bar = document.getElementById('quizAdminTimerBar');
-                if (bar) bar.style.width = '0%';
+        // ── GAME CONTROL ────────────────────────────────────
+        async function qgStartRound() {
+            var next = (qg.currentRound === undefined || qg.currentRound === null || qg.currentRound < 0) ? 0 : qg.currentRound + 1;
+            if(next >= qg.sets.length){qgFinish();return;}
+            qg.currentRound = next;
+            await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
+                status:'playing', currentRound:next,
+                roundStartedAt:firebase.firestore.FieldValue.serverTimestamp()
             });
+            qgShowAdminRound(next);
+        }
 
-            clearInterval(quizGameState.timer);
-            quizGameState.timer = setInterval(function() {
+        function qgShowAdminRound(ri) {
+            document.getElementById('quizGameLobbyView').style.display='none';
+            var el=document.getElementById('quizGamePlayView');el.style.display='block';
+            var set=qg.sets[ri]; var tl=qg.roundTime;
+            var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;">ROUND '+(ri+1)+' / '+qg.sets.length+'</div>';
+            h+='<div id="qgTimer" style="font-family:\'Press Start 2P\';font-size:24px;color:#00ffff;text-shadow:0 0 15px #00ffff;">'+tl+'</div></div>';
+            h+='<div style="width:100%;background:rgba(255,255,255,0.05);border:2px solid rgba(0,255,255,0.2);border-radius:20px;height:10px;margin-bottom:20px;overflow:hidden;">';
+            h+='<div id="qgTimerBar" style="width:100%;height:100%;background:linear-gradient(90deg,#00ffff,#ff00ff);border-radius:20px;transition:width '+tl+'s linear;box-shadow:0 0 10px rgba(0,255,255,0.5);"></div></div>';
+            // Two columns
+            h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">';
+            // Left - Beginner
+            h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #00ffff;border-radius:12px;padding:20px;box-shadow:0 0 20px rgba(0,255,255,0.15);">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#00ffff;text-align:center;margin-bottom:14px;">🌱 BEGINNER</div>';
+            h+='<div style="font-size:22px;color:#fff;text-align:center;line-height:1.6;padding:10px;">'+escapeHtml(set.sentences[0].korean)+'</div>';
+            if(set.sentences[0].english) h+='<div style="font-size:13px;color:#888;text-align:center;margin-top:10px;">'+escapeHtml(set.sentences[0].english)+'</div>';
+            h+='</div>';
+            // Right - Advanced
+            h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #ff00ff;border-radius:12px;padding:20px;box-shadow:0 0 20px rgba(255,0,255,0.15);">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#ff00ff;text-align:center;margin-bottom:14px;">🌟 ADVANCED</div>';
+            for(var j=0;j<set.sentences.length;j++){
+                h+='<div style="font-size:'+(set.sentences.length>2?'18':'22')+'px;color:#fff;text-align:center;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
+                if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
+            }
+            h+='</div></div>';
+            // Submission tracker
+            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;margin-bottom:8px;">📊 SUBMISSIONS</div>';
+            h+='<div id="qgSubTracker" style="background:rgba(0,0,0,0.3);border:2px solid rgba(0,255,255,0.1);border-radius:8px;padding:12px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
+            // Listen All
+            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff9800;margin-bottom:8px;">🔊 LISTEN ALL</div>';
+            h+='<div id="qgListenAll" style="background:rgba(0,0,0,0.3);border:2px solid rgba(255,152,0,0.2);border-radius:8px;padding:12px;font-size:12px;color:#888;">Recordings will appear here as students submit...</div></div>';
+            // Buttons
+            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
+            h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#ff9800,#f44336);border:2px solid #ff9800;color:#fff;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
+            if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc);border:2px solid #ff00ff;color:#fff;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➜ NEXT ROUND</button>';
+            h+='<button onclick="qgShowLeaderboardAdmin()" style="background:linear-gradient(135deg,#FFD700,#FFA500);border:2px solid #FFD700;color:#000;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏆 LEADERBOARD</button>';
+            h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#888;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
+            el.innerHTML=h;
+            // Animate timer bar
+            requestAnimationFrame(function(){var bar=document.getElementById('qgTimerBar');if(bar)bar.style.width='0%';});
+            clearInterval(qg.timer);
+            var timeLeft=tl;
+            qg.timer=setInterval(function(){
                 timeLeft--;
-                var timerEl = document.getElementById('quizAdminTimer');
-                if (timerEl) {
-                    timerEl.textContent = timeLeft;
-                    if (timeLeft <= 10) { timerEl.style.color = '#ff00ff'; timerEl.style.textShadow = '0 0 15px #ff00ff'; }
-                }
-                if (timeLeft <= 0) {
-                    clearInterval(quizGameState.timer);
-                    quizGameEndRound();
-                }
-            }, 1000);
+                var te=document.getElementById('qgTimer');
+                if(te){te.textContent=timeLeft;if(timeLeft<=10){te.style.color='#ff00ff';te.style.textShadow='0 0 15px #ff00ff';}}
+                if(timeLeft<=0){clearInterval(qg.timer);qgEndRound();}
+            },1000);
+            // Listen for submissions
+            qgListenSubmissions(ri);
         }
 
-        // ── CHECK (uses same make.com webhooks as existing TR) ──
-        function quizGameCheck(side, roundIdx) {
-            var set = quizGameState.sets[roundIdx];
-            if (!set) return;
-
-            var scenario1Url = (side === 'novice') ? TR_LEFT_SCENARIO_1 : TR_RIGHT_SCENARIO_1;
-            var scenario2Url = (side === 'novice') ? TR_LEFT_SCENARIO_2 : TR_RIGHT_SCENARIO_2;
-
-            var sentences = [];
-            if (side === 'novice') {
-                sentences.push(set.sentences[0]);
-            } else {
-                sentences = set.sentences;
-            }
-
-            var btnId = (side === 'novice') ? 'quizCheckBegBtn' : 'quizCheckAdvBtn';
-            var btn = document.getElementById(btnId);
-            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ FETCHING...'; }
-
-            // Step 1: Fetch transcripts
-            fetch(scenario1Url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'fetch_transcripts', timestamp: new Date().toISOString() })
-            })
-            .then(function(r) {
-                if (!r.ok) throw new Error('Fetch failed (' + r.status + ')');
-                return r.text().catch(function() { return ''; });
-            })
-            .then(function() {
-                if (btn) btn.innerHTML = '⏳ PROCESSING...';
-                return new Promise(function(resolve) { setTimeout(resolve, 5000); });
-            })
-            .then(function() {
-                if (btn) btn.innerHTML = '⏳ GRADING...';
-                var koreanText = sentences.map(function(s) { return s.korean; }).join('\n');
-                var englishText = sentences.map(function(s) { return s.english; }).join('\n');
-                return fetch(scenario2Url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'check_answer',
-                        korean_sentence: koreanText,
-                        english_translation: englishText,
-                        card_index: roundIdx,
-                        side: side,
-                        points: 10,
-                        timestamp: new Date().toISOString()
-                    })
+        function qgListenSubmissions(round) {
+            if(qg.unsubSession) qg.unsubSession();
+            qg.unsubSession = db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB)
+                .where('round','==',round).onSnapshot(function(snap){
+                var tracker=document.getElementById('qgSubTracker');
+                var listenEl=document.getElementById('qgListenAll');
+                if(!tracker||!listenEl) return;
+                if(snap.empty){tracker.innerHTML='Waiting for recordings...';listenEl.innerHTML='Recordings will appear here...';return;}
+                var subs=[];snap.forEach(function(d){subs.push(d.data());});
+                // Tracker
+                var begSubs=subs.filter(function(s){return s.level==='beginner';});
+                var advSubs=subs.filter(function(s){return s.level==='advanced';});
+                tracker.innerHTML='<span style="color:#00ffff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff00ff;">🌟 Advanced: '+advSubs.length+' submitted</span>';
+                // Listen All - audio players
+                var lh='';
+                subs.forEach(function(s){
+                    var lc=s.level==='beginner'?'#00ffff':'#ff00ff';
+                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
+                    lh+='<span style="font-size:18px;">'+(s.emoji||'😊')+'</span>';
+                    lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
+                    lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
+                    if(s.audioUrl) lh+='<audio controls preload="none" style="height:32px;max-width:200px;" src="'+s.audioUrl+'"></audio>';
+                    lh+='</div>';
                 });
-            })
-            .then(function(r) {
-                if (r.ok) return r.json().catch(function() { return {}; });
-                throw new Error('Grading failed (' + r.status + ')');
-            })
-            .then(function(result) {
-                var matchCount = result.matched_count || result.matchedCount || 0;
-                if (btn) { btn.innerHTML = '✅ ' + matchCount + ' MATCHED'; btn.style.borderColor = '#00ff88'; btn.style.color = '#00ff88'; }
-
-                // Update scores in Firestore for student view
-                if (result.students && quizGameState.sessionId) {
-                    result.students.forEach(function(s) {
-                        // Find player by name and update their score
-                        db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId)
-                            .collection(QUIZ_GAME_PLAYERS_SUB)
-                            .where('name', '==', s.name)
-                            .get().then(function(snap) {
-                                snap.forEach(function(doc) {
-                                    var currentScore = doc.data().score || 0;
-                                    doc.ref.update({ score: currentScore + (s.points || 10) });
-                                });
-                            });
-                    });
-                }
-
-                setTimeout(function() {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = (side === 'novice') ? '✅ CHECK BEGINNERS' : '✅ CHECK ADVANCED';
-                        btn.style.borderColor = (side === 'novice') ? '#00ffff' : '#ff00ff';
-                        btn.style.color = (side === 'novice') ? '#00ffff' : '#ff00ff';
-                    }
-                }, 4000);
-            })
-            .catch(function(err) {
-                console.error('Quiz check error:', err);
-                if (btn) { btn.innerHTML = '❌ ERROR'; btn.style.borderColor = '#ff4444'; btn.style.color = '#ff4444'; }
-                setTimeout(function() {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = (side === 'novice') ? '✅ CHECK BEGINNERS' : '✅ CHECK ADVANCED';
-                        btn.style.borderColor = (side === 'novice') ? '#00ffff' : '#ff00ff';
-                        btn.style.color = (side === 'novice') ? '#00ffff' : '#ff00ff';
-                    }
-                }, 3000);
+                listenEl.innerHTML=lh||'No recordings yet.';
             });
         }
 
-        async function quizGameEndRound() {
-            clearInterval(quizGameState.timer);
-            if (quizGameState.sessionId) {
-                await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
-                    status: 'round_result'
-                });
-            }
-            var timerEl = document.getElementById('quizAdminTimer');
-            if (timerEl) { timerEl.textContent = "TIME'S UP"; timerEl.style.fontSize = '14px'; }
-        }
-
-        async function quizGamePostLeaderboard() {
-            // Uses same leaderboard webhooks as existing TR
-            var btn = event.target;
-            btn.disabled = true;
-            btn.innerHTML = '⏳ POSTING...';
-
+        async function qgEndRound() {
+            clearInterval(qg.timer);
+            // Update leaderboards from all submissions
             try {
-                await Promise.all([
-                    fetch(TR_LEADERBOARD_NOVICE, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'post_leaderboard', timestamp: new Date().toISOString() })
-                    }),
-                    fetch(TR_LEADERBOARD_ADVANCED, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'post_leaderboard', timestamp: new Date().toISOString() })
-                    })
-                ]);
-
-                // Also update Firestore leaderboard for student view
-                if (quizGameState.sessionId) {
-                    var playersSnap = await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId)
-                        .collection(QUIZ_GAME_PLAYERS_SUB)
-                        .orderBy('score', 'desc').get();
-
-                    var beginnerBoard = [];
-                    var advancedBoard = [];
-                    playersSnap.forEach(function(doc) {
-                        var p = doc.data();
-                        var entry = { name: p.name, emoji: p.emoji, score: p.score || 0 };
-                        if (p.level === 'beginner') beginnerBoard.push(entry);
-                        else advancedBoard.push(entry);
-                    });
-
-                    await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
-                        leaderboard_beginner: beginnerBoard,
-                        leaderboard_advanced: advancedBoard,
-                        status: 'round_result'
-                    });
-                }
-
-                btn.innerHTML = '✅ POSTED!';
-                btn.style.background = 'linear-gradient(135deg, #39ff14, #00cc00)';
-                setTimeout(function() {
-                    btn.disabled = false;
-                    btn.innerHTML = '🏆 LEADERBOARD';
-                    btn.style.background = 'linear-gradient(135deg,#FFD700,#FFA500)';
-                }, 4000);
-            } catch(err) {
-                console.error('Leaderboard error:', err);
-                btn.innerHTML = '❌ ERROR';
-                setTimeout(function() {
-                    btn.disabled = false;
-                    btn.innerHTML = '🏆 LEADERBOARD';
-                    btn.style.background = 'linear-gradient(135deg,#FFD700,#FFA500)';
-                }, 3000);
-            }
+                var allSubs = await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).get();
+                var scores = {}; // {playerId: {name,emoji,level,totalScore}}
+                allSubs.forEach(function(d){
+                    var s=d.data(); var key=s.playerId||s.playerName;
+                    if(!scores[key]) scores[key]={name:s.playerName,emoji:s.emoji,level:s.level,score:0};
+                    scores[key].score += (s.score||0);
+                });
+                var begBoard=[],advBoard=[];
+                Object.values(scores).forEach(function(p){
+                    var entry={name:p.name,emoji:p.emoji,score:p.score};
+                    if(p.level==='beginner') begBoard.push(entry); else advBoard.push(entry);
+                });
+                begBoard.sort(function(a,b){return b.score-a.score;});
+                advBoard.sort(function(a,b){return b.score-a.score;});
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
+                    status:'round_result',
+                    leaderboard_beginner:begBoard.slice(0,10),
+                    leaderboard_advanced:advBoard.slice(0,10)
+                });
+            } catch(e){console.error('End round error:',e);}
+            var te=document.getElementById('qgTimer');
+            if(te){te.textContent="TIME'S UP";te.style.fontSize='14px';}
         }
 
-        async function quizGameFinish() {
-            clearInterval(quizGameState.timer);
-            if (quizGameState.sessionId) {
-                await db.collection(QUIZ_GAME_COLLECTION).doc(quizGameState.sessionId).update({
-                    status: 'finished'
+        function qgShowLeaderboardAdmin() {
+            db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).get().then(function(doc){
+                if(!doc.exists) return;
+                var d=doc.data();
+                var ov=document.createElement('div');ov.id='qgLBModal';
+                ov.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:100001;display:flex;justify-content:center;align-items:center;padding:20px;';
+                var h='<div style="background:rgba(0,0,0,0.85);border:3px solid #FFD700;border-radius:16px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;">';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:14px;color:#FFD700;text-align:center;margin-bottom:20px;">🏆 LEADERBOARD</div>';
+                h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
+                // Beginner
+                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#00ffff;margin-bottom:10px;text-align:center;">🌱 BEGINNER</div>';
+                (d.leaderboard_beginner||[]).forEach(function(p,i){
+                    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+                    h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
+                    h+='<span style="color:#fff;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+'</span>';
+                    h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
                 });
-            }
-            if (quizGameState.unsubscribe) {
-                quizGameState.unsubscribe();
-                quizGameState.unsubscribe = null;
-            }
-            alert('🏁 Game finished! Students will see the final leaderboard.');
-            quizGameState.sessionId = null;
-            quizGameState.currentRound = -1;
-            quizGameRenderSetup();
+                if(!(d.leaderboard_beginner||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
+                h+='</div>';
+                // Advanced
+                h+='<div><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff00ff;margin-bottom:10px;text-align:center;">🌟 ADVANCED</div>';
+                (d.leaderboard_advanced||[]).forEach(function(p,i){
+                    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+                    h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
+                    h+='<span style="color:#fff;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+'</span>';
+                    h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
+                });
+                if(!(d.leaderboard_advanced||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
+                h+='</div></div>';
+                h+='<div style="text-align:center;margin-top:16px;"><button onclick="document.getElementById(\'qgLBModal\').remove()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 30px;border-radius:8px;font-size:13px;cursor:pointer;">✕ Close</button></div></div>';
+                ov.innerHTML=h;ov.onclick=function(e){if(e.target===ov)ov.remove();};
+                document.body.appendChild(ov);
+            });
         }
 
-        // ── STUDENT PAGE GENERATOR ─────────────────────────
-        // When ?quizgame=ROOMCODE is in URL, redirect to student view
-        (function checkQuizGameJoin() {
-            var params = new URLSearchParams(window.location.search);
-            var roomCode = params.get('quizgame');
-            if (roomCode) {
-                document.addEventListener('DOMContentLoaded', function() {
-                    quizGameStudentInit(roomCode);
-                });
-            }
+        async function qgFinish() {
+            clearInterval(qg.timer);
+            if(qg.sessionId) await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'finished'});
+            if(qg.unsubSession){qg.unsubSession();qg.unsubSession=null;}
+            if(qg.unsubPlayers){qg.unsubPlayers();qg.unsubPlayers=null;}
+            alert('🏁 Game finished!');
+            qg.sessionId=null;qg.currentRound=-1;qgRenderSetup();
+        }
+
+        // ══════════════════════════════════════════════════════
+        // STUDENT SIDE — accessed via ?quizgame=ROOMCODE
+        // ══════════════════════════════════════════════════════
+        (function(){
+            var p=new URLSearchParams(window.location.search);
+            var rc=p.get('quizgame');
+            if(rc) document.addEventListener('DOMContentLoaded',function(){qsInit(rc);});
         })();
 
-        function quizGameStudentInit(roomCode) {
-            // Hide entire admin UI
-            document.body.innerHTML = '';
-            document.body.style.cssText = 'margin:0; padding:0; min-height:100vh; background:#0a0a15; font-family:"Noto Sans",sans-serif; color:#fff; overflow-x:hidden;';
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:'😊', playerLevel:'beginner', localBlob:null };
 
-            // Add Press Start 2P font
-            var fontLink = document.createElement('link');
-            fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
-            fontLink.rel = 'stylesheet';
-            document.head.appendChild(fontLink);
-
-            // Inject student app
-            var app = document.createElement('div');
-            app.id = 'quizStudentApp';
-            app.style.cssText = 'max-width:600px; margin:0 auto; padding:20px; min-height:100vh;';
+        function qsInit(roomCode) {
+            document.body.innerHTML='';
+            document.body.style.cssText='margin:0;padding:0;min-height:100vh;background:#0a0a15;font-family:"Noto Sans",sans-serif;color:#fff;overflow-x:hidden;';
+            if(!document.querySelector('link[href*="Press+Start+2P"]')){var fl=document.createElement('link');fl.href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';fl.rel='stylesheet';document.head.appendChild(fl);}
+            var app=document.createElement('div');app.id='qsApp';app.style.cssText='max-width:500px;margin:0 auto;padding:20px;min-height:100vh;';
             document.body.appendChild(app);
-
-            app.innerHTML = '<div style="text-align:center; padding:40px 20px;">' +
-                '<div style="font-size:40px; margin-bottom:12px;">🎮</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:14px; color:#00ffff; text-shadow:0 0 10px #00ffff; margin-bottom:6px;">QUIZ GAME</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff; margin-bottom:30px;">KoreanLearnin</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#888; margin-bottom:6px;">ROOM CODE</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:24px; color:#00ffff; text-shadow:0 0 15px #00ffff; letter-spacing:6px; margin-bottom:30px;">' + roomCode.toUpperCase() + '</div>' +
-                '<div style="background:rgba(0,0,0,0.5); border:3px solid #ff00ff; border-radius:16px; padding:24px; max-width:350px; margin:0 auto;">' +
-                '<div style="margin-bottom:16px;">' +
-                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:4px; font-weight:600; text-align:left;">YOUR NAME</label>' +
-                    '<input type="text" id="qsPlayerName" placeholder="Enter your name" maxlength="20" style="width:100%; padding:12px; background:rgba(0,0,0,0.5); border:2px solid #ff00ff; border-radius:8px; color:#fff; font-size:15px; outline:none;" onfocus="this.style.borderColor=\'#00ffff\';this.style.boxShadow=\'0 0 15px rgba(0,255,255,0.3)\'" onblur="this.style.borderColor=\'#ff00ff\';this.style.boxShadow=\'none\'">' +
-                '</div>' +
-                '<div style="margin-bottom:16px;">' +
-                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:8px; font-weight:600; text-align:left;">CHOOSE EMOJI</label>' +
-                    '<div id="qsEmojiGrid" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;"></div>' +
-                '</div>' +
-                '<div style="margin-bottom:20px;">' +
-                    '<label style="font-size:11px; color:#00ffff; display:block; margin-bottom:8px; font-weight:600; text-align:left;">YOUR LEVEL</label>' +
-                    '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">' +
-                        '<button id="qsLevelBeg" onclick="qsSelectLevel(\'beginner\')" class="qs-level-btn qs-level-active" style="background:rgba(0,255,255,0.15); border:3px solid #00ffff; color:#00ffff; padding:14px 10px; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; transition:all 0.2s;">🌱 Beginner</button>' +
-                        '<button id="qsLevelAdv" onclick="qsSelectLevel(\'advanced\')" class="qs-level-btn" style="background:rgba(0,0,0,0.3); border:3px solid #555; color:#888; padding:14px 10px; border-radius:10px; cursor:pointer; font-weight:700; font-size:13px; transition:all 0.2s;">🌟 Advanced</button>' +
-                    '</div>' +
-                '</div>' +
-                '<button onclick="qsJoinGame(\'' + roomCode + '\')" style="width:100%; background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px; border-radius:10px; font-family:\'Press Start 2P\'; font-size:11px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform=\'scale(1.03)\'" onmouseout="this.style.transform=\'scale(1)\'">JOIN GAME</button>' +
+            var emojis=['😊','😎','🤓','🥳','😺','🐶','🦊','🐻','🐸','🐱','🦁','🐰','🐼','🦋','🌟','🔥','💎','🎵','🍀','⚡'];
+            var eh='';emojis.forEach(function(e,i){eh+='<button onclick="qsPickEmoji(\''+e+'\',this)" style="width:40px;height:40px;font-size:22px;border-radius:8px;border:2px solid '+(i===0?'#ff00ff':'#333')+';background:'+(i===0?'rgba(255,0,255,0.2)':'rgba(0,0,0,0.3)')+';cursor:pointer;transition:all 0.15s;">'+e+'</button>';});
+            app.innerHTML='<div style="text-align:center;padding:30px 10px;">'+
+                '<div style="font-size:36px;margin-bottom:8px;">🎮</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:12px;color:#00ffff;text-shadow:0 0 10px #00ffff;margin-bottom:4px;">QUIZ GAME</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff00ff;margin-bottom:24px;">KoreanLearnin</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:20px;color:#00ffff;text-shadow:0 0 15px #00ffff;letter-spacing:6px;margin-bottom:24px;">'+roomCode.toUpperCase()+'</div>'+
+                '<div style="background:rgba(0,0,0,0.5);border:3px solid #ff00ff;border-radius:16px;padding:20px;text-align:left;">'+
+                '<div style="margin-bottom:14px;"><label style="font-size:11px;color:#00ffff;display:block;margin-bottom:4px;font-weight:600;">YOUR NAME</label>'+
+                '<input type="text" id="qsName" placeholder="Enter your name" maxlength="20" style="width:100%;padding:12px;background:rgba(0,0,0,0.5);border:2px solid #ff00ff;border-radius:8px;color:#fff;font-size:15px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor=\'#00ffff\'" onblur="this.style.borderColor=\'#ff00ff\'"></div>'+
+                '<div style="margin-bottom:14px;"><label style="font-size:11px;color:#00ffff;display:block;margin-bottom:6px;font-weight:600;">EMOJI</label>'+
+                '<div id="qsEmojiGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">'+eh+'</div></div>'+
+                '<div style="margin-bottom:16px;"><label style="font-size:11px;color:#00ffff;display:block;margin-bottom:6px;font-weight:600;">LEVEL</label>'+
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+                '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(0,255,255,0.15);border:3px solid #00ffff;color:#00ffff;padding:12px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;">🌱 Beginner</button>'+
+                '<button id="qsLvlA" onclick="qsPickLevel(\'advanced\')" style="background:rgba(0,0,0,0.3);border:3px solid #555;color:#888;padding:12px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;">🌟 Advanced</button></div></div>'+
+                '<button onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#ff00ff,#cc00cc);border:3px solid #ff00ff;color:#fff;padding:14px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;box-shadow:0 0 25px rgba(255,0,255,0.4);">JOIN GAME</button>'+
                 '</div></div>';
-
-            // Populate emoji grid
-            var emojis = ['😊','😎','🤓','🥳','😺','🐶','🦊','🐻','🐸','🐱','🦁','🐰','🐼','🦋','🌟','🔥','💎','🎵','🍀','⚡'];
-            var emojiGrid = document.getElementById('qsEmojiGrid');
-            window._qsSelectedEmoji = '😊';
-            emojis.forEach(function(e, i) {
-                var btn = document.createElement('button');
-                btn.textContent = e;
-                btn.style.cssText = 'width:40px; height:40px; font-size:22px; border-radius:8px; border:2px solid ' + (i === 0 ? '#ff00ff' : '#333') + '; background:' + (i === 0 ? 'rgba(255,0,255,0.2)' : 'rgba(0,0,0,0.3)') + '; cursor:pointer; transition:all 0.15s;';
-                btn.onclick = function() {
-                    document.querySelectorAll('#qsEmojiGrid button').forEach(function(b) {
-                        b.style.borderColor = '#333';
-                        b.style.background = 'rgba(0,0,0,0.3)';
-                    });
-                    this.style.borderColor = '#ff00ff';
-                    this.style.background = 'rgba(255,0,255,0.2)';
-                    window._qsSelectedEmoji = e;
-                };
-                emojiGrid.appendChild(btn);
-            });
-
-            window._qsSelectedLevel = 'beginner';
         }
 
-        function qsSelectLevel(level) {
-            window._qsSelectedLevel = level;
-            var begBtn = document.getElementById('qsLevelBeg');
-            var advBtn = document.getElementById('qsLevelAdv');
-            if (level === 'beginner') {
-                begBtn.style.borderColor = '#00ffff'; begBtn.style.color = '#00ffff'; begBtn.style.background = 'rgba(0,255,255,0.15)';
-                advBtn.style.borderColor = '#555'; advBtn.style.color = '#888'; advBtn.style.background = 'rgba(0,0,0,0.3)';
-            } else {
-                advBtn.style.borderColor = '#ff00ff'; advBtn.style.color = '#ff00ff'; advBtn.style.background = 'rgba(255,0,255,0.15)';
-                begBtn.style.borderColor = '#555'; begBtn.style.color = '#888'; begBtn.style.background = 'rgba(0,0,0,0.3)';
-            }
+        function qsPickEmoji(e,btn){
+            qs.playerEmoji=e;
+            document.querySelectorAll('#qsEmojiGrid button').forEach(function(b){b.style.borderColor='#333';b.style.background='rgba(0,0,0,0.3)';});
+            btn.style.borderColor='#ff00ff';btn.style.background='rgba(255,0,255,0.2)';
+        }
+        function qsPickLevel(lv){
+            qs.playerLevel=lv;
+            var b=document.getElementById('qsLvlB'),a=document.getElementById('qsLvlA');
+            if(lv==='beginner'){b.style.borderColor='#00ffff';b.style.color='#00ffff';b.style.background='rgba(0,255,255,0.15)';a.style.borderColor='#555';a.style.color='#888';a.style.background='rgba(0,0,0,0.3)';}
+            else{a.style.borderColor='#ff00ff';a.style.color='#ff00ff';a.style.background='rgba(255,0,255,0.15)';b.style.borderColor='#555';b.style.color='#888';b.style.background='rgba(0,0,0,0.3)';}
         }
 
-        async function qsJoinGame(roomCode) {
-            var name = (document.getElementById('qsPlayerName').value || '').trim();
-            if (!name) { alert('Please enter your name.'); return; }
-
-            var emoji = window._qsSelectedEmoji || '😊';
-            var level = window._qsSelectedLevel || 'beginner';
-
-            var app = document.getElementById('quizStudentApp');
-            app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">⏳</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#00ffff;">JOINING GAME...</div></div>';
-
+        async function qsJoin(roomCode) {
+            var name=(document.getElementById('qsName').value||'').trim();
+            if(!name){alert('Enter your name.');return;}
+            qs.playerName=name;
+            var app=document.getElementById('qsApp');
+            app.innerHTML='<div style="text-align:center;padding:60px 20px;"><div style="font-size:30px;">⏳</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#00ffff;margin-top:12px;">JOINING...</div></div>';
             try {
-                // Find the game session by room code
-                var snap = await db.collection(QUIZ_GAME_COLLECTION).where('roomCode', '==', roomCode.toUpperCase()).limit(1).get();
-                if (snap.empty) {
-                    app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">❌</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff;">GAME NOT FOUND</div><p style="color:#888; margin-top:12px;">Check the room code and try again.</p></div>';
-                    return;
-                }
-
-                var sessionDoc = snap.docs[0];
-                var sessionId = sessionDoc.id;
-
-                // Add player
-                await db.collection(QUIZ_GAME_COLLECTION).doc(sessionId)
-                    .collection(QUIZ_GAME_PLAYERS_SUB).add({
-                        name: name,
-                        emoji: emoji,
-                        level: level,
-                        score: 0,
-                        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                // Show waiting room and listen for game state
-                qsShowWaitingRoom(sessionId, name, emoji, level);
-
-            } catch(err) {
-                console.error('Join game error:', err);
-                app.innerHTML = '<div style="text-align:center; padding:60px 20px;"><div style="font-size:30px; margin-bottom:12px;">❌</div><div style="font-family:\'Press Start 2P\'; font-size:10px; color:#ff00ff;">ERROR</div><p style="color:#888; margin-top:12px;">' + err.message + '</p></div>';
-            }
+                var snap=await db.collection(QUIZ_GAME_COLLECTION).where('roomCode','==',roomCode.toUpperCase()).limit(1).get();
+                if(snap.empty){app.innerHTML='<div style="text-align:center;padding:60px;"><div style="font-size:30px;">❌</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#ff00ff;margin-top:12px;">GAME NOT FOUND</div></div>';return;}
+                qs.sessionId=snap.docs[0].id;
+                var pDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).add({
+                    name:name,emoji:qs.playerEmoji,level:qs.playerLevel,score:0,
+                    joinedAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+                qs.playerId=pDoc.id;
+                qsWaitingRoom();
+            } catch(e){console.error(e);app.innerHTML='<div style="text-align:center;padding:60px;"><div style="font-size:30px;">❌</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#ff00ff;margin-top:12px;">ERROR</div><p style="color:#888;margin-top:8px;font-size:13px;">'+e.message+'</p></div>';}
         }
 
-        function qsShowWaitingRoom(sessionId, playerName, playerEmoji, playerLevel) {
-            var app = document.getElementById('quizStudentApp');
+        function qsWaitingRoom() {
+            var app=document.getElementById('qsApp');
+            var lc=qs.playerLevel==='beginner'?'#00ffff':'#ff00ff';
+            app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
+                '<div style="font-size:36px;margin-bottom:6px;">🎮</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:11px;color:#00ffff;text-shadow:0 0 10px #00ffff;margin-bottom:16px;">WAITING ROOM</div>'+
+                '<div style="font-size:32px;margin-bottom:4px;">'+qs.playerEmoji+'</div>'+
+                '<div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
+                '<div style="font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
+                '<div id="qsPlayers" style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:12px;padding:14px;margin-bottom:16px;min-height:50px;"></div>'+
+                '<div id="qsStatus" style="font-family:\'Press Start 2P\';font-size:9px;color:#888;">Waiting for teacher...</div>'+
+                '<div id="qsGameArea"></div></div>';
+            // Listen players
+            db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).onSnapshot(function(snap){
+                var el=document.getElementById('qsPlayers');if(!el)return;
+                var h='';snap.forEach(function(d){var p=d.data();var c=p.level==='beginner'?'#00ffff':'#ff00ff';
+                h+='<span style="display:inline-block;margin:3px;padding:5px 9px;background:rgba(0,0,0,0.4);border:2px solid '+c+';border-radius:8px;font-size:12px;">'+(p.emoji||'😊')+' '+escapeHtml(p.name||'')+'</span>';});
+                el.innerHTML=h||'<p style="color:#888;font-size:12px;">...</p>';
+            });
+            // Listen game state
+            db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).onSnapshot(function(doc){
+                if(!doc.exists)return; var d=doc.data();
+                var status=document.getElementById('qsStatus');
+                var area=document.getElementById('qsGameArea');
+                if(!area)return;
+                if(d.status==='playing') qsShowRound(d,area,status);
+                else if(d.status==='round_result') qsShowResult(d,area,status);
+                else if(d.status==='finished') qsShowFinished(area,status);
+                else if(d.status==='lobby'){if(status)status.textContent='Waiting for teacher...';area.innerHTML='';}
+            });
+        }
 
-            app.innerHTML = '<div style="text-align:center; padding:30px 10px;">' +
-                '<div style="font-size:40px; margin-bottom:8px;">🎮</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:12px; color:#00ffff; text-shadow:0 0 10px #00ffff; margin-bottom:20px;">WAITING ROOM</div>' +
-                '<div style="font-size:36px; margin-bottom:4px;">' + playerEmoji + '</div>' +
-                '<div style="font-size:16px; font-weight:700; color:#fff; margin-bottom:4px;">' + escapeHtml(playerName) + '</div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:' + (playerLevel === 'beginner' ? '#00ffff' : '#ff00ff') + '; margin-bottom:24px;">' + (playerLevel === 'beginner' ? '🌱 BEGINNER' : '🌟 ADVANCED') + '</div>' +
-                '<div id="qsPlayersWaiting" style="background:rgba(0,0,0,0.4); border:2px solid rgba(0,255,255,0.15); border-radius:12px; padding:16px; margin-bottom:20px; min-height:60px;">' +
-                '<p style="color:#888; font-size:12px;">Waiting for others...</p></div>' +
-                '<div style="font-family:\'Press Start 2P\'; font-size:9px; color:#888;" id="qsStatusText">Waiting for teacher to start...</div>' +
-                '<div id="qsGameArea"></div>' +
-                '</div>';
+        function qsShowRound(d,area,status) {
+            if(status){status.textContent='🔴 ROUND '+(d.currentRound+1)+' — READ ALOUD!';status.style.color='#ff00ff';}
+            var set=d.sets[d.currentRound]; if(!set)return;
+            var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+            var lc=qs.playerLevel==='beginner'?'#00ffff':'#ff00ff';
+            // Check if already submitted this round
+            var existingArea=area.querySelector('[data-round="'+d.currentRound+'"]');
+            if(existingArea) return; // Don't re-render if already showing this round
+            var h='<div data-round="'+d.currentRound+'" style="margin-top:16px;">';
+            h+='<div style="background:rgba(0,0,0,0.5);border:3px solid '+lc+';border-radius:14px;padding:20px;box-shadow:0 0 25px '+lc+'22;margin-bottom:16px;">';
+            for(var i=0;i<sentences.length;i++){
+                h+='<div style="font-size:20px;color:#fff;text-align:center;line-height:1.7;margin-bottom:6px;">'+escapeHtml(sentences[i].korean)+'</div>';
+                if(sentences[i].english) h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(sentences[i].english)+'</div>';
+            }
+            h+='</div>';
+            // Record button
+            h+='<div style="text-align:center;">';
+            h+='<button id="qsRecBtn" onclick="qsRecord()" style="background:rgba(239,68,68,0.15);border:3px solid #ef4444;color:#ef4444;padding:16px 40px;border-radius:12px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;transition:all 0.2s;">🎤 RECORD</button>';
+            h+='<div id="qsRecStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
+            h+='</div></div>';
+            area.innerHTML=h;
+        }
 
-            // Listen for other players
-            db.collection(QUIZ_GAME_COLLECTION).doc(sessionId)
-                .collection(QUIZ_GAME_PLAYERS_SUB)
-                .onSnapshot(function(snap) {
-                    var container = document.getElementById('qsPlayersWaiting');
-                    if (!container) return;
-                    var html = '';
-                    snap.forEach(function(doc) {
-                        var p = doc.data();
-                        var lc = p.level === 'beginner' ? '#00ffff' : '#ff00ff';
-                        html += '<span style="display:inline-block; margin:4px; padding:6px 10px; background:rgba(0,0,0,0.4); border:2px solid ' + lc + '; border-radius:8px; font-size:13px;">' + (p.emoji || '😊') + ' ' + escapeHtml(p.name || '') + '</span>';
-                    });
-                    container.innerHTML = html || '<p style="color:#888; font-size:12px;">No players yet...</p>';
+        var qsRecorder=null;
+        function qsRecord() {
+            var btn=document.getElementById('qsRecBtn');
+            if(qsRecorder&&qsRecorder.state==='recording'){
+                qsRecorder.stop();
+                btn.innerHTML='⏳ PROCESSING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                var chunks=[];
+                var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                    else if(MediaRecorder.isTypeSupported('audio/mp4'))mime='audio/mp4';
+                    else if(MediaRecorder.isTypeSupported('audio/aac'))mime='audio/aac';
+                }
+                var opts=mime?{mimeType:mime}:{};
+                qsRecorder=new MediaRecorder(stream,opts);
+                qsRecorder.ondataavailable=function(e){chunks.push(e.data);};
+                qsRecorder.onstop=function(){
+                    stream.getTracks().forEach(function(t){t.stop();});
+                    var blobType=mime||'audio/webm';
+                    qs.localBlob=new Blob(chunks,{type:blobType});
+                    qsSubmitRecording(blobType);
+                };
+                qsRecorder.start();
+                btn.innerHTML='⏹ STOP';btn.style.borderColor='#ff00ff';btn.style.color='#ff00ff';btn.style.animation='qsPulse 1s infinite';
+                document.getElementById('qsRecStatus').textContent='Recording...';
+            }).catch(function(err){alert('Microphone access denied: '+err.message);});
+        }
+
+        async function qsSubmitRecording(mimeType) {
+            var statusEl=document.getElementById('qsRecStatus');
+            try {
+                statusEl.textContent='⏳ Uploading audio...';
+                // 1. Upload to Firebase Storage
+                var ext=mimeType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/'+qs.playerId+'_round'+qsGetCurrentRound()+'.'+ext;
+                var ref=firebase.storage().ref().child(path);
+                await ref.put(qs.localBlob,{contentType:mimeType});
+                var audioUrl=await ref.getDownloadURL();
+
+                statusEl.textContent='⏳ Transcribing...';
+                // 2. Send to Whisper for transcription
+                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
+                var gameData=sessionDoc.data();
+                var set=gameData.sets[gameData.currentRound];
+                var expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
+
+                var formData=new FormData();
+                formData.append('audio',qs.localBlob,'recording.'+ext);
+                formData.append('prompt',expectedKorean);
+                var whisperResp=await fetch('https://whisper-proxy-386010826708.us-central1.run.app',{method:'POST',body:formData});
+                var whisperData=await whisperResp.json();
+                var transcript=(whisperData.text||whisperData.words?.map(function(w){return w.word;}).join(' ')||'').trim();
+
+                statusEl.textContent='⏳ Grading...';
+                // 3. Grade with ChatGPT
+                var gradePrompt='You are grading a Korean language student\'s reading. They were supposed to read:\n"'+expectedKorean+'"\n\nThey actually said (from speech recognition):\n"'+transcript+'"\n\nGrade their accuracy 0-100. Give specific feedback on pronunciation. Reply ONLY with JSON: {"score":NUMBER,"feedback":"short encouraging feedback with specific tips","transcript":"what they said"}';
+                var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({prompt:gradePrompt,max_tokens:500})
+                });
+                var aiData=await aiResp.json();
+                var rt=aiData.text||aiData.result||aiData.response||JSON.stringify(aiData);
+                rt=rt.replace(/^```json\s*|```\s*$/g,'').trim();
+                var grade={score:50,feedback:'',transcript:transcript};
+                try{var parsed=JSON.parse(rt);grade=parsed;}catch(e){var m=rt.match(/{[\s\S]*}/);if(m)try{grade=JSON.parse(m[0]);}catch(e2){}}
+                var points=Math.round((grade.score||0)/10);
+
+                // 4. Save submission to Firestore
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId, playerName:qs.playerName, emoji:qs.playerEmoji,
+                    level:qs.playerLevel, round:gameData.currentRound,
+                    audioUrl:audioUrl, transcript:grade.transcript||transcript,
+                    score:points, gradeScore:grade.score, feedback:grade.feedback||'',
+                    expectedKorean:expectedKorean, submittedAt:firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-            // Listen for game state changes
-            db.collection(QUIZ_GAME_COLLECTION).doc(sessionId).onSnapshot(function(doc) {
-                if (!doc.exists) return;
-                var data = doc.data();
-                var statusEl = document.getElementById('qsStatusText');
-                var gameArea = document.getElementById('qsGameArea');
-                if (!gameArea) return;
+                // 5. Update player total score
+                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
+                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
 
-                if (data.status === 'playing') {
-                    var set = data.sets[data.currentRound];
-                    if (!set) return;
+                // 6. Show feedback popup
+                qsShowFeedback(grade,points,audioUrl,expectedSentences);
 
-                    // Show the sentence(s) for this player's level
-                    var sentences = [];
-                    if (playerLevel === 'beginner') {
-                        sentences = [set.sentences[0]];
-                    } else {
-                        sentences = set.sentences;
-                    }
-
-                    var levelColor = playerLevel === 'beginner' ? '#00ffff' : '#ff00ff';
-                    var levelLabel = playerLevel === 'beginner' ? '🌱 BEGINNER' : '🌟 ADVANCED';
-
-                    var h = '<div style="margin-top:20px; background:rgba(0,0,0,0.5); border:3px solid ' + levelColor + '; border-radius:14px; padding:24px; box-shadow:0 0 25px ' + levelColor + '22;">';
-                    h += '<div style="font-family:\'Press Start 2P\'; font-size:10px; color:' + levelColor + '; text-align:center; margin-bottom:4px;">ROUND ' + (data.currentRound + 1) + ' OF ' + data.totalRounds + '</div>';
-                    h += '<div style="font-family:\'Press Start 2P\'; font-size:8px; color:#888; text-align:center; margin-bottom:16px;">' + levelLabel + '</div>';
-
-                    for (var i = 0; i < sentences.length; i++) {
-                        h += '<div style="font-size:22px; color:#fff; text-align:center; line-height:1.7; margin-bottom:8px;">' + escapeHtml(sentences[i].korean) + '</div>';
-                        if (sentences[i].english) {
-                            h += '<div style="font-size:12px; color:#888; text-align:center; margin-bottom:12px;">' + escapeHtml(sentences[i].english) + '</div>';
-                        }
-                    }
-
-                    h += '<div style="text-align:center; margin-top:16px; font-family:\'Press Start 2P\'; font-size:9px; color:#888;">🎙️ Read aloud now!</div>';
-                    h += '</div>';
-
-                    gameArea.innerHTML = h;
-                    if (statusEl) { statusEl.textContent = '🔴 ROUND IN PROGRESS'; statusEl.style.color = '#ff00ff'; }
-
-                } else if (data.status === 'round_result') {
-                    if (statusEl) { statusEl.textContent = '⏸ ROUND ENDED'; statusEl.style.color = '#FFD700'; }
-
-                    // Show leaderboard if available
-                    if (data.leaderboard_beginner || data.leaderboard_advanced) {
-                        var board = playerLevel === 'beginner' ? (data.leaderboard_beginner || []) : (data.leaderboard_advanced || []);
-                        var h = '<div style="margin-top:20px; background:rgba(0,0,0,0.5); border:3px solid #FFD700; border-radius:14px; padding:20px;">';
-                        h += '<div style="font-family:\'Press Start 2P\'; font-size:11px; color:#FFD700; text-align:center; margin-bottom:14px;">🏆 LEADERBOARD</div>';
-                        if (board.length === 0) {
-                            h += '<p style="text-align:center; color:#888;">No scores yet.</p>';
-                        }
-                        for (var i = 0; i < board.length; i++) {
-                            var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
-                            var isMe = board[i].name === playerName;
-                            h += '<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #333;' + (isMe ? 'background:rgba(255,0,255,0.1);border-radius:6px;' : '') + '">';
-                            h += '<span style="color:#fff;">' + medal + ' ' + (board[i].emoji || '') + ' ' + escapeHtml(board[i].name) + (isMe ? ' ⬅️' : '') + '</span>';
-                            h += '<span style="color:#FFD700; font-weight:700;">' + (board[i].score || 0) + '</span>';
-                            h += '</div>';
-                        }
-                        h += '</div>';
-                        gameArea.innerHTML = h;
-                    }
-
-                } else if (data.status === 'finished') {
-                    if (statusEl) { statusEl.textContent = '🏁 GAME OVER'; statusEl.style.color = '#00ff88'; }
-                    gameArea.innerHTML = '<div style="margin-top:20px; text-align:center; padding:30px;"><div style="font-size:50px;">🏁</div><div style="font-family:\'Press Start 2P\'; font-size:14px; color:#00ffff; margin-top:12px;">GAME OVER</div><p style="color:#888; margin-top:8px;">Thanks for playing!</p></div>';
-
-                } else if (data.status === 'lobby') {
-                    if (statusEl) { statusEl.textContent = 'Waiting for teacher to start...'; statusEl.style.color = '#888'; }
-                    gameArea.innerHTML = '';
-                }
-            });
+            } catch(err){
+                console.error('Submit error:',err);
+                statusEl.textContent='❌ Error: '+err.message;
+                var btn=document.getElementById('qsRecBtn');
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.animation='none';}
+            }
         }
+
+        function qsGetCurrentRound() {
+            // Read from Firestore cache or DOM
+            var el=document.querySelector('[data-round]');
+            return el?parseInt(el.dataset.round):0;
+        }
+
+        function qsShowFeedback(grade,points,audioUrl,expectedSentences) {
+            var area=document.getElementById('qsGameArea');
+            var lc=qs.playerLevel==='beginner'?'#00ffff':'#ff00ff';
+            var scoreColor=grade.score>=80?'#00ff88':grade.score>=50?'#FFD700':'#ff4444';
+            var h='<div style="margin-top:16px;background:rgba(0,0,0,0.6);border:3px solid '+lc+';border-radius:16px;padding:24px;text-align:center;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:28px;color:'+scoreColor+';text-shadow:0 0 15px '+scoreColor+';margin-bottom:4px;">'+grade.score+'%</div>';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;margin-bottom:16px;">+'+points+' POINTS</div>';
+            // Feedback
+            if(grade.feedback){
+                h+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-bottom:16px;text-align:left;">';
+                h+='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Feedback</div>';
+                h+='<div style="font-size:14px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback)+'</div></div>';
+            }
+            // What you said vs expected
+            if(grade.transcript){
+                h+='<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left;">';
+                h+='<div style="font-size:10px;color:#888;margin-bottom:4px;">YOU SAID:</div>';
+                h+='<div style="font-size:13px;color:#a855f7;margin-bottom:8px;">'+escapeHtml(grade.transcript)+'</div>';
+                h+='<div style="font-size:10px;color:#888;margin-bottom:4px;">EXPECTED:</div>';
+                h+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedSentences.map(function(s){return s.korean;}).join(' '))+'</div></div>';
+            }
+            // Audio buttons
+            h+='<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">';
+            var koreanForTTS=expectedSentences.map(function(s){return s.korean;}).join(' ');
+            h+='<button onclick="qsPlayTeacher(\''+koreanForTTS.replace(/'/g,"\\'")+'\')" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🔊 Teacher Example</button>';
+            h+='<button onclick="qsPlayMine()" style="background:rgba(168,85,247,0.15);border:2px solid #a855f7;color:#a855f7;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🎧 My Recording</button></div>';
+            // Close
+            h+='<button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button>';
+            h+='</div>';
+            area.innerHTML=h;
+        }
+
+        var qsTTSAudio=null;
+        function qsPlayTeacher(text) {
+            if(qsTTSAudio){qsTTSAudio.pause();qsTTSAudio=null;}
+            fetch('https://tts-proxy-386010826708.us-central1.run.app',{
+                method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})
+            }).then(function(r){return r.blob();}).then(function(blob){
+                qsTTSAudio=new Audio(URL.createObjectURL(blob));qsTTSAudio.play();
+            }).catch(function(e){console.error('TTS error:',e);alert('Could not play teacher audio.');});
+        }
+        function qsPlayMine() {
+            if(!qs.localBlob){alert('No recording found.');return;}
+            var a=new Audio(URL.createObjectURL(qs.localBlob));a.play();
+        }
+
+        function qsCloseFeedback() {
+            var area=document.getElementById('qsGameArea');
+            area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
+        }
+
+        function qsShowResult(d,area,status) {
+            if(status){status.textContent='🏆 ROUND RESULTS';status.style.color='#FFD700';}
+            var board=(qs.playerLevel==='beginner')?(d.leaderboard_beginner||[]):(d.leaderboard_advanced||[]);
+            // Only show if area doesn't already have feedback popup open
+            if(area.querySelector('[data-round]'))return; // still in recording mode
+            var h='<div style="margin-top:16px;background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#FFD700;text-align:center;margin-bottom:14px;">🏆 TOP 5</div>';
+            var top5=board.slice(0,5);
+            if(top5.length===0) h+='<p style="text-align:center;color:#888;">No scores yet.</p>';
+            top5.forEach(function(p,i){
+                var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+                var isMe=p.name===qs.playerName;
+                h+='<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #333;'+(isMe?'background:rgba(255,0,255,0.1);border-radius:6px;':'')+'">';
+                h+='<span style="color:#fff;font-size:14px;">'+medal+' '+(p.emoji||'')+' '+escapeHtml(p.name)+(isMe?' ⬅️':'')+'</span>';
+                h+='<span style="color:#FFD700;font-weight:700;font-size:14px;">'+p.score+'</span></div>';
+            });
+            h+='</div>';
+            area.innerHTML=h;
+        }
+
+        function qsShowFinished(area,status) {
+            if(status){status.textContent='🏁 GAME OVER';status.style.color='#00ff88';}
+            area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">🏁</div><div style="font-family:\'Press Start 2P\';font-size:14px;color:#00ffff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
+        }
+
     </script>
 
 <!-- ═══════════════════════════════════════════════════════ -->
-<!-- 🎮 QUIZ GAME OVERLAY (Admin — KoreanLearnin)          -->
+<!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center; padding:20px;">
-    <div style="background:rgba(0,0,0,0.85); border:3px solid #00ffff; border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 0 40px rgba(0,255,255,0.3), 0 0 80px rgba(255,0,255,0.1);">
-
+    <div style="background:rgba(0,0,0,0.85); border:3px solid #00ffff; border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 0 40px rgba(0,255,255,0.3),0 0 80px rgba(255,0,255,0.1);">
         <!-- Header -->
         <div style="background:rgba(0,0,0,0.6); border-bottom:3px solid #ff00ff; padding:18px 24px; border-radius:13px 13px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
                 <span style="font-size:28px;">🎮</span>
                 <div>
                     <div style="font-family:'Press Start 2P'; font-size:12px; color:#00ffff; text-shadow:0 0 10px #00ffff;">QUIZ GAME</div>
-                    <div style="font-size:11px; color:#888; margin-top:4px;">Speech-based reading game &bull; Uses Tuesday Reading sets</div>
+                    <div style="font-size:11px; color:#888; margin-top:4px;">Speech-based reading game &bull; Record → Whisper → Grade</div>
                 </div>
             </div>
-            <button onclick="closeKahootMaker()" style="background:rgba(255,0,255,0.2); border:2px solid #ff00ff; color:#ff00ff; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,0,255,0.4)'" onmouseout="this.style.background='rgba(255,0,255,0.2)'">✕</button>
+            <button onclick="closeKahootMaker()" style="background:rgba(255,0,255,0.2); border:2px solid #ff00ff; color:#ff00ff; width:36px; height:36px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.background='rgba(255,0,255,0.4)'" onmouseout="this.style.background='rgba(255,0,255,0.2)'">✕</button>
         </div>
-
-        <!-- Setup View -->
+        <!-- Setup -->
         <div id="quizGameSetupView" style="padding:24px;">
-            <!-- Round Time Setting -->
             <div style="margin-bottom:20px;">
-                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px; text-shadow:0 0 8px rgba(255,0,255,0.5);">⏱️ ROUND TIME</div>
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px;">⏱️ ROUND TIME</div>
                 <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="number" id="quizGameRoundTime" value="60" min="5" max="600" style="background:rgba(0,0,0,0.5); color:#fff; border:2px solid #ff00ff; border-radius:8px; padding:10px 16px; font-size:16px; width:100px; text-align:center; outline:none;" onfocus="this.style.borderColor='#00ffff';this.style.boxShadow='0 0 15px rgba(0,255,255,0.3)'" onblur="this.style.borderColor='#ff00ff';this.style.boxShadow='none'">
+                    <input type="number" id="quizGameRoundTime" value="60" min="5" max="600" style="background:rgba(0,0,0,0.5); color:#fff; border:2px solid #ff00ff; border-radius:8px; padding:10px 16px; font-size:16px; width:100px; text-align:center; outline:none;" onfocus="this.style.borderColor='#00ffff'" onblur="this.style.borderColor='#ff00ff'">
                     <span style="font-size:13px; color:#888;">seconds</span>
                 </div>
             </div>
-
-            <!-- Sets Preview -->
             <div style="margin-bottom:20px;">
-                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px; text-shadow:0 0 8px rgba(255,0,255,0.5);">📋 ROUNDS (from Tuesday Reading sets)</div>
-                <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:2px solid rgba(0,255,255,0.2); border-radius:10px; padding:12px; background:rgba(0,0,0,0.3);">
-                    <p style="color:#888; font-size:13px;">Loading sets...</p>
-                </div>
-                <p style="font-size:11px; color:#555; margin-top:6px;">💡 Sets are loaded from the Tuesday Reading tab above. Add/edit sets there, then come back.</p>
+                <div style="font-family:'Press Start 2P'; font-size:9px; color:#ff00ff; margin-bottom:10px;">📋 ROUNDS (from Tuesday Reading sets)</div>
+                <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:2px solid rgba(0,255,255,0.2); border-radius:10px; padding:12px; background:rgba(0,0,0,0.3);"><p style="color:#888;">Loading...</p></div>
+                <p style="font-size:11px; color:#555; margin-top:6px;">💡 Add/edit sets in the Tuesday Reading tab above.</p>
             </div>
-
-            <!-- Create Game -->
             <div style="text-align:center;">
-                <button id="quizGameCreateBtn" onclick="quizGameCreateSession()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px 48px; border-radius:12px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 0 35px rgba(255,0,255,0.6)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 25px rgba(255,0,255,0.4)'">🎮 CREATE GAME</button>
-                <p style="font-size:11px; color:#555; margin-top:8px;">Creates a game room &amp; generates a student join link</p>
+                <button id="quizGameCreateBtn" onclick="qgCreateSession()" style="background:linear-gradient(135deg,#ff00ff,#cc00cc); border:3px solid #ff00ff; color:#fff; padding:16px 48px; border-radius:12px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; box-shadow:0 0 25px rgba(255,0,255,0.4); transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">🎮 CREATE GAME</button>
+                <p style="font-size:11px; color:#555; margin-top:8px;">Creates room &amp; generates student join link</p>
             </div>
         </div>
-
-        <!-- Lobby View (after game created, before start) -->
+        <!-- Lobby -->
         <div id="quizGameLobbyView" style="display:none; padding:24px;"></div>
-
-        <!-- Play View (active rounds) -->
+        <!-- Play -->
         <div id="quizGamePlayView" style="display:none; padding:24px;"></div>
     </div>
 </div>
 
 <style>
-    .quiz-loading-dots::after {
-        content: '';
-        animation: quizDots 1.5s infinite;
-    }
-    @keyframes quizDots {
-        0% { content: '.'; }
-        33% { content: '..'; }
-        66% { content: '...'; }
-    }
+    .quiz-loading-dots::after { content:''; animation:quizDots 1.5s infinite; }
+    @keyframes quizDots { 0%{content:'.';} 33%{content:'..';} 66%{content:'...';} }
+    @keyframes qsPulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
 </style>
 
 </body>
