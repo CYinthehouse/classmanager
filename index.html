@@ -1939,7 +1939,7 @@
 
                         <!-- View Materials Button -->
                         <div style="margin-bottom: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #ff7777, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
+                            <button class="btn" onclick="openMaterialsCreator()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: 2px solid #a855f7; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(168,85,247,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(168,85,247,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(168,85,247,0.3)'">📑 View Materials</button>
                             <button class="btn" onclick="trImportFromMaterials()" style="background: linear-gradient(135deg, #0ea5e9, #38bdf8); border: 2px solid #38bdf8; color: #fff; font-size: 14px; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.25s; box-shadow: 0 0 15px rgba(56,189,248,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(56,189,248,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(56,189,248,0.3)'">📂 Import from Materials</button>
                         </div>
 
@@ -1962,7 +1962,7 @@
                         <!-- Generate Cards -->
                         <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
                             <button class="btn" onclick="generateTRCards()" style="background: linear-gradient(135deg, #ff00ff, #9c27b0); border-color: #ff00ff; color: #fff; font-weight: 600;">🃏 Generate Reading Cards</button>
-                            <button class="btn" onclick="openKahootMaker()" style="background: linear-gradient(135deg, #ff00ff, #cc00cc); border: 2px solid #ff00ff; color: #fff; font-weight: 600; box-shadow: 0 0 15px rgba(255,0,255,0.3);" onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 0 25px rgba(255,0,255,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 0 15px rgba(255,0,255,0.3)'">🎮 Quiz Game</button>
+                            <button class="btn" onclick="openKahootMaker()" style="background: linear-gradient(135deg, #ff00ff, #9c27b0); border-color: #ff00ff; color: #fff; font-weight: 600;">🎮 Quiz Game</button>
                             <button class="btn btn-sm" onclick="clearAllTR()" style="background: #333; color: #ff3366; border-color: #ff3366;">🗑️ Clear All</button>
                         </div>
 
@@ -30386,7 +30386,6 @@ Return ONLY this JSON (no markdown, no code blocks):
             timer: null
         };
 
-        var sparkleSVG='<svg class="sparkle-svg" viewBox="0 0 96 96"';
         // Helper to render emoji - handles both GIF URLs and text emojis
         function renderEmoji(val,size){
             size=size||24;
