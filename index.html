@@ -30941,10 +30941,44 @@ Return ONLY this JSON (no markdown, no code blocks):
                     })
                 });
                 var aiData=await aiResp.json();
-                var rt=aiData.data||aiData.text||aiData.result||aiData.response||'';
+                console.log('GPT-4o audio raw response:', JSON.stringify(aiData).substring(0,500));
+                // gpt-4o-audio-preview can return in various formats depending on proxy
+                var rt='';
+                if(aiData.data && typeof aiData.data==='string') rt=aiData.data;
+                else if(aiData.data && typeof aiData.data==='object') rt=JSON.stringify(aiData.data);
+                else if(aiData.text) rt=aiData.text;
+                else if(aiData.result) rt=aiData.result;
+                else if(aiData.response) rt=aiData.response;
+                else if(aiData.content) rt=typeof aiData.content==='string'?aiData.content:JSON.stringify(aiData.content);
+                else if(aiData.choices && aiData.choices[0]){
+                    var msg=aiData.choices[0].message||aiData.choices[0];
+                    if(msg.audio && msg.audio.transcript) rt=msg.audio.transcript;
+                    else if(msg.content) rt=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
+                    else if(msg.text) rt=msg.text;
+                }
+                else rt=JSON.stringify(aiData);
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
+                console.log('GPT-4o audio extracted text:', rt.substring(0,300));
                 rt=rt.replace(/^```json\s*|```\s*$/g,'').trim();
-                try{var parsed=JSON.parse(rt);if(parsed.score!==undefined){grade=parsed;transcript=parsed.transcript||'';audioGradingWorked=true;}}catch(e){var m=rt.match(/{[\s\S]*}/);if(m)try{var p2=JSON.parse(m[0]);if(p2.score!==undefined){grade=p2;transcript=p2.transcript||'';audioGradingWorked=true;}}catch(e2){}}
+                // Try to extract transcript even if JSON parsing fails
+                var rawTranscriptMatch=rt.match(/"transcript"\s*:\s*"([^"]+)"/);
+                try{var parsed=JSON.parse(rt);if(parsed.score!==undefined){grade=parsed;transcript=parsed.transcript||'';audioGradingWorked=true;}}catch(e){
+                    console.log('JSON parse failed, trying regex extraction');
+                    var m=rt.match(/{[\s\S]*}/);
+                    if(m)try{var p2=JSON.parse(m[0]);if(p2.score!==undefined){grade=p2;transcript=p2.transcript||'';audioGradingWorked=true;}}catch(e2){
+                        console.log('Regex JSON also failed, trying field extraction');
+                        // Last resort: extract fields individually
+                        var scoreMatch=rt.match(/"score"\s*:\s*(\d+)/);
+                        var feedbackMatch=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        if(scoreMatch){
+                            grade.score=parseInt(scoreMatch[1]);
+                            grade.feedback=feedbackMatch?feedbackMatch[1].replace(/\\"/g,'"'):'';
+                            grade.transcript=rawTranscriptMatch?rawTranscriptMatch[1]:'';
+                            transcript=grade.transcript;
+                            audioGradingWorked=true;
+                        }
+                    }
+                }
                 }catch(audioErr){console.error('GPT-4o audio grading failed:',audioErr);}
                 }// end if wavBase64
 
