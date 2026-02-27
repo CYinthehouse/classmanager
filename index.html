@@ -30600,12 +30600,77 @@ Return ONLY this JSON (no markdown, no code blocks):
         async function qgStartRound() {
             var next = (qg.currentRound === undefined || qg.currentRound === null || qg.currentRound < 0) ? 0 : qg.currentRound + 1;
             if(next >= qg.sets.length){qgFinish();return;}
-            qg.currentRound = next;
+            // Show preview with drawpad first, don't start round yet
+            qgShowPreview(next);
+        }
+
+        function qgShowPreview(ri) {
+            document.getElementById('quizGameLobbyView').style.display='none';
+            var el=document.getElementById('quizGamePlayView');el.style.display='block';
+            var set=qg.sets[ri];
+
+            var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">ROUND '+(ri+1)+' / '+qg.sets.length+'</div>';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:12px;color:#fbbf24;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">✏️ PREVIEW</div></div>';
+
+            // ── SLIDE VIEWER + DRAWPAD ──
+            var slideIdx=-1;
+            if(qg.materialSlides && qg.sentenceSlideMap && qg.sentenceSlideMap.length>0){
+                var firstK=set.sentences[0].korean;
+                for(var sm=0;sm<qg.sentenceSlideMap.length;sm++){
+                    if(qg.sentenceSlideMap[sm].korean===firstK){slideIdx=qg.sentenceSlideMap[sm].slideIdx;break;}
+                }
+            }
+            if(slideIdx>=0 && qg.materialSlides && qg.materialSlides[slideIdx]){
+                var slide=qg.materialSlides[slideIdx];
+                h+='<div id="qgSlideContainer" style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;margin-bottom:20px;border:2px solid rgba(251,191,36,0.4);box-shadow:0 0 20px rgba(251,191,36,0.15);">';
+                h+='<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;" crossorigin="anonymous">';
+                h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:12px;">';
+                for(var ss=0;ss<slide.sentences.length;ss++){
+                    var isInRound=false;
+                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean===slide.sentences[ss]){isInRound=true;break;}}
+                    var sBg=isInRound?'background:rgba(255,255,100,0.25);border-radius:8px;padding:4px 12px;':'padding:4px 12px;opacity:0.5;';
+                    h+='<div style="font-size:28px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;'+sBg+'">'+escapeHtml(slide.sentences[ss])+'</div>';
+                }
+                h+='</div>';
+                h+='<canvas id="qgDrawCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;" onmousedown="qgDrawStart(event)" onmousemove="qgDrawMove(event)" onmouseup="qgDrawEnd()" onmouseleave="qgDrawEnd()" ontouchstart="qgDrawStart(event)" ontouchmove="qgDrawMove(event)" ontouchend="qgDrawEnd()"></canvas>';
+                h+=qgBuildDrawControls();
+                h+='</div>';
+            } else {
+                h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-align:center;">';
+                for(var j=0;j<set.sentences.length;j++){
+                    h+='<div style="font-size:22px;color:#fff;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
+                    if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
+                }
+                h+='</div>';
+            }
+
+            // Big start button
+            h+='<div style="text-align:center;margin-top:8px;">';
+            h+='<button onclick="qgCommitRound('+ri+')" style="background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;padding:16px 48px;border-radius:10px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;transition:all 0.2s;">▶ START ROUND '+(ri+1)+'</button>';
+            h+='</div>';
+
+            el.innerHTML=h;
+
+            // Init draw canvas
+            setTimeout(function(){
+                var cv=document.getElementById('qgDrawCanvas');
+                if(cv){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;qgDrawCtx=cv.getContext('2d');qgDrawCtx.lineCap='round';qgDrawCtx.lineJoin='round';qgDrawCtx.lineWidth=3;}
+            },100);
+        }
+
+        // Actually start the round (write to Firestore, start timer)
+        async function qgCommitRound(ri) {
+            qg.currentRound = ri;
             await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
-                status:'playing', currentRound:next,
+                status:'playing', currentRound:ri,
                 roundStartedAt:firebase.firestore.FieldValue.serverTimestamp()
             });
-            qgShowAdminRound(next);
+            // Preserve canvas drawing
+            var canvasData=null;
+            var cv=document.getElementById('qgDrawCanvas');
+            if(cv && qgDrawCtx) canvasData=cv.toDataURL();
+            qgShowAdminRound(ri, canvasData);
         }
 
         // Sequential audio player state
@@ -30616,7 +30681,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         var qgAudioEl=null;
         var qgAudioTTSCache={};
 
-        function qgShowAdminRound(ri) {
+        function qgShowAdminRound(ri, canvasData) {
             document.getElementById('quizGameLobbyView').style.display='none';
             var el=document.getElementById('quizGamePlayView');el.style.display='block';
             var set=qg.sets[ri]; var tl=qg.roundTime;
@@ -30649,14 +30714,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='</div>';
                 // Drawing canvas overlay
                 h+='<canvas id="qgDrawCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;" onmousedown="qgDrawStart(event)" onmousemove="qgDrawMove(event)" onmouseup="qgDrawEnd()" onmouseleave="qgDrawEnd()" ontouchstart="qgDrawStart(event)" ontouchmove="qgDrawMove(event)" ontouchend="qgDrawEnd()"></canvas>';
-                // Draw controls
-                h+='<div style="position:absolute;top:8px;right:8px;z-index:3;display:flex;gap:4px;">';
-                h+='<button onclick="qgDrawColor=\'#ff0000\'" style="width:24px;height:24px;border-radius:50%;background:#ff0000;border:2px solid #fff;cursor:pointer;"></button>';
-                h+='<button onclick="qgDrawColor=\'#0066ff\'" style="width:24px;height:24px;border-radius:50%;background:#0066ff;border:2px solid #fff;cursor:pointer;"></button>';
-                h+='<button onclick="qgDrawColor=\'#00cc00\'" style="width:24px;height:24px;border-radius:50%;background:#00cc00;border:2px solid #fff;cursor:pointer;"></button>';
-                h+='<button onclick="qgDrawColor=\'#ffcc00\'" style="width:24px;height:24px;border-radius:50%;background:#ffcc00;border:2px solid #fff;cursor:pointer;"></button>';
-                h+='<button onclick="qgDrawClear()" style="padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.6);border:1px solid #888;color:#fff;font-size:11px;cursor:pointer;">✕</button>';
-                h+='</div>';
+                h+=qgBuildDrawControls();
                 h+='</div>';
             } else {
                 // Fallback: show sentences as text if no material slides
@@ -30699,11 +30757,19 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
             el.innerHTML=h;
 
-            // Init draw canvas
+            // Init draw canvas + restore preview annotations
             if(slideIdx>=0){
                 setTimeout(function(){
                     var cv=document.getElementById('qgDrawCanvas');
-                    if(cv){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;qgDrawCtx=cv.getContext('2d');qgDrawCtx.lineCap='round';qgDrawCtx.lineJoin='round';qgDrawCtx.lineWidth=3;}
+                    if(cv){
+                        cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;
+                        qgDrawCtx=cv.getContext('2d');qgDrawCtx.lineCap='round';qgDrawCtx.lineJoin='round';qgDrawCtx.lineWidth=3;
+                        if(canvasData){
+                            var img=new Image();
+                            img.onload=function(){qgDrawCtx.drawImage(img,0,0,cv.width,cv.height);};
+                            img.src=canvasData;
+                        }
+                    }
                 },100);
             }
 
@@ -30728,11 +30794,50 @@ Return ONLY this JSON (no markdown, no code blocks):
         var qgDrawCtx=null;
         var qgDrawing=false;
         var qgDrawColor='#ff0000';
+        var qgDrawEraser=false;
+
+        function qgBuildDrawControls(){
+            var h='<div style="position:absolute;top:8px;right:8px;z-index:3;display:flex;gap:4px;flex-wrap:wrap;">';
+            h+='<button onclick="qgSetDrawColor(\'#ff0000\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#ff0000;border:3px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
+            h+='<button onclick="qgSetDrawColor(\'#0066ff\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#0066ff;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
+            h+='<button onclick="qgSetDrawColor(\'#00cc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#00cc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
+            h+='<button onclick="qgSetDrawColor(\'#ffcc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#ffcc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
+            h+='<button id="qgEraserBtn" onclick="qgToggleEraser()" style="width:26px;height:26px;border-radius:50%;background:repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);font-size:12px;line-height:22px;text-align:center;" title="Eraser">🧹</button>';
+            h+='<button onclick="qgDrawClear()" style="padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.6);border:1px solid #888;color:#fff;font-size:11px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);">✕</button>';
+            h+='</div>';
+            return h;
+        }
+
+        function qgSetDrawColor(color,btn){
+            qgDrawColor=color;qgDrawEraser=false;
+            var cv=document.getElementById('qgDrawCanvas');
+            if(cv)cv.style.cursor='crosshair';
+            document.querySelectorAll('.qgColorBtn').forEach(function(b){b.style.borderWidth='2px';});
+            if(btn)btn.style.borderWidth='3px';
+            var eb=document.getElementById('qgEraserBtn');
+            if(eb)eb.style.borderColor='#fff';
+        }
+
+        function qgToggleEraser(){
+            qgDrawEraser=!qgDrawEraser;
+            var cv=document.getElementById('qgDrawCanvas');
+            if(cv)cv.style.cursor=qgDrawEraser?'cell':'crosshair';
+            var eb=document.getElementById('qgEraserBtn');
+            if(eb)eb.style.borderColor=qgDrawEraser?'#ff0':'#fff';
+            document.querySelectorAll('.qgColorBtn').forEach(function(b){b.style.borderWidth='2px';});
+        }
 
         function qgDrawStart(e){
             e.preventDefault();qgDrawing=true;
             if(!qgDrawCtx)return;
-            qgDrawCtx.strokeStyle=qgDrawColor;
+            if(qgDrawEraser){
+                qgDrawCtx.globalCompositeOperation='destination-out';
+                qgDrawCtx.lineWidth=20;
+            } else {
+                qgDrawCtx.globalCompositeOperation='source-over';
+                qgDrawCtx.strokeStyle=qgDrawColor;
+                qgDrawCtx.lineWidth=3;
+            }
             qgDrawCtx.beginPath();
             var r=e.target.getBoundingClientRect();
             var x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
@@ -30748,7 +30853,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             var sx=e.target.width/r.width;var sy=e.target.height/r.height;
             qgDrawCtx.lineTo(x*sx,y*sy);qgDrawCtx.stroke();
         }
-        function qgDrawEnd(){qgDrawing=false;}
+        function qgDrawEnd(){
+            qgDrawing=false;
+            if(qgDrawCtx)qgDrawCtx.globalCompositeOperation='source-over';
+        }
         function qgDrawClear(){
             if(!qgDrawCtx)return;
             var cv=qgDrawCtx.canvas;qgDrawCtx.clearRect(0,0,cv.width,cv.height);
@@ -30813,9 +30921,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             // 2. Play student recording
             try{
                 if(item.audioUrl){
-                    var resp=await fetch(item.audioUrl);
-                    var blob=await resp.blob();
-                    await qgPlayBlob(blob,qgAudioSpeed);
+                    await qgPlayUrl(item.audioUrl,qgAudioSpeed);
                 }
             }catch(e){console.log('Audio play error:',e);}
 
@@ -30835,6 +30941,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                 qgAudioEl.onended=function(){URL.revokeObjectURL(url);resolve();};
                 qgAudioEl.onerror=function(){URL.revokeObjectURL(url);resolve();};
                 qgAudioEl.play().catch(function(){resolve();});
+            });
+        }
+
+        function qgPlayUrl(url,speed){
+            return new Promise(function(resolve){
+                if(!qgAudioPlaying){resolve();return;}
+                qgAudioEl=new Audio(url);
+                qgAudioEl.playbackRate=speed;
+                qgAudioEl.onended=function(){resolve();};
+                qgAudioEl.onerror=function(){console.log('Audio error for:',url);resolve();};
+                qgAudioEl.play().catch(function(e){console.log('Play failed:',e);resolve();});
             });
         }
 
@@ -30863,7 +30980,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var isGrading=s.status==='grading';
                     var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var borderColor=isGrading?'#fbbf2444':lc+'33';
-                    lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;cursor:pointer;" onclick="qgPlaySingle('+qgAudioQueue.length+')">';
+                    var queueIdx=-1;
+                    if(s.audioUrl && !isGrading){
+                        queueIdx=qgAudioQueue.length;
+                        qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0});
+                    }
+                    var clickAttr=queueIdx>=0?'onclick="qgPlaySingle('+queueIdx+')"':'';
+                    lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;'+(queueIdx>=0?'cursor:pointer;':'')+'" '+clickAttr+'>';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
                     if(isGrading){
@@ -30877,10 +31000,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                         lh+='<span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';
                     }
                     lh+='</div>';
-
-                    if(s.audioUrl && s.status!=='grading'){
-                        qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0});
-                    }
                 });
                 listEl.innerHTML=lh||'<span style="color:#888;">No recordings yet.</span>';
 
@@ -30895,15 +31014,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             qgStopAll();
             var item=qgAudioQueue[idx];
             try{
-                var resp=await fetch(item.audioUrl);
-                var blob=await resp.blob();
                 qgAudioPlaying=true;
                 document.querySelectorAll('.qgListItem').forEach(function(el,i){
                     el.style.background=i===idx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';
                 });
                 var np=document.getElementById('qgNowPlaying');
                 if(np){np.style.display='block';np.innerHTML='🔊 Playing: <strong style="color:#ff9800;">'+escapeHtml(item.name)+'</strong>';}
-                await qgPlayBlob(blob,qgAudioSpeed);
+                await qgPlayUrl(item.audioUrl,qgAudioSpeed);
                 qgStopAll();
             }catch(e){console.log('Play error:',e);qgStopAll();}
         }
@@ -31363,8 +31480,29 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var wavBase64=await blobToWavBase64(qs.localBlob);
 
+                // Get standard pronunciation from g2pk service
+                var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
+                var expectedPronunciation='';
+                try{
+                    var g2pResp=await fetch(G2PK_URL+'/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:expectedKorean})
+                    });
+                    if(g2pResp.ok){
+                        var g2pData=await g2pResp.json();
+                        expectedPronunciation=g2pData.pronunciation||'';
+                        console.log('g2pk pronunciation:',expectedKorean,'→',expectedPronunciation);
+                    }
+                }catch(e){console.log('g2pk unavailable, grading against spelling only:',e);}
+
+                // Build grading prompt with pronunciation if available
+                var pronSection='';
+                if(expectedPronunciation && expectedPronunciation!==expectedKorean){
+                    pronSection='\nEXPECTED PRONUNCIATION: "'+expectedPronunciation+'"\n\nCRITICAL: Korean spelling ≠ pronunciation. The PRONUNCIATION form above reflects all standard Korean phonological rules (연음/liaison, 비음화/nasalization, 격음화/aspiration, 경음화/tensification, ㅎ탈락/ㅎ-weakening, 구개음화/palatalization, 받침 neutralization, etc).\nYou MUST grade the student\'s audio against the PRONUNCIATION form, NOT the written form.\nFor example: 않았어요 is pronounced 아나써요, so a student saying "아나써요" is 100% CORRECT.\nAnother example: 같이 is pronounced 가치, so a student saying "가치" is CORRECT.\nAnother example: 있었던건 is pronounced 이써떤건, so a student must say "이써떤건" — saying it literally as spelled would be WRONG.\n';
+                }
+
                 // Send audio directly to GPT-4o-audio-preview for phonetic transcription + grading
-                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED: "'+expectedKorean+'"\n\nI am sending you their audio recording. Listen carefully and transcribe EXACTLY what you hear — phonetically accurate in Hangul.\n\nCRITICAL TRANSCRIPTION RULES:\n- Transcribe what you ACTUALLY HEAR, not what was expected.\n- If the student said ㅋ instead of ㄱ, write ㅋ (e.g. 코양이 NOT 고양이).\n- Be extremely sensitive to: ㄱ/ㅋ/ㄲ, ㅂ/ㅍ/ㅃ, ㄷ/ㅌ/ㄸ, ㅈ/ㅊ/ㅉ, ㅅ/ㅆ distinctions.\n- If a word sounds English (e.g. "center" instead of 센터), write it in English.\n- If vowels are wrong (ㅓ vs ㅗ, ㅐ vs ㅔ), transcribe the vowel you actually heard.\n- Do NOT auto-correct to the expected text. Do NOT assume they said it correctly.\n\nGRADING RULES:\n- 0% if entire speech is in English or non-Korean.\n- Compare word by word. Score = (correct words / total expected words) × 100.\n- Each wrong consonant type (plain/aspirated/tense) means that word is WRONG.\n- Missing or added words reduce the score.\n- English words mixed in count as wrong for that word but don\'t make entire score 0%.\n\nFEEDBACK:\n- Name specific words that were wrong.\n- For consonant errors explain: "You said 코 (aspirated ㅋ) instead of 고 (plain ㄱ)".\n- Be encouraging but honest.\n\nReply ONLY with valid JSON, no other text:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"exactly what you heard"}';
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronSection+'\n\nI am sending you their audio recording. Listen carefully and transcribe EXACTLY what you hear — phonetically accurate in Hangul.\n\nCRITICAL TRANSCRIPTION RULES:\n- Transcribe what you ACTUALLY HEAR, not what was expected.\n- If the student said ㅋ instead of ㄱ, write ㅋ (e.g. 코양이 NOT 고양이).\n- Be extremely sensitive to: ㄱ/ㅋ/ㄲ, ㅂ/ㅍ/ㅃ, ㄷ/ㅌ/ㄸ, ㅈ/ㅊ/ㅉ, ㅅ/ㅆ distinctions.\n- If a word sounds English (e.g. "center" instead of 센터), write it in English.\n- If vowels are wrong (ㅓ vs ㅗ, ㅐ vs ㅔ), transcribe the vowel you actually heard.\n- Do NOT auto-correct to the expected text. Do NOT assume they said it correctly.\n\nGRADING RULES:\n- 0% if entire speech is in English or non-Korean.\n- Compare the student\'s pronunciation against the EXPECTED PRONUNCIATION (not spelling). If no pronunciation form is provided, compare against the written form.\n- Score = (correctly pronounced words / total expected words) × 100.\n- A word is CORRECT if the student\'s pronunciation matches the standard pronunciation form.\n- A word is WRONG if the student uses a different consonant type (plain/aspirated/tense) than the standard pronunciation requires, or uses wrong vowels, or skips/adds syllables.\n- Missing or added words reduce the score.\n- English words mixed in count as wrong for that word but don\'t make entire score 0%.\n\nFEEDBACK:\n- Name specific words that were mispronounced.\n- For consonant errors explain what the student said vs what was expected.\n- If the student correctly applied a pronunciation rule (e.g. liaison, nasalization), acknowledge it positively.\n- Be encouraging but honest.\n\nReply ONLY with valid JSON, no other text:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"exactly what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
