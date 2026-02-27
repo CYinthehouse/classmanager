@@ -30911,30 +30911,102 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         async function qgEndRound() {
             clearInterval(qg.timer);
-            // Update leaderboards from all submissions
+            // Update leaderboards from players subcollection (accumulated scores)
             try {
-                var allSubs = await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).get();
-                var scores = {}; // {playerId: {name,emoji,level,totalScore}}
-                allSubs.forEach(function(d){
-                    var s=d.data(); var key=s.playerId||s.playerName;
-                    if(!scores[key]) scores[key]={name:s.playerName,emoji:s.emoji,level:s.level,score:0};
-                    scores[key].score += (s.score||0);
-                });
+                var allPlayers = await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get();
                 var begBoard=[],advBoard=[];
-                Object.values(scores).forEach(function(p){
-                    var entry={name:p.name,emoji:p.emoji,score:p.score};
+                allPlayers.forEach(function(d){
+                    var p=d.data();
+                    var entry={name:p.name,emoji:p.emoji,score:p.score||0};
                     if(p.level==='beginner') begBoard.push(entry); else advBoard.push(entry);
                 });
                 begBoard.sort(function(a,b){return b.score-a.score;});
                 advBoard.sort(function(a,b){return b.score-a.score;});
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
                     status:'round_result',
-                    leaderboard_beginner:begBoard.slice(0,10),
-                    leaderboard_advanced:advBoard.slice(0,10)
+                    leaderboard_beginner:begBoard,
+                    leaderboard_advanced:advBoard
                 });
             } catch(e){console.error('End round error:',e);}
             var te=document.getElementById('qgTimer');
             if(te){te.textContent="TIME'S UP";te.style.fontSize='14px';}
+        }
+
+        function qgBuildPodium(board, label, labelColor) {
+            var h='<div style="text-align:center;">';
+            h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:'+labelColor+';margin-bottom:16px;">'+label+'</div>';
+            if(!board||board.length===0){h+='<p style="color:#888;font-size:12px;">No scores yet</p></div>';return h;}
+
+            // Podium: 2nd | 1st | 3rd
+            var p1=board[0]||null, p2=board[1]||null, p3=board[2]||null;
+            var podiumColors={1:'linear-gradient(180deg,#FFD700,#b8960f)',2:'linear-gradient(180deg,#C0C0C0,#808080)',3:'linear-gradient(180deg,#CD7F32,#8B5A2B)'};
+            var podiumH={1:'140px',2:'110px',3:'90px'};
+            var medalEmoji={1:'🥇',2:'🥈',3:'🥉'};
+
+            // Avatars + names row (positioned above podiums)
+            h+='<div style="display:flex;justify-content:center;align-items:flex-end;gap:0;margin-bottom:0;min-height:100px;">';
+
+            // 2nd place avatar
+            h+='<div style="width:110px;text-align:center;">';
+            if(p2){
+                h+='<div style="font-size:11px;color:#fff;font-weight:700;margin-bottom:4px;">'+escapeHtml(p2.name)+'</div>';
+                h+='<div style="margin-bottom:4px;">'+renderEmoji(p2.emoji,48)+'</div>';
+            }
+            h+='</div>';
+
+            // 1st place avatar (confetti + crown)
+            h+='<div style="width:130px;text-align:center;">';
+            if(p1){
+                h+='<div style="font-size:13px;color:#fff;font-weight:700;margin-bottom:4px;">'+escapeHtml(p1.name)+'</div>';
+                h+='<div style="font-size:20px;margin-bottom:-4px;">🎊</div>';
+                h+='<div style="margin-bottom:4px;">'+renderEmoji(p1.emoji,60)+'</div>';
+            }
+            h+='</div>';
+
+            // 3rd place avatar
+            h+='<div style="width:110px;text-align:center;">';
+            if(p3){
+                h+='<div style="font-size:11px;color:#fff;font-weight:700;margin-bottom:4px;">'+escapeHtml(p3.name)+'</div>';
+                h+='<div style="margin-bottom:4px;">'+renderEmoji(p3.emoji,44)+'</div>';
+            }
+            h+='</div>';
+            h+='</div>';
+
+            // Podium blocks row
+            h+='<div style="display:flex;justify-content:center;align-items:flex-end;gap:4px;">';
+
+            // 2nd place podium
+            h+='<div style="width:110px;height:'+podiumH[2]+';background:'+podiumColors[2]+';border-radius:8px 8px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:12px;">';
+            h+='<div style="font-size:28px;">'+medalEmoji[2]+'</div>';
+            if(p2) h+='<div style="font-family:\'Press Start 2P\';font-size:12px;color:#fff;margin-top:8px;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">'+p2.score+'</div>';
+            h+='</div>';
+
+            // 1st place podium
+            h+='<div style="width:130px;height:'+podiumH[1]+';background:'+podiumColors[1]+';border-radius:8px 8px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:12px;">';
+            h+='<div style="font-size:32px;">'+medalEmoji[1]+'</div>';
+            if(p1) h+='<div style="font-family:\'Press Start 2P\';font-size:14px;color:#fff;margin-top:8px;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">'+p1.score+'</div>';
+            h+='</div>';
+
+            // 3rd place podium
+            h+='<div style="width:110px;height:'+podiumH[3]+';background:'+podiumColors[3]+';border-radius:8px 8px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:12px;">';
+            h+='<div style="font-size:24px;">'+medalEmoji[3]+'</div>';
+            if(p3) h+='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#fff;margin-top:8px;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">'+p3.score+'</div>';
+            h+='</div>';
+            h+='</div>';
+
+            // Remaining players (4th+)
+            if(board.length>3){
+                h+='<div style="margin-top:16px;text-align:left;max-width:350px;margin-left:auto;margin-right:auto;">';
+                for(var i=3;i<board.length;i++){
+                    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #333;">';
+                    h+='<span style="color:#ccc;font-size:12px;">'+(i+1)+'. '+renderEmoji(board[i].emoji,18)+' '+escapeHtml(board[i].name)+'</span>';
+                    h+='<span style="color:#FFD700;font-weight:700;font-size:12px;">'+board[i].score+'</span></div>';
+                }
+                h+='</div>';
+            }
+
+            h+='</div>';
+            return h;
         }
 
         function qgShowLeaderboardAdmin() {
@@ -30942,42 +31014,100 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(!doc.exists) return;
                 var d=doc.data();
                 var ov=document.createElement('div');ov.id='qgLBModal';
-                ov.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:100001;display:flex;justify-content:center;align-items:center;padding:20px;';
-                var h='<div style="background:rgba(0,0,0,0.85);border:3px solid #FFD700;border-radius:16px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;">';
-                h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#FFD700;text-align:center;margin-bottom:20px;">🏆 LEADERBOARD</div>';
-                h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
-                // Beginner
-                h+='<div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;color:#41c0ff;margin-bottom:10px;text-align:center;">🌱 BEGINNER</div>';
-                (d.leaderboard_beginner||[]).forEach(function(p,i){
-                    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-                    h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
-                    h+='<span style="color:#fff;">'+medal+' '+renderEmoji(p.emoji,20)+' '+escapeHtml(p.name)+'</span>';
-                    h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
-                });
-                if(!(d.leaderboard_beginner||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
+                ov.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.92);z-index:100001;display:flex;justify-content:center;align-items:center;padding:20px;';
+                var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;">';
+                h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;text-align:center;margin-bottom:24px;">🏆 LEADERBOARD</div>';
+                h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">';
+                h+=qgBuildList(d.leaderboard_beginner||[],'🌱 BEGINNER','#41c0ff',null);
+                h+=qgBuildList(d.leaderboard_advanced||[],'🌟 ADVANCED','#ff7777',null);
                 h+='</div>';
-                // Advanced
-                h+='<div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;margin-bottom:10px;text-align:center;">🌟 ADVANCED</div>';
-                (d.leaderboard_advanced||[]).forEach(function(p,i){
-                    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-                    h+='<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #333;">';
-                    h+='<span style="color:#fff;">'+medal+' '+renderEmoji(p.emoji,20)+' '+escapeHtml(p.name)+'</span>';
-                    h+='<span style="color:#FFD700;font-weight:700;">'+p.score+'</span></div>';
-                });
-                if(!(d.leaderboard_advanced||[]).length) h+='<p style="color:#888;text-align:center;font-size:12px;">No scores yet</p>';
-                h+='</div></div>';
-                h+='<div style="text-align:center;margin-top:16px;"><button onclick="document.getElementById(\'qgLBModal\').remove()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 30px;border-radius:8px;font-size:13px;cursor:pointer;">✕ Close</button></div></div>';
+                h+='<div style="text-align:center;margin-top:20px;"><button onclick="document.getElementById(\'qgLBModal\').remove()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 30px;border-radius:8px;font-size:13px;cursor:pointer;">✕ Close</button></div></div>';
                 ov.innerHTML=h;ov.onclick=function(e){if(e.target===ov)ov.remove();};
                 document.body.appendChild(ov);
             });
         }
 
+        // List-style leaderboard (used between rounds)
+        function qgBuildList(board, label, labelColor, myName) {
+            var h='<div style="text-align:center;">';
+            h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:'+labelColor+';margin-bottom:12px;">'+label+'</div>';
+            if(!board||board.length===0){h+='<p style="color:#888;font-size:12px;">No scores yet</p></div>';return h;}
+            var top10=board.slice(0,10);
+            var myIdx=-1;
+            if(myName){for(var i=0;i<board.length;i++){if(board[i].name===myName){myIdx=i;break;}}}
+            for(var i=0;i<top10.length;i++){
+                var p=top10[i];
+                var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'<span style="color:#888;font-size:11px;width:22px;display:inline-block;text-align:center;">'+(i+1)+'.</span>';
+                var isMe=myName&&p.name===myName;
+                var bg=isMe?'background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.4);':'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);';
+                h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;border-radius:8px;'+bg+'">';
+                h+='<div style="display:flex;align-items:center;gap:8px;">';
+                h+='<span>'+medal+'</span>';
+                h+='<span>'+renderEmoji(p.emoji,22)+'</span>';
+                h+='<span style="color:#fff;font-size:13px;font-weight:600;">'+escapeHtml(p.name)+'</span>';
+                if(isMe) h+='<span style="color:#FFD700;font-size:11px;font-weight:700;margin-left:4px;">⬅ YOU</span>';
+                h+='</div>';
+                h+='<span style="color:#FFD700;font-weight:700;font-size:13px;">'+p.score+'</span></div>';
+            }
+            // If player is outside top 10, show them below
+            if(myName&&myIdx>=10){
+                var p=board[myIdx];
+                h+='<div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.4);">';
+                h+='<div style="display:flex;align-items:center;gap:8px;">';
+                h+='<span style="color:#888;font-size:11px;width:22px;display:inline-block;text-align:center;">'+(myIdx+1)+'.</span>';
+                h+='<span>'+renderEmoji(p.emoji,22)+'</span>';
+                h+='<span style="color:#fff;font-size:13px;font-weight:600;">'+escapeHtml(p.name)+'</span>';
+                h+='<span style="color:#FFD700;font-size:11px;font-weight:700;margin-left:4px;">⬅ YOU</span>';
+                h+='</div>';
+                h+='<span style="color:#FFD700;font-weight:700;font-size:13px;">'+p.score+'</span></div>';
+            }
+            h+='</div>';
+            return h;
+        }
+
         async function qgFinish() {
             clearInterval(qg.timer);
-            if(qg.sessionId) await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'finished'});
+            // Show podium before finishing
+            if(qg.sessionId){
+                try{
+                    // Read leaderboards from players subcollection (accumulated scores)
+                    var allPlayers=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get();
+                    var begBoard=[],advBoard=[];
+                    allPlayers.forEach(function(d){
+                        var p=d.data();
+                        var entry={name:p.name,emoji:p.emoji,score:p.score||0};
+                        if(p.level==='beginner')begBoard.push(entry);else advBoard.push(entry);
+                    });
+                    begBoard.sort(function(a,b){return b.score-a.score;});
+                    advBoard.sort(function(a,b){return b.score-a.score;});
+                    await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
+                        status:'finished',
+                        leaderboard_beginner:begBoard,
+                        leaderboard_advanced:advBoard
+                    });
+                    // Show podium modal
+                    var ov=document.createElement('div');ov.id='qgLBModal';
+                    ov.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.92);z-index:100001;display:flex;justify-content:center;align-items:center;padding:20px;';
+                    var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;">';
+                    h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;text-align:center;margin-bottom:8px;">🏆 FINAL STANDINGS</div>';
+                    h+='<div style="font-size:30px;text-align:center;margin-bottom:20px;">🎊🏁🎊</div>';
+                    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">';
+                    h+=qgBuildPodium(begBoard.slice(0,10),'🌱 BEGINNER','#41c0ff');
+                    h+=qgBuildPodium(advBoard.slice(0,10),'🌟 ADVANCED','#ff7777');
+                    h+='</div>';
+                    h+='<div style="text-align:center;margin-top:20px;"><button onclick="document.getElementById(\'qgLBModal\').remove();qgAfterFinish();" style="background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;padding:12px 30px;border-radius:8px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">✕ Close Game</button></div></div>';
+                    ov.innerHTML=h;
+                    document.body.appendChild(ov);
+                }catch(e){
+                    console.error('Finish error:',e);
+                    await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'finished'});
+                    qgAfterFinish();
+                }
+            } else { qgAfterFinish(); }
+        }
+        function qgAfterFinish(){
             if(qg.unsubSession){qg.unsubSession();qg.unsubSession=null;}
             if(qg.unsubPlayers){qg.unsubPlayers();qg.unsubPlayers=null;}
-            alert('🏁 Game finished!');
             qg.sessionId=null;qg.currentRound=-1;qgRenderSetup();
         }
 
@@ -31375,30 +31505,44 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowResult(d,area,status) {
-            if(status){status.textContent='🏆 ROUND RESULTS';status.style.color='#FFD700';}
+            if(status){status.textContent='\u{1F3C6} ROUND RESULTS';status.style.color='#FFD700';}
             var board=(qs.playerLevel==='beginner')?(d.leaderboard_beginner||[]):(d.leaderboard_advanced||[]);
-            // Only show if area doesn't already have feedback popup open
-            if(area.querySelector('[data-round]'))return; // still in recording mode
+            if(area.querySelector('[data-round]'))return;
+            var levelLabel=qs.playerLevel==='beginner'?'\u{1F331} BEGINNER':'\u{1F31F} ADVANCED';
+            var levelColor=qs.playerLevel==='beginner'?'#41c0ff':'#ff7777';
             var h='<div style="margin-top:16px;background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;">';
-            h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:11px;color:#FFD700;text-align:center;margin-bottom:14px;">🏆 TOP 5</div>';
-            var top5=board.slice(0,5);
-            if(top5.length===0) h+='<p style="text-align:center;color:#888;">No scores yet.</p>';
-            top5.forEach(function(p,i){
-                var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-                var isMe=p.name===qs.playerName;
-                h+='<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #333;'+(isMe?'background:rgba(255,0,255,0.1);border-radius:6px;':'')+'">';
-                h+='<span style="color:#fff;font-size:14px;">'+medal+' '+renderEmoji(p.emoji,18)+' '+escapeHtml(p.name)+(isMe?' ⬅️':'')+'</span>';
-                h+='<span style="color:#FFD700;font-weight:700;font-size:14px;">'+p.score+'</span></div>';
-            });
+            h+=qgBuildList(board,levelLabel,levelColor,qs.playerName);
             h+='</div>';
             area.innerHTML=h;
         }
 
         function qsShowFinished(area,status) {
-            if(status){status.textContent='🏁 GAME OVER';status.style.color='#00ff88';}
-            area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">🏁</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
+            if(status){status.textContent='\u{1F3C1} GAME OVER';status.style.color='#00ff88';}
+            // Fetch final leaderboard and show podium for their level
+            if(qs.sessionId){
+                db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
+                    if(!doc.exists)return;
+                    var d=doc.data();
+                    var board=(qs.playerLevel==='beginner')?(d.leaderboard_beginner||[]):(d.leaderboard_advanced||[]);
+                    var levelLabel=qs.playerLevel==='beginner'?'\u{1F331} BEGINNER':'\u{1F31F} ADVANCED';
+                    var levelColor=qs.playerLevel==='beginner'?'#41c0ff':'#ff7777';
+                    var h='<div style="margin-top:16px;text-align:center;padding:10px;">';
+                    h+='<div style="font-size:30px;margin-bottom:8px;">\u{1F389}\u{1F3C1}\u{1F389}</div>';
+                    h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#FFD700;margin-bottom:16px;">FINAL STANDINGS</div>';
+                    h+=qgBuildPodium(board,levelLabel,levelColor);
+                    // Show player position
+                    var myIdx=-1;
+                    for(var mi=0;mi<board.length;mi++){if(board[mi].name===qs.playerName){myIdx=mi;break;}}
+                    if(myIdx>=0){
+                        h+='<div style="margin-top:14px;font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">You finished #'+(myIdx+1)+' with '+board[myIdx].score+' pts!</div>';
+                    }
+                    h+='</div>';
+                    area.innerHTML=h;
+                });
+            } else {
+                area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">\u{1F3C1}</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
+            }
         }
-
     </script>
 
 <!-- ═══════════════════════════════════════════════════════ -->
