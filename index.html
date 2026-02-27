@@ -8981,6 +8981,8 @@
         // ==================== TUESDAY READING CLASS ====================
         var trSets = [];
         var trInputMode = 'text';
+        var trMaterialDocId = null;
+        var trMaterialSlides = null;
         var trGeneratedCards = [];
         var TR_MAX_SETS = 10;
 
@@ -9047,11 +9049,16 @@
                 if (!doc.exists) { alert('Not found.'); return; }
                 var data = doc.data();
 
+                // Save material reference for quiz game
+                trMaterialDocId = docId;
+                trMaterialSlides = null;
+
                 // Extract all sentences from the slides
                 var allSentences = [];
                 if (data.slides) {
                     try {
                         var slides = JSON.parse(data.slides);
+                        trMaterialSlides = slides;
                         for (var i = 0; i < slides.length; i++) {
                             if (slides[i].sentences) {
                                 for (var j = 0; j < slides[i].sentences.length; j++) {
@@ -30505,15 +30512,33 @@ Return ONLY this JSON (no markdown, no code blocks):
                         ti++;
                     }
                 var roomCode = Math.random().toString(36).substring(2,8).toUpperCase();
+                // Build sentence-to-slide mapping for PDF/slide navigation
+                var sentenceSlideMap = [];
+                if (trMaterialSlides) {
+                    var si = 0;
+                    for (var ms = 0; ms < trMaterialSlides.length; ms++) {
+                        if (trMaterialSlides[ms].sentences) {
+                            for (var mj = 0; mj < trMaterialSlides[ms].sentences.length; mj++) {
+                                sentenceSlideMap.push({ slideIdx: ms, sentenceIdx: mj, korean: trMaterialSlides[ms].sentences[mj] });
+                                si++;
+                            }
+                        }
+                    }
+                }
                 var doc = await db.collection(QUIZ_GAME_COLLECTION).add({
                     roomCode: roomCode, status:'lobby', currentRound:-1,
                     totalRounds: qg.sets.length, roundTime: roundTime,
                     roundStartedAt: null,
                     sets: qg.sets.map(function(s){return{setIndex:s.setIndex,sentences:s.sentences};}),
                     leaderboard_beginner:[], leaderboard_advanced:[],
+                    materialDocId: trMaterialDocId || null,
+                    materialSlides: trMaterialSlides ? JSON.stringify(trMaterialSlides) : null,
+                    sentenceSlideMap: sentenceSlideMap,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 qg.sessionId = doc.id;
+                qg.materialSlides = trMaterialSlides || null;
+                qg.sentenceSlideMap = sentenceSlideMap || [];
                 var pageUrl = window.location.href.split('?')[0].split('#')[0];
                 var studentUrl = pageUrl + '?quizgame=' + roomCode;
                 await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({studentUrl:studentUrl});
@@ -30583,6 +30608,14 @@ Return ONLY this JSON (no markdown, no code blocks):
             qgShowAdminRound(next);
         }
 
+        // Sequential audio player state
+        var qgAudioQueue=[];
+        var qgAudioIdx=-1;
+        var qgAudioPlaying=false;
+        var qgAudioSpeed=1;
+        var qgAudioEl=null;
+        var qgAudioTTSCache={};
+
         function qgShowAdminRound(ri) {
             document.getElementById('quizGameLobbyView').style.display='none';
             var el=document.getElementById('quizGamePlayView');el.style.display='block';
@@ -30592,28 +30625,72 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div id="qgTimer" style="font-family:\'Press Start 2P\';font-size:24px;color:#e0e0e0;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+tl+'</div></div>';
             h+='<div style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;height:10px;margin-bottom:20px;overflow:hidden;">';
             h+='<div id="qgTimerBar" style="width:100%;height:100%;background:linear-gradient(90deg,#41c0ff,#ff7777);border-radius:20px;transition:width '+tl+'s linear;"></div></div>';
-            // Two columns
-            h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">';
-            // Left - Beginner
-            h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
-            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#41c0ff;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;margin-bottom:14px;">🌱 BEGINNER</div>';
-            h+='<div style="font-size:22px;color:#fff;text-align:center;line-height:1.6;padding:10px;">'+escapeHtml(set.sentences[0].korean)+'</div>';
-            if(set.sentences[0].english) h+='<div style="font-size:13px;color:#888;text-align:center;margin-top:10px;">'+escapeHtml(set.sentences[0].english)+'</div>';
-            h+='</div>';
-            // Right - Advanced
-            h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
-            h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#ff7777;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;margin-bottom:14px;">🌟 ADVANCED</div>';
-            for(var j=0;j<set.sentences.length;j++){
-                h+='<div style="font-size:'+(set.sentences.length>2?'18':'22')+'px;color:#fff;text-align:center;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
-                if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
+
+            // ── SLIDE VIEWER + DRAWPAD ──
+            var slideIdx=-1;
+            if(qg.materialSlides && qg.sentenceSlideMap && qg.sentenceSlideMap.length>0){
+                var firstK=set.sentences[0].korean;
+                for(var sm=0;sm<qg.sentenceSlideMap.length;sm++){
+                    if(qg.sentenceSlideMap[sm].korean===firstK){slideIdx=qg.sentenceSlideMap[sm].slideIdx;break;}
+                }
             }
-            h+='</div></div>';
+            if(slideIdx>=0 && qg.materialSlides && qg.materialSlides[slideIdx]){
+                var slide=qg.materialSlides[slideIdx];
+                h+='<div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;margin-bottom:20px;border:2px solid rgba(65,192,255,0.2);box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
+                h+='<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;" crossorigin="anonymous">';
+                h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:12px;">';
+                for(var ss=0;ss<slide.sentences.length;ss++){
+                    // Highlight sentences that are in this round
+                    var isInRound=false;
+                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean===slide.sentences[ss]){isInRound=true;break;}}
+                    var sBg=isInRound?'background:rgba(255,255,100,0.25);border-radius:8px;padding:4px 12px;':'padding:4px 12px;opacity:0.5;';
+                    h+='<div style="font-size:28px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;'+sBg+'">'+escapeHtml(slide.sentences[ss])+'</div>';
+                }
+                h+='</div>';
+                // Drawing canvas overlay
+                h+='<canvas id="qgDrawCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;" onmousedown="qgDrawStart(event)" onmousemove="qgDrawMove(event)" onmouseup="qgDrawEnd()" onmouseleave="qgDrawEnd()" ontouchstart="qgDrawStart(event)" ontouchmove="qgDrawMove(event)" ontouchend="qgDrawEnd()"></canvas>';
+                // Draw controls
+                h+='<div style="position:absolute;top:8px;right:8px;z-index:3;display:flex;gap:4px;">';
+                h+='<button onclick="qgDrawColor=\'#ff0000\'" style="width:24px;height:24px;border-radius:50%;background:#ff0000;border:2px solid #fff;cursor:pointer;"></button>';
+                h+='<button onclick="qgDrawColor=\'#0066ff\'" style="width:24px;height:24px;border-radius:50%;background:#0066ff;border:2px solid #fff;cursor:pointer;"></button>';
+                h+='<button onclick="qgDrawColor=\'#00cc00\'" style="width:24px;height:24px;border-radius:50%;background:#00cc00;border:2px solid #fff;cursor:pointer;"></button>';
+                h+='<button onclick="qgDrawColor=\'#ffcc00\'" style="width:24px;height:24px;border-radius:50%;background:#ffcc00;border:2px solid #fff;cursor:pointer;"></button>';
+                h+='<button onclick="qgDrawClear()" style="padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.6);border:1px solid #888;color:#fff;font-size:11px;cursor:pointer;">✕</button>';
+                h+='</div>';
+                h+='</div>';
+            } else {
+                // Fallback: show sentences as text if no material slides
+                h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-align:center;">';
+                for(var j=0;j<set.sentences.length;j++){
+                    h+='<div style="font-size:22px;color:#fff;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
+                    if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
+                }
+                h+='</div>';
+            }
+
             // Submission tracker
             h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">📊 SUBMISSIONS</div>';
             h+='<div id="qgSubTracker" style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
-            // Listen All
+
+            // ── LISTEN ALL (Sequential Player) ──
             h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">🔊 LISTEN ALL</div>';
-            h+='<div id="qgListenAll" style="background:rgba(255,119,119,0.03);border:1px solid rgba(255,119,119,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-size:12px;color:#888;">Recordings will appear here as students submit...</div></div>';
+            h+='<div id="qgListenAll" style="background:rgba(255,119,119,0.03);border:1px solid rgba(255,119,119,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
+            h+='<div id="qgListenControls" style="display:none;margin-bottom:10px;">';
+            h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+            h+='<button id="qgPlayAllBtn" onclick="qgPlayAll()" style="background:linear-gradient(135deg,#ff9800,#f57c00);border:none;color:#000;font-weight:700;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;">▶ Play All</button>';
+            h+='<button onclick="qgStopAll()" style="background:rgba(255,255,255,0.1);border:1px solid #666;color:#ccc;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">⏹ Stop</button>';
+            h+='<span style="color:#888;font-size:11px;margin-left:4px;">Speed:</span>';
+            var speeds=[0.5,1,1.5,2,3,5];
+            for(var sp=0;sp<speeds.length;sp++){
+                var isActive=speeds[sp]===1?'background:#ff9800;color:#000;border-color:#ff9800;':'background:rgba(255,255,255,0.08);color:#ccc;border-color:#555;';
+                h+='<button onclick="qgSetSpeed('+speeds[sp]+',this)" class="qgSpeedBtn" style="'+isActive+'padding:4px 8px;border-radius:6px;border:1px solid;font-size:11px;cursor:pointer;font-weight:600;">'+speeds[sp]+'x</button>';
+            }
+            h+='</div>';
+            h+='<div id="qgNowPlaying" style="margin-top:8px;font-size:11px;color:#888;display:none;"></div>';
+            h+='</div>';
+            h+='<div id="qgListenList" style="font-size:12px;color:#888;">Recordings will appear here as students submit...</div>';
+            h+='</div></div>';
+
             // Buttons
             h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
@@ -30621,6 +30698,15 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<button onclick="qgShowLeaderboardAdmin()" style="background:linear-gradient(135deg,#f0c040,#d4a017);border:none;color:#1a1a2e;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;text-shadow:-2px -2px 0 rgba(0,0,0,0.3),2px -2px 0 rgba(0,0,0,0.3),-2px 2px 0 rgba(0,0,0,0.3),2px 2px 0 rgba(0,0,0,0.3);font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏆 LEADERBOARD</button>';
             h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
             el.innerHTML=h;
+
+            // Init draw canvas
+            if(slideIdx>=0){
+                setTimeout(function(){
+                    var cv=document.getElementById('qgDrawCanvas');
+                    if(cv){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;qgDrawCtx=cv.getContext('2d');qgDrawCtx.lineCap='round';qgDrawCtx.lineJoin='round';qgDrawCtx.lineWidth=3;}
+                },100);
+            }
+
             // Animate timer bar
             requestAnimationFrame(function(){var bar=document.getElementById('qgTimerBar');if(bar)bar.style.width='0%';});
             clearInterval(qg.timer);
@@ -30631,8 +30717,125 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(te){te.textContent=timeLeft;if(timeLeft<=10){te.style.color='#e87777';}}
                 if(timeLeft<=0){clearInterval(qg.timer);qgEndRound();}
             },1000);
+            // Reset audio player state
+            qgStopAll();
+            qgAudioQueue=[];
             // Listen for submissions
             qgListenSubmissions(ri);
+        }
+
+        // ── DRAWPAD ──
+        var qgDrawCtx=null;
+        var qgDrawing=false;
+        var qgDrawColor='#ff0000';
+
+        function qgDrawStart(e){
+            e.preventDefault();qgDrawing=true;
+            if(!qgDrawCtx)return;
+            qgDrawCtx.strokeStyle=qgDrawColor;
+            qgDrawCtx.beginPath();
+            var r=e.target.getBoundingClientRect();
+            var x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+            var y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+            var sx=e.target.width/r.width;var sy=e.target.height/r.height;
+            qgDrawCtx.moveTo(x*sx,y*sy);
+        }
+        function qgDrawMove(e){
+            if(!qgDrawing||!qgDrawCtx)return;e.preventDefault();
+            var r=e.target.getBoundingClientRect();
+            var x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+            var y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+            var sx=e.target.width/r.width;var sy=e.target.height/r.height;
+            qgDrawCtx.lineTo(x*sx,y*sy);qgDrawCtx.stroke();
+        }
+        function qgDrawEnd(){qgDrawing=false;}
+        function qgDrawClear(){
+            if(!qgDrawCtx)return;
+            var cv=qgDrawCtx.canvas;qgDrawCtx.clearRect(0,0,cv.width,cv.height);
+        }
+
+        // ── SEQUENTIAL LISTEN ALL PLAYER ──
+        function qgSetSpeed(s,btn){
+            qgAudioSpeed=s;
+            if(qgAudioEl)qgAudioEl.playbackRate=s;
+            document.querySelectorAll('.qgSpeedBtn').forEach(function(b){
+                b.style.background='rgba(255,255,255,0.08)';b.style.color='#ccc';b.style.borderColor='#555';
+            });
+            if(btn){btn.style.background='#ff9800';btn.style.color='#000';btn.style.borderColor='#ff9800';}
+        }
+
+        function qgStopAll(){
+            qgAudioPlaying=false;qgAudioIdx=-1;
+            if(qgAudioEl){qgAudioEl.pause();qgAudioEl.src='';qgAudioEl=null;}
+            var np=document.getElementById('qgNowPlaying');if(np)np.style.display='none';
+            // Remove highlights
+            document.querySelectorAll('.qgListItem').forEach(function(el){el.style.background='rgba(0,0,0,0.3)';});
+            var btn=document.getElementById('qgPlayAllBtn');if(btn)btn.innerHTML='▶ Play All';
+        }
+
+        async function qgPlayAll(){
+            if(qgAudioPlaying){qgStopAll();return;}
+            if(qgAudioQueue.length===0)return;
+            qgAudioPlaying=true;
+            var btn=document.getElementById('qgPlayAllBtn');if(btn)btn.innerHTML='⏸ Pause';
+            var np=document.getElementById('qgNowPlaying');if(np)np.style.display='block';
+            qgAudioIdx=0;
+            qgPlayNext();
+        }
+
+        async function qgPlayNext(){
+            if(!qgAudioPlaying||qgAudioIdx>=qgAudioQueue.length){qgStopAll();return;}
+            var item=qgAudioQueue[qgAudioIdx];
+            // Highlight current item
+            document.querySelectorAll('.qgListItem').forEach(function(el,i){
+                el.style.background=i===qgAudioIdx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';
+            });
+            var np=document.getElementById('qgNowPlaying');
+            if(np)np.innerHTML='🔊 Now playing: <strong style="color:#ff9800;">'+escapeHtml(item.name)+'</strong> ('+(qgAudioIdx+1)+'/'+qgAudioQueue.length+')';
+
+            // 1. Play TTS name announcement
+            try{
+                var ttsBlob=qgAudioTTSCache[item.name];
+                if(!ttsBlob){
+                    var ttsResp=await fetch('https://tts-proxy-386010826708.us-central1.run.app',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:item.name})
+                    });
+                    if(ttsResp.ok){ttsBlob=await ttsResp.blob();qgAudioTTSCache[item.name]=ttsBlob;}
+                }
+                if(ttsBlob){
+                    await qgPlayBlob(ttsBlob,1);
+                }
+            }catch(e){console.log('TTS error:',e);}
+
+            if(!qgAudioPlaying)return;
+
+            // 2. Play student recording
+            try{
+                if(item.audioUrl){
+                    var resp=await fetch(item.audioUrl);
+                    var blob=await resp.blob();
+                    await qgPlayBlob(blob,qgAudioSpeed);
+                }
+            }catch(e){console.log('Audio play error:',e);}
+
+            if(!qgAudioPlaying)return;
+
+            // Next
+            qgAudioIdx++;
+            qgPlayNext();
+        }
+
+        function qgPlayBlob(blob,speed){
+            return new Promise(function(resolve){
+                if(!qgAudioPlaying){resolve();return;}
+                var url=URL.createObjectURL(blob);
+                qgAudioEl=new Audio(url);
+                qgAudioEl.playbackRate=speed;
+                qgAudioEl.onended=function(){URL.revokeObjectURL(url);resolve();};
+                qgAudioEl.onerror=function(){URL.revokeObjectURL(url);resolve();};
+                qgAudioEl.play().catch(function(){resolve();});
+            });
         }
 
         function qgListenSubmissions(round) {
@@ -30640,9 +30843,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             qg.unsubSession = db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB)
                 .where('round','==',round).onSnapshot(function(snap){
                 var tracker=document.getElementById('qgSubTracker');
-                var listenEl=document.getElementById('qgListenAll');
-                if(!tracker||!listenEl) return;
-                if(snap.empty){tracker.innerHTML='Waiting for recordings...';listenEl.innerHTML='Recordings will appear here...';return;}
+                var listEl=document.getElementById('qgListenList');
+                var ctrlEl=document.getElementById('qgListenControls');
+                if(!tracker||!listEl) return;
+                if(snap.empty){tracker.innerHTML='Waiting for recordings...';listEl.innerHTML='<span style="color:#888;">Recordings will appear here as students submit...</span>';if(ctrlEl)ctrlEl.style.display='none';return;}
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
                 // Tracker
                 var begSubs=subs.filter(function(s){return s.level==='beginner';});
@@ -30651,13 +30855,15 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var trackerHtml='<span style="color:#41c0ff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff7777;">🌟 Advanced: '+advSubs.length+' submitted</span>';
                 if(gradingCount>0) trackerHtml+=' &bull; <span style="color:#fbbf24;">⏳ '+gradingCount+' grading...</span>';
                 tracker.innerHTML=trackerHtml;
-                // Listen All - audio players
+
+                // Update audio queue (only graded subs with audio)
+                qgAudioQueue=[];
                 var lh='';
-                subs.forEach(function(s){
+                subs.forEach(function(s,idx){
                     var isGrading=s.status==='grading';
                     var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var borderColor=isGrading?'#fbbf2444':lc+'33';
-                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;">';
+                    lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;cursor:pointer;" onclick="qgPlaySingle('+qgAudioQueue.length+')">';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
                     if(isGrading){
@@ -30665,12 +30871,43 @@ Return ONLY this JSON (no markdown, no code blocks):
                     } else {
                         lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
                     }
-                    if(s.audioUrl) lh+='<audio controls preload="none" style="height:32px;max-width:200px;" src="'+s.audioUrl+'"></audio>';
+                    if(isGrading){
+                        lh+='<span style="font-size:11px;color:#fbbf24;">⏳</span>';
+                    } else {
+                        lh+='<span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';
+                    }
                     lh+='</div>';
+
+                    if(s.audioUrl && s.status!=='grading'){
+                        qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0});
+                    }
                 });
-                listenEl.innerHTML=lh||'No recordings yet.';
+                listEl.innerHTML=lh||'<span style="color:#888;">No recordings yet.</span>';
+
+                // Show controls if we have any audio
+                if(ctrlEl) ctrlEl.style.display=qgAudioQueue.length>0?'block':'none';
             });
         }
+
+        // Play a single student's recording
+        async function qgPlaySingle(idx){
+            if(idx<0||idx>=qgAudioQueue.length)return;
+            qgStopAll();
+            var item=qgAudioQueue[idx];
+            try{
+                var resp=await fetch(item.audioUrl);
+                var blob=await resp.blob();
+                qgAudioPlaying=true;
+                document.querySelectorAll('.qgListItem').forEach(function(el,i){
+                    el.style.background=i===idx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';
+                });
+                var np=document.getElementById('qgNowPlaying');
+                if(np){np.style.display='block';np.innerHTML='🔊 Playing: <strong style="color:#ff9800;">'+escapeHtml(item.name)+'</strong>';}
+                await qgPlayBlob(blob,qgAudioSpeed);
+                qgStopAll();
+            }catch(e){console.log('Play error:',e);qgStopAll();}
+        }
+
 
         async function qgEndRound() {
             clearInterval(qg.timer);
