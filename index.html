@@ -31480,7 +31480,23 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var wavBase64=await blobToWavBase64(qs.localBlob);
 
-                // Get standard pronunciation from g2pk service
+                // ========== AZURE PRONUNCIATION ASSESSMENT ==========
+                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
+                var azureResult=null;
+                try{
+                    statusEl.textContent='🔍 Analyzing pronunciation...';
+                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
+                    });
+                    if(azResp.ok){
+                        azureResult=await azResp.json();
+                        if(azureResult.error && azureResult.accuracy===0) azureResult=null;
+                        console.log('Azure result:',JSON.stringify(azureResult));
+                    }
+                }catch(e){console.log('Azure unavailable, falling back to GPT only:',e);}
+
+                // ========== G2PK PRONUNCIATION LOOKUP ==========
                 var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
                 var expectedPronunciation='';
                 try{
@@ -31493,17 +31509,36 @@ Return ONLY this JSON (no markdown, no code blocks):
                         expectedPronunciation=g2pData.pronunciation||'';
                         console.log('g2pk pronunciation:',expectedKorean,'→',expectedPronunciation);
                     }
-                }catch(e){console.log('g2pk unavailable, grading against spelling only:',e);}
+                }catch(e){console.log('g2pk unavailable:',e);}
 
-                // Build grading prompt with pronunciation if available
-
-                // Build grading prompt - focus on LISTENING not string comparison
+                // ========== GPT GRADING (with Azure data if available) ==========
+                statusEl.textContent='📝 Generating feedback...';
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
-                    pronInfo='\nSTANDARD PRONUNCIATION: "'+expectedPronunciation+'"\n(This is how the written text above should actually sound when spoken correctly, according to standard Korean pronunciation rules including liaison/연음, nasalization/비음화, aspiration/격음화, tensification/경음화, ㅎ-weakening/ㅎ탈락, palatalization/구개음화, batchim neutralization, etc.)\n';
+                    pronInfo='\nSTANDARD PRONUNCIATION: "'+expectedPronunciation+'"\n(This shows how the text should sound when spoken correctly per standard Korean pronunciation rules.)\n';
                 }
 
-                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge whether the student\'s PRONUNCIATION is correct. Focus on the SOUNDS you hear, not on text/string comparison.\n\nCRITICAL — UNDERSTANDING TRANSCRIPTION vs PRONUNCIATION:\nYour transcription will use standard Korean spelling (orthographic form). The pronunciation guide above uses phonetic spelling. These often look different but represent THE SAME SOUND.\n- If your transcription of a word matches the WRITTEN form → the word is CORRECT (the student read the right text).\n- If your transcription matches the PRONUNCIATION form → the word is also CORRECT.\n- A word is ONLY WRONG if what you hear matches NEITHER the written form NOR the pronunciation form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n- Example: Written form says 않았어요, pronunciation guide says 아나써요. If you transcribe 않았어요, that is CORRECT — the student said the right word. Do NOT flag this as "missing the ㅎ sound" or "not applying pronunciation rules."\n- Example: Written form says 고양이였지만, pronunciation guide says 꼬양이엳찌만. If you transcribe 고양이였지만, that is CORRECT.\n- Example: Written form says 찾고, pronunciation guide says 찯꼬. Student says 잡꼬 — this matches NEITHER form, so it IS an error.\n\nWHAT TO ACTUALLY PENALIZE (genuine errors only):\n- Wrong consonant TYPE: plain(ㄱㄷㅂㅈ) vs aspirated(ㅋㅌㅍㅊ) vs tense(ㄲㄸㅃㅉ) — e.g. saying ㅈ when ㅊ was needed.\n- Wrong vowels: ㅓ vs ㅗ, ㅐ vs ㅔ, ㅜ vs ㅡ, etc.\n- Missing or added syllables/words.\n- Entire words spoken in English instead of Korean.\n- Saying a completely different word than expected.\n\nSCORING:\n- Rate overall pronunciation accuracy from 0 to 100.\n- 0% = entirely English or non-Korean.\n- 100% = all words pronounced correctly.\n- Deduct proportionally based on severity and number of genuine errors.\n- Small errors (slightly off vowel) = small deduction (5-10 pts). Major errors (wrong consonant type, whole word wrong) = larger deduction (10-20 pts).\n\nFEEDBACK RULES:\n- ONLY mention words that were genuinely mispronounced. Do NOT list correct words.\n- For each error, briefly explain what the student said vs what was expected.\n- Keep feedback concise. No numbering every word.\n- If everything was correct or nearly correct, just give a short positive comment.\n\nSELF-CONSISTENCY CHECK (MANDATORY):\n- Before finalizing, verify your score matches your feedback.\n- If you described a word as correct, it MUST be counted as correct in your score.\n- If your feedback mentions only 1 small error out of many words, your score should be 85-95%, not 60%.\n- Count total words spoken. Count genuine errors. Score = roughly ((total - errors) / total) * 100, adjusted for severity.\n\nAlso provide a transcript of what you heard (using standard Korean spelling).\n\nReply ONLY with valid JSON, no other text:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                // If Azure succeeded, include its data in the GPT prompt for better feedback
+                var azureInfo='';
+                if(azureResult){
+                    azureInfo='\n\nAZURE PRONUNCIATION ASSESSMENT RESULTS (from a dedicated pronunciation AI):\n';
+                    azureInfo+='- Overall Accuracy: '+azureResult.accuracy+'/100\n';
+                    azureInfo+='- Fluency: '+azureResult.fluency+'/100\n';
+                    azureInfo+='- Completeness: '+azureResult.completeness+'/100\n';
+                    azureInfo+='- Pronunciation Score: '+azureResult.pronunciation+'/100\n';
+                    azureInfo+='- Azure Transcript: "'+azureResult.transcript+'"\n';
+                    if(azureResult.words && azureResult.words.length>0){
+                        var errorWords=azureResult.words.filter(function(w){return w.error_type && w.error_type!=='None';});
+                        if(errorWords.length>0){
+                            azureInfo+='- Words with errors: '+errorWords.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
+                        }else{
+                            azureInfo+='- All words recognized correctly by Azure.\n';
+                        }
+                    }
+                    azureInfo+='\nUse the Azure scores as a STRONG reference. Your final score should be close to Azure\'s pronunciation score. If Azure gave a low accuracy score for a word, that word was likely mispronounced even if you think it sounds OK. Trust Azure for phonetic accuracy.\n';
+                }
+
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense).\n- Wrong vowels.\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Keep feedback concise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31523,7 +31558,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var aiData=await aiResp.json();
                 console.log('GPT-4o audio response:', JSON.stringify(aiData).substring(0,500));
 
-                // Parse response — proxy returns {success:true, data:...}
+                // Parse GPT response
                 var rt='';
                 if(aiData.data && typeof aiData.data==='string') rt=aiData.data;
                 else if(aiData.data && typeof aiData.data==='object') rt=JSON.stringify(aiData.data);
@@ -31544,10 +31579,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                     grade=parsed;
                     transcript=parsed.transcript||'';
                 }catch(e){
-                    var m=rt.match(/{[\s\S]*}/);
+                    var m=rt.match(/\{[\s\S]*\}/);
                     if(m)try{grade=JSON.parse(m[0]);transcript=grade.transcript||'';}catch(e2){}
                     if(!transcript){
-                        // Extract fields individually as last resort
                         var sm=rt.match(/"score"\s*:\s*(\d+)/);
                         var fm=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                         var tm=rt.match(/"transcript"\s*:\s*"((?:[^"\\]|\\.)*)"/);
@@ -31556,7 +31590,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                         if(tm){grade.transcript=tm[1];transcript=tm[1];}
                     }
                 }
+
+                // ========== HYBRID SCORING: 70% Azure + 30% GPT ==========
+                var gptScore=typeof grade.score==='number'?grade.score:0;
+                if(azureResult && typeof azureResult.pronunciation==='number'){
+                    var azureScore=azureResult.pronunciation;
+                    var hybridScore=Math.round(azureScore*0.7 + gptScore*0.3);
+                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' → Final='+hybridScore);
+                    grade.score=hybridScore;
+                    grade.feedback=(grade.feedback||'')+' [Azure: '+azureScore+'/100]';
+                }else{
+                    console.log('GPT-only score:',gptScore);
+                }
                 console.log('Final grade:', grade.score, '/', transcript);
+
 
                 // 4. Save submission to Firestore
                 var finalScore = typeof grade.score === 'number' ? grade.score : 0;
