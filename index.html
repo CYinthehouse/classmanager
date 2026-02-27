@@ -30403,7 +30403,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             btn.classList.add('sparkle-btn');
             btn.style.position='relative';btn.style.overflow='visible';
             // Position each sparkle differently
-            var positions=[{t:'10%',l:'-5%'},{t:'85%',l:'10%'},{t:'25%',l:'50%'},{t:'75%',l:'85%'},{t:'15%',l:'105%'}];
+            var positions=[{t:'10%',l:'5%'},{t:'85%',l:'15%'},{t:'25%',l:'50%'},{t:'75%',l:'80%'},{t:'15%',l:'92%'}];
             var delays=[1,2,3,2,4];
             var scales=[1.1,1.25,1.1,0.9,0.8];
             for(var i=0;i<5;i++){
@@ -30647,15 +30647,24 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Tracker
                 var begSubs=subs.filter(function(s){return s.level==='beginner';});
                 var advSubs=subs.filter(function(s){return s.level==='advanced';});
-                tracker.innerHTML='<span style="color:#41c0ff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff7777;">🌟 Advanced: '+advSubs.length+' submitted</span>';
+                var gradingCount=subs.filter(function(s){return s.status==='grading';}).length;
+                var trackerHtml='<span style="color:#41c0ff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff7777;">🌟 Advanced: '+advSubs.length+' submitted</span>';
+                if(gradingCount>0) trackerHtml+=' &bull; <span style="color:#fbbf24;">⏳ '+gradingCount+' grading...</span>';
+                tracker.innerHTML=trackerHtml;
                 // Listen All - audio players
                 var lh='';
                 subs.forEach(function(s){
+                    var isGrading=s.status==='grading';
                     var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
-                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
+                    var borderColor=isGrading?'#fbbf2444':lc+'33';
+                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;">';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
-                    lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
+                    if(isGrading){
+                        lh+='<div style="font-size:10px;color:#fbbf24;">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; ⏳ Grading...</div></div>';
+                    } else {
+                        lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
+                    }
                     if(s.audioUrl) lh+='<audio controls preload="none" style="height:32px;max-width:200px;" src="'+s.audioUrl+'"></audio>';
                     lh+='</div>';
                 });
@@ -30777,6 +30786,8 @@ Return ONLY this JSON (no markdown, no code blocks):
 ];
 
         function qsInit(roomCode) {
+            // Inject sparkle CSS into head so it survives body.innerHTML clearing
+            if(!document.querySelector('#sparkleStyles')){var ss=document.createElement('style');ss.id='sparkleStyles';ss.textContent='.sparkle-btn{position:relative;overflow:visible;transition:transform 0.2s,box-shadow 0.2s;}.sparkle-btn:hover{transform:scale(1.05) translateY(-2px) !important;box-shadow:0 6px 20px rgba(255,119,119,0.4) !important;}.sparkle-btn:active{transform:scale(0.98) !important;}.sparkle-btn .sparkle-svg{opacity:0;}.sparkle-btn:hover .sparkle-svg{animation:qgSparkle 0.75s both;}.sparkle-btn:hover .sparkle-svg:nth-of-type(1){animation-delay:0.15s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(2){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(3){animation-delay:0.45s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(4){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(5){animation-delay:0.6s;}@keyframes qgSparkle{0%{transform:translate(-50%,-50%) scale(0);opacity:0;}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}.sparkle-btn::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(108deg,transparent 0% 40%,rgba(255,255,255,0.3) 40% 45%,transparent 45% 55%,rgba(255,255,255,0.2) 55% 65%,transparent 65%);background-size:200% 100%;background-position:200% 0;transition:background-position 0s;pointer-events:none;z-index:2;}.sparkle-btn:hover::after{background-position:-200% 0;transition:background-position 1.2s 0.2s ease-out;}';document.head.appendChild(ss);}
             document.body.innerHTML='';
             document.body.style.cssText='margin:0;padding:0;min-height:100vh;background:#0a0a15;font-family:"Noto Sans",sans-serif;color:#fff;overflow-x:hidden;';
             if(!document.querySelector('link[href*="Press+Start+2P"]')){var fl=document.createElement('link');fl.href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';fl.rel='stylesheet';document.head.appendChild(fl);}
@@ -30936,13 +30947,22 @@ Return ONLY this JSON (no markdown, no code blocks):
                 await ref.put(qs.localBlob,{contentType:mimeType});
                 var audioUrl=await ref.getDownloadURL();
 
-                statusEl.textContent='⏳ Transcribing & grading...';
-                // Get expected text
+                // 2. Write pending submission immediately so teacher sees it
                 var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
                 var gameData=sessionDoc.data();
                 var set=gameData.sets[gameData.currentRound];
                 var expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
                 var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
+
+                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId, playerName:qs.playerName, emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel, round:gameData.currentRound,
+                    audioUrl:audioUrl, transcript:'', score:0, gradeScore:0, feedback:'',
+                    expectedKorean:expectedKorean, submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                    status:'grading'
+                });
+
+                statusEl.textContent='⏳ Transcribing & grading...';
 
                 // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
                 async function blobToWavBase64(blob) {
@@ -31038,12 +31058,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var finalTranscript = grade.transcript || transcript || '';
                 var points = Math.round(finalScore / 10);
 
-                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
-                    playerId:qs.playerId, playerName:qs.playerName, emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel, round:gameData.currentRound,
-                    audioUrl:audioUrl, transcript:finalTranscript,
+                await pendingRef.update({
+                    transcript:finalTranscript,
                     score:points, gradeScore:finalScore, feedback:finalFeedback,
-                    expectedKorean:expectedKorean, submittedAt:firebase.firestore.FieldValue.serverTimestamp()
+                    status:'graded'
                 });
 
                 // 5. Update player total score
@@ -31176,7 +31194,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 <div id="quizGameSetsPreview" style="max-height:300px; overflow-y:auto; border:1px solid rgba(65,192,255,0.15); border-radius:10px; padding:12px; background:rgba(65,192,255,0.03); box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;"><p style="color:#888;">Loading...</p></div>
 
             </div>
-            <div style="text-align:center;">
+            <div style="text-align:center;overflow:visible;padding:10px 0;">
                 <button id="quizGameCreateBtn" onclick="qgCreateSession()" style="background:linear-gradient(135deg,#ff7777,#e85555); border:none; color:#fff; text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505; padding:16px 48px; border-radius:12px; box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px; font-family:'Press Start 2P'; font-size:11px; cursor:pointer; transition:all 0.2s;">🎮 CREATE GAME</button>
 
             </div>
