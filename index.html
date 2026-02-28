@@ -31688,20 +31688,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptFeedback='';
                 var gptScore=0;
                 try{
-                    var gptPrompt='You are a strict but fair Korean pronunciation coach for English-speaking learners. The student was supposed to say: "'+drillText+'".\n';
+                    var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\n';
                     if(azureResult){
-                        gptPrompt+='Azure pronunciation assessment scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
+                        gptPrompt+='Azure pronunciation scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
                         if(azureResult.words){
                             var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                            if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
+                            if(errW.length>0)gptPrompt+='Azure flagged these words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'. ONLY comment on these words.\n';
                         }
                     }
-                    gptPrompt+='Listen to the audio and grade pronunciation 0-100.\n';
-                    gptPrompt+='CRITICAL RULES:\n';
-                    gptPrompt+='- ㅔ and ㅐ are THE SAME in modern Korean. NEVER flag this as an error.\n';
-                    gptPrompt+='- Use correct terminology: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), ASPIRATED (ㅋㅌㅍㅊ). Say "lacks tensification on ㄲ" or "over-aspirated ㄱ sounds like ㅋ", never "not pronounced clearly".\n';
-                    gptPrompt+='- If you cannot pinpoint the exact vowel/consonant error, explain the pronunciation rule for that word (e.g. "받침 ㅅ in 있었 links as 이썯, requiring tense ㅆ").\n';
-                    gptPrompt+='- NEVER give vague feedback. Be concise — max 2 sentences.\n';
+                    gptPrompt+='RULES:\n';
+                    gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
+                    gptPrompt+='- ONLY comment on words Azure flagged. Do NOT invent errors.\n';
+                    gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification".\n';
+                    gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule for that word instead.\n';
+                    gptPrompt+='- Max 2 sentences.\n';
                     gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
                     var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
@@ -31904,7 +31904,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     azureInfo+='\nUse the Azure scores as a STRONG reference. Your final score should be close to Azure\'s pronunciation score. If Azure gave a low accuracy score for a word, that word was likely mispronounced even if you think it sounds OK. Trust Azure for phonetic accuracy.\n';
                 }
 
-                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nCRITICAL — ㅔ and ㅐ ARE THE SAME IN MODERN KOREAN:\n- These two vowels have merged in modern Korean pronunciation. They are pronounced identically.\n- NEVER flag ㅔ vs ㅐ as an error. They are always equivalent.\n\nCRITICAL — ASPIRATION AND TENSIFICATION TERMINOLOGY:\n- Korean has three consonant types: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), and ASPIRATED (ㅋㅌㅍㅊ).\n- If student says a PLAIN consonant (ㄱ) where a TENSE one (ㄲ) was needed → "lacks tensification on ㄲ, sounds like plain ㄱ"\n- If student says a PLAIN consonant where an ASPIRATED one was needed → "insufficient aspiration on ㅋ, sounds like plain ㄱ"\n- If student says a TENSE or ASPIRATED consonant where a PLAIN one was needed → "over-aspirated ㄱ, sounds like ㅋ/ㄲ"\n- Always use the terms "tensification", "aspiration", "over-aspirated", or "under-aspirated" — never say "not pronounced clearly".\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense) — use correct terminology above.\n- Wrong vowels (except ㅔ/ㅐ which are always equivalent).\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Be SPECIFIC about what was wrong using correct linguistic terms.\n- If you cannot identify the exact vowel or consonant error, provide the specific pronunciation rule for that word instead (e.g. "받침 ㅅ in 있었던 should be pronounced as ㄷ before ㅇ, linking to the next syllable as 이썯떤").\n- NEVER give vague feedback like "vowel inaccuracies" or "consonant issues" or "not pronounced clearly".\n- Keep feedback concise but precise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES — READ CAREFULLY BEFORE GIVING FEEDBACK:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this. They are the same sound.\n\n2. ONLY comment on words Azure flagged as "Mispronunciation" or "Omission". If Azure says a word has error_type "None", DO NOT comment on that word at all.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification issues when the EXPECTED text has a tense consonant (ㄲㄸㅃㅆㅉ) but the student used a plain one.\n - ㅈ in 제가 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㅈ in 오지 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㄱ in 고 is PLAIN ㄱ. Do not say it is under-aspirated.\n - Only flag tensification if the phonetic form shows ㄲㄸㅃㅆㅉ and the student said ㄱㄷㅂㅅㅈ instead.\n\n4. TERMINOLOGY:\n - Plain → Tense error: "lacks tensification, pronounced ㄱ instead of expected ㄲ"\n - Plain → Aspirated error: "insufficient aspiration, pronounced ㄱ instead of expected ㅋ"\n - Tense/Aspirated → Plain error: "over-aspirated/over-tensed"\n\n5. If Azure flagged a word but you cannot hear a specific error, provide the pronunciation RULE for that word instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable as 이써떤"\n - e.g. "않았어요 has a silent ㅎ: pronounced 아나써요"\n Do NOT make up an error you cannot actually hear.\n\n6. Keep feedback to 2-4 items maximum. Only the most important errors.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure scored '+azureResult.pronunciation+'/100. Stay within 10 points of Azure unless you have strong reason.':'')+ '\n- 0% = non-Korean. 100% = perfect.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31962,10 +31962,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(azureResult && typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
                     var hybridScore=Math.round(azureScore*0.7 + gptScore*0.3);
-                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' (after -5) → Final='+hybridScore);
+                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' → Final='+hybridScore);
                     grade.score=hybridScore;
                 }else{
-                    console.log('GPT-only score:',gptScore,'(after -5 adjustment)');
+                    console.log('GPT-only score:',gptScore);
                 }
                 console.log('Final grade:', grade.score, '/', transcript);
 
@@ -32204,21 +32204,23 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }catch(e){console.log('Bonus Azure error:',e);}
 
                 // GPT grading (same as normal round)
-                var gptPrompt='You are a strict but fair Korean pronunciation grader for English-speaking learners.\n';
+                var gptPrompt='You are a Korean pronunciation grading assistant.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
-                gptPrompt+='Phonetic form (how it should sound): "'+phonetic+'"\n';
+                gptPrompt+='Phonetic form (correct pronunciation): "'+phonetic+'"\n';
+                gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
                 if(azureResult){
                     gptPrompt+='Azure pronunciation scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
                     if(azureResult.words){
                         var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                        if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
+                        if(errW.length>0)gptPrompt+='Azure flagged these words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'. ONLY comment on these words.\n';
                     }
                 }
-                gptPrompt+='CRITICAL RULES:\n';
-                gptPrompt+='- ㅔ and ㅐ are THE SAME in modern Korean. NEVER flag this as an error.\n';
-                gptPrompt+='- Use correct terminology: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), ASPIRATED (ㅋㅌㅍㅊ). Say "lacks tensification" or "over-aspirated", never "not pronounced clearly".\n';
-                gptPrompt+='- If you cannot pinpoint the exact vowel/consonant error, explain the pronunciation rule for that word instead (e.g. batchim rules, linking rules).\n';
-                gptPrompt+='- NEVER give vague feedback. Every error must name the specific sound or rule.\n';
+                gptPrompt+='RULES:\n';
+                gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
+                gptPrompt+='- ONLY comment on words Azure flagged. Do NOT invent errors for words Azure marked as correct.\n';
+                gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when expected text has ㄲㄸㅃㅆㅉ but student said ㄱㄷㅂㅅㅈ.\n';
+                gptPrompt+='- If you cannot hear a specific error on a flagged word, give the pronunciation rule instead (e.g. batchim linking, silent ㅎ).\n';
+                gptPrompt+='- Max 2-4 feedback items.\n';
                 gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"TEXT","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
@@ -32296,8 +32298,31 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsCloseFeedback() {
-            // Auto-trigger bonus round instead of just waiting
-            qsStartBonus();
+            // Check if enough time remains for bonus (at least 10 seconds)
+            db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
+                if(!doc.exists){qsShowWaiting();return;}
+                var d=doc.data();
+                // If round already ended, don't start bonus
+                if(d.status!=='playing'){qs.isBusy=false;qsFlushPending();qsShowWaiting();return;}
+                var roundTime=d.roundTime||60;
+                var startedAt=d.roundStartedAt;
+                if(startedAt&&startedAt.toDate){
+                    var elapsed=(Date.now()-startedAt.toDate().getTime())/1000;
+                    var remaining=roundTime-elapsed;
+                    if(remaining<10){
+                        qs.isBusy=false;qsFlushPending();
+                        qsShowWaiting();
+                        return;
+                    }
+                }
+                // Enough time — auto-trigger bonus
+                qsStartBonus();
+            }).catch(function(e){console.error('Bonus time check error:',e);qsShowWaiting();});
+        }
+
+        function qsShowWaiting(){
+            var area=document.getElementById('qsGameArea');
+            if(area)area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
         }
 
         function qsShowResult(d,area,status) {
