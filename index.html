@@ -31957,11 +31957,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // ========== HYBRID SCORING: 70% Azure + 30% GPT ==========
+                // ========== HYBRID SCORING: 35% Azure + 65% GPT ==========
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 if(azureResult && typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
-                    var hybridScore=Math.round(azureScore*0.7 + gptScore*0.3);
+                    var hybridScore=Math.round(azureScore*0.35 + gptScore*0.65);
                     console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' → Final='+hybridScore);
                     grade.score=hybridScore;
                 }else{
@@ -32239,11 +32239,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){}
                 }
 
-                // Hybrid: 70% Azure + 30% GPT (same as normal round)
+                // Hybrid: 35% Azure + 65% GPT (same as normal round)
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 if(azureResult&&typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
-                    grade.score=Math.round(azureScore*0.7+gptScore*0.3);
+                    grade.score=Math.round(azureScore*0.35+gptScore*0.65);
                     console.log('Bonus hybrid: Azure='+azureScore+' GPT='+gptScore+' → Final='+grade.score);
                 }
 
