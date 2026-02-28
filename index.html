@@ -30752,6 +30752,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             // Buttons
             h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
+            h+='<button onclick="qgShowDrillUI()" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🎙 DRILL</button>';
             if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86,0 -2px 0 #005a86,0 2px 0 #005a86,-2px 0 0 #005a86,2px 0 0 #005a86;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➜ NEXT ROUND</button>';
             h+='<button onclick="qgShowLeaderboardAdmin()" style="background:linear-gradient(135deg,#f0c040,#d4a017);border:none;color:#1a1a2e;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;text-shadow:-2px -2px 0 rgba(0,0,0,0.3),2px -2px 0 rgba(0,0,0,0.3),-2px 2px 0 rgba(0,0,0,0.3),2px 2px 0 rgba(0,0,0,0.3);font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏆 LEADERBOARD</button>';
             h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
@@ -30988,7 +30989,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var clickAttr=queueIdx>=0?'onclick="qgPlaySingle('+queueIdx+')"':'';
                     lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;'+(queueIdx>=0?'cursor:pointer;':'')+'" '+clickAttr+'>';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
-                    lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
+                    lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+(s.isBonus?' <span style="color:#FFD700;font-size:9px;">⭐BONUS</span>':'')+'</div>';
                     if(isGrading){
                         lh+='<div style="font-size:10px;color:#fbbf24;">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; ⏳ Grading...</div></div>';
                     } else {
@@ -31026,8 +31027,190 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
 
+        // ══════════════════════════════════════════════════════
+        // TRANSCRIPTION DRILL (no points, pronunciation focus)
+        // ══════════════════════════════════════════════════════
+        var qgDrillRecorder=null;
+
+        function qgShowDrillUI(){
+            clearInterval(qg.timer);
+            var bar=document.getElementById('qgTimerBar');
+            if(bar){bar.style.transition='none';bar.style.width=bar.offsetWidth+'px';}
+            var el=document.getElementById('quizGamePlayView');
+            var h='<div style="padding:20px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:12px;color:#9b59b6;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;margin-bottom:16px;">🎙 PRONUNCIATION DRILL</div>';
+            h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:16px;">No points — pure pronunciation practice</div>';
+            // Input area
+            h+='<div style="background:rgba(0,0,0,0.4);border:2px solid #9b59b6;border-radius:12px;padding:16px;margin-bottom:16px;">';
+            h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Korean text for students to read:</label>';
+            h+='<textarea id="qgDrillText" rows="3" placeholder="Type Korean text here or use mic to transcribe..." style="width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:16px;resize:vertical;box-sizing:border-box;outline:none;font-family:\'Noto Sans KR\',sans-serif;"></textarea>';
+            h+='<div style="display:flex;gap:8px;margin-top:8px;">';
+            h+='<button id="qgDrillMicBtn" onclick="qgDrillTranscribe()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">🎤 Speak to type</button>';
+            h+='<div id="qgDrillMicStatus" style="font-size:11px;color:#888;display:flex;align-items:center;"></div>';
+            h+='</div></div>';
+            // Send to options
+            h+='<div style="margin-bottom:16px;">';
+            h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Send to:</label>';
+            h+='<div style="display:flex;gap:10px;">';
+            h+='<button id="qgDrillToBeg" onclick="qgDrillPickTarget(\'beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">🌱 Beginner</button>';
+            h+='<button id="qgDrillToAdv" onclick="qgDrillPickTarget(\'advanced\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">🌟 Advanced</button>';
+            h+='<button id="qgDrillToBoth" onclick="qgDrillPickTarget(\'both\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">📢 Both</button>';
+            h+='</div></div>';
+            // Send button
+            h+='<button id="qgDrillSendBtn" onclick="qgDrillSend()" style="width:100%;background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;padding:14px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;margin-bottom:12px;">SEND DRILL</button>';
+            // Listening area for drill submissions
+            h+='<div id="qgDrillListenArea" style="display:none;background:rgba(0,0,0,0.4);border:2px solid #9b59b644;border-radius:12px;padding:16px;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:#9b59b6;margin-bottom:10px;">🎧 DRILL RECORDINGS</div>';
+            h+='<div id="qgDrillSubList" style="font-size:12px;color:#888;">Waiting for students...</div></div>';
+            // Back button
+            h+='<div style="text-align:center;margin-top:12px;"><button onclick="qgEndDrill()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:8px;cursor:pointer;">← BACK TO ROUND</button></div>';
+            h+='</div>';
+            el.innerHTML=h;
+            qg.drillTarget='both';
+            qgDrillPickTarget('both');
+        }
+
+        var qgDrillTarget='both';
+        function qgDrillPickTarget(t){
+            qgDrillTarget=t;
+            ['qgDrillToBeg','qgDrillToAdv','qgDrillToBoth'].forEach(function(id){
+                var b=document.getElementById(id);if(!b)return;
+                b.style.borderColor='rgba(255,255,255,0.2)';b.style.color='#888';b.style.background='rgba(255,255,255,0.08)';
+            });
+            var activeId=t==='beginner'?'qgDrillToBeg':t==='advanced'?'qgDrillToAdv':'qgDrillToBoth';
+            var ab=document.getElementById(activeId);
+            if(ab){ab.style.borderColor='#9b59b6';ab.style.color='#fff';ab.style.background='rgba(155,89,182,0.2)';}
+        }
+
+        function qgDrillTranscribe(){
+            var btn=document.getElementById('qgDrillMicBtn');
+            var st=document.getElementById('qgDrillMicStatus');
+            if(qgDrillRecorder&&qgDrillRecorder.state==='recording'){
+                qgDrillRecorder.stop();btn.innerHTML='🎤 Speak to type';btn.style.borderColor='#ef4444';
+                st.textContent='Processing...';
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                var chunks=[];
+                var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                }
+                qgDrillRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+                qgDrillRecorder.ondataavailable=function(e){chunks.push(e.data);};
+                qgDrillRecorder.onstop=async function(){
+                    stream.getTracks().forEach(function(t){t.stop();});
+                    var blob=new Blob(chunks,{type:mime||'audio/webm'});
+                    st.textContent='Transcribing...';
+                    try{
+                        var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                        var arrayBuf=await blob.arrayBuffer();
+                        var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+                        var samples=audioBuf.getChannelData(0);
+                        var sampleRate=audioBuf.sampleRate;
+                        if(sampleRate>16000){var ratio=sampleRate/16000;var newLen=Math.floor(samples.length/ratio);var ds=new Float32Array(newLen);for(var i=0;i<newLen;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sampleRate=16000;}
+                        var bufLen=44+samples.length*2;var wavBuf=new ArrayBuffer(bufLen);var view=new DataView(wavBuf);
+                        function ws(o,s){for(var i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));}
+                        ws(0,'RIFF');view.setUint32(4,bufLen-8,true);ws(8,'WAVE');ws(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);ws(36,'data');view.setUint32(40,samples.length*2,true);
+                        for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+                        var bytes=new Uint8Array(wavBuf);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+                        var wavB64=btoa(binary);
+                        var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                            method:'POST',headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:'Transcribe this Korean audio. Reply ONLY with the Korean text you hear, nothing else.'},{type:'input_audio',input_audio:{data:wavB64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:200,temperature:0.1})
+                        });
+                        var data=await resp.json();
+                        var text='';
+                        if(data.data&&typeof data.data==='string')text=data.data;
+                        else if(data.data&&data.data.transcript)text=data.data.transcript;
+                        else if(data.choices&&data.choices[0]){var m=data.choices[0].message||data.choices[0];text=m.audio?m.audio.transcript:(m.content||'');}
+                        text=text.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').replace(/^["']+|["']+$/g,'').trim();
+                        if(text){document.getElementById('qgDrillText').value=text;st.textContent='✅ Transcribed!';st.style.color='#39ff14';}
+                        else{st.textContent='❌ Could not transcribe';st.style.color='#e87777';}
+                    }catch(e){st.textContent='❌ '+e.message;st.style.color='#e87777';}
+                    setTimeout(function(){st.style.color='#888';},3000);
+                };
+                qgDrillRecorder.start();
+                btn.innerHTML='⏹ Stop';btn.style.borderColor='#e87777';
+                st.textContent='🔴 Listening...';st.style.color='#ef4444';
+            }).catch(function(err){st.textContent='Mic error: '+err.message;});
+        }
+
+        async function qgDrillSend(){
+            var text=(document.getElementById('qgDrillText').value||'').trim();
+            if(!text){alert('Enter Korean text for the drill.');return;}
+            var btn=document.getElementById('qgDrillSendBtn');
+            btn.disabled=true;btn.innerHTML='⏳ SENDING...';
+            try{
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
+                    status:'drill',
+                    drillText:text,
+                    drillTarget:qgDrillTarget,
+                    drillId:Date.now().toString()
+                });
+                btn.innerHTML='✅ SENT!';btn.style.background='linear-gradient(135deg,#39ff14,#00cc00)';
+                // Show listening area
+                document.getElementById('qgDrillListenArea').style.display='block';
+                // Listen for drill submissions
+                qgListenDrillSubs();
+                setTimeout(function(){btn.disabled=false;btn.innerHTML='SEND DRILL';btn.style.background='linear-gradient(135deg,#9b59b6,#8e44ad)';},3000);
+            }catch(e){console.error(e);btn.innerHTML='❌ Error';btn.disabled=false;}
+        }
+
+        function qgListenDrillSubs(){
+            if(qg.unsubDrill) qg.unsubDrill();
+            qg.unsubDrill=db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection('drill_submissions').onSnapshot(function(snap){
+                var listEl=document.getElementById('qgDrillSubList');if(!listEl)return;
+                if(snap.empty){listEl.innerHTML='<span style="color:#888;">Waiting for students...</span>';return;}
+                var subs=[];snap.forEach(function(d){subs.push(d.data());});
+                var lh='';
+                subs.forEach(function(s,idx){
+                    var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
+                    var scoreColor=s.score>=80?'#39ff14':s.score>=60?'#fbbf24':'#ef4444';
+                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;'+(s.audioUrl?'cursor:pointer;':'')+'" '+(s.audioUrl?'onclick="qgPlayDrillAudio(\''+s.audioUrl+'\',this)"':'')+'>';
+                    lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
+                    lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
+                    if(s.status==='grading'){
+                        lh+='<div style="font-size:10px;color:#fbbf24;">⏳ Grading...</div></div>';
+                        lh+='<span style="font-size:11px;color:#fbbf24;">⏳</span>';
+                    }else{
+                        lh+='<div style="font-size:10px;color:'+lc+';">'+(s.feedback||'')+'</div></div>';
+                        lh+='<span style="font-size:14px;font-weight:700;color:'+scoreColor+';">'+s.score+'</span>';
+                        lh+='<span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';
+                    }
+                    lh+='</div>';
+                });
+                listEl.innerHTML=lh;
+            });
+        }
+
+        async function qgPlayDrillAudio(url,el){
+            qgStopAll();
+            try{await qgPlayUrl(url,1);}catch(e){console.log('Drill play error:',e);}
+        }
+
+        async function qgEndDrill(){
+            try{
+                // Clear drill submissions
+                var snap=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection('drill_submissions').get();
+                var batch=db.batch();
+                snap.forEach(function(d){batch.delete(d.ref);});
+                await batch.commit();
+                // Reset status back to playing
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'playing',drillText:firebase.firestore.FieldValue.delete(),drillTarget:firebase.firestore.FieldValue.delete(),drillId:firebase.firestore.FieldValue.delete()});
+            }catch(e){console.error('End drill error:',e);}
+            if(qg.unsubDrill){qg.unsubDrill();qg.unsubDrill=null;}
+            // Re-render the current round
+            qgShowPreview(qg.currentRound);
+        }
+
+
         async function qgEndRound() {
             clearInterval(qg.timer);
+            // Stop the CSS timer bar animation
+            var bar=document.getElementById('qgTimerBar');
+            if(bar){bar.style.transition='none';bar.style.width=bar.offsetWidth+'px';}
             // Update leaderboards from players subcollection (accumulated scores)
             try {
                 var allPlayers = await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get();
@@ -31234,10 +31417,14 @@ Return ONLY this JSON (no markdown, no code blocks):
         (function(){
             var p=new URLSearchParams(window.location.search);
             var rc=p.get('quizgame');
-            if(rc) document.addEventListener('DOMContentLoaded',function(){qsInit(rc);});
+            if(rc) document.addEventListener('DOMContentLoaded',function(){
+                // Preload emoji GIFs so they display instantly
+                emojis.forEach(function(url){var img=new Image();img.src=url;});
+                qsInit(rc);
+            });
         })();
 
-        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'beginner', localBlob:null };
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null };
         var emojis=[
 'https://www.dropbox.com/scl/fi/dvki6jr4vougyhqh2euaa/_FO2BAC315742-final-1.gif?rlkey=tnrie3eu2d0gwmfmix9dstmfg&st=wj02p5wq&dl=1',
 'https://www.dropbox.com/scl/fi/ebgp46m47sbwrzt48nutf/Eating-crazy.gif?rlkey=qzgx54jtnxva6ahr1wlhsfrzs&st=u14ec51o&dl=1',
@@ -31291,7 +31478,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div id="qsEmojiGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">'+eh+'</div></div>'+
                 '<div style="margin-bottom:16px;"><label style="font-size:13px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">LEVEL</label>'+
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
-                '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:12px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:13px;">🌱 Beginner</button>'+
+                '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:13px;">🌱 Beginner</button>'+
                 '<button id="qsLvlA" onclick="qsPickLevel(\'advanced\')" style="background:rgba(0,0,0,0.3);border:3px solid #555;color:#888;padding:12px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:13px;">🌟 Advanced</button></div></div>'+
                 '<button id="qsJoinBtn" onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;padding:14px;border-radius:10px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;">JOIN GAME</button>'+
                 '</div></div>';
@@ -31313,6 +31500,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         async function qsJoin(roomCode) {
             var name=(document.getElementById('qsName').value||'').trim();
             if(!name){alert('Enter your name.');return;}
+            if(!qs.playerLevel){alert('Please select Beginner or Advanced before joining.');return;}
             qs.playerName=name;
             var app=document.getElementById('qsApp');
             app.innerHTML='<div style="text-align:center;padding:60px 20px;"><div style="font-size:30px;">⏳</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#ccc;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-top:12px;">JOINING...</div></div>';
@@ -31354,7 +31542,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var status=document.getElementById('qsStatus');
                 var area=document.getElementById('qsGameArea');
                 if(!area)return;
+                // Don't interrupt student if they're actively recording or being graded
+                if(qs.isBusy && (d.status==='round_result' || d.status==='finished')){
+                    qs.pendingStatus=d;
+                    return;
+                }
                 if(d.status==='playing') qsShowRound(d,area,status);
+                else if(d.status==='drill') qsShowDrill(d,area,status);
                 else if(d.status==='round_result') { ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';}); qsShowResult(d,area,status); }
                 else if(d.status==='finished') { ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';}); qsShowFinished(area,status); }
                 else if(d.status==='lobby'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='';});if(status){status.textContent='Waiting for teacher...';status.style.color='#888';}area.innerHTML='';}
@@ -31388,6 +31582,173 @@ Return ONLY this JSON (no markdown, no code blocks):
             area.innerHTML=h;
         }
 
+        // ── STUDENT DRILL ──
+        var qsDrillRecorder=null;
+        function qsShowDrill(d,area,status){
+            // Check if this drill targets this student's level
+            if(d.drillTarget && d.drillTarget!=='both' && d.drillTarget!==qs.playerLevel){
+                if(status){status.textContent='⏸ Waiting...';status.style.color='#888';}
+                area.innerHTML='<div style="text-align:center;padding:40px 20px;"><div style="font-size:11px;color:#888;">This drill is for '+(d.drillTarget==='beginner'?'Beginner':'Advanced')+' students only.</div></div>';
+                return;
+            }
+            ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+            if(status){status.textContent='🎙 PRONUNCIATION DRILL';status.style.color='#9b59b6';}
+            // Don't re-render if already showing this drill
+            if(area.querySelector('[data-drill="'+d.drillId+'"]'))return;
+            var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+            var h='<div data-drill="'+d.drillId+'" style="margin-top:16px;">';
+            h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">No points — practice your pronunciation!</div>';
+            h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #9b59b6;border-radius:14px;padding:20px;box-shadow:0 0 25px rgba(155,89,182,0.15);margin-bottom:16px;text-align:center;">';
+            h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(d.drillText)+'</div></div>';
+            h+='<div style="text-align:center;">';
+            h+='<button id="qsDrillRecBtn" onclick="qsDrillRecord(\''+escapeHtml(d.drillText).replace(/'/g,"\\'")+'\',\''+d.drillId+'\')" style="background:rgba(155,89,182,0.15);border:3px solid #9b59b6;color:#9b59b6;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">';
+            h+='🎤 RECORD</button>';
+            h+='<div id="qsDrillStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
+            h+='<div id="qsDrillResult" style="margin-top:12px;"></div>';
+            h+='</div></div>';
+            area.innerHTML=h;
+        }
+
+        function qsDrillRecord(drillText,drillId){
+            var btn=document.getElementById('qsDrillRecBtn');
+            if(qsDrillRecorder&&qsDrillRecorder.state==='recording'){
+                qsDrillRecorder.stop();
+                btn.innerHTML='⏳ GRADING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                return;
+            }
+            qs.isBusy=true;
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                var chunks=[];var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                }
+                qsDrillRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+                qsDrillRecorder.ondataavailable=function(e){chunks.push(e.data);};
+                qsDrillRecorder.onstop=async function(){
+                    stream.getTracks().forEach(function(t){t.stop();});
+                    var blob=new Blob(chunks,{type:mime||'audio/webm'});
+                    await qsDrillSubmit(blob,mime||'audio/webm',drillText,drillId);
+                };
+                qsDrillRecorder.start();
+                btn.innerHTML='⏹ STOP';btn.style.borderColor='#e87777';btn.style.color='#e87777';
+                document.getElementById('qsDrillStatus').textContent='Recording...';
+            }).catch(function(err){alert('Mic error: '+err.message);});
+        }
+
+        async function qsDrillSubmit(blob,mimeType,drillText,drillId){
+            var statusEl=document.getElementById('qsDrillStatus');
+            var resultEl=document.getElementById('qsDrillResult');
+            try{
+                statusEl.textContent='⏳ Uploading...';
+                // Upload audio
+                var ext=mimeType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/drill_'+qs.playerId+'_'+drillId+'.'+ext;
+                var ref=firebase.storage().ref().child(path);
+                await ref.put(blob,{contentType:mimeType});
+                var audioUrl=await ref.getDownloadURL();
+
+                // Write pending submission
+                var subRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection('drill_submissions').add({
+                    playerId:qs.playerId,playerName:qs.playerName,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel,drillId:drillId,drillText:drillText,
+                    audioUrl:audioUrl,score:0,feedback:'',status:'grading',
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                statusEl.textContent='🔍 Analyzing pronunciation...';
+
+                // Convert to WAV
+                var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                var arrayBuf=await blob.arrayBuffer();
+                var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+                var samples=audioBuf.getChannelData(0);var sr=audioBuf.sampleRate;
+                if(sr>16000){var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);var ds=new Float32Array(nl);for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sr=16000;}
+                var bl=44+samples.length*2;var wb=new ArrayBuffer(bl);var v=new DataView(wb);
+                function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+                ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
+                for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+                var bytes=new Uint8Array(wb);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+                var wavBase64=btoa(binary);
+
+                // Call Azure (95% weight for drill)
+                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
+                var azureResult=null;
+                try{
+                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({referenceText:drillText,audioBase64:wavBase64})
+                    });
+                    var azData=await azResp.json();
+                    if(azData&&typeof azData.pronunciation==='number'&&!azData.error){azureResult=azData;}
+                    console.log('Drill Azure result:',azData);
+                }catch(e){console.log('Drill Azure error:',e);}
+
+                // Call GPT for score + feedback
+                var gptFeedback='';
+                var gptScore=0;
+                try{
+                    var gptPrompt='You are a strict Korean pronunciation coach. The student was supposed to say: "'+drillText+'".\n';
+                    if(azureResult){
+                        gptPrompt+='Azure pronunciation assessment scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
+                        if(azureResult.words){
+                            var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
+                            if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
+                        }
+                    }
+                    gptPrompt+='Listen to the audio and grade pronunciation 0-100. Be STRICT — deduct heavily for wrong vowels, consonant errors, English accent bleed.\n';
+                    gptPrompt+='Give SPECIFIC feedback naming exact sound errors (e.g. "pronounced ㅓ as ㅗ", "used English R instead of Korean ㄹ"). Be concise — max 2 sentences.\n';
+                    gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
+                    var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gptPrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:300,temperature:0.1})
+                    });
+                    var gptData=await gptResp.json();
+                    var gptText='';
+                    if(gptData.data&&typeof gptData.data==='string')gptText=gptData.data;
+                    else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];gptText=m.audio?m.audio.transcript:(m.content||'');}
+                    gptText=gptText.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
+                    try{
+                        var parsed=JSON.parse(gptText);
+                        gptScore=typeof parsed.score==='number'?parsed.score:0;
+                        gptScore=Math.max(0,gptScore-10); // 10% harsher like regular rounds
+                        gptFeedback=parsed.feedback||'';
+                    }catch(pe){gptFeedback=gptText;}
+                }catch(e){console.log('Drill GPT error:',e);}
+
+                // Score: 95% Azure, 5% GPT
+                var finalScore=0;
+                if(azureResult){
+                    finalScore=Math.round(azureResult.pronunciation*0.95 + gptScore*0.05);
+                    console.log('Drill score: Azure='+azureResult.pronunciation+' GPT='+gptScore+' Final='+finalScore);
+                }else{
+                    finalScore=Math.max(0,gptScore); // Fallback to GPT-only if Azure fails
+                }
+                var feedback=gptFeedback||'Pronunciation assessed.';
+
+                // Update Firestore
+                await subRef.update({score:finalScore,feedback:feedback,status:'graded'});
+
+                // Show result to student
+                var scoreColor=finalScore>=80?'#39ff14':finalScore>=60?'#fbbf24':'#ef4444';
+                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;">'+
+                    '<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-align:center;">'+finalScore+'<span style="font-size:10px;color:#888;">/100</span></div>'+
+                    '<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(feedback)+'</div></div>';
+                statusEl.textContent='';
+                qs.isBusy=false;qsFlushPending();
+                // Re-enable record button for retry
+                var btn=document.getElementById('qsDrillRecBtn');
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
+
+            }catch(e){
+                console.error('Drill submit error:',e);
+                statusEl.textContent='❌ Error: '+e.message;
+                qs.isBusy=false;qsFlushPending();
+                var btn=document.getElementById('qsDrillRecBtn');
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
+            }
+        }
+
         var qsRecorder=null;
         function qsRecord() {
             var btn=document.getElementById('qsRecBtn');
@@ -31396,6 +31757,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 btn.innerHTML='⏳ PROCESSING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
                 return;
             }
+            qs.isBusy=true;
             navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
                 var chunks=[];
                 var mime='';
@@ -31538,7 +31900,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     azureInfo+='\nUse the Azure scores as a STRONG reference. Your final score should be close to Azure\'s pronunciation score. If Azure gave a low accuracy score for a word, that word was likely mispronounced even if you think it sounds OK. Trust Azure for phonetic accuracy.\n';
                 }
 
-                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense).\n- Wrong vowels.\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Keep feedback concise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense).\n- Wrong vowels.\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Be SPECIFIC about what was wrong: name the exact sound error (e.g. "pronounced ㅓ as ㅗ in 었어요", "used English R instead of Korean ㄹ", "aspirated ㄱ where plain ㄱ was needed", "merged ㅐ and ㅔ vowels"). Do NOT say vague things like "vowel inaccuracies" or "consonant issues".\n- Keep feedback concise but precise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31593,14 +31955,15 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // ========== HYBRID SCORING: 70% Azure + 30% GPT ==========
                 var gptScore=typeof grade.score==='number'?grade.score:0;
+                // GPT is 10% harsher to counteract leniency
+                gptScore=Math.max(0, gptScore - 10);
                 if(azureResult && typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
                     var hybridScore=Math.round(azureScore*0.7 + gptScore*0.3);
-                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' → Final='+hybridScore);
+                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' (after -5) → Final='+hybridScore);
                     grade.score=hybridScore;
-                    grade.feedback=(grade.feedback||'')+' [Azure: '+azureScore+'/100]';
                 }else{
-                    console.log('GPT-only score:',gptScore);
+                    console.log('GPT-only score:',gptScore,'(after -5 adjustment)');
                 }
                 console.log('Final grade:', grade.score, '/', transcript);
 
@@ -31628,6 +31991,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             } catch(err){
                 console.error('Submit error:',err);
                 statusEl.textContent='❌ Error: '+err.message;
+                qs.isBusy=false;
+                qsFlushPending();
                 var btn=document.getElementById('qsRecBtn');
                 if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.animation='none';}
             }
@@ -31685,9 +32050,248 @@ Return ONLY this JSON (no markdown, no code blocks):
             var a=new Audio(URL.createObjectURL(qs.localBlob));a.play();
         }
 
-        function qsCloseFeedback() {
+        // ── BONUS ROUND ──
+        var qsBonusRecorder=null;
+        async function qsStartBonus(){
             var area=document.getElementById('qsGameArea');
-            area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
+            area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">⭐ GENERATING BONUS...</div><div style="font-size:11px;color:#888;margin-top:8px;">Preparing a bonus sentence for you!</div></div>';
+            try{
+                // Get current round sentences
+                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
+                var gameData=sessionDoc.data();
+                var set=gameData.sets[gameData.currentRound];
+                var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                var originalKorean=sentences.map(function(s){return s.korean;}).join('\n');
+                var originalEnglish=sentences.map(function(s){return s.english||'';}).filter(Boolean).join('\n');
+
+                // Call GPT to generate bonus sentence
+                var prompt='You are a Korean language teaching assistant.\n';
+                prompt+='Original Korean sentence(s):\n'+originalKorean+'\n';
+                if(originalEnglish)prompt+='English translation(s):\n'+originalEnglish+'\n';
+                prompt+='Create a NEW version of this sentence by changing exactly ONE noun to a different noun that still makes sense in context. Keep the grammar, verb endings, and sentence structure identical.\n';
+                prompt+='Examples:\n- "나는 학교에 갔어요" → "나는 병원에 갔어요" (학교→병원)\n- "고양이가 물을 마셔요" → "고양이가 우유를 마셔요" (물→우유)\n\n';
+                prompt+='Reply ONLY with JSON: {"korean":"THE NEW KOREAN SENTENCE","english":"ENGLISH TRANSLATION","changed":"ORIGINAL_NOUN → NEW_NOUN"}';
+
+                var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({messages:[{role:'user',content:prompt}],model:'gpt-4o',max_tokens:300,temperature:0.8})
+                });
+                var data=await resp.json();
+                var text='';
+                if(data.data&&typeof data.data==='string')text=data.data;
+                else if(data.choices&&data.choices[0])text=data.choices[0].message.content||'';
+                text=text.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
+                var bonus=JSON.parse(text);
+
+                // Store for submission
+                qs.bonusKorean=bonus.korean;
+                qs.bonusRound=gameData.currentRound;
+
+                // Show bonus UI
+                var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+                var h='<div data-bonus="'+gameData.currentRound+'" style="margin-top:16px;">';
+                h+='<div style="text-align:center;margin-bottom:10px;">';
+                h+='<span style="font-family:\'Press Start 2P\';font-size:10px;background:linear-gradient(135deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;">⭐ BONUS SENTENCE ⭐</span>';
+                h+='<div style="font-size:10px;color:#888;margin-top:4px;">Earn extra points!</div></div>';
+                h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;box-shadow:0 0 25px rgba(255,215,0,0.15);margin-bottom:16px;text-align:center;">';
+                h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(bonus.korean)+'</div>';
+                if(bonus.english)h+='<div style="font-size:11px;color:#888;margin-top:6px;">'+escapeHtml(bonus.english)+'</div>';
+                if(bonus.changed)h+='<div style="font-size:10px;color:#FFA500;margin-top:6px;">Changed: '+escapeHtml(bonus.changed)+'</div>';
+                h+='</div>';
+                h+='<div style="text-align:center;">';
+                h+='<button id="qsBonusRecBtn" onclick="qsBonusRecord()" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #8B6914,2px -2px 0 #8B6914,-2px 2px 0 #8B6914,2px 2px 0 #8B6914,0 -2px 0 #8B6914,0 2px 0 #8B6914,-2px 0 0 #8B6914,2px 0 0 #8B6914;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">🎤 RECORD</button>';
+                h+='<div id="qsBonusStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
+                h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
+                h+='</div></div>';
+                area.innerHTML=h;
+
+            }catch(e){
+                console.error('Bonus generation error:',e);
+                area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
+            }
+        }
+
+        function qsBonusRecord(){
+            var btn=document.getElementById('qsBonusRecBtn');
+            if(qsBonusRecorder&&qsBonusRecorder.state==='recording'){
+                qsBonusRecorder.stop();
+                btn.innerHTML='⏳ GRADING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                return;
+            }
+            qs.isBusy=true;
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                var chunks=[];var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                }
+                qsBonusRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+                qsBonusRecorder.ondataavailable=function(e){chunks.push(e.data);};
+                qsBonusRecorder.onstop=async function(){
+                    stream.getTracks().forEach(function(t){t.stop();});
+                    var blob=new Blob(chunks,{type:mime||'audio/webm'});
+                    qs.localBlob=blob;
+                    await qsBonusSubmit(blob,mime||'audio/webm');
+                };
+                qsBonusRecorder.start();
+                btn.innerHTML='⏹ STOP';btn.style.borderColor='#e87777';btn.style.color='#e87777';
+                document.getElementById('qsBonusStatus').textContent='Recording...';
+            }).catch(function(err){alert('Mic error: '+err.message);});
+        }
+
+        async function qsBonusSubmit(blob,mimeType){
+            var statusEl=document.getElementById('qsBonusStatus');
+            var resultEl=document.getElementById('qsBonusResult');
+            try{
+                statusEl.textContent='⏳ Uploading...';
+                // Upload audio
+                var ext=mimeType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/bonus_'+qs.playerId+'_round'+qs.bonusRound+'.'+ext;
+                var storRef=firebase.storage().ref().child(path);
+                await storRef.put(blob,{contentType:mimeType});
+                var audioUrl=await storRef.getDownloadURL();
+
+                var expectedKorean=qs.bonusKorean;
+
+                // Write pending submission (marked as bonus)
+                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId,playerName:qs.playerName,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel,round:qs.bonusRound,isBonus:true,
+                    audioUrl:audioUrl,transcript:'',score:0,gradeScore:0,feedback:'',
+                    expectedKorean:expectedKorean,submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                    status:'grading'
+                });
+
+                statusEl.textContent='⏳ Transcribing & grading...';
+
+                // Convert to WAV
+                var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+                var arrayBuf=await blob.arrayBuffer();
+                var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+                var samples=audioBuf.getChannelData(0);var sr=audioBuf.sampleRate;
+                if(sr>16000){var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);var ds=new Float32Array(nl);for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sr=16000;}
+                var bl=44+samples.length*2;var wb=new ArrayBuffer(bl);var v=new DataView(wb);
+                function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+                ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
+                for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+                var bytes=new Uint8Array(wb);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+                var wavBase64=btoa(binary);
+
+                // Get phonetic form from g2pk
+                var phonetic=expectedKorean;
+                try{
+                    var g2pkResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/convert',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:expectedKorean})
+                    });
+                    var g2pkData=await g2pkResp.json();
+                    if(g2pkData.phonetic)phonetic=g2pkData.phonetic;
+                }catch(e){console.log('g2pk error:',e);}
+
+                // Azure pronunciation assessment
+                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
+                var azureResult=null;
+                try{
+                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
+                    });
+                    var azData=await azResp.json();
+                    if(azData&&typeof azData.pronunciation==='number'&&!azData.error)azureResult=azData;
+                    console.log('Bonus Azure:',azData);
+                }catch(e){console.log('Bonus Azure error:',e);}
+
+                // GPT grading (same as normal round)
+                var gptPrompt='You are a STRICT Korean pronunciation grader. Grade the student reading Korean text aloud.\n';
+                gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
+                gptPrompt+='Phonetic form (how it should sound): "'+phonetic+'"\n';
+                if(azureResult){
+                    gptPrompt+='Azure pronunciation scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
+                    if(azureResult.words){
+                        var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
+                        if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
+                    }
+                }
+                gptPrompt+='Be SPECIFIC about what was wrong: name the exact sound error. Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"TEXT","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
+
+                var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gptPrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:400,temperature:0.1})
+                });
+                var gptData=await gptResp.json();
+                var rt='';
+                if(gptData.data&&typeof gptData.data==='string')rt=gptData.data;
+                else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];rt=m.audio?m.audio.transcript:(m.content||'');}
+                rt=rt.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
+
+                var grade={score:0,feedback:'',transcript:''};
+                try{grade=JSON.parse(rt);}catch(e){
+                    var jm=rt.match(/\{[\s\S]*\}/);
+                    if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){}
+                }
+
+                // Hybrid: 70% Azure + 30% GPT (same as normal round)
+                var gptScore=typeof grade.score==='number'?grade.score:0;
+                gptScore=Math.max(0,gptScore-10);
+                if(azureResult&&typeof azureResult.pronunciation==='number'){
+                    var azureScore=azureResult.pronunciation;
+                    grade.score=Math.round(azureScore*0.7+gptScore*0.3);
+                    console.log('Bonus hybrid: Azure='+azureScore+' GPT='+gptScore+' → Final='+grade.score);
+                }
+
+                var finalScore=typeof grade.score==='number'?grade.score:0;
+                var points=Math.round(finalScore/10);
+
+                // Save to Firestore
+                await pendingRef.update({
+                    transcript:grade.transcript||'',score:points,gradeScore:finalScore,
+                    feedback:grade.feedback||'',status:'graded'
+                });
+
+                // Update player total score (bonus points count!)
+                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
+                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
+
+                // Show result
+                var scoreColor=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
+                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;">'+
+                    '<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-align:center;">'+finalScore+'%</div>'+
+                    '<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;text-align:center;margin-top:4px;">⭐ +'+points+' BONUS POINTS</div>'+
+                    (grade.feedback?'<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(grade.feedback)+'</div>':'')+
+                    '</div>';
+                statusEl.textContent='';
+                // Clear busy flag and flush any pending status change
+                qs.isBusy=false;
+                qsFlushPending();
+                var btn=document.getElementById('qsBonusRecBtn');
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+
+            }catch(e){
+                console.error('Bonus submit error:',e);
+                statusEl.textContent='❌ Error: '+e.message;
+                qs.isBusy=false;
+                qsFlushPending();
+                var btn=document.getElementById('qsBonusRecBtn');
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+            }
+        }
+
+        function qsFlushPending(){
+            if(qs.pendingStatus && !qs.isBusy){
+                var d=qs.pendingStatus;
+                qs.pendingStatus=null;
+                var status=document.getElementById('qsStatus');
+                var area=document.getElementById('qsGameArea');
+                if(!area)return;
+                if(d.status==='round_result'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});qsShowResult(d,area,status);}
+                else if(d.status==='finished'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});qsShowFinished(area,status);}
+            }
+        }
+
+        function qsCloseFeedback() {
+            // Auto-trigger bonus round instead of just waiting
+            qsStartBonus();
         }
 
         function qsShowResult(d,area,status) {
