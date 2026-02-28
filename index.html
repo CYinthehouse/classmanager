@@ -18050,7 +18050,7 @@ Return ONLY valid JSON (single object, not array):
                         <button id="toolRainbow" class="active" onclick="setDrawTool('rainbow')" title="Rainbow Pen">🌈 Draw</button>
                         <button id="toolPen" onclick="setDrawTool('pen')" title="Pen">✏️ Pen</button>
                         <button id="toolHighlight" onclick="setDrawTool('highlight')" title="Highlighter">🖍️ Highlight</button>
-                        <button id="toolEraser" onclick="setDrawTool('eraser')" title="Eraser">🧹 Erase</button>
+                        <button id="toolEraser" onclick="setDrawTool('eraser')" title="Eraser">🗑️ Erase</button>
                     </div>
                     <div class="tool-group">
                         <label style="color: #fff; font-size: 12px;">Size:</label>
@@ -30803,7 +30803,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<button onclick="qgSetDrawColor(\'#0066ff\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#0066ff;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button onclick="qgSetDrawColor(\'#00cc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#00cc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button onclick="qgSetDrawColor(\'#ffcc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#ffcc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
-            h+='<button id="qgEraserBtn" onclick="qgToggleEraser()" style="width:26px;height:26px;border-radius:50%;background:repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);font-size:12px;line-height:22px;text-align:center;" title="Eraser">🧹</button>';
+            h+='<button id="qgEraserBtn" onclick="qgToggleEraser()" style="width:26px;height:26px;border-radius:50%;background:repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);font-size:12px;line-height:22px;text-align:center;" title="Eraser">🗑️</button>';
             h+='<button onclick="qgDrawClear()" style="padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.6);border:1px solid #888;color:#fff;font-size:11px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);">✕</button>';
             h+='</div>';
             return h;
@@ -31688,7 +31688,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptFeedback='';
                 var gptScore=0;
                 try{
-                    var gptPrompt='You are a strict Korean pronunciation coach. The student was supposed to say: "'+drillText+'".\n';
+                    var gptPrompt='You are a strict but fair Korean pronunciation coach for English-speaking learners. The student was supposed to say: "'+drillText+'".\n';
                     if(azureResult){
                         gptPrompt+='Azure pronunciation assessment scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
                         if(azureResult.words){
@@ -31696,8 +31696,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                             if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
                         }
                     }
-                    gptPrompt+='Listen to the audio and grade pronunciation 0-100. Be STRICT — deduct heavily for wrong vowels, consonant errors, English accent bleed.\n';
-                    gptPrompt+='Give SPECIFIC feedback naming exact sound errors (e.g. "pronounced ㅓ as ㅗ", "used English R instead of Korean ㄹ"). Be concise — max 2 sentences.\n';
+                    gptPrompt+='Listen to the audio and grade pronunciation 0-100.\n';
+                    gptPrompt+='CRITICAL RULES:\n';
+                    gptPrompt+='- ㅔ and ㅐ are THE SAME in modern Korean. NEVER flag this as an error.\n';
+                    gptPrompt+='- Use correct terminology: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), ASPIRATED (ㅋㅌㅍㅊ). Say "lacks tensification on ㄲ" or "over-aspirated ㄱ sounds like ㅋ", never "not pronounced clearly".\n';
+                    gptPrompt+='- If you cannot pinpoint the exact vowel/consonant error, explain the pronunciation rule for that word (e.g. "받침 ㅅ in 있었 links as 이썯, requiring tense ㅆ").\n';
+                    gptPrompt+='- NEVER give vague feedback. Be concise — max 2 sentences.\n';
                     gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
                     var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
@@ -31711,7 +31715,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     try{
                         var parsed=JSON.parse(gptText);
                         gptScore=typeof parsed.score==='number'?parsed.score:0;
-                        gptScore=Math.max(0,gptScore-10); // 10% harsher like regular rounds
+                        
                         gptFeedback=parsed.feedback||'';
                     }catch(pe){gptFeedback=gptText;}
                 }catch(e){console.log('Drill GPT error:',e);}
@@ -31900,7 +31904,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     azureInfo+='\nUse the Azure scores as a STRONG reference. Your final score should be close to Azure\'s pronunciation score. If Azure gave a low accuracy score for a word, that word was likely mispronounced even if you think it sounds OK. Trust Azure for phonetic accuracy.\n';
                 }
 
-                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense).\n- Wrong vowels.\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Be SPECIFIC about what was wrong: name the exact sound error (e.g. "pronounced ㅓ as ㅗ in 었어요", "used English R instead of Korean ㄹ", "aspirated ㄱ where plain ㄱ was needed", "merged ㅐ and ㅔ vowels"). Do NOT say vague things like "vowel inaccuracies" or "consonant issues".\n- Keep feedback concise but precise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                var gradePrompt='You are a strict but fair Korean pronunciation grading system for English-speaking learners.\n\nThe student was supposed to read this Korean text aloud:\nEXPECTED (written): "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nYOUR TASK: LISTEN to the audio and judge the student\'s pronunciation. Focus on SOUNDS, not text comparison.\n\nCRITICAL — TRANSCRIPTION vs PRONUNCIATION:\nYour transcription uses standard spelling. The pronunciation guide uses phonetic spelling. These often look different but sound THE SAME.\n- If your transcription matches the WRITTEN form → CORRECT.\n- If it matches the PRONUNCIATION form → also CORRECT.\n- ONLY WRONG if it matches NEITHER form.\n- Do NOT penalize differences that are purely orthographic representations of the same sound.\n\nCRITICAL — ㅔ and ㅐ ARE THE SAME IN MODERN KOREAN:\n- These two vowels have merged in modern Korean pronunciation. They are pronounced identically.\n- NEVER flag ㅔ vs ㅐ as an error. They are always equivalent.\n\nCRITICAL — ASPIRATION AND TENSIFICATION TERMINOLOGY:\n- Korean has three consonant types: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), and ASPIRATED (ㅋㅌㅍㅊ).\n- If student says a PLAIN consonant (ㄱ) where a TENSE one (ㄲ) was needed → "lacks tensification on ㄲ, sounds like plain ㄱ"\n- If student says a PLAIN consonant where an ASPIRATED one was needed → "insufficient aspiration on ㅋ, sounds like plain ㄱ"\n- If student says a TENSE or ASPIRATED consonant where a PLAIN one was needed → "over-aspirated ㄱ, sounds like ㅋ/ㄲ"\n- Always use the terms "tensification", "aspiration", "over-aspirated", or "under-aspirated" — never say "not pronounced clearly".\n\nWHAT TO PENALIZE:\n- Wrong consonant type (plain vs aspirated vs tense) — use correct terminology above.\n- Wrong vowels (except ㅔ/ㅐ which are always equivalent).\n- Missing or added syllables/words.\n- English words instead of Korean.\n- Heavy accent that makes words unintelligible.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure gave this student a pronunciation score of '+azureResult.pronunciation+'/100. Your score should be within 10 points of Azure\'s score unless you have strong reason to differ.':'')+ '\n- 0% = entirely non-Korean. 100% = perfect pronunciation.\n\nFEEDBACK:\n- ONLY mention genuinely mispronounced words. Do NOT list correct words.\n- Be SPECIFIC about what was wrong using correct linguistic terms.\n- If you cannot identify the exact vowel or consonant error, provide the specific pronunciation rule for that word instead (e.g. "받침 ㅅ in 있었던 should be pronounced as ㄷ before ㅇ, linking to the next syllable as 이썯떤").\n- NEVER give vague feedback like "vowel inaccuracies" or "consonant issues" or "not pronounced clearly".\n- Keep feedback concise but precise.\n- If everything was correct, give a short positive comment.\n\nSELF-CONSISTENCY CHECK:\n- Verify score matches feedback. If only 1 error out of many words, score should be 85-95%.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31955,8 +31959,6 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // ========== HYBRID SCORING: 70% Azure + 30% GPT ==========
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                // GPT is 10% harsher to counteract leniency
-                gptScore=Math.max(0, gptScore - 10);
                 if(azureResult && typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
                     var hybridScore=Math.round(azureScore*0.7 + gptScore*0.3);
@@ -32202,7 +32204,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }catch(e){console.log('Bonus Azure error:',e);}
 
                 // GPT grading (same as normal round)
-                var gptPrompt='You are a STRICT Korean pronunciation grader. Grade the student reading Korean text aloud.\n';
+                var gptPrompt='You are a strict but fair Korean pronunciation grader for English-speaking learners.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
                 gptPrompt+='Phonetic form (how it should sound): "'+phonetic+'"\n';
                 if(azureResult){
@@ -32212,7 +32214,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                         if(errW.length>0)gptPrompt+='Problem words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'.\n';
                     }
                 }
-                gptPrompt+='Be SPECIFIC about what was wrong: name the exact sound error. Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"TEXT","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
+                gptPrompt+='CRITICAL RULES:\n';
+                gptPrompt+='- ㅔ and ㅐ are THE SAME in modern Korean. NEVER flag this as an error.\n';
+                gptPrompt+='- Use correct terminology: PLAIN (ㄱㄷㅂㅅㅈ), TENSE (ㄲㄸㅃㅆㅉ), ASPIRATED (ㅋㅌㅍㅊ). Say "lacks tensification" or "over-aspirated", never "not pronounced clearly".\n';
+                gptPrompt+='- If you cannot pinpoint the exact vowel/consonant error, explain the pronunciation rule for that word instead (e.g. batchim rules, linking rules).\n';
+                gptPrompt+='- NEVER give vague feedback. Every error must name the specific sound or rule.\n';
+                gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"TEXT","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -32232,7 +32239,6 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // Hybrid: 70% Azure + 30% GPT (same as normal round)
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                gptScore=Math.max(0,gptScore-10);
                 if(azureResult&&typeof azureResult.pronunciation==='number'){
                     var azureScore=azureResult.pronunciation;
                     grade.score=Math.round(azureScore*0.7+gptScore*0.3);
