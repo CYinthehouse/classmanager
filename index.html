@@ -16568,20 +16568,29 @@ Return ONLY valid JSON (single object, not array):
     function startGameFromJunbi() {
       document.getElementById('junbiScreen').style.display = 'none';
       document.getElementById('floatingCoverBtn').style.display = 'none';
-      // Warm up phoneme service - send tiny WAV to force model load (~15s on cold start)
+      // Warm up phoneme service - send requests to all 3 instances to force model load
       try{
         var sr=16000,dur=0.1,len=Math.floor(sr*dur);
-        var wb=new ArrayBuffer(44+len*2);var v=new DataView(wb);
-        function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-        ws(0,'RIFF');v.setUint32(4,36+len*2,true);ws(8,'WAVE');ws(12,'fmt ');
-        v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-        v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
-        v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,len*2,true);
-        var fd=new FormData();
-        fd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'warmup.wav');
-        fd.append('phonetic_hangul','안녕');fd.append('original_text','안녕');
-        fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/analyze',{method:'POST',body:fd}).catch(function(){});
-        console.log('Phoneme service warm-up sent');
+        function makeWarmupWav(){
+          var wb=new ArrayBuffer(44+len*2);var v=new DataView(wb);
+          function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+          ws(0,'RIFF');v.setUint32(4,36+len*2,true);ws(8,'WAVE');ws(12,'fmt ');
+          v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+          v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+          v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,len*2,true);
+          return new Blob([new Uint8Array(wb)],{type:'audio/wav'});
+        }
+        function sendWarmup(){
+          var fd=new FormData();
+          fd.append('audio',makeWarmupWav(),'warmup.wav');
+          fd.append('phonetic_hangul','안녕');fd.append('original_text','안녕');
+          fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/analyze',{method:'POST',body:fd}).catch(function(){});
+        }
+        // Send 3 requests staggered to hit all 3 min-instances
+        sendWarmup();
+        setTimeout(sendWarmup,500);
+        setTimeout(sendWarmup,1000);
+        console.log('Phoneme service warm-up sent x3');
       }catch(e){}
       startGame();
     }
@@ -31703,7 +31712,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptFeedback='';
                 var gptScore=0;
                 try{
-                    var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\n';
+                    var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                     if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
                         gptPrompt+='PHONEME ANALYSIS RESULTS:\n';
                         gptPrompt+='Phoneme accuracy score: '+phonemeResult.score+'/100\n';
@@ -31925,7 +31934,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeInfo+='\nONLY comment on errors the phoneme analysis detected. Do NOT invent additional errors. Trust the phoneme analysis for phonetic accuracy.\n';
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES — READ CAREFULLY BEFORE GIVING FEEDBACK:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this. They are the same sound.\n\n2. ONLY comment on errors the phoneme analysis detected. If phoneme analysis shows no error for a sound, DO NOT comment on that sound at all.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification issues when the EXPECTED text has a tense consonant (ㄲㄸㅃㅆㅉ) but the student used a plain one.\n - ㅈ in 제가 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㅈ in 오지 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㄱ in 고 is PLAIN ㄱ. Do not say it is under-aspirated.\n - Only flag tensification if the phonetic form shows ㄲㄸㅃㅆㅉ and the student said ㄱㄷㅂㅅㅈ instead.\n\n4. TERMINOLOGY:\n - Plain → Tense error: "lacks tensification, pronounced ㄱ instead of expected ㄲ"\n - Plain → Aspirated error: "insufficient aspiration, pronounced ㄱ instead of expected ㅋ"\n - Tense/Aspirated → Plain error: "over-aspirated/over-tensed"\n\n5. If phoneme analysis flagged an error but you cannot hear it clearly, provide the pronunciation RULE for that word instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable as 이써떤"\n - e.g. "않았어요 has a silent ㅎ: pronounced 아나써요"\n Do NOT make up an error you cannot actually hear.\n\n6. Keep feedback to 2-4 items maximum. Only the most important errors.\n\nSCORING:\n- Rate 0 to 100.'+(phonemeResult?'\n- Phoneme accuracy score: '+phonemeResult.score+'/100. Stay within 15 points of this unless you have strong reason.':'')+ '\n- 0% = non-Korean. 100% = perfect.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES — READ CAREFULLY BEFORE GIVING FEEDBACK:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this. They are the same sound.\n\n2. ONLY comment on errors the phoneme analysis detected. If phoneme analysis shows no error for a sound, DO NOT comment on that sound at all.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification issues when the EXPECTED text has a tense consonant (ㄲㄸㅃㅆㅉ) but the student used a plain one.\n - ㅈ in 제가 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㅈ in 오지 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㄱ in 고 is PLAIN ㄱ. Do not say it is under-aspirated.\n - Only flag tensification if the phonetic form shows ㄲㄸㅃㅆㅉ and the student said ㄱㄷㅂㅅㅈ instead.\n\n4. TERMINOLOGY:\n - Plain → Tense error: "lacks tensification, pronounced ㄱ instead of expected ㄲ"\n - Plain → Aspirated error: "insufficient aspiration, pronounced ㄱ instead of expected ㅋ"\n - Tense/Aspirated → Plain error: "over-aspirated/over-tensed"\n\n5. If phoneme analysis flagged an error but you cannot hear it clearly, provide the pronunciation RULE for that word instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable as 이써떤"\n - e.g. "않았어요 has a silent ㅎ: pronounced 아나써요"\n Do NOT make up an error you cannot actually hear.\n\n6. Keep feedback to 2-4 items maximum. Only the most important errors.\n\nSCORING:\n- Rate 0 to 100.'+(phonemeResult?'\n- Phoneme accuracy score: '+phonemeResult.score+'/100. Stay within 15 points of this unless you have strong reason.':'')+ '\n- 0% = non-Korean or no speech. 100% = perfect.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you ACTUALLY heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31990,6 +31999,33 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
                 console.log('Final grade:', grade.score, '/', transcript);
 
+                // Safety check: detect no speech / echoed transcript
+                var finalTranscriptCheck=grade.transcript||transcript||'';
+                if(!finalTranscriptCheck.trim()){
+                    // Empty transcript = no speech detected
+                    grade.score=0;
+                    grade.feedback=grade.feedback||'No speech detected. Please try again.';
+                    console.log('Override: empty transcript → score 0');
+                }else{
+                    // Check if GPT just echoed the expected text or phonetic form
+                    var cleanT=finalTranscriptCheck.replace(/[\s.,!?。、]/g,'');
+                    var cleanE=expectedKorean.replace(/[\s.,!?。、]/g,'');
+                    var cleanP=(expectedPronunciation||'').replace(/[\s.,!?。、]/g,'');
+                    if(cleanT===cleanE||cleanT===cleanP){
+                        // Transcript is identical to expected — GPT likely hallucinated
+                        // Only flag if phoneme service also had issues or was unavailable
+                        if(!phonemeResult||phonemeResult.score>95){
+                            console.log('Warning: transcript matches expected text exactly, possible hallucination');
+                        }
+                    }
+                    // Check for English words (more than 2 english words = probably wrong language)
+                    var engWords=finalTranscriptCheck.match(/[a-zA-Z]{3,}/g);
+                    if(engWords&&engWords.length>2){
+                        grade.score=0;
+                        grade.feedback='Non-Korean speech detected. Please read the Korean text.';
+                        console.log('Override: English detected → score 0');
+                    }
+                }
 
                 // 4. Save submission to Firestore
                 var finalScore = typeof grade.score === 'number' ? grade.score : 0;
@@ -32082,7 +32118,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Get current round sentences
                 var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
                 var gameData=sessionDoc.data();
+                console.log('Bonus: gameData.currentRound=',gameData.currentRound,'status=',gameData.status);
+                if(gameData.status!=='playing'){console.log('Bonus aborted: game not playing');qsShowWaiting();return;}
                 var set=gameData.sets[gameData.currentRound];
+                if(!set){console.error('Bonus: no set found for round',gameData.currentRound);qsShowWaiting();return;}
                 var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
                 var originalKorean=sentences.map(function(s){return s.korean;}).join('\n');
                 var originalEnglish=sentences.map(function(s){return s.english||'';}).filter(Boolean).join('\n');
@@ -32100,11 +32139,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                     body:JSON.stringify({messages:[{role:'user',content:prompt}],model:'gpt-4o',max_tokens:300,temperature:0.8})
                 });
                 var data=await resp.json();
+                console.log('Bonus GPT raw response:',JSON.stringify(data).substring(0,500));
                 var text='';
                 if(data.data&&typeof data.data==='string')text=data.data;
                 else if(data.choices&&data.choices[0])text=data.choices[0].message.content||'';
+                else if(data.data&&typeof data.data==='object')text=JSON.stringify(data.data);
                 text=text.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
+                console.log('Bonus parsed text:',text);
+                if(!text){throw new Error('Empty GPT response for bonus');}
                 var bonus=JSON.parse(text);
+                if(!bonus.korean){throw new Error('No korean field in bonus response');}
+                console.log('Bonus sentence:',bonus.korean);
 
                 // Store for submission
                 qs.bonusKorean=bonus.korean;
@@ -32225,7 +32270,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }catch(e){console.log('Bonus phoneme error:',e);}
 
                 // GPT grading (same as normal round)
-                var gptPrompt='You are a Korean pronunciation grading assistant.\n';
+                var gptPrompt='You are a Korean pronunciation grading assistant.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
                 gptPrompt+='Phonetic form (correct pronunciation): "'+phonetic+'"\n';
                 gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
