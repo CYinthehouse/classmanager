@@ -16568,8 +16568,21 @@ Return ONLY valid JSON (single object, not array):
     function startGameFromJunbi() {
       document.getElementById('junbiScreen').style.display = 'none';
       document.getElementById('floatingCoverBtn').style.display = 'none';
-      // Warm up phoneme service (model takes ~15s to load on cold start)
-      fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/health').catch(function(){});
+      // Warm up phoneme service - send tiny WAV to force model load (~15s on cold start)
+      try{
+        var sr=16000,dur=0.1,len=Math.floor(sr*dur);
+        var wb=new ArrayBuffer(44+len*2);var v=new DataView(wb);
+        function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+        ws(0,'RIFF');v.setUint32(4,36+len*2,true);ws(8,'WAVE');ws(12,'fmt ');
+        v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+        v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+        v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,len*2,true);
+        var fd=new FormData();
+        fd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'warmup.wav');
+        fd.append('phonetic_hangul','안녕');fd.append('original_text','안녕');
+        fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/analyze',{method:'POST',body:fd}).catch(function(){});
+        console.log('Phoneme service warm-up sent');
+      }catch(e){}
       startGame();
     }
     
