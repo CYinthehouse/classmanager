@@ -16568,6 +16568,8 @@ Return ONLY valid JSON (single object, not array):
     function startGameFromJunbi() {
       document.getElementById('junbiScreen').style.display = 'none';
       document.getElementById('floatingCoverBtn').style.display = 'none';
+      // Warm up phoneme service (model takes ~15s to load on cold start)
+      fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/health').catch(function(){});
       startGame();
     }
     
@@ -31671,34 +31673,40 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var bytes=new Uint8Array(wb);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
                 var wavBase64=btoa(binary);
 
-                // Call Azure (95% weight for drill)
-                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
-                var azureResult=null;
+                // Call phoneme service (50% weight for drill)
+                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var phonemeResult=null;
                 try{
-                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({referenceText:drillText,audioBase64:wavBase64})
-                    });
-                    var azData=await azResp.json();
-                    if(azData&&typeof azData.pronunciation==='number'&&!azData.error){azureResult=azData;}
-                    console.log('Drill Azure result:',azData);
-                }catch(e){console.log('Drill Azure error:',e);}
+                    var formData=new FormData();
+                    formData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                    formData.append('phonetic_hangul',drillText);
+                    formData.append('original_text',drillText);
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
+                    if(phResp.ok){phonemeResult=await phResp.json();}
+                    console.log('Drill phoneme result:',phonemeResult);
+                }catch(e){console.log('Drill phoneme error:',e);}
 
                 // Call GPT for score + feedback
                 var gptFeedback='';
                 var gptScore=0;
                 try{
                     var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\n';
-                    if(azureResult){
-                        gptPrompt+='Azure pronunciation scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
-                        if(azureResult.words){
-                            var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                            if(errW.length>0)gptPrompt+='Azure flagged these words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'. ONLY comment on these words.\n';
-                        }
+                    if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
+                        gptPrompt+='PHONEME ANALYSIS RESULTS:\n';
+                        gptPrompt+='Phoneme accuracy score: '+phonemeResult.score+'/100\n';
+                        gptPrompt+='Detected errors:\n';
+                        phonemeResult.errors.forEach(function(err){
+                            if(err.type==='substitution')gptPrompt+='- Expected /'+err.expected+'/ but heard /'+err.actual+'/\n';
+                            else if(err.type==='deletion')gptPrompt+='- Missing phoneme /'+err.expected+'/\n';
+                            else if(err.type==='insertion')gptPrompt+='- Extra phoneme /'+err.actual+'/ inserted\n';
+                        });
+                        gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
+                    }else if(phonemeResult){
+                        gptPrompt+='Phoneme analysis found no errors. Score: '+phonemeResult.score+'/100.\n';
                     }
                     gptPrompt+='RULES:\n';
                     gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
-                    gptPrompt+='- ONLY comment on words Azure flagged. Do NOT invent errors.\n';
+                    gptPrompt+='- ONLY comment on errors the phoneme analysis detected. Do NOT invent errors.\n';
                     gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification".\n';
                     gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule for that word instead.\n';
                     gptPrompt+='- Max 2 sentences.\n';
@@ -31720,13 +31728,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }catch(pe){gptFeedback=gptText;}
                 }catch(e){console.log('Drill GPT error:',e);}
 
-                // Score: 95% Azure, 5% GPT
+                // Score: 50% Phoneme + 50% GPT
                 var finalScore=0;
-                if(azureResult){
-                    finalScore=Math.round(azureResult.pronunciation*0.95 + gptScore*0.05);
-                    console.log('Drill score: Azure='+azureResult.pronunciation+' GPT='+gptScore+' Final='+finalScore);
+                if(phonemeResult&&typeof phonemeResult.score==='number'){
+                    finalScore=Math.round(phonemeResult.score*0.5 + gptScore*0.5);
+                    console.log('Drill score: Phoneme='+phonemeResult.score+' GPT='+gptScore+' Final='+finalScore);
                 }else{
-                    finalScore=Math.max(0,gptScore); // Fallback to GPT-only if Azure fails
+                    finalScore=Math.max(0,gptScore); // Fallback to GPT-only if phoneme service fails
                 }
                 var feedback=gptFeedback||'Pronunciation assessed.';
 
@@ -31846,22 +31854,6 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var wavBase64=await blobToWavBase64(qs.localBlob);
 
-                // ========== AZURE PRONUNCIATION ASSESSMENT ==========
-                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
-                var azureResult=null;
-                try{
-                    statusEl.textContent='🔍 Analyzing pronunciation...';
-                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
-                    });
-                    if(azResp.ok){
-                        azureResult=await azResp.json();
-                        if(azureResult.error && azureResult.accuracy===0) azureResult=null;
-                        console.log('Azure result:',JSON.stringify(azureResult));
-                    }
-                }catch(e){console.log('Azure unavailable, falling back to GPT only:',e);}
-
                 // ========== G2PK PRONUNCIATION LOOKUP ==========
                 var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
                 var expectedPronunciation='';
@@ -31877,34 +31869,49 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }catch(e){console.log('g2pk unavailable:',e);}
 
-                // ========== GPT GRADING (with Azure data if available) ==========
-                statusEl.textContent='📝 Generating feedback...';
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
                     pronInfo='\nSTANDARD PRONUNCIATION: "'+expectedPronunciation+'"\n(This shows how the text should sound when spoken correctly per standard Korean pronunciation rules.)\n';
                 }
 
-                // If Azure succeeded, include its data in the GPT prompt for better feedback
-                var azureInfo='';
-                if(azureResult){
-                    azureInfo='\n\nAZURE PRONUNCIATION ASSESSMENT RESULTS (from a dedicated pronunciation AI):\n';
-                    azureInfo+='- Overall Accuracy: '+azureResult.accuracy+'/100\n';
-                    azureInfo+='- Fluency: '+azureResult.fluency+'/100\n';
-                    azureInfo+='- Completeness: '+azureResult.completeness+'/100\n';
-                    azureInfo+='- Pronunciation Score: '+azureResult.pronunciation+'/100\n';
-                    azureInfo+='- Azure Transcript: "'+azureResult.transcript+'"\n';
-                    if(azureResult.words && azureResult.words.length>0){
-                        var errorWords=azureResult.words.filter(function(w){return w.error_type && w.error_type!=='None';});
-                        if(errorWords.length>0){
-                            azureInfo+='- Words with errors: '+errorWords.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
-                        }else{
-                            azureInfo+='- All words recognized correctly by Azure.\n';
-                        }
+                // ========== PHONEME PRONUNCIATION ANALYSIS ==========
+                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var phonemeResult=null;
+                try{
+                    statusEl.textContent='🔍 Analyzing pronunciation...';
+                    var formData=new FormData();
+                    formData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
+                    formData.append('phonetic_hangul',expectedPronunciation||expectedKorean);
+                    formData.append('original_text',expectedKorean);
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
+                    if(phResp.ok){
+                        phonemeResult=await phResp.json();
+                        console.log('Phoneme result:',JSON.stringify(phonemeResult));
                     }
-                    azureInfo+='\nUse the Azure scores as a STRONG reference. Your final score should be close to Azure\'s pronunciation score. If Azure gave a low accuracy score for a word, that word was likely mispronounced even if you think it sounds OK. Trust Azure for phonetic accuracy.\n';
+                }catch(e){console.log('Phoneme service unavailable, falling back to GPT only:',e);}
+
+                // ========== GPT GRADING (with phoneme data if available) ==========
+                statusEl.textContent='📝 Generating feedback...';
+
+                // If phoneme analysis succeeded, include its data in the GPT prompt for better feedback
+                var phonemeInfo='';
+                if(phonemeResult){
+                    phonemeInfo='\n\nPHONEME ANALYSIS RESULTS (from a dedicated phoneme recognition AI):\n';
+                    phonemeInfo+='- Phoneme Accuracy Score: '+phonemeResult.score+'/100\n';
+                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                        phonemeInfo+='- Detected errors:\n';
+                        phonemeResult.errors.forEach(function(err){
+                            if(err.type==='substitution')phonemeInfo+='  • Expected /'+err.expected+'/ but heard /'+err.actual+'/\n';
+                            else if(err.type==='deletion')phonemeInfo+='  • Missing phoneme /'+err.expected+'/\n';
+                            else if(err.type==='insertion')phonemeInfo+='  • Extra phoneme /'+err.actual+'/ inserted\n';
+                        });
+                    }else{
+                        phonemeInfo+='- No phoneme errors detected.\n';
+                    }
+                    phonemeInfo+='\nONLY comment on errors the phoneme analysis detected. Do NOT invent additional errors. Trust the phoneme analysis for phonetic accuracy.\n';
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+azureInfo+'\nI am sending you their audio recording.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES — READ CAREFULLY BEFORE GIVING FEEDBACK:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this. They are the same sound.\n\n2. ONLY comment on words Azure flagged as "Mispronunciation" or "Omission". If Azure says a word has error_type "None", DO NOT comment on that word at all.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification issues when the EXPECTED text has a tense consonant (ㄲㄸㅃㅆㅉ) but the student used a plain one.\n - ㅈ in 제가 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㅈ in 오지 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㄱ in 고 is PLAIN ㄱ. Do not say it is under-aspirated.\n - Only flag tensification if the phonetic form shows ㄲㄸㅃㅆㅉ and the student said ㄱㄷㅂㅅㅈ instead.\n\n4. TERMINOLOGY:\n - Plain → Tense error: "lacks tensification, pronounced ㄱ instead of expected ㄲ"\n - Plain → Aspirated error: "insufficient aspiration, pronounced ㄱ instead of expected ㅋ"\n - Tense/Aspirated → Plain error: "over-aspirated/over-tensed"\n\n5. If Azure flagged a word but you cannot hear a specific error, provide the pronunciation RULE for that word instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable as 이써떤"\n - e.g. "않았어요 has a silent ㅎ: pronounced 아나써요"\n Do NOT make up an error you cannot actually hear.\n\n6. Keep feedback to 2-4 items maximum. Only the most important errors.\n\nSCORING:\n- Rate 0 to 100.'+(azureResult?'\n- Azure scored '+azureResult.pronunciation+'/100. Stay within 10 points of Azure unless you have strong reason.':'')+ '\n- 0% = non-Korean. 100% = perfect.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES — READ CAREFULLY BEFORE GIVING FEEDBACK:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this. They are the same sound.\n\n2. ONLY comment on errors the phoneme analysis detected. If phoneme analysis shows no error for a sound, DO NOT comment on that sound at all.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification issues when the EXPECTED text has a tense consonant (ㄲㄸㅃㅆㅉ) but the student used a plain one.\n - ㅈ in 제가 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㅈ in 오지 is PLAIN ㅈ. Do not say it lacks tensification.\n - ㄱ in 고 is PLAIN ㄱ. Do not say it is under-aspirated.\n - Only flag tensification if the phonetic form shows ㄲㄸㅃㅆㅉ and the student said ㄱㄷㅂㅅㅈ instead.\n\n4. TERMINOLOGY:\n - Plain → Tense error: "lacks tensification, pronounced ㄱ instead of expected ㄲ"\n - Plain → Aspirated error: "insufficient aspiration, pronounced ㄱ instead of expected ㅋ"\n - Tense/Aspirated → Plain error: "over-aspirated/over-tensed"\n\n5. If phoneme analysis flagged an error but you cannot hear it clearly, provide the pronunciation RULE for that word instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable as 이써떤"\n - e.g. "않았어요 has a silent ㅎ: pronounced 아나써요"\n Do NOT make up an error you cannot actually hear.\n\n6. Keep feedback to 2-4 items maximum. Only the most important errors.\n\nSCORING:\n- Rate 0 to 100.'+(phonemeResult?'\n- Phoneme accuracy score: '+phonemeResult.score+'/100. Stay within 15 points of this unless you have strong reason.':'')+ '\n- 0% = non-Korean. 100% = perfect.\n\nProvide a transcript of what you heard.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"specific feedback","transcript":"what you heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -31957,12 +31964,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // ========== HYBRID SCORING: 35% Azure + 65% GPT ==========
+                // ========== HYBRID SCORING: 50% Phoneme + 50% GPT ==========
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                if(azureResult && typeof azureResult.pronunciation==='number'){
-                    var azureScore=azureResult.pronunciation;
-                    var hybridScore=Math.round(azureScore*0.35 + gptScore*0.65);
-                    console.log('Hybrid score: Azure='+azureScore+' GPT='+gptScore+' → Final='+hybridScore);
+                if(phonemeResult && typeof phonemeResult.score==='number'){
+                    var phonemeScore=phonemeResult.score;
+                    var hybridScore=Math.round(phonemeScore*0.5 + gptScore*0.5);
+                    console.log('Hybrid score: Phoneme='+phonemeScore+' GPT='+gptScore+' → Final='+hybridScore);
                     grade.score=hybridScore;
                 }else{
                     console.log('GPT-only score:',gptScore);
@@ -32190,34 +32197,40 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(g2pkData.phonetic)phonetic=g2pkData.phonetic;
                 }catch(e){console.log('g2pk error:',e);}
 
-                // Azure pronunciation assessment
-                var AZURE_PRON_URL='https://azure-pronunciation-386010826708.us-central1.run.app';
-                var azureResult=null;
+                // Phoneme pronunciation analysis
+                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var phonemeResult=null;
                 try{
-                    var azResp=await fetch(AZURE_PRON_URL+'/assess',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
-                    });
-                    var azData=await azResp.json();
-                    if(azData&&typeof azData.pronunciation==='number'&&!azData.error)azureResult=azData;
-                    console.log('Bonus Azure:',azData);
-                }catch(e){console.log('Bonus Azure error:',e);}
+                    var formData=new FormData();
+                    formData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                    formData.append('phonetic_hangul',phonetic||expectedKorean);
+                    formData.append('original_text',expectedKorean);
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
+                    if(phResp.ok){phonemeResult=await phResp.json();}
+                    console.log('Bonus phoneme:',phonemeResult);
+                }catch(e){console.log('Bonus phoneme error:',e);}
 
                 // GPT grading (same as normal round)
                 var gptPrompt='You are a Korean pronunciation grading assistant.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
                 gptPrompt+='Phonetic form (correct pronunciation): "'+phonetic+'"\n';
                 gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
-                if(azureResult){
-                    gptPrompt+='Azure pronunciation scores: accuracy='+azureResult.accuracy+', fluency='+azureResult.fluency+', pronunciation='+azureResult.pronunciation+'/100.\n';
-                    if(azureResult.words){
-                        var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                        if(errW.length>0)gptPrompt+='Azure flagged these words: '+errW.map(function(w){return w.word+' ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'. ONLY comment on these words.\n';
-                    }
+                if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
+                    gptPrompt+='PHONEME ANALYSIS RESULTS:\n';
+                    gptPrompt+='Phoneme accuracy score: '+phonemeResult.score+'/100\n';
+                    gptPrompt+='Detected errors:\n';
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution')gptPrompt+='- Expected /'+err.expected+'/ but heard /'+err.actual+'/\n';
+                        else if(err.type==='deletion')gptPrompt+='- Missing phoneme /'+err.expected+'/\n';
+                        else if(err.type==='insertion')gptPrompt+='- Extra phoneme /'+err.actual+'/ inserted\n';
+                    });
+                    gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
+                }else if(phonemeResult){
+                    gptPrompt+='Phoneme analysis found no errors. Score: '+phonemeResult.score+'/100.\n';
                 }
                 gptPrompt+='RULES:\n';
                 gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
-                gptPrompt+='- ONLY comment on words Azure flagged. Do NOT invent errors for words Azure marked as correct.\n';
+                gptPrompt+='- ONLY comment on errors the phoneme analysis detected. Do NOT invent errors for sounds the analysis marked as correct.\n';
                 gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when expected text has ㄲㄸㅃㅆㅉ but student said ㄱㄷㅂㅅㅈ.\n';
                 gptPrompt+='- If you cannot hear a specific error on a flagged word, give the pronunciation rule instead (e.g. batchim linking, silent ㅎ).\n';
                 gptPrompt+='- Max 2-4 feedback items.\n';
@@ -32239,12 +32252,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){}
                 }
 
-                // Hybrid: 35% Azure + 65% GPT (same as normal round)
+                // Hybrid: 50% Phoneme + 50% GPT
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                if(azureResult&&typeof azureResult.pronunciation==='number'){
-                    var azureScore=azureResult.pronunciation;
-                    grade.score=Math.round(azureScore*0.35+gptScore*0.65);
-                    console.log('Bonus hybrid: Azure='+azureScore+' GPT='+gptScore+' → Final='+grade.score);
+                if(phonemeResult&&typeof phonemeResult.score==='number'){
+                    var phonemeScore=phonemeResult.score;
+                    grade.score=Math.round(phonemeScore*0.5+gptScore*0.5);
+                    console.log('Bonus hybrid: Phoneme='+phonemeScore+' GPT='+gptScore+' → Final='+grade.score);
                 }
 
                 var finalScore=typeof grade.score==='number'?grade.score:0;
