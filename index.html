@@ -31419,6 +31419,62 @@ Return ONLY this JSON (no markdown, no code blocks):
                     h+=qgBuildPodium(begBoard.slice(0,10),'🌱 BEGINNER','#41c0ff');
                     h+=qgBuildPodium(advBoard.slice(0,10),'🌟 ADVANCED','#ff7777');
                     h+='</div>';
+
+                    // Fetch all submissions for best/worst review
+                    try{
+                        var allSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).where('status','==','graded').get();
+                        var subs=[];
+                        allSubs.forEach(function(doc){var d=doc.data();if(typeof d.gradeScore==='number')subs.push(d);});
+                        subs.sort(function(a,b){return b.gradeScore-a.gradeScore;});
+
+                        function buildSubList(items,title,color){
+                            var s='<div style="margin-top:20px;">';
+                            s+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:'+color+';margin-bottom:10px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+title+'</div>';
+                            items.forEach(function(sub,i){
+                                var sc=sub.gradeScore;
+                                var scColor=sc>=80?'#00ff88':sc>=50?'#FFD700':'#ff4444';
+                                var audioId='qgReview_'+title.replace(/[^a-zA-Z]/g,'')+'_'+i;
+                                s+='<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">';
+                                s+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:'+scColor+';min-width:40px;">'+sc+'%</span>';
+                                s+='<span style="font-size:13px;color:#fff;flex:1;">'+escapeHtml(sub.playerName||'Student')+'</span>';
+                                s+='<span style="font-size:10px;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">R'+(sub.round+1)+(sub.isBonus?' ⭐':'')+'</span>';
+                                if(sub.audioUrl){
+                                    s+='<audio id="'+audioId+'" src="'+escapeHtml(sub.audioUrl)+'" preload="none"></audio>';
+                                    s+='<button onclick="var a=document.getElementById(\''+audioId+'\');if(a.paused){a.play();this.textContent=\'⏹\'}else{a.pause();a.currentTime=0;this.textContent=\'▶\'}" style="background:none;border:1px solid #888;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:11px;">▶</button>';
+                                    s+='<select onchange="document.getElementById(\''+audioId+'\').playbackRate=parseFloat(this.value)" style="background:#1a1a2e;border:1px solid #555;color:#ccc;font-size:10px;border-radius:4px;padding:2px;">';
+                                    s+='<option value="1">1x</option><option value="0.75">0.75x</option><option value="0.5">0.5x</option><option value="1.25">1.25x</option></select>';
+                                }
+                                s+='</div>';
+                                // Show feedback on click
+                                if(sub.feedback||sub.transcript){
+                                    var detailId=audioId+'_detail';
+                                    s+='<div id="'+detailId+'" style="display:none;background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 12px;margin-bottom:8px;margin-left:50px;font-size:11px;color:#aaa;">';
+                                    if(sub.transcript)s+='<div style="color:#a855f7;margin-bottom:4px;">Said: '+escapeHtml(sub.transcript)+'</div>';
+                                    if(sub.expectedKorean)s+='<div style="color:#00ff88;margin-bottom:4px;">Expected: '+escapeHtml(sub.expectedKorean)+'</div>';
+                                    if(sub.feedback)s+='<div style="color:#ddd;">'+escapeHtml(sub.feedback)+'</div>';
+                                    s+='</div>';
+                                    // Make the row clickable to toggle details
+                                    s=s.replace('margin-bottom:6px;display:flex','margin-bottom:6px;cursor:pointer;display:flex');
+                                    s=s.replace('padding:10px 12px;margin','padding:10px 12px;margin');
+                                    // Add onclick to the row div - replace last occurrence
+                                    var rowStart=s.lastIndexOf('<div style="background:rgba(255,255,255,0.05)');
+                                    if(rowStart>-1){
+                                        s=s.substring(0,rowStart)+'<div onclick="var el=document.getElementById(\''+detailId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="background:rgba(255,255,255,0.05)'+s.substring(rowStart+'<div style="background:rgba(255,255,255,0.05)'.length);
+                                    }
+                                }
+                            });
+                            s+='</div>';
+                            return s;
+                        }
+
+                        if(subs.length>0){
+                            var best5=subs.slice(0,5);
+                            var worst5=subs.slice(-5).reverse();
+                            h+=buildSubList(best5,'🏆 TOP 5 BEST','#00ff88');
+                            if(subs.length>5) h+=buildSubList(worst5,'📉 TOP 5 NEEDS WORK','#ff4444');
+                        }
+                    }catch(subErr){console.error('Error loading submissions for review:',subErr);}
+
                     h+='<div style="text-align:center;margin-top:20px;"><button onclick="document.getElementById(\'qgLBModal\').remove();qgAfterFinish();" style="background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;padding:12px 30px;border-radius:8px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">✕ Close Game</button></div></div>';
                     ov.innerHTML=h;
                     document.body.appendChild(ov);
@@ -31600,7 +31656,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='</div>';
             // Record button
             h+='<div style="text-align:center;">';
-            h+='<button id="qsRecBtn" onclick="qsRecord()" style="background:rgba(239,68,68,0.15);border:3px solid #ef4444;color:#ef4444;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;transition:all 0.2s;">🎤 RECORD</button>';
+            h+='<button id="qsRecBtn" onclick="qsRecord()" style="background:rgba(239,68,68,0.15);border:3px solid #ef4444;color:#ef4444;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;transition:all 0.2s;">🎤 START RECORDING</button>';
             h+='<div id="qsRecStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
             h+='</div></div>';
             area.innerHTML=h;
@@ -31626,7 +31682,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(d.drillText)+'</div></div>';
             h+='<div style="text-align:center;">';
             h+='<button id="qsDrillRecBtn" onclick="qsDrillRecord(\''+escapeHtml(d.drillText).replace(/'/g,"\\'")+'\',\''+d.drillId+'\')" style="background:rgba(155,89,182,0.15);border:3px solid #9b59b6;color:#9b59b6;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">';
-            h+='🎤 RECORD</button>';
+            h+='🎤 START RECORDING</button>';
             h+='<div id="qsDrillStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
             h+='<div id="qsDrillResult" style="margin-top:12px;"></div>';
             h+='</div></div>';
@@ -31681,7 +31737,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             qs.drillBlob=null;qs.drillMime=null;
             qs.isBusy=false;
             var btn=document.getElementById('qsDrillRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
+            if(btn){btn.style.display='';btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
             document.getElementById('qsDrillStatus').textContent='';
         }
 
@@ -31821,7 +31877,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 statusEl.textContent='❌ Error: '+e.message;
                 qs.isBusy=false;qsFlushPending();
                 var btn=document.getElementById('qsDrillRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
+                if(btn){btn.disabled=false;btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
             }
         }
 
@@ -31878,7 +31934,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             qs.localBlob=null;qs.localMime=null;
             qs.isBusy=false;
             var btn=document.getElementById('qsRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.animation='none';}
+            if(btn){btn.style.display='';btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.animation='none';}
             document.getElementById('qsRecStatus').textContent='';
         }
 
@@ -32181,6 +32237,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         // ── BONUS ROUND ──
         var qsBonusRecorder=null;
         async function qsStartBonus(){
+            qs.isBusy=true;
             var area=document.getElementById('qsGameArea');
             area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">⭐ GENERATING BONUS...</div><div style="font-size:11px;color:#888;margin-top:8px;">Preparing a bonus sentence for you!</div></div>';
             try{
@@ -32249,7 +32306,11 @@ Return ONLY this JSON (no markdown, no code blocks):
 
             }catch(e){
                 console.error('Bonus generation error:',e);
-                area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
+                qs.isBusy=false;
+                qsFlushPending();
+                if(!qs.pendingStatus){
+                    area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#888;">⏳ Waiting for next round...</div></div>';
+                }
             }
         }
 
@@ -32264,7 +32325,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(bonus.changed)h+='<div style="font-size:10px;color:#FFA500;margin-top:6px;">Changed: '+escapeHtml(bonus.changed)+'</div>';
                 h+='</div>';
                 h+='<div style="text-align:center;">';
-                h+='<button id="qsBonusRecBtn" onclick="qsBonusRecord()" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #8B6914,2px -2px 0 #8B6914,-2px 2px 0 #8B6914,2px 2px 0 #8B6914,0 -2px 0 #8B6914,0 2px 0 #8B6914,-2px 0 0 #8B6914,2px 0 0 #8B6914;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">🎤 RECORD</button>';
+                h+='<button id="qsBonusRecBtn" onclick="qsBonusRecord()" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #8B6914,2px -2px 0 #8B6914,-2px 2px 0 #8B6914,2px 2px 0 #8B6914,0 -2px 0 #8B6914,0 2px 0 #8B6914,-2px 0 0 #8B6914,2px 0 0 #8B6914;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;">🎤 START RECORDING</button>';
                 h+='<div id="qsBonusStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
                 h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
                 h+='</div></div>';
@@ -32315,9 +32376,15 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsBonusTrash(){
             qs.bonusBlob=null;qs.bonusMime=null;
+            // If round already ended while reviewing, flush to leaderboard
+            if(qs.pendingStatus){
+                qs.isBusy=false;
+                qsFlushPending();
+                return;
+            }
             qs.isBusy=false;
             var btn=document.getElementById('qsBonusRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+            if(btn){btn.style.display='';btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
             document.getElementById('qsBonusStatus').textContent='';
         }
 
@@ -32474,11 +32541,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
                 resultEl.innerHTML=rh;
                 statusEl.textContent='';
-                // Clear busy flag and flush any pending status change
-                qs.isBusy=false;
-                qsFlushPending();
                 var btn=document.getElementById('qsBonusRecBtn');
                 if(btn){btn.style.display='none';}
+                // Don't flush yet — let student review feedback
+                // Show continue button if round ended while grading
+                if(qs.pendingStatus){
+                    var contHtml='<div style="text-align:center;margin-top:12px;">';
+                    contHtml+='<button onclick="qsBonusDismiss()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">CONTINUE →</button></div>';
+                    resultEl.innerHTML+=contHtml;
+                }else{
+                    // Round hasn't ended yet — just clear busy
+                    qs.isBusy=false;
+                }
 
             }catch(e){
                 console.error('Bonus submit error:',e);
@@ -32488,6 +32562,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var btn=document.getElementById('qsBonusRecBtn');
                 if(btn){btn.style.display='none';}
             }
+        }
+
+        function qsBonusDismiss(){
+            qs.isBusy=false;
+            qsFlushPending();
         }
 
         function qsFlushPending(){
