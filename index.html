@@ -31637,7 +31637,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             var btn=document.getElementById('qsDrillRecBtn');
             if(qsDrillRecorder&&qsDrillRecorder.state==='recording'){
                 qsDrillRecorder.stop();
-                btn.innerHTML='⏳ GRADING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                btn.style.display='none';
+                document.getElementById('qsDrillStatus').textContent='';
                 return;
             }
             qs.isBusy=true;
@@ -31649,15 +31650,39 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
                 qsDrillRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
                 qsDrillRecorder.ondataavailable=function(e){chunks.push(e.data);};
-                qsDrillRecorder.onstop=async function(){
+                qsDrillRecorder.onstop=function(){
                     stream.getTracks().forEach(function(t){t.stop();});
                     var blob=new Blob(chunks,{type:mime||'audio/webm'});
-                    await qsDrillSubmit(blob,mime||'audio/webm',drillText,drillId);
+                    qs.drillBlob=blob;
+                    qs.drillMime=mime||'audio/webm';
+                    qs.drillText=drillText;
+                    qs.drillId=drillId;
+                    // Show confirm/trash UI
+                    var statusEl=document.getElementById('qsDrillStatus');
+                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
+                    confirmHtml+='<button onclick="qsDrillConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
+                    confirmHtml+='<button onclick="qsDrillTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                    confirmHtml+='</div>';
+                    statusEl.innerHTML=confirmHtml;
                 };
                 qsDrillRecorder.start();
                 btn.innerHTML='⏹ STOP';btn.style.borderColor='#e87777';btn.style.color='#e87777';
                 document.getElementById('qsDrillStatus').textContent='Recording...';
-            }).catch(function(err){alert('Mic error: '+err.message);});
+            }).catch(function(err){alert('Mic error: '+err.message);qs.isBusy=false;});
+        }
+
+        function qsDrillConfirm(){
+            var statusEl=document.getElementById('qsDrillStatus');
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            qsDrillSubmit(qs.drillBlob,qs.drillMime,qs.drillText,qs.drillId);
+        }
+
+        function qsDrillTrash(){
+            qs.drillBlob=null;qs.drillMime=null;
+            qs.isBusy=false;
+            var btn=document.getElementById('qsDrillRecBtn');
+            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
+            document.getElementById('qsDrillStatus').textContent='';
         }
 
         // Phoneme label → Hangul mapping for student-friendly feedback
@@ -31728,7 +31753,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                     if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
                         gptPrompt+='PRONUNCIATION ANALYSIS:\n';
-                        gptPrompt+='Sound accuracy score: '+phonemeResult.score+'/100\n';
+
                         gptPrompt+='Detected errors:\n';
                         phonemeResult.errors.forEach(function(err){
                             if(err.type==='substitution')gptPrompt+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
@@ -31737,15 +31762,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                         });
                         gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
                     }else if(phonemeResult){
-                        gptPrompt+='No pronunciation errors detected. Score: '+phonemeResult.score+'/100.\n';
+                        gptPrompt+='No pronunciation errors detected.\n';
                     }
                     gptPrompt+='RULES:\n';
                     gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
                     gptPrompt+='- ONLY comment on errors detected above. Do NOT invent errors.\n';
                     gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                     gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule for that word instead.\n';
-                    gptPrompt+='FEEDBACK STYLE: Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
+                    gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
                     gptPrompt+='- Max 2 bullet points.\n';
+                    gptPrompt+='SCORING RUBRIC — grade independently:\n';
+                    gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
+                    gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Do NOT grade leniently.\n';
                     gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
                     var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
@@ -31802,7 +31830,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             var btn=document.getElementById('qsRecBtn');
             if(qsRecorder&&qsRecorder.state==='recording'){
                 qsRecorder.stop();
-                btn.innerHTML='⏳ PROCESSING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                btn.style.display='none';
+                document.getElementById('qsRecStatus').textContent='';
                 return;
             }
             qs.isBusy=true;
@@ -31822,12 +31851,35 @@ Return ONLY this JSON (no markdown, no code blocks):
                     stream.getTracks().forEach(function(t){t.stop();});
                     var blobType=mime||'audio/webm';
                     qs.localBlob=new Blob(chunks,{type:blobType});
-                    qsSubmitRecording(blobType);
+                    qs.localMime=blobType;
+                    qs.recordDuration=(Date.now()-(qs.recordStartTime||Date.now()))/1000;
+                    // Show confirm/trash UI
+                    var statusEl=document.getElementById('qsRecStatus');
+                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
+                    confirmHtml+='<button onclick="qsConfirmSubmit()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
+                    confirmHtml+='<button onclick="qsTrashRecording()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                    confirmHtml+='</div>';
+                    statusEl.innerHTML=confirmHtml;
                 };
                 qsRecorder.start();
+                qs.recordStartTime=Date.now();
                 btn.innerHTML='⏹ STOP';btn.style.borderColor='#e87777';btn.style.color='#e87777';btn.style.animation='qsPulse 1s infinite';
                 document.getElementById('qsRecStatus').textContent='Recording...';
             }).catch(function(err){alert('Microphone access denied: '+err.message);});
+        }
+
+        function qsConfirmSubmit(){
+            var statusEl=document.getElementById('qsRecStatus');
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            qsSubmitRecording(qs.localMime);
+        }
+
+        function qsTrashRecording(){
+            qs.localBlob=null;qs.localMime=null;
+            qs.isBusy=false;
+            var btn=document.getElementById('qsRecBtn');
+            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.animation='none';}
+            document.getElementById('qsRecStatus').textContent='';
         }
 
         async function qsSubmitRecording(mimeType) {
@@ -31933,8 +31985,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // If phoneme analysis succeeded, include its data in the GPT prompt for better feedback
                 var phonemeInfo='';
                 if(phonemeResult){
-                    phonemeInfo='\n\nPRONUNCIATION ANALYSIS (from a dedicated phoneme recognition AI):\n';
-                    phonemeInfo+='- Phoneme Accuracy Score: '+phonemeResult.score+'/100\n';
+                    phonemeInfo='\n\nPRONUNCIATION ANALYSIS:\n';
                     if(phonemeResult.errors&&phonemeResult.errors.length>0){
                         phonemeInfo+='- Detected errors:\n';
                         phonemeResult.errors.forEach(function(err){
@@ -31948,7 +31999,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeInfo+='\nONLY comment on errors the analysis detected. Do NOT invent additional errors. Trust the analysis for accuracy.\n';
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. ONLY comment on errors the analysis detected. If no error was flagged for a sound, do NOT comment on it.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n4. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n5. Keep feedback to 2-4 bullet points max.\n\nFEEDBACK STYLE:\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING:\n- Rate 0 to 100.'+(phonemeResult?'\n- Sound accuracy score: '+phonemeResult.score+'/100. Stay within 15 points of this unless you have strong reason.':'')+ '\n- 0% = non-Korean or no speech. 100% = perfect.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback using Hangul","transcript":"what you ACTUALLY heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. ONLY comment on errors the analysis detected. If no error was flagged for a sound, do NOT comment on it.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n4. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n5. Keep feedback to 2-4 bullet points max.\n\nFEEDBACK STYLE:\n- ALWAYS write feedback in ENGLISH. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade independently using this scale:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nDo NOT grade leniently. Use the FULL range of scores. A student with 3+ errors should NOT score above 65.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback using Hangul","transcript":"what you ACTUALLY heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -32041,8 +32092,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // 4. Save submission to Firestore
+                // 4. Speed penalty: beginner + recording over 60s → -5% (silent)
                 var finalScore = typeof grade.score === 'number' ? grade.score : 0;
+                if(qs.playerLevel==='beginner' && qs.recordDuration && qs.recordDuration>60){
+                    finalScore=Math.max(0,finalScore-5);
+                    console.log('Speed penalty applied: recording was '+Math.round(qs.recordDuration)+'s, -5% → '+finalScore);
+                }
                 var finalFeedback = grade.feedback || '';
                 var finalTranscript = grade.transcript || transcript || '';
                 var points = Math.round(finalScore / 10);
@@ -32220,7 +32275,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             var btn=document.getElementById('qsBonusRecBtn');
             if(qsBonusRecorder&&qsBonusRecorder.state==='recording'){
                 qsBonusRecorder.stop();
-                btn.innerHTML='⏳ GRADING...';btn.disabled=true;btn.style.borderColor='#888';btn.style.color='#888';
+                btn.style.display='none';
+                document.getElementById('qsBonusStatus').textContent='';
                 return;
             }
             qs.isBusy=true;
@@ -32232,16 +32288,37 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
                 qsBonusRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
                 qsBonusRecorder.ondataavailable=function(e){chunks.push(e.data);};
-                qsBonusRecorder.onstop=async function(){
+                qsBonusRecorder.onstop=function(){
                     stream.getTracks().forEach(function(t){t.stop();});
                     var blob=new Blob(chunks,{type:mime||'audio/webm'});
-                    qs.localBlob=blob;
-                    await qsBonusSubmit(blob,mime||'audio/webm');
+                    qs.bonusBlob=blob;
+                    qs.bonusMime=mime||'audio/webm';
+                    // Show confirm/trash UI
+                    var statusEl=document.getElementById('qsBonusStatus');
+                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
+                    confirmHtml+='<button onclick="qsBonusConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
+                    confirmHtml+='<button onclick="qsBonusTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                    confirmHtml+='</div>';
+                    statusEl.innerHTML=confirmHtml;
                 };
                 qsBonusRecorder.start();
                 btn.innerHTML='⏹ STOP';btn.style.borderColor='#e87777';btn.style.color='#e87777';
                 document.getElementById('qsBonusStatus').textContent='Recording...';
-            }).catch(function(err){alert('Mic error: '+err.message);});
+            }).catch(function(err){alert('Mic error: '+err.message);qs.isBusy=false;});
+        }
+
+        function qsBonusConfirm(){
+            var statusEl=document.getElementById('qsBonusStatus');
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            qsBonusSubmit(qs.bonusBlob,qs.bonusMime);
+        }
+
+        function qsBonusTrash(){
+            qs.bonusBlob=null;qs.bonusMime=null;
+            qs.isBusy=false;
+            var btn=document.getElementById('qsBonusRecBtn');
+            if(btn){btn.style.display='';btn.innerHTML='🎤 RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+            document.getElementById('qsBonusStatus').textContent='';
         }
 
         async function qsBonusSubmit(blob,mimeType){
@@ -32313,7 +32390,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
                 if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
                     gptPrompt+='PRONUNCIATION ANALYSIS:\n';
-                    gptPrompt+='Sound accuracy score: '+phonemeResult.score+'/100\n';
+
                     gptPrompt+='Detected errors:\n';
                     phonemeResult.errors.forEach(function(err){
                         if(err.type==='substitution')gptPrompt+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
@@ -32322,15 +32399,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                     });
                     gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
                 }else if(phonemeResult){
-                    gptPrompt+='No pronunciation errors detected. Score: '+phonemeResult.score+'/100.\n';
+                    gptPrompt+='No pronunciation errors detected.\n';
                 }
                 gptPrompt+='RULES:\n';
                 gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
                 gptPrompt+='- ONLY comment on detected errors. Do NOT invent errors.\n';
                 gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                 gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule instead.\n';
-                gptPrompt+='FEEDBACK STYLE: Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
+                gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
                 gptPrompt+='- Max 2-4 bullet points.\n';
+                gptPrompt+='SCORING RUBRIC — grade independently:\n';
+                gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
+                gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Do NOT grade leniently.\n';
                 gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"bulleted feedback using Hangul","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
@@ -32373,17 +32453,32 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // Show result
                 var scoreColor=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
-                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;">'+
-                    '<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-align:center;">'+finalScore+'%</div>'+
-                    '<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;text-align:center;margin-top:4px;">⭐ +'+points+' BONUS POINTS</div>'+
-                    (grade.feedback?'<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(grade.feedback)+'</div>':'')+
-                    '</div>';
+                var rh='<div style="background:rgba(0,0,0,0.6);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';">'+finalScore+'%</div>';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;margin-top:4px;">⭐ +'+points+' BONUS POINTS</div>';
+                rh+='</div>';
+                // Feedback
+                if(grade.feedback){
+                    rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
+                    rh+='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Feedback</div>';
+                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
+                }
+                // Transcript
+                var bonusTranscript=grade.transcript||'';
+                if(bonusTranscript){
+                    rh+='<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-top:10px;text-align:left;">';
+                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">YOU SAID:</div>';
+                    rh+='<div style="font-size:13px;color:#a855f7;margin-bottom:8px;">'+escapeHtml(bonusTranscript)+'</div>';
+                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">EXPECTED:</div>';
+                    rh+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedKorean)+'</div></div>';
+                }
+                resultEl.innerHTML=rh;
                 statusEl.textContent='';
                 // Clear busy flag and flush any pending status change
                 qs.isBusy=false;
                 qsFlushPending();
                 var btn=document.getElementById('qsBonusRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+                if(btn){btn.style.display='none';}
 
             }catch(e){
                 console.error('Bonus submit error:',e);
@@ -32391,7 +32486,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 qs.isBusy=false;
                 qsFlushPending();
                 var btn=document.getElementById('qsBonusRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';}
+                if(btn){btn.style.display='none';}
             }
         }
 
