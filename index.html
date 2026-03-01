@@ -31880,7 +31880,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                 try{
                     statusEl.textContent='🔍 Analyzing pronunciation...';
                     var formData=new FormData();
-                    formData.append('audio',qs.localBlob,'audio.wav');
+                    var wavBinary=atob(wavBase64);var wavBytes=new Uint8Array(wavBinary.length);for(var i=0;i<wavBinary.length;i++)wavBytes[i]=wavBinary.charCodeAt(i);
+                    formData.append('audio',new Blob([wavBytes],{type:'audio/wav'}),'audio.wav');
                     formData.append('phonetic_hangul',expectedPronunciation||expectedKorean);
                     formData.append('original_text',expectedKorean);
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
