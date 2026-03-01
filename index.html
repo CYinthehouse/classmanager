@@ -32697,6 +32697,31 @@ Return ONLY this JSON (no markdown, no code blocks):
     @keyframes quizDots { 0%{content:'.';} 33%{content:'..';} 66%{content:'...';} }
     @keyframes qsPulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
 
+    /* 6-frame button press animation for all quiz game buttons */
+    @keyframes btnPress {
+        0%   { transform: translate(0, 0) scale(1); box-shadow: 3px 3px 0 rgba(0,0,0,0.35); filter: brightness(1); }
+        15%  { transform: translate(1px, 1px) scale(0.98); box-shadow: 2px 2px 0 rgba(0,0,0,0.25); filter: brightness(0.92); }
+        30%  { transform: translate(2px, 2px) scale(0.96); box-shadow: 1px 1px 0 rgba(0,0,0,0.15); filter: brightness(0.85); }
+        50%  { transform: translate(3px, 3px) scale(0.95); box-shadow: 0px 0px 0 rgba(0,0,0,0); filter: brightness(0.8); }
+        75%  { transform: translate(1px, 1px) scale(0.98); box-shadow: 2px 2px 0 rgba(0,0,0,0.2); filter: brightness(0.95); }
+        100% { transform: translate(0, 0) scale(1); box-shadow: 3px 3px 0 rgba(0,0,0,0.35); filter: brightness(1); }
+    }
+
+    /* Apply to all buttons inside quiz game containers, except sparkle buttons */
+    #quizGameTeacher button:not(.sparkle-btn):not(.qgColorBtn):not(.qgSpeedBtn):active,
+    #quizGameStudent button:not(.sparkle-btn):active,
+    #qgLBModal button:not(.sparkle-btn):active {
+        animation: btnPress 0.25s ease-out;
+    }
+
+    /* Also give all quiz buttons a resting shadow so the press feels physical */
+    #quizGameTeacher button:not(.sparkle-btn):not(.qgColorBtn):not(.qgSpeedBtn),
+    #quizGameStudent button:not(.sparkle-btn),
+    #qgLBModal button:not(.sparkle-btn) {
+        box-shadow: 3px 3px 0 rgba(0,0,0,0.35);
+        transition: transform 0.1s, box-shadow 0.1s, filter 0.1s;
+    }
+
     /* Sparkle button styles */
     .sparkle-btn {
         position: relative;
