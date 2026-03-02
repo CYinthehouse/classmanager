@@ -31812,9 +31812,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptFeedback='';
                 var gptScore=0;
                 try{
-                    var gptPrompt='You are a Korean pronunciation grading assistant. The student was supposed to say: "'+drillText+'".\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
+                    var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nThe student was supposed to say: "'+drillText+'".\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                     if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
-                        gptPrompt+='PRONUNCIATION ANALYSIS:\n';
+                        gptPrompt+='AUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
 
                         gptPrompt+='Detected errors:\n';
                         phonemeResult.errors.forEach(function(err){
@@ -31822,20 +31822,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                             else if(err.type==='deletion')gptPrompt+='- Missing sound '+ph(err.expected)+'\n';
                             else if(err.type==='insertion')gptPrompt+='- Extra sound '+ph(err.actual)+' inserted\n';
                         });
-                        gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
+                        gptPrompt+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
                     }else if(phonemeResult){
-                        gptPrompt+='No pronunciation errors detected.\n';
+                        gptPrompt+='Automated analysis found no pronunciation errors.\n';
                     }
                     gptPrompt+='RULES:\n';
                     gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
-                    gptPrompt+='- ONLY comment on errors detected above. Do NOT invent errors.\n';
+                    gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                     gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
-                    gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule for that word instead.\n';
+                    gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
                     gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
                     gptPrompt+='- Max 2 bullet points.\n';
-                    gptPrompt+='SCORING RUBRIC — grade independently:\n';
+                    gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
                     gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
-                    gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Do NOT grade leniently.\n';
+                    gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Use the FULL range of scores.\n';
                     gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
                     var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
@@ -31844,7 +31844,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var gptData=await gptResp.json();
                     var gptText='';
                     if(gptData.data&&typeof gptData.data==='string')gptText=gptData.data;
-                    else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];gptText=m.audio?m.audio.transcript:(m.content||'');}
+                    else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];gptText=m.content?(typeof m.content==='string'?m.content:JSON.stringify(m.content)):(m.audio?m.audio.transcript:'');}
                     gptText=gptText.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
                     try{
                         var parsed=JSON.parse(gptText);
@@ -32047,7 +32047,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // If phoneme analysis succeeded, include its data in the GPT prompt for better feedback
                 var phonemeInfo='';
                 if(phonemeResult){
-                    phonemeInfo='\n\nPRONUNCIATION ANALYSIS:\n';
+                    phonemeInfo='\n\nAUTOMATED PRONUNCIATION ANALYSIS (potential errors — verify against what you hear):\n';
                     if(phonemeResult.errors&&phonemeResult.errors.length>0){
                         phonemeInfo+='- Detected errors:\n';
                         phonemeResult.errors.forEach(function(err){
@@ -32061,7 +32061,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeInfo+='\nONLY comment on errors the analysis detected. Do NOT invent additional errors. Trust the analysis for accuracy.\n';
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Your job is to provide feedback on pronunciation, NOT to detect errors yourself.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. ONLY comment on errors the analysis detected. If no error was flagged for a sound, do NOT comment on it.\n\n3. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n4. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n5. Keep feedback to 2-4 bullet points max.\n\nFEEDBACK STYLE:\n- ALWAYS write feedback in ENGLISH. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade independently using this scale:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nDo NOT grade leniently. Use the FULL range of scores. A student with 3+ errors should NOT score above 65.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback using Hangul","transcript":"what you ACTUALLY heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- ALWAYS write feedback in ENGLISH. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback using Hangul","transcript":"what you ACTUALLY heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -32087,8 +32087,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 else if(aiData.data && typeof aiData.data==='object') rt=JSON.stringify(aiData.data);
                 else if(aiData.choices && aiData.choices[0]){
                     var msg=aiData.choices[0].message||aiData.choices[0];
-                    if(msg.audio && msg.audio.transcript) rt=msg.audio.transcript;
-                    else if(msg.content) rt=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
+                    // Prefer content (structured JSON) over audio.transcript (spoken text)
+                    if(msg.content) rt=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
+                    else if(msg.audio && msg.audio.transcript) rt=msg.audio.transcript;
                 }
                 else rt=JSON.stringify(aiData);
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
@@ -32457,12 +32458,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }catch(e){console.log('Bonus phoneme error:',e);}
 
                 // GPT grading (same as normal round)
-                var gptPrompt='You are a Korean pronunciation grading assistant.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
+                var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
                 gptPrompt+='Phonetic form (correct pronunciation): "'+phonetic+'"\n';
                 gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
                 if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
-                    gptPrompt+='PRONUNCIATION ANALYSIS:\n';
+                    gptPrompt+='AUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
 
                     gptPrompt+='Detected errors:\n';
                     phonemeResult.errors.forEach(function(err){
@@ -32470,20 +32471,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                         else if(err.type==='deletion')gptPrompt+='- Missing sound '+ph(err.expected)+'\n';
                         else if(err.type==='insertion')gptPrompt+='- Extra sound '+ph(err.actual)+' inserted\n';
                     });
-                    gptPrompt+='ONLY comment on these detected errors. Do NOT invent additional errors.\n';
+                    gptPrompt+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
                 }else if(phonemeResult){
-                    gptPrompt+='No pronunciation errors detected.\n';
+                    gptPrompt+='Automated analysis found no pronunciation errors.\n';
                 }
                 gptPrompt+='RULES:\n';
                 gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
-                gptPrompt+='- ONLY comment on detected errors. Do NOT invent errors.\n';
+                gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                 gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
-                gptPrompt+='- If you cannot hear a specific error, give the pronunciation rule instead.\n';
+                gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
                 gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
-                gptPrompt+='- Max 2-4 bullet points.\n';
-                gptPrompt+='SCORING RUBRIC — grade independently:\n';
+                gptPrompt+='- Max 2-4 bullet points. If no real errors, say so positively.\n';
+                gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
                 gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
-                gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Do NOT grade leniently.\n';
+                gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Use the FULL range of scores.\n';
                 gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"bulleted feedback using Hangul","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
@@ -32493,14 +32494,31 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptData=await gptResp.json();
                 var rt='';
                 if(gptData.data&&typeof gptData.data==='string')rt=gptData.data;
-                else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];rt=m.audio?m.audio.transcript:(m.content||'');}
+                else if(gptData.data&&typeof gptData.data==='object')rt=JSON.stringify(gptData.data);
+                else if(gptData.choices&&gptData.choices[0]){
+                    var m=gptData.choices[0].message||gptData.choices[0];
+                    // Prefer content (structured JSON) over audio.transcript (spoken text)
+                    if(m.content)rt=typeof m.content==='string'?m.content:JSON.stringify(m.content);
+                    else if(m.audio&&m.audio.transcript)rt=m.audio.transcript;
+                }
+                else rt=JSON.stringify(gptData);
                 rt=rt.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
 
                 var grade={score:0,feedback:'',transcript:''};
+                console.log('Bonus GPT raw text:', rt.substring(0,500));
                 try{grade=JSON.parse(rt);}catch(e){
                     var jm=rt.match(/\{[\s\S]*\}/);
-                    if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){}
+                    if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){
+                        // Last resort: extract fields with regex
+                        var sm=rt.match(/"score"\s*:\s*(\d+)/);
+                        var fm=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        var tm=rt.match(/"transcript"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        if(sm)grade.score=parseInt(sm[1]);
+                        if(fm)grade.feedback=fm[1];
+                        if(tm)grade.transcript=tm[1];
+                    }
                 }
+                console.log('Bonus parsed grade:', JSON.stringify({score:grade.score,feedback:(grade.feedback||'').substring(0,100),transcript:(grade.transcript||'').substring(0,50)}));
 
                 // Hybrid: 50% Phoneme + 50% GPT
                 var gptScore=typeof grade.score==='number'?grade.score:0;
