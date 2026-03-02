@@ -274,6 +274,7 @@
         .level-novice { border-color: #00ffff; color: #00ffff; background: rgba(0,255,255,0.2); }
         .level-beginner { border-color: #39ff14; color: #39ff14; background: rgba(57,255,20,0.2); }
         .level-advanced { border-color: #ffff00; color: #ffff00; background: rgba(255,255,0,0.2); }
+        .level-absolute-beginner { border-color: #ff69b4; color: #ff69b4; background: rgba(255,105,180,0.2); }
         .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
         .status-pending { background: rgba(255,255,0,0.2); color: #ffff00; }
         .status-assigned { background: rgba(57,255,20,0.2); color: #39ff14; }
@@ -18444,6 +18445,9 @@ Return ONLY valid JSON (single object, not array):
                     const startDate = parseESTDate(cls.startDate);
                     const todayDate = getESTToday();
                     
+                    // Normalize both to midnight for fair same-day comparison
+                    startDate.setHours(0, 0, 0, 0);
+                    
                     if (todayDate < startDate) return 0; // Not started yet
                     
                     const daysSinceStart = getDaysBetween(todayDate, startDate);
@@ -21119,6 +21123,7 @@ Return ONLY valid JSON (single object, not array):
                 if (!cls.startDate) return null;
                 const startDate = parseESTDate(cls.startDate);
                 const todayDate = getESTToday();
+                startDate.setHours(0, 0, 0, 0);
                 if (todayDate < startDate) return 0;
                 const daysSinceStart = getDaysBetween(todayDate, startDate);
                 return Math.min(Math.floor(daysSinceStart / 7) + 1, 7);
@@ -30496,7 +30501,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
                 html += '<span style="font-weight:700;color:#ccc;font-size:12px;">Round ' + (i+1) + '</span>';
                 html += '<span style="font-size:11px;color:#888;">' + s.sentences.length + ' sentence' + (s.sentences.length>1?'s':'') + '</span></div>';
-                html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+                html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">';
+                html += '<div style="background:rgba(255,105,180,0.05);border:1px solid rgba(255,105,180,0.2);border-radius:6px;padding:8px;">';
+                html += '<div style="font-size:10px;color:#ff69b4;margin-bottom:4px;font-weight:600;">🐣 ABS (5 words)</div>';
+                var abw=s.absoluteBeginnerWords||[];
+                html += '<div style="font-size:12px;color:#fff;">'+(abw.length>0?escapeHtml(abw.join(', ')):'<span style=color:#666>pending...</span>')+'</div></div>';
                 html += '<div style="background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.2);border-radius:6px;padding:8px;">';
                 html += '<div style="font-size:10px;color:#41c0ff;margin-bottom:4px;font-weight:600;">🌱 BEG (1st only)</div>';
                 html += '<div style="font-size:12px;color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div></div>';
@@ -30535,6 +30544,70 @@ Return ONLY this JSON (no markdown, no code blocks):
                         if (ti < translations.length && translations[ti]) qg.sets[i].sentences[j].english = translations[ti].english||'';
                         ti++;
                     }
+
+                // Generate Absolute Beginner syllable blocks for each round
+                btn.innerHTML = '<span class="quiz-loading-dots">⏳ GENERATING ABS. BEG WORDS</span>';
+                try {
+                    var abPrompt = 'You are a Korean language teaching assistant for ABSOLUTE BEGINNERS.\n';
+                    abPrompt += 'For each round below, generate 5 simple Korean syllable blocks (1-3 syllable words) that relate to key words or sounds in the round\'s sentences. These are for students who barely know Korean and are just learning to read Hangul.\n\n';
+                    abPrompt += 'Requirements:\n- Each word must be 1-3 syllables (e.g. 밤, 컵, 물, 사과, 바나나)\n- Pick common, concrete nouns or simple words\n- Try to extract or relate to nouns/key words from the round\'s sentences when possible\n- If the sentences have difficult words, simplify to basic vocabulary with similar sounds\n- Fill remaining slots with common beginner words\n\n';
+                    abPrompt += 'Rounds:\n';
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        abPrompt += 'Round ' + (i+1) + ': ' + qg.sets[i].sentences.map(function(s){return s.korean;}).join(' / ') + '\n';
+                    }
+                    abPrompt += '\nReturn ONLY a JSON array with one entry per round: [{"round":1,"words":["word1","word2","word3","word4","word5"]}, ...]. No markdown.';
+
+                    var abResp = await fetch(aiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:abPrompt, max_tokens:2000}) });
+                    var abData = await abResp.json();
+                    var abRt = abData.text||abData.result||abData.response||JSON.stringify(abData);
+                    var abParsed = []; var abMatch = abRt.match(/\[[\s\S]*?\]/); if(abMatch) try{abParsed=JSON.parse(abMatch[0]);}catch(e){}
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        if (i < abParsed.length && abParsed[i].words && abParsed[i].words.length > 0) {
+                            qg.sets[i].absoluteBeginnerWords = abParsed[i].words.slice(0, 5);
+                        } else {
+                            qg.sets[i].absoluteBeginnerWords = ['밥', '물', '집', '손', '눈']; // fallback
+                        }
+                        console.log('Round '+(i+1)+' abs beg words:', qg.sets[i].absoluteBeginnerWords);
+                    }
+                } catch(abErr) {
+                    console.error('Abs beginner word generation error:', abErr);
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        qg.sets[i].absoluteBeginnerWords = ['밥', '물', '집', '손', '눈'];
+                    }
+                }
+
+                // Pre-generate bonus clauses for absolute beginners (goal-aware)
+                // These are stored per-round so they're instant when a student triggers bonus
+                btn.innerHTML = '<span class="quiz-loading-dots">⏳ PRELOADING BONUS</span>';
+                try {
+                    var bonusPrompt = 'You are a Korean language teaching assistant for ABSOLUTE BEGINNERS.\n';
+                    bonusPrompt += 'Generate one very short Korean clause (2-3 words max) per round. These must be extremely simple — only basic vocabulary with 1-3 syllable words.\n';
+                    bonusPrompt += 'Each clause should relate to the syllable blocks for that round.\n';
+                    bonusPrompt += 'Examples of appropriate difficulty: "밥 먹어요", "물 주세요", "집에 가요", "고양이 봐요", "한국어 공부해요"\n\n';
+                    bonusPrompt += 'Rounds:\n';
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        var abw = qg.sets[i].absoluteBeginnerWords || [];
+                        bonusPrompt += 'Round ' + (i+1) + ' syllables: ' + abw.join(', ') + '\n';
+                    }
+                    bonusPrompt += '\nReturn ONLY a JSON array: [{"round":1,"korean":"short clause","english":"translation"}, ...]. No markdown.';
+                    var bonusResp = await fetch(aiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:bonusPrompt, max_tokens:1500}) });
+                    var bonusData = await bonusResp.json();
+                    var bonusRt = bonusData.text||bonusData.result||bonusData.response||JSON.stringify(bonusData);
+                    var bonusParsed = []; var bonusMatch = bonusRt.match(/\[[\s\S]*?\]/); if(bonusMatch) try{bonusParsed=JSON.parse(bonusMatch[0]);}catch(e){}
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        if (i < bonusParsed.length && bonusParsed[i].korean) {
+                            qg.sets[i].absoluteBeginnerBonus = { korean: bonusParsed[i].korean, english: bonusParsed[i].english || '' };
+                        } else {
+                            qg.sets[i].absoluteBeginnerBonus = { korean: '밥 먹어요', english: 'I eat rice' };
+                        }
+                        console.log('Round '+(i+1)+' abs beg bonus:', qg.sets[i].absoluteBeginnerBonus.korean);
+                    }
+                } catch(bonusErr) {
+                    console.error('Abs beginner bonus preload error:', bonusErr);
+                    for (var i = 0; i < qg.sets.length; i++) {
+                        qg.sets[i].absoluteBeginnerBonus = { korean: '밥 먹어요', english: 'I eat rice' };
+                    }
+                }
                 var roomCode = Math.random().toString(36).substring(2,8).toUpperCase();
                 // Build sentence-to-slide mapping for PDF/slide navigation
                 var sentenceSlideMap = [];
@@ -30553,8 +30626,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                     roomCode: roomCode, status:'lobby', currentRound:-1,
                     totalRounds: qg.sets.length, roundTime: roundTime,
                     roundStartedAt: null,
-                    sets: qg.sets.map(function(s){return{setIndex:s.setIndex,sentences:s.sentences};}),
-                    leaderboard_beginner:[], leaderboard_advanced:[],
+                    sets: qg.sets.map(function(s){return{setIndex:s.setIndex,sentences:s.sentences,absoluteBeginnerWords:s.absoluteBeginnerWords||[],absoluteBeginnerBonus:s.absoluteBeginnerBonus||null};}),
+                    leaderboard_absolute_beginner:[], leaderboard_beginner:[], leaderboard_advanced:[],
                     materialDocId: trMaterialDocId || null,
                     materialSlides: trMaterialSlides ? JSON.stringify(trMaterialSlides) : null,
                     sentenceSlideMap: sentenceSlideMap,
@@ -30612,7 +30685,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(!box) return;
                 if(snap.empty){box.innerHTML='<p style="color:#888;font-size:12px;width:100%;text-align:center;">Waiting for students...</p>';return;}
                 var h='';
-                snap.forEach(function(d){var p=d.data();var lc=p.level==='beginner'?'#8bb4d6':'#c4a0e8';var ll=p.level==='beginner'?'BEG':'ADV';
+                snap.forEach(function(d){var p=d.data();var lc=p.level==='absolute_beginner'?'#ff69b4':p.level==='beginner'?'#8bb4d6':'#c4a0e8';var ll=p.level==='absolute_beginner'?'ABS':p.level==='beginner'?'BEG':'ADV';
                 h+='<div style="background:rgba(0,0,0,0.5);border:2px solid '+lc+';border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 0 10px '+lc+'33;">';
                 h+='<span>'+renderEmoji(p.emoji,28)+'</span><div><div style="font-size:13px;font-weight:700;color:#fff;">'+escapeHtml(p.name||'Student')+'</div>';
                 h+='<div style="font-size:9px;color:'+lc+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';">'+ll+'</div></div></div>';});
@@ -30991,7 +31064,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(snap.empty){tracker.innerHTML='Waiting for recordings...';listEl.innerHTML='<span style="color:#888;">Recordings will appear here as students submit...</span>';if(ctrlEl)ctrlEl.style.display='none';return;}
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
                 // Tracker
-                var begSubs=subs.filter(function(s){return s.level==='beginner';});
+                var begSubs=subs.filter(function(s){return s.level==='beginner'||s.level==='absolute_beginner';});
                 var advSubs=subs.filter(function(s){return s.level==='advanced';});
                 var gradingCount=subs.filter(function(s){return s.status==='grading';}).length;
                 var trackerHtml='<span style="color:#41c0ff;">🌱 Beginner: '+begSubs.length+' submitted</span> &bull; <span style="color:#ff7777;">🌟 Advanced: '+advSubs.length+' submitted</span>';
@@ -31003,7 +31076,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var lh='';
                 subs.forEach(function(s,idx){
                     var isGrading=s.status==='grading';
-                    var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
+                    var lc=s.level==='absolute_beginner'?'#ff69b4':s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var borderColor=isGrading?'#fbbf2444':lc+'33';
                     var queueIdx=-1;
                     if(s.audioUrl && !isGrading){
@@ -31015,9 +31088,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+(s.isBonus?' <span style="color:#FFD700;font-size:9px;">⭐BONUS</span>':'')+'</div>';
                     if(isGrading){
-                        lh+='<div style="font-size:10px;color:#fbbf24;">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; ⏳ Grading...</div></div>';
+                        lh+='<div style="font-size:10px;color:#fbbf24;">'+(s.level==='absolute_beginner'?'ABS':s.level==='beginner'?'BEG':'ADV')+' &bull; ⏳ Grading...</div></div>';
                     } else {
-                        lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
+                        lh+='<div style="font-size:10px;color:'+lc+';">'+(s.level==='absolute_beginner'?'ABS':s.level==='beginner'?'BEG':'ADV')+' &bull; '+(s.score||0)+' pts</div></div>';
                     }
                     if(isGrading){
                         lh+='<span style="font-size:11px;color:#fbbf24;">⏳</span>';
@@ -31076,9 +31149,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div style="margin-bottom:16px;">';
             h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Send to:</label>';
             h+='<div style="display:flex;gap:10px;">';
-            h+='<button id="qgDrillToBeg" onclick="qgDrillPickTarget(\'beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">🌱 Beginner</button>';
-            h+='<button id="qgDrillToAdv" onclick="qgDrillPickTarget(\'advanced\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">🌟 Advanced</button>';
-            h+='<button id="qgDrillToBoth" onclick="qgDrillPickTarget(\'both\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">📢 Both</button>';
+            h+='<button id="qgDrillToAbsBeg" onclick="qgDrillPickTarget(\'absolute_beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🐣 Abs.Beg</button>';
+            h+='<button id="qgDrillToBeg" onclick="qgDrillPickTarget(\'beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🌱 Beginner</button>';
+            h+='<button id="qgDrillToAdv" onclick="qgDrillPickTarget(\'advanced\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🌟 Advanced</button>';
+            h+='<button id="qgDrillToBoth" onclick="qgDrillPickTarget(\'both\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">📢 All</button>';
             h+='</div></div>';
             // Send button
             h+='<button id="qgDrillSendBtn" onclick="qgDrillSend()" style="width:100%;background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;padding:14px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;margin-bottom:12px;">SEND DRILL</button>';
@@ -31097,11 +31171,11 @@ Return ONLY this JSON (no markdown, no code blocks):
         var qgDrillTarget='both';
         function qgDrillPickTarget(t){
             qgDrillTarget=t;
-            ['qgDrillToBeg','qgDrillToAdv','qgDrillToBoth'].forEach(function(id){
+            ['qgDrillToAbsBeg','qgDrillToBeg','qgDrillToAdv','qgDrillToBoth'].forEach(function(id){
                 var b=document.getElementById(id);if(!b)return;
                 b.style.borderColor='rgba(255,255,255,0.2)';b.style.color='#888';b.style.background='rgba(255,255,255,0.08)';
             });
-            var activeId=t==='beginner'?'qgDrillToBeg':t==='advanced'?'qgDrillToAdv':'qgDrillToBoth';
+            var activeId=t==='absolute_beginner'?'qgDrillToAbsBeg':t==='beginner'?'qgDrillToBeg':t==='advanced'?'qgDrillToAdv':'qgDrillToBoth';
             var ab=document.getElementById(activeId);
             if(ab){ab.style.borderColor='#9b59b6';ab.style.color='#fff';ab.style.background='rgba(155,89,182,0.2)';}
         }
@@ -31128,18 +31202,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var blob=new Blob(chunks,{type:mime||'audio/webm'});
                     st.textContent='Transcribing...';
                     try{
-                        var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-                        var arrayBuf=await blob.arrayBuffer();
-                        var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
-                        var samples=audioBuf.getChannelData(0);
-                        var sampleRate=audioBuf.sampleRate;
-                        if(sampleRate>16000){var ratio=sampleRate/16000;var newLen=Math.floor(samples.length/ratio);var ds=new Float32Array(newLen);for(var i=0;i<newLen;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sampleRate=16000;}
-                        var bufLen=44+samples.length*2;var wavBuf=new ArrayBuffer(bufLen);var view=new DataView(wavBuf);
-                        function ws(o,s){for(var i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));}
-                        ws(0,'RIFF');view.setUint32(4,bufLen-8,true);ws(8,'WAVE');ws(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);ws(36,'data');view.setUint32(40,samples.length*2,true);
-                        for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
-                        var bytes=new Uint8Array(wavBuf);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
-                        var wavB64=btoa(binary);
+                        var wav=await convertBlobToWav(blob);
+                        var wavB64=wav.base64;
                         var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                             method:'POST',headers:{'Content-Type':'application/json'},
                             body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:'Transcribe this Korean audio. Reply ONLY with the Korean text you hear, nothing else.'},{type:'input_audio',input_audio:{data:wavB64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:200,temperature:0.1})
@@ -31190,7 +31254,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
                 var lh='';
                 subs.forEach(function(s,idx){
-                    var lc=s.level==='beginner'?'#8bb4d6':'#c4a0e8';
+                    var lc=s.level==='absolute_beginner'?'#ff69b4':s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var scoreColor=s.score>=80?'#39ff14':s.score>=60?'#fbbf24':'#ef4444';
                     lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;'+(s.audioUrl?'cursor:pointer;':'')+'" '+(s.audioUrl?'onclick="qgPlayDrillAudio(\''+s.audioUrl+'\',this)"':'')+'>';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
@@ -31238,16 +31302,20 @@ Return ONLY this JSON (no markdown, no code blocks):
             // Update leaderboards from players subcollection (accumulated scores)
             try {
                 var allPlayers = await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get();
-                var begBoard=[],advBoard=[];
+                var absBegBoard=[],begBoard=[],advBoard=[];
                 allPlayers.forEach(function(d){
                     var p=d.data();
                     var entry={name:p.name,emoji:p.emoji,score:p.score||0};
-                    if(p.level==='beginner') begBoard.push(entry); else advBoard.push(entry);
+                    if(p.level==='absolute_beginner') absBegBoard.push(entry);
+                    else if(p.level==='beginner') begBoard.push(entry);
+                    else advBoard.push(entry);
                 });
+                absBegBoard.sort(function(a,b){return b.score-a.score;});
                 begBoard.sort(function(a,b){return b.score-a.score;});
                 advBoard.sort(function(a,b){return b.score-a.score;});
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
                     status:'round_result',
+                    leaderboard_absolute_beginner:absBegBoard,
                     leaderboard_beginner:begBoard,
                     leaderboard_advanced:advBoard
                 });
@@ -31342,6 +31410,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;">';
                 h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;text-align:center;margin-bottom:24px;">🏆 LEADERBOARD</div>';
                 h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">';
+                h+=qgBuildList(d.leaderboard_absolute_beginner||[],'🐣 ABS. BEGINNER','#ff69b4',null);
                 h+=qgBuildList(d.leaderboard_beginner||[],'🌱 BEGINNER','#41c0ff',null);
                 h+=qgBuildList(d.leaderboard_advanced||[],'🌟 ADVANCED','#ff7777',null);
                 h+='</div>';
@@ -31396,16 +31465,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                 try{
                     // Read leaderboards from players subcollection (accumulated scores)
                     var allPlayers=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get();
-                    var begBoard=[],advBoard=[];
+                    var absBegBoard=[],begBoard=[],advBoard=[];
                     allPlayers.forEach(function(d){
                         var p=d.data();
                         var entry={name:p.name,emoji:p.emoji,score:p.score||0};
-                        if(p.level==='beginner')begBoard.push(entry);else advBoard.push(entry);
+                        if(p.level==='absolute_beginner')absBegBoard.push(entry);
+                        else if(p.level==='beginner')begBoard.push(entry);
+                        else advBoard.push(entry);
                     });
+                    absBegBoard.sort(function(a,b){return b.score-a.score;});
                     begBoard.sort(function(a,b){return b.score-a.score;});
                     advBoard.sort(function(a,b){return b.score-a.score;});
                     await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
                         status:'finished',
+                        leaderboard_absolute_beginner:absBegBoard,
                         leaderboard_beginner:begBoard,
                         leaderboard_advanced:advBoard
                     });
@@ -31415,7 +31488,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;">';
                     h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;text-align:center;margin-bottom:8px;">🏆 FINAL STANDINGS</div>';
                     h+='<div style="font-size:30px;text-align:center;margin-bottom:20px;">🎊🏁🎊</div>';
-                    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">';
+                    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">';
+                    h+=qgBuildPodium(absBegBoard.slice(0,10),'🐣 ABS. BEG','#ff69b4');
                     h+=qgBuildPodium(begBoard.slice(0,10),'🌱 BEGINNER','#41c0ff');
                     h+=qgBuildPodium(advBoard.slice(0,10),'🌟 ADVANCED','#ff7777');
                     h+='</div>';
@@ -31504,7 +31578,298 @@ Return ONLY this JSON (no markdown, no code blocks):
             });
         })();
 
-        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null };
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null, tevelloUser:null };
+
+        // Level display helpers
+        function qsGetLevelColor(lv){ return lv==='absolute_beginner'?'#ff69b4':lv==='beginner'?'#8bb4d6':'#c4a0e8'; }
+        function qsGetLevelLabel(lv){ return lv==='absolute_beginner'?'\u{1F423} ABS. BEGINNER':lv==='beginner'?'\u{1F331} BEGINNER':'\u{1F31F} ADVANCED'; }
+        function qsGetLevelShort(lv){ return lv==='absolute_beginner'?'ABS':lv==='beginner'?'BEG':'ADV'; }
+        function qsGetLeaderboardKey(lv){ return lv==='absolute_beginner'?'leaderboard_absolute_beginner':lv==='beginner'?'leaderboard_beginner':'leaderboard_advanced'; }
+
+        // ── TEVELLO ACCOUNT SYSTEM ──
+        var TEVELLO_COLLECTION = 'tevello_accounts';
+
+        function qsTevelloLogin(){
+            var overlay=document.getElementById('qsTevelloOverlay');
+            if(overlay){overlay.style.display='flex';return;}
+            // Create modal overlay
+            overlay=document.createElement('div');
+            overlay.id='qsTevelloOverlay';
+            overlay.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+            var modal='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:400px;width:100%;position:relative;">';
+            modal+='<button onclick="document.getElementById(\'qsTevelloOverlay\').style.display=\'none\'" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>';
+            modal+='<div style="text-align:center;margin-bottom:20px;">';
+            modal+='<div style="font-size:28px;margin-bottom:8px;">🔑</div>';
+            modal+='<div style="font-family:\'Press Start 2P\';font-size:12px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">TEVELLO LOGIN</div></div>';
+            // Tab toggle
+            modal+='<div id="qsTevelloTabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">';
+            modal+='<button id="qsTevTabLogin" onclick="qsTevSwitchTab(\'login\')" style="background:rgba(255,215,0,0.15);border:2px solid #FFD700;color:#FFD700;padding:10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">LOG IN</button>';
+            modal+='<button id="qsTevTabSignup" onclick="qsTevSwitchTab(\'signup\')" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#888;padding:10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">SIGN UP</button>';
+            modal+='</div>';
+            // Login form
+            modal+='<div id="qsTevLoginForm">';
+            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Username</label>';
+            modal+='<input type="text" id="qsTevLoginUser" placeholder="Your username" autocomplete="username" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
+            modal+='<div style="margin-bottom:16px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Password</label>';
+            modal+='<input type="password" id="qsTevLoginPass" placeholder="Your password" autocomplete="current-password" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')qsTevDoLogin()"></div>';
+            modal+='<div id="qsTevLoginMsg" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>';
+            modal+='<button onclick="qsTevDoLogin()" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#000;padding:13px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;font-weight:700;">LOG IN</button>';
+            modal+='</div>';
+            // Signup form (hidden)
+            modal+='<div id="qsTevSignupForm" style="display:none;">';
+            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Choose a Username</label>';
+            modal+='<input type="text" id="qsTevSignupUser" placeholder="Pick a username" autocomplete="username" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
+            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Password</label>';
+            modal+='<input type="password" id="qsTevSignupPass" placeholder="Create a password" autocomplete="new-password" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
+            modal+='<div style="margin-bottom:16px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Confirm Password</label>';
+            modal+='<input type="password" id="qsTevSignupConfirm" placeholder="Confirm password" autocomplete="new-password" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')qsTevDoSignup()"></div>';
+            modal+='<div id="qsTevSignupMsg" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>';
+            modal+='<button onclick="qsTevDoSignup()" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#000;padding:13px;border-radius:10px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;font-weight:700;">CREATE ACCOUNT</button>';
+            modal+='</div>';
+            modal+='</div>';
+            overlay.innerHTML=modal;
+            document.body.appendChild(overlay);
+        }
+
+        function qsTevSwitchTab(tab){
+            var loginBtn=document.getElementById('qsTevTabLogin');
+            var signupBtn=document.getElementById('qsTevTabSignup');
+            var loginForm=document.getElementById('qsTevLoginForm');
+            var signupForm=document.getElementById('qsTevSignupForm');
+            if(tab==='login'){
+                loginBtn.style.background='rgba(255,215,0,0.15)';loginBtn.style.borderColor='#FFD700';loginBtn.style.color='#FFD700';loginBtn.style.borderWidth='2px';
+                signupBtn.style.background='rgba(255,255,255,0.06)';signupBtn.style.borderColor='rgba(255,255,255,0.2)';signupBtn.style.color='#888';signupBtn.style.borderWidth='1px';
+                loginForm.style.display='';signupForm.style.display='none';
+            } else {
+                signupBtn.style.background='rgba(255,215,0,0.15)';signupBtn.style.borderColor='#FFD700';signupBtn.style.color='#FFD700';signupBtn.style.borderWidth='2px';
+                loginBtn.style.background='rgba(255,255,255,0.06)';loginBtn.style.borderColor='rgba(255,255,255,0.2)';loginBtn.style.color='#888';loginBtn.style.borderWidth='1px';
+                signupForm.style.display='';loginForm.style.display='none';
+            }
+        }
+
+        // Simple hash for password storage (not bcrypt but adequate for this use case)
+        async function qsTevHash(password){
+            var enc=new TextEncoder();
+            var data=enc.encode(password+'_tevello_salt_kl');
+            var hash=await crypto.subtle.digest('SHA-256',data);
+            var arr=Array.from(new Uint8Array(hash));
+            return arr.map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+        }
+
+        async function qsTevDoLogin(){
+            var user=(document.getElementById('qsTevLoginUser').value||'').trim().toLowerCase();
+            var pass=document.getElementById('qsTevLoginPass').value||'';
+            var msg=document.getElementById('qsTevLoginMsg');
+            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter username and password.';return;}
+            msg.style.color='#888';msg.textContent='Logging in...';
+            try{
+                var snap=await db.collection(TEVELLO_COLLECTION).where('username','==',user).limit(1).get();
+                if(snap.empty){msg.style.color='#ff4444';msg.textContent='Account not found. Try signing up!';return;}
+                var doc=snap.docs[0];
+                var data=doc.data();
+                var hashed=await qsTevHash(pass);
+                if(data.passwordHash!==hashed){msg.style.color='#ff4444';msg.textContent='Incorrect password.';return;}
+                // Success
+                qs.tevelloUser={id:doc.id, username:data.username, displayName:data.displayName||data.username, emoji:data.emoji||0, level:data.level||'', goal:data.goal||''};
+                // Save to localStorage for convenience
+                try{localStorage.setItem('tevello_user',JSON.stringify(qs.tevelloUser));}catch(e){}
+                document.getElementById('qsTevelloOverlay').style.display='none';
+                qsTevUpdateUI();
+                // Show goal prompt (returning user)
+                qsTevShowGoalPrompt(false);
+            }catch(e){
+                console.error('Tevello login error:',e);
+                msg.style.color='#ff4444';msg.textContent='Error: '+e.message;
+            }
+        }
+
+        async function qsTevDoSignup(){
+            var user=(document.getElementById('qsTevSignupUser').value||'').trim();
+            var pass=document.getElementById('qsTevSignupPass').value||'';
+            var confirm=document.getElementById('qsTevSignupConfirm').value||'';
+            var msg=document.getElementById('qsTevSignupMsg');
+            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Fill in all fields.';return;}
+            if(user.length<3){msg.style.color='#ff4444';msg.textContent='Username must be 3+ characters.';return;}
+            if(pass.length<4){msg.style.color='#ff4444';msg.textContent='Password must be 4+ characters.';return;}
+            if(pass!==confirm){msg.style.color='#ff4444';msg.textContent='Passwords do not match.';return;}
+            var userLower=user.toLowerCase();
+            if(!/^[a-z0-9._-]+$/.test(userLower)){msg.style.color='#ff4444';msg.textContent='Username: letters, numbers, . _ - only.';return;}
+            msg.style.color='#888';msg.textContent='Creating account...';
+            try{
+                // Check if username taken
+                var existing=await db.collection(TEVELLO_COLLECTION).where('username','==',userLower).limit(1).get();
+                if(!existing.empty){msg.style.color='#ff4444';msg.textContent='Username already taken!';return;}
+                var hashed=await qsTevHash(pass);
+                var docRef=await db.collection(TEVELLO_COLLECTION).add({
+                    username:userLower,
+                    displayName:user,
+                    passwordHash:hashed,
+                    emoji:0,
+                    level:'',
+                    goal:'',
+                    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+                qs.tevelloUser={id:docRef.id, username:userLower, displayName:user, emoji:0, level:'', goal:''};
+                try{localStorage.setItem('tevello_user',JSON.stringify(qs.tevelloUser));}catch(e){}
+                document.getElementById('qsTevelloOverlay').style.display='none';
+                qsTevUpdateUI();
+                // Show goal prompt (first time, mandatory)
+                qsTevShowGoalPrompt(true);
+            }catch(e){
+                console.error('Tevello signup error:',e);
+                msg.style.color='#ff4444';msg.textContent='Error: '+e.message;
+            }
+        }
+
+        function qsTevUpdateUI(){
+            var btn=document.getElementById('qsTevelloBtn');
+            var indicator=document.getElementById('qsTevelloStatus');
+            if(qs.tevelloUser){
+                if(btn){btn.innerHTML='🔑 '+escapeHtml(qs.tevelloUser.displayName);btn.style.background='linear-gradient(135deg,#2d6a1e,#1a4a10)';btn.style.borderColor='#39ff14';btn.style.color='#39ff14';}
+                if(indicator)indicator.innerHTML='<span style="color:#39ff14;font-size:11px;">✓ Logged in as <strong>'+escapeHtml(qs.tevelloUser.displayName)+'</strong></span>';
+                // Pre-fill name from account
+                var nameInput=document.getElementById('qsName');
+                if(nameInput && !nameInput.value) nameInput.value=qs.tevelloUser.displayName;
+                // Restore saved preferences
+                if(qs.tevelloUser.emoji && typeof qs.tevelloUser.emoji==='number'){
+                    qs.playerEmoji=qs.tevelloUser.emoji;
+                    var emojiButtons=document.querySelectorAll('#qsEmojiGrid button');
+                    emojiButtons.forEach(function(b,i){
+                        if(i===qs.tevelloUser.emoji){b.style.borderColor='#ff7777';b.style.background='rgba(124,58,237,0.2)';}
+                        else{b.style.borderColor='rgba(255,255,255,0.1)';b.style.background='rgba(255,255,255,0.06)';}
+                    });
+                }
+                if(qs.tevelloUser.level){
+                    qsPickLevel(qs.tevelloUser.level);
+                }
+            } else {
+                if(btn){btn.innerHTML='🔑 Login with Tevello';btn.style.background='linear-gradient(135deg,#FFD700,#FFA500)';btn.style.borderColor='#FFD700';btn.style.color='#000';}
+                if(indicator)indicator.innerHTML='';
+            }
+        }
+
+        function qsTevLogout(){
+            qs.tevelloUser=null;
+            try{localStorage.removeItem('tevello_user');}catch(e){}
+            qsTevUpdateUI();
+        }
+
+        // Save preferences back to Tevello account after joining
+        async function qsTevSavePrefs(){
+            if(!qs.tevelloUser)return;
+            try{
+                await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).update({
+                    emoji:qs.playerEmoji||0,
+                    level:qs.playerLevel||''
+                });
+            }catch(e){console.log('Tevello prefs save error:',e);}
+        }
+
+        // ── KOREAN 3-MONTH GOAL ──
+        function qsTevShowGoalPrompt(isFirstTime){
+            var existing=document.getElementById('qsTevGoalOverlay');
+            if(existing)existing.remove();
+            var overlay=document.createElement('div');
+            overlay.id='qsTevGoalOverlay';
+            overlay.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+            var currentGoal=(qs.tevelloUser&&qs.tevelloUser.goal)||'';
+            var psFont='font-family:\'Press Start 2P\'';
+            var goldTS='text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024';
+            var taStyle='width:100%;padding:12px;background:rgba(255,255,255,0.08);border:2px solid rgba(255,215,0,0.3);border-radius:10px;color:#fff;font-size:14px;resize:vertical;box-sizing:border-box;outline:none;font-family:\'Noto Sans\',sans-serif;line-height:1.5;';
+            var m='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #FFD700;border-radius:16px;padding:28px;max-width:420px;width:100%;position:relative;">';
+            if(isFirstTime){
+                m+='<div style="text-align:center;margin-bottom:20px;">';
+                m+='<div style="font-size:32px;margin-bottom:8px;">🎯</div>';
+                m+='<div style="'+psFont+';font-size:11px;color:#FFD700;'+goldTS+';margin-bottom:12px;">SET YOUR GOAL</div>';
+                m+='<div style="font-size:13px;color:#ccc;line-height:1.6;">Welcome! Set your Korean learning goal for the next 3 months. What do you want to achieve?</div></div>';
+                m+='<div style="margin-bottom:16px;">';
+                m+='<textarea id="qsTevGoalInput" rows="3" maxlength="300" placeholder="e.g. I want to be able to order food in Korean, hold a basic conversation, read a children\'s book..." style="'+taStyle+'"></textarea>';
+                m+='<div style="text-align:right;font-size:11px;color:#666;margin-top:4px;"><span id="qsTevGoalCount">0</span>/300</div></div>';
+                m+='<button onclick="qsTevSaveGoal(true)" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#000;padding:13px;border-radius:10px;'+psFont+';font-size:10px;cursor:pointer;font-weight:700;">SAVE GOAL ✓</button>';
+            } else {
+                m+='<button onclick="document.getElementById(\'qsTevGoalOverlay\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>';
+                m+='<div style="text-align:center;margin-bottom:16px;">';
+                m+='<div style="font-size:28px;margin-bottom:8px;">🎯</div>';
+                m+='<div style="'+psFont+';font-size:11px;color:#FFD700;'+goldTS+';margin-bottom:6px;">YOUR 3-MONTH GOAL</div></div>';
+                if(currentGoal){
+                    m+='<div id="qsTevGoalDisplay" style="background:rgba(255,215,0,0.08);border:2px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px;margin-bottom:16px;">';
+                    m+='<div style="font-size:14px;color:#fff;line-height:1.6;white-space:pre-wrap;">'+escapeHtml(currentGoal)+'</div></div>';
+                    m+='<div id="qsTevGoalActions" style="display:flex;gap:10px;">';
+                    m+='<button onclick="qsTevEditGoal()" style="flex:1;background:rgba(255,215,0,0.12);border:2px solid #FFD700;color:#FFD700;padding:12px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;">✏️ EDIT</button>';
+                    m+='<button onclick="document.getElementById(\'qsTevGoalOverlay\').remove()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:12px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;">LOOKS GOOD ✓</button>';
+                    m+='</div>';
+                } else {
+                    m+='<div style="font-size:13px;color:#ccc;line-height:1.6;text-align:center;margin-bottom:16px;">You haven\'t set a goal yet. What do you want to achieve in the next 3 months?</div>';
+                    m+='<div style="margin-bottom:16px;">';
+                    m+='<textarea id="qsTevGoalInput" rows="3" maxlength="300" placeholder="e.g. I want to be able to order food in Korean, hold a basic conversation..." style="'+taStyle+'"></textarea>';
+                    m+='<div style="text-align:right;font-size:11px;color:#666;margin-top:4px;"><span id="qsTevGoalCount">0</span>/300</div></div>';
+                    m+='<div style="display:flex;gap:10px;">';
+                    m+='<button onclick="qsTevSaveGoal(false)" style="flex:1;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#000;padding:13px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;font-weight:700;">SAVE GOAL</button>';
+                    m+='<button onclick="document.getElementById(\'qsTevGoalOverlay\').remove()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;">SKIP</button>';
+                    m+='</div>';
+                }
+            }
+            m+='<div id="qsTevGoalMsg" style="font-size:12px;min-height:16px;margin-top:10px;text-align:center;"></div>';
+            m+='</div>';
+            overlay.innerHTML=m;
+            document.body.appendChild(overlay);
+            var input=document.getElementById('qsTevGoalInput');
+            var counter=document.getElementById('qsTevGoalCount');
+            if(input&&counter){input.addEventListener('input',function(){counter.textContent=input.value.length;});}
+        }
+
+        function qsTevEditGoal(){
+            var display=document.getElementById('qsTevGoalDisplay');
+            var actions=document.getElementById('qsTevGoalActions');
+            var currentGoal=(qs.tevelloUser&&qs.tevelloUser.goal)||'';
+            var psFont='font-family:\'Press Start 2P\'';
+            var taStyle='width:100%;padding:12px;background:rgba(255,255,255,0.08);border:2px solid rgba(255,215,0,0.3);border-radius:10px;color:#fff;font-size:14px;resize:vertical;box-sizing:border-box;outline:none;font-family:\'Noto Sans\',sans-serif;line-height:1.5;';
+            if(display&&actions){
+                display.innerHTML='<div style="margin-bottom:16px;"><textarea id="qsTevGoalInput" rows="3" maxlength="300" style="'+taStyle+'">'+escapeHtml(currentGoal)+'</textarea><div style="text-align:right;font-size:11px;color:#666;margin-top:4px;"><span id="qsTevGoalCount">'+currentGoal.length+'</span>/300</div></div>';
+                display.style.cssText='background:none;border:none;padding:0;margin-bottom:16px;';
+                actions.innerHTML='<button onclick="qsTevSaveGoal(false)" style="flex:1;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#000;padding:13px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;font-weight:700;">SAVE ✓</button><button onclick="document.getElementById(\'qsTevGoalOverlay\').remove()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px;border-radius:10px;'+psFont+';font-size:9px;cursor:pointer;">CANCEL</button>';
+                var input=document.getElementById('qsTevGoalInput');
+                var counter=document.getElementById('qsTevGoalCount');
+                if(input&&counter){input.addEventListener('input',function(){counter.textContent=input.value.length;});input.focus();}
+            }
+        }
+
+        async function qsTevSaveGoal(isFirstTime){
+            var input=document.getElementById('qsTevGoalInput');
+            var msg=document.getElementById('qsTevGoalMsg');
+            if(!input){return;}
+            var goal=input.value.trim();
+            if(isFirstTime && !goal){
+                if(msg){msg.style.color='#ff4444';msg.textContent='Please enter a goal to continue!';}
+                return;
+            }
+            if(msg){msg.style.color='#888';msg.textContent='Saving...';}
+            try{
+                await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).update({goal:goal});
+                qs.tevelloUser.goal=goal;
+                try{localStorage.setItem('tevello_user',JSON.stringify(qs.tevelloUser));}catch(e){}
+                document.getElementById('qsTevGoalOverlay').remove();
+            }catch(e){
+                console.error('Goal save error:',e);
+                if(msg){msg.style.color='#ff4444';msg.textContent='Error saving: '+e.message;}
+            }
+        }
+
+        // Try auto-login from localStorage on init
+        function qsTevAutoLogin(){
+            try{
+                var saved=localStorage.getItem('tevello_user');
+                if(saved){
+                    var parsed=JSON.parse(saved);
+                    if(parsed && parsed.id && parsed.username){
+                        qs.tevelloUser=parsed;
+                        qsTevUpdateUI();
+                        // Show goal prompt for returning user (dismissable)
+                        qsTevShowGoalPrompt(false);
+                    }
+                }
+            }catch(e){}
+        }
         var emojis=[
 'https://www.dropbox.com/scl/fi/dvki6jr4vougyhqh2euaa/_FO2BAC315742-final-1.gif?rlkey=tnrie3eu2d0gwmfmix9dstmfg&st=wj02p5wq&dl=1',
 'https://www.dropbox.com/scl/fi/ebgp46m47sbwrzt48nutf/Eating-crazy.gif?rlkey=qzgx54jtnxva6ahr1wlhsfrzs&st=u14ec51o&dl=1',
@@ -31563,12 +31928,15 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div style="margin-bottom:14px;"><label style="font-size:13px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">EMOJI</label>'+
                 '<div id="qsEmojiGrid" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">'+eh+'</div></div>'+
                 '<div style="margin-bottom:16px;"><label style="font-size:13px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">LEVEL</label>'+
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
-                '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:13px;">🌱 Beginner</button>'+
-                '<button id="qsLvlA" onclick="qsPickLevel(\'advanced\')" style="background:rgba(0,0,0,0.3);border:3px solid #555;color:#888;padding:12px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:13px;">🌟 Advanced</button></div></div>'+
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
+                '<button id="qsLvlAB" onclick="qsPickLevel(\'absolute_beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 6px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:11px;">🐣 Abs. Beg</button>'+
+                '<button id="qsLvlB" onclick="qsPickLevel(\'beginner\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 6px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:11px;">🌱 Beginner</button>'+
+                '<button id="qsLvlA" onclick="qsPickLevel(\'advanced\')" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 6px;border-radius:10px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-weight:700;font-size:11px;">🌟 Advanced</button></div></div>'+
+                '<button id="qsTevelloBtn" onclick="qsTevelloLogin()" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);border:2px solid #FFD700;color:#000;padding:13px;border-radius:10px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;margin-bottom:8px;">🔑 Login with Tevello</button>'+
+                '<div id="qsTevelloStatus" style="text-align:center;min-height:18px;margin-bottom:10px;"></div>'+
                 '<button id="qsJoinBtn" onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;padding:14px;border-radius:10px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;">JOIN GAME</button>'+
                 '</div></div>';
-            setTimeout(function(){var jb=document.getElementById('qsJoinBtn');if(jb)addSparkles(jb);},50);
+            setTimeout(function(){var jb=document.getElementById('qsJoinBtn');if(jb)addSparkles(jb);var tb=document.getElementById('qsTevelloBtn');if(tb)addSparkles(tb);qsTevAutoLogin();},50);
         }
 
         function qsPickEmoji(e,btn){
@@ -31578,15 +31946,17 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
         function qsPickLevel(lv){
             qs.playerLevel=lv;
-            var b=document.getElementById('qsLvlB'),a=document.getElementById('qsLvlA');
-            if(lv==='beginner'){b.style.borderColor='#ff7777';b.style.color='#ccc';b.style.background='rgba(124,58,237,0.15)';a.style.borderColor='rgba(255,255,255,0.1)';a.style.color='#888';a.style.background='rgba(255,255,255,0.06)';}
-            else{a.style.borderColor='#ff7777';a.style.color='#ccc';a.style.background='rgba(124,58,237,0.15)';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='#888';b.style.background='rgba(255,255,255,0.06)';}
+            var ab=document.getElementById('qsLvlAB'),b=document.getElementById('qsLvlB'),a=document.getElementById('qsLvlA');
+            [ab,b,a].forEach(function(btn){if(btn){btn.style.borderColor='rgba(255,255,255,0.1)';btn.style.color='#888';btn.style.background='rgba(255,255,255,0.06)';}});
+            var active=lv==='absolute_beginner'?ab:lv==='beginner'?b:a;
+            if(active){active.style.borderColor='#ff7777';active.style.color='#ccc';active.style.background='rgba(124,58,237,0.15)';}
         }
 
         async function qsJoin(roomCode) {
+            if(!qs.tevelloUser){qsTevelloLogin();return;}
             var name=(document.getElementById('qsName').value||'').trim();
             if(!name){alert('Enter your name.');return;}
-            if(!qs.playerLevel){alert('Please select Beginner or Advanced before joining.');return;}
+            if(!qs.playerLevel){alert('Please select a level before joining.');return;}
             qs.playerName=name;
             var app=document.getElementById('qsApp');
             app.innerHTML='<div style="text-align:center;padding:60px 20px;"><div style="font-size:30px;">⏳</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#ccc;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-top:12px;">JOINING...</div></div>';
@@ -31596,8 +31966,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 qs.sessionId=snap.docs[0].id;
                 var pDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).add({
                     name:name,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),level:qs.playerLevel,score:0,
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
+                    tevelloUsername:qs.tevelloUser?qs.tevelloUser.username:null,
                     joinedAt:firebase.firestore.FieldValue.serverTimestamp()
                 });
+                // Save preferences back to Tevello account
+                qsTevSavePrefs();
                 qs.playerId=pDoc.id;
                 qsWaitingRoom();
             } catch(e){console.error(e);app.innerHTML='<div style="text-align:center;padding:60px;"><div style="font-size:30px;">❌</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#e87777;margin-top:12px;">ERROR</div><p style="color:#888;margin-top:8px;font-size:13px;">'+e.message+'</p></div>';}
@@ -31605,20 +31979,20 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsWaitingRoom() {
             var app=document.getElementById('qsApp');
-            var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+            var lc=qsGetLevelColor(qs.playerLevel);
             app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
                 '<div id="qsWaitingHeader" style="font-size:36px;margin-bottom:6px;">🎮</div>'+
                 '<div id="qsWaitingTitle" style="font-family:\'Press Start 2P\';font-size:11px;color:#41c0ff;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:16px;">WAITING ROOM</div>'+
                 '<div id="qsPlayerEmoji" style="margin-bottom:4px;">'+renderEmoji(qs.playerEmoji,40)+'</div>'+
                 '<div id="qsPlayerName" style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">'+escapeHtml(qs.playerName)+'</div>'+
-                '<div id="qsPlayerLevel" style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+(qs.playerLevel==='beginner'?'🌱 BEGINNER':'🌟 ADVANCED')+'</div>'+
+                '<div id="qsPlayerLevel" style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:8px;color:'+lc+';margin-bottom:20px;">'+qsGetLevelLabel(qs.playerLevel)+'</div>'+
                 '<div id="qsPlayers" style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:12px;padding:14px;margin-bottom:16px;min-height:50px;"></div>'+
                 '<div id="qsStatus" style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;color:#888;">Waiting for teacher...</div>'+
                 '<div id="qsGameArea"></div></div>';
             // Listen players
             db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).onSnapshot(function(snap){
                 var el=document.getElementById('qsPlayers');if(!el)return;
-                var h='';snap.forEach(function(d){var p=d.data();var c=p.level==='beginner'?'#8bb4d6':'#c4a0e8';
+                var h='';snap.forEach(function(d){var p=d.data();var c=p.level==='absolute_beginner'?'#ff69b4':p.level==='beginner'?'#8bb4d6':'#c4a0e8';
                 h+='<span style="display:inline-block;margin:3px;padding:5px 9px;background:rgba(0,0,0,0.4);border:2px solid '+c+';border-radius:8px;font-size:12px;">'+renderEmoji(p.emoji,18)+' '+escapeHtml(p.name||'')+'</span>';});
                 el.innerHTML=h||'<p style="color:#888;font-size:12px;">...</p>';
             });
@@ -31648,16 +32022,35 @@ Return ONLY this JSON (no markdown, no code blocks):
             });
             if(status){status.textContent='🔴 ROUND '+(d.currentRound+1)+' — READ ALOUD!';status.style.color='#e87777';}
             var set=d.sets[d.currentRound]; if(!set)return;
-            var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
-            var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+            var sentences;
+            if(qs.playerLevel==='absolute_beginner'){
+                // Show 5 syllable blocks instead of sentences
+                var abWords=set.absoluteBeginnerWords||[];
+                sentences=abWords.map(function(w){return{korean:w,english:''};});
+                if(sentences.length===0) sentences=[set.sentences[0]]; // fallback
+            } else {
+                sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+            }
+            var lc=qsGetLevelColor(qs.playerLevel);
             // Check if already submitted this round
             var existingArea=area.querySelector('[data-round="'+d.currentRound+'"]');
             if(existingArea) return; // Don't re-render if already showing this round
             var h='<div data-round="'+d.currentRound+'" style="margin-top:16px;">';
             h+='<div style="background:rgba(0,0,0,0.5);border:3px solid '+lc+';border-radius:14px;padding:20px;box-shadow:0 0 25px '+lc+'22;margin-bottom:16px;">';
-            for(var i=0;i<sentences.length;i++){
-                h+='<div style="font-size:20px;color:#fff;text-align:center;line-height:1.7;margin-bottom:6px;">'+escapeHtml(sentences[i].korean)+'</div>';
-                if(sentences[i].english) h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(sentences[i].english)+'</div>';
+            if(qs.playerLevel==='absolute_beginner' && sentences.length>1){
+                h+='<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:10px 0;">';
+                for(var i=0;i<sentences.length;i++){
+                    h+='<div style="background:rgba(255,105,180,0.12);border:2px solid #ff69b4;border-radius:12px;padding:14px 22px;min-width:70px;text-align:center;">';
+                    h+='<div style="font-size:28px;color:#fff;font-weight:700;">'+escapeHtml(sentences[i].korean)+'</div>';
+                    if(sentences[i].english) h+='<div style="font-size:10px;color:#ff69b4;margin-top:4px;">'+escapeHtml(sentences[i].english)+'</div>';
+                    h+='</div>';
+                }
+                h+='</div>';
+            } else {
+                for(var i=0;i<sentences.length;i++){
+                    h+='<div style="font-size:20px;color:#fff;text-align:center;line-height:1.7;margin-bottom:6px;">'+escapeHtml(sentences[i].korean)+'</div>';
+                    if(sentences[i].english) h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">'+escapeHtml(sentences[i].english)+'</div>';
+                }
             }
             h+='</div>';
             // Record button
@@ -31674,14 +32067,14 @@ Return ONLY this JSON (no markdown, no code blocks):
             // Check if this drill targets this student's level
             if(d.drillTarget && d.drillTarget!=='both' && d.drillTarget!==qs.playerLevel){
                 if(status){status.textContent='⏸ Waiting...';status.style.color='#888';}
-                area.innerHTML='<div style="text-align:center;padding:40px 20px;"><div style="font-size:11px;color:#888;">This drill is for '+(d.drillTarget==='beginner'?'Beginner':'Advanced')+' students only.</div></div>';
+                area.innerHTML='<div style="text-align:center;padding:40px 20px;"><div style="font-size:11px;color:#888;">This drill is for '+(d.drillTarget==='absolute_beginner'?'Absolute Beginner':d.drillTarget==='beginner'?'Beginner':'Advanced')+' students only.</div></div>';
                 return;
             }
             ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
             if(status){status.textContent='🎙 PRONUNCIATION DRILL';status.style.color='#9b59b6';}
             // Don't re-render if already showing this drill
             if(area.querySelector('[data-drill="'+d.drillId+'"]'))return;
-            var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+            var lc=qsGetLevelColor(qs.playerLevel);
             var h='<div data-drill="'+d.drillId+'" style="margin-top:16px;">';
             h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">No points — practice your pronunciation!</div>';
             h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #9b59b6;border-radius:14px;padding:20px;box-shadow:0 0 25px rgba(155,89,182,0.15);margin-bottom:16px;text-align:center;">';
@@ -31793,6 +32186,35 @@ Return ONLY this JSON (no markdown, no code blocks):
             return result;
         }
 
+        // Shared WAV conversion utility — converts any audio blob to 16kHz mono WAV.
+        // Returns {base64: string, buffer: ArrayBuffer} for GPT and phoneme service respectively.
+        async function convertBlobToWav(blob){
+            var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+            var arrayBuf=await blob.arrayBuffer();
+            var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
+            audioCtx.close();
+            var samples=audioBuf.getChannelData(0);
+            var sr=audioBuf.sampleRate;
+            if(sr>16000){
+                var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);
+                var ds=new Float32Array(nl);
+                for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}
+                samples=ds;sr=16000;
+            }
+            var bl=44+samples.length*2;
+            var wb=new ArrayBuffer(bl);
+            var v=new DataView(wb);
+            function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+            ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');
+            v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+            v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+            v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
+            for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+            var bytes=new Uint8Array(wb);
+            var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+            return {base64:btoa(binary), buffer:wb};
+        }
+
         async function qsDrillSubmit(blob,mimeType,drillText,drillId){
             var statusEl=document.getElementById('qsDrillStatus');
             var resultEl=document.getElementById('qsDrillResult');
@@ -31816,17 +32238,21 @@ Return ONLY this JSON (no markdown, no code blocks):
                 statusEl.textContent='🔍 Analyzing pronunciation...';
 
                 // Convert to WAV
-                var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-                var arrayBuf=await blob.arrayBuffer();
-                var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
-                var samples=audioBuf.getChannelData(0);var sr=audioBuf.sampleRate;
-                if(sr>16000){var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);var ds=new Float32Array(nl);for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sr=16000;}
-                var bl=44+samples.length*2;var wb=new ArrayBuffer(bl);var v=new DataView(wb);
-                function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-                ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
-                for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
-                var bytes=new Uint8Array(wb);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
-                var wavBase64=btoa(binary);
+                var wav=await convertBlobToWav(blob);
+                var wavBase64=wav.base64;
+                var wb=wav.buffer;
+
+                // G2PK pronunciation lookup
+                var drillPhonetic=drillText;
+                try{
+                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:drillText})
+                    });
+                    var g2pData=await g2pResp.json();
+                    if(g2pData.pronunciation)drillPhonetic=g2pData.pronunciation;
+                    console.log('Drill g2pk:',drillText,'→',drillPhonetic);
+                }catch(e){console.log('Drill g2pk error:',e);}
 
                 // Call phoneme service (50% weight for drill)
                 var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
@@ -31834,7 +32260,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 try{
                     var formData=new FormData();
                     formData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                    formData.append('phonetic_hangul',drillText);
+                    formData.append('phonetic_hangul',drillPhonetic);
                     formData.append('original_text',drillText);
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
                     if(phResp.ok){phonemeResult=await phResp.json();}
@@ -31846,19 +32272,27 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptFeedback='';
                 var gptScore=0;
                 try{
-                    var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nThe student was supposed to say: "'+drillText+'".\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
-                    if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
-                        gptPrompt+='AUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
-
-                        gptPrompt+='Detected errors:\n';
-                        phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')gptPrompt+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                            else if(err.type==='deletion')gptPrompt+='- Missing sound '+ph(err.expected)+'\n';
-                            else if(err.type==='insertion')gptPrompt+='- Extra sound '+ph(err.actual)+' inserted\n';
-                        });
-                        gptPrompt+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
-                    }else if(phonemeResult){
-                        gptPrompt+='Automated analysis found no pronunciation errors.\n';
+                    var pronInfo='';
+                    if(drillPhonetic && drillPhonetic!==drillText){
+                        pronInfo='\nSTANDARD PRONUNCIATION: "'+drillPhonetic+'"\n';
+                    }
+                    var phonemeInfo='';
+                    if(phonemeResult){
+                        if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                            phonemeInfo='\nAUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
+                            phonemeResult.errors.forEach(function(err){
+                                if(err.type==='substitution')phonemeInfo+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
+                                else if(err.type==='deletion')phonemeInfo+='- Missing sound '+ph(err.expected)+'\n';
+                                else if(err.type==='insertion')phonemeInfo+='- Extra sound '+ph(err.actual)+' inserted\n';
+                            });
+                            phonemeInfo+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
+                        }else{
+                            phonemeInfo='\nAutomated analysis found no pronunciation errors.\n';
+                        }
+                    }
+                    var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\n\nThe student was supposed to say:\nWRITTEN FORM: "'+drillText+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
+                    if(drillPhonetic && drillPhonetic!==drillText){
+                        gptPrompt+='IMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nDo NOT flag differences between written and phonetic forms as errors.\n';
                     }
                     gptPrompt+='RULES:\n';
                     gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
@@ -31870,7 +32304,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                     gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
                     gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
                     gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Use the FULL range of scores.\n';
-                    gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT"}';
+                    gptPrompt+='Provide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n';
+                    gptPrompt+='Reply ONLY with JSON: {"score":NUMBER,"feedback":"TEXT","transcript":"WHAT YOU HEARD"}';
                     var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                         method:'POST',headers:{'Content-Type':'application/json'},
                         body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gptPrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:300,temperature:0.1})
@@ -31993,7 +32428,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
                 var gameData=sessionDoc.data();
                 var set=gameData.sets[gameData.currentRound];
-                var expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                var expectedSentences;
+                if(qs.playerLevel==='absolute_beginner'){
+                    var abWords=set.absoluteBeginnerWords||[];
+                    expectedSentences=abWords.length>0?abWords.map(function(w){return{korean:w,english:''};}):([set.sentences[0]]);
+                } else {
+                    expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                }
                 var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
 
                 var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
@@ -32007,36 +32448,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                 statusEl.textContent='⏳ Transcribing & grading...';
 
                 // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
-                async function blobToWavBase64(blob) {
-                    var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-                    var arrayBuf=await blob.arrayBuffer();
-                    var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
-                    var samples=audioBuf.getChannelData(0);
-                    var sampleRate=audioBuf.sampleRate;
-                    // Downsample to 16kHz to keep size small
-                    if(sampleRate>16000){
-                        var ratio=sampleRate/16000;
-                        var newLen=Math.floor(samples.length/ratio);
-                        var downsampled=new Float32Array(newLen);
-                        for(var i=0;i<newLen;i++){downsampled[i]=samples[Math.floor(i*ratio)];}
-                        samples=downsampled;sampleRate=16000;
-                    }
-                    var bufLen=44+samples.length*2;
-                    var wavBuf=new ArrayBuffer(bufLen);
-                    var view=new DataView(wavBuf);
-                    function writeStr(o,s){for(var i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));}
-                    writeStr(0,'RIFF');view.setUint32(4,bufLen-8,true);writeStr(8,'WAVE');
-                    writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
-                    view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);
-                    view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);
-                    view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,samples.length*2,true);
-                    for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
-                    var bytes=new Uint8Array(wavBuf);
-                    var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
-                    return btoa(binary);
-                }
-
-                var wavBase64=await blobToWavBase64(qs.localBlob);
+                var wav=await convertBlobToWav(qs.localBlob);
+                var wavBase64=wav.base64;
 
                 // ========== G2PK PRONUNCIATION LOOKUP ==========
                 var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
@@ -32064,8 +32477,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 try{
                     statusEl.textContent='🔍 Analyzing pronunciation...';
                     var formData=new FormData();
-                    var wavBinary=atob(wavBase64);var wavBytes=new Uint8Array(wavBinary.length);for(var i=0;i<wavBinary.length;i++)wavBytes[i]=wavBinary.charCodeAt(i);
-                    formData.append('audio',new Blob([wavBytes],{type:'audio/wav'}),'audio.wav');
+                    formData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
                     formData.append('phonetic_hangul',expectedPronunciation||expectedKorean);
                     formData.append('original_text',expectedKorean);
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
@@ -32192,7 +32604,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // 4. Speed penalty: beginner + recording over 60s → -5% (silent)
                 var finalScore = typeof grade.score === 'number' ? grade.score : 0;
-                if(qs.playerLevel==='beginner' && qs.recordDuration && qs.recordDuration>60){
+                if((qs.playerLevel==='beginner'||qs.playerLevel==='absolute_beginner') && qs.recordDuration && qs.recordDuration>60){
                     finalScore=Math.max(0,finalScore-5);
                     console.log('Speed penalty applied: recording was '+Math.round(qs.recordDuration)+'s, -5% → '+finalScore);
                 }
@@ -32232,7 +32644,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsShowFeedback(grade,points,audioUrl,expectedSentences) {
             var area=document.getElementById('qsGameArea');
-            var lc=qs.playerLevel==='beginner'?'#8bb4d6':'#c4a0e8';
+            var lc=qsGetLevelColor(qs.playerLevel);
             var scoreColor=grade.score>=80?'#00ff88':grade.score>=50?'#FFD700':'#ff4444';
             var h='<div style="margin-top:16px;background:rgba(0,0,0,0.6);border:3px solid '+lc+';border-radius:16px;padding:24px;text-align:center;">';
             h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:28px;color:'+scoreColor+';margin-bottom:4px;">'+grade.score+'%</div>';
@@ -32290,17 +32702,52 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(gameData.status!=='playing'){console.log('Bonus aborted: game not playing');qsShowWaiting();return;}
                 var set=gameData.sets[gameData.currentRound];
                 if(!set){console.error('Bonus: no set found for round',gameData.currentRound);qsShowWaiting();return;}
-                var sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                var sentences;
+                if(qs.playerLevel==='absolute_beginner'){
+                    var abWords=set.absoluteBeginnerWords||[];
+                    sentences=abWords.length>0?abWords.map(function(w){return{korean:w,english:''};}):([set.sentences[0]]);
+                } else {
+                    sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
+                }
                 var originalKorean=sentences.map(function(s){return s.korean;}).join('\n');
                 var originalEnglish=sentences.map(function(s){return s.english||'';}).filter(Boolean).join('\n');
 
                 // Call GPT to generate bonus sentence
-                var prompt='You are a Korean language teaching assistant.\n';
-                prompt+='Original Korean sentence(s):\n'+originalKorean+'\n';
-                if(originalEnglish)prompt+='English translation(s):\n'+originalEnglish+'\n';
-                prompt+='Create a NEW version of this sentence by changing exactly ONE noun to a different noun that still makes sense in context. Keep the grammar, verb endings, and sentence structure identical.\n';
-                prompt+='Examples:\n- "나는 학교에 갔어요" → "나는 병원에 갔어요" (학교→병원)\n- "고양이가 물을 마셔요" → "고양이가 우유를 마셔요" (물→우유)\n\n';
-                prompt+='Reply ONLY with JSON: {"korean":"THE NEW KOREAN SENTENCE","english":"ENGLISH TRANSLATION","changed":"ORIGINAL_NOUN → NEW_NOUN"}';
+                var prompt;
+                if(qs.playerLevel==='absolute_beginner'){
+                    // Check for preloaded bonus first
+                    var preloadedBonus=set.absoluteBeginnerBonus||null;
+                    var studentGoal=(qs.tevelloUser&&qs.tevelloUser.goal)||'';
+                    if(preloadedBonus && preloadedBonus.korean && !studentGoal){
+                        // Use preloaded bonus (no goal set, so generic is fine)
+                        var bonus=preloadedBonus;
+                        console.log('Using preloaded abs beg bonus:',bonus.korean);
+                        qs.bonusKorean=bonus.korean;
+                        qs.bonusRound=gameData.currentRound;
+                        qsShowBonusUI(area,bonus,gameData.currentRound);
+                        return;
+                    }
+                    // Goal is set or no preload — generate custom bonus via AI
+                    prompt='You are a Korean language teaching assistant for absolute beginners who barely know Korean.\n';
+                    prompt+='The student just practiced these syllable blocks: '+originalKorean.replace(/\n/g,', ')+'\n';
+                    if(studentGoal){
+                        prompt+='The student\'s 3-month Korean learning goal is: "'+studentGoal.replace(/"/g,'\\"')+'".\n';
+                        prompt+='Generate ONE very short, simple Korean clause (2-3 words maximum) that relates to their goal. The clause should be relevant to what they want to achieve, but simple enough for an absolute beginner to read.\n';
+                    } else {
+                        prompt+='Generate ONE very short, simple Korean clause (2-3 words maximum) that an absolute beginner could attempt to read.\n';
+                    }
+                    prompt+='Use only common, basic vocabulary with simple syllable structure (1-3 syllable words only).\n';
+                    prompt+='Examples of appropriate difficulty: "밥 먹어요", "물 주세요", "집에 가요", "고양이 봐요", "한국어 공부해요"\n';
+                    prompt+='Try to incorporate one of the syllable blocks the student practiced if possible.\n';
+                    prompt+='Reply ONLY with JSON: {"korean":"THE SHORT CLAUSE","english":"ENGLISH TRANSLATION","changed":"bonus"}';
+                } else {
+                    prompt='You are a Korean language teaching assistant.\n';
+                    prompt+='Original Korean sentence(s):\n'+originalKorean+'\n';
+                    if(originalEnglish)prompt+='English translation(s):\n'+originalEnglish+'\n';
+                    prompt+='Create a NEW version of this sentence by changing exactly ONE noun to a different noun that still makes sense in context. Keep the grammar, verb endings, and sentence structure identical.\n';
+                    prompt+='Examples:\n- "나는 학교에 갔어요" → "나는 병원에 갔어요" (학교→병원)\n- "고양이가 물을 마셔요" → "고양이가 우유를 마셔요" (물→우유)\n\n';
+                    prompt+='Reply ONLY with JSON: {"korean":"THE NEW KOREAN SENTENCE","english":"ENGLISH TRANSLATION","changed":"ORIGINAL_NOUN → NEW_NOUN"}';
+                }
 
                 var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -32342,8 +32789,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Store for submission
                 qs.bonusKorean=bonus.korean;
                 qs.bonusRound=gameData.currentRound;
-                qsShowBonusUI(area,bonus,gameData.currentRound);
-
                 qsShowBonusUI(area,bonus,gameData.currentRound);
 
             }catch(e){
@@ -32456,27 +32901,19 @@ Return ONLY this JSON (no markdown, no code blocks):
                 statusEl.textContent='⏳ Transcribing & grading...';
 
                 // Convert to WAV
-                var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-                var arrayBuf=await blob.arrayBuffer();
-                var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
-                var samples=audioBuf.getChannelData(0);var sr=audioBuf.sampleRate;
-                if(sr>16000){var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);var ds=new Float32Array(nl);for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}samples=ds;sr=16000;}
-                var bl=44+samples.length*2;var wb=new ArrayBuffer(bl);var v=new DataView(wb);
-                function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-                ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
-                for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
-                var bytes=new Uint8Array(wb);var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
-                var wavBase64=btoa(binary);
+                var wav=await convertBlobToWav(blob);
+                var wavBase64=wav.base64;
+                var wb=wav.buffer;
 
                 // Get phonetic form from g2pk
                 var phonetic=expectedKorean;
                 try{
-                    var g2pkResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/convert',{
+                    var g2pkResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
                         method:'POST',headers:{'Content-Type':'application/json'},
                         body:JSON.stringify({text:expectedKorean})
                     });
                     var g2pkData=await g2pkResp.json();
-                    if(g2pkData.phonetic)phonetic=g2pkData.phonetic;
+                    if(g2pkData.pronunciation)phonetic=g2pkData.pronunciation;
                 }catch(e){console.log('g2pk error:',e);}
 
                 // Phoneme pronunciation analysis
@@ -32671,10 +33108,10 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsShowResult(d,area,status) {
             if(status){status.textContent='\u{1F3C6} ROUND RESULTS';status.style.color='#FFD700';}
-            var board=(qs.playerLevel==='beginner')?(d.leaderboard_beginner||[]):(d.leaderboard_advanced||[]);
+            var board=d[qsGetLeaderboardKey(qs.playerLevel)]||[];
             if(area.querySelector('[data-round]'))return;
-            var levelLabel=qs.playerLevel==='beginner'?'\u{1F331} BEGINNER':'\u{1F31F} ADVANCED';
-            var levelColor=qs.playerLevel==='beginner'?'#41c0ff':'#ff7777';
+            var levelLabel=qsGetLevelLabel(qs.playerLevel);
+            var levelColor=qsGetLevelColor(qs.playerLevel);
             var h='<div style="margin-top:16px;background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;">';
             h+=qgBuildList(board,levelLabel,levelColor,qs.playerName);
             h+='</div>';
@@ -32688,9 +33125,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
                     if(!doc.exists)return;
                     var d=doc.data();
-                    var board=(qs.playerLevel==='beginner')?(d.leaderboard_beginner||[]):(d.leaderboard_advanced||[]);
-                    var levelLabel=qs.playerLevel==='beginner'?'\u{1F331} BEGINNER':'\u{1F31F} ADVANCED';
-                    var levelColor=qs.playerLevel==='beginner'?'#41c0ff':'#ff7777';
+                    var board=d[qsGetLeaderboardKey(qs.playerLevel)]||[];
+                    var levelLabel=qsGetLevelLabel(qs.playerLevel);
+                    var levelColor=qsGetLevelColor(qs.playerLevel);
                     var h='<div style="margin-top:16px;text-align:center;padding:10px;">';
                     h+='<div style="font-size:30px;margin-bottom:8px;">\u{1F389}\u{1F3C1}\u{1F389}</div>';
                     h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#FFD700;margin-bottom:16px;">FINAL STANDINGS</div>';
