@@ -31322,6 +31322,50 @@ Return ONLY this JSON (no markdown, no code blocks):
             } catch(e){console.error('End round error:',e);}
             var te=document.getElementById('qgTimer');
             if(te){te.textContent="TIME'S UP";te.style.fontSize='14px';}
+
+            // Aggregate top 3 phoneme errors from all students this round
+            try{
+                var roundSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).where('round','==',qg.currentRound).where('status','==','graded').get();
+                var errFreq={};
+                roundSubs.forEach(function(doc){
+                    var d=doc.data();
+                    if(d.phonemeErrors&&d.phonemeErrors.length>0){
+                        d.phonemeErrors.forEach(function(e){
+                            var key;
+                            if(e.type==='substitution') key=(e.expected||'?')+'→'+(e.actual||'?');
+                            else if(e.type==='deletion') key='missing:'+(e.expected||'?');
+                            else key='extra:'+(e.actual||'?');
+                            errFreq[key]=(errFreq[key]||0)+1;
+                        });
+                    }
+                });
+                var topErr=Object.keys(errFreq).sort(function(a,b){return errFreq[b]-errFreq[a];}).slice(0,3);
+                if(topErr.length>0){
+                    var errDiv=document.getElementById('qgRoundErrors');
+                    if(!errDiv){
+                        errDiv=document.createElement('div');errDiv.id='qgRoundErrors';
+                        errDiv.style.cssText='margin-top:12px;padding:14px;background:rgba(255,68,68,0.08);border:2px solid rgba(255,68,68,0.3);border-radius:10px;';
+                        var timerParent=te?te.parentNode:null;
+                        if(timerParent)timerParent.insertAdjacentElement('afterend',errDiv);
+                    }
+                    var eh='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#ff4444;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:10px;">🔤 TOP ERRORS THIS ROUND</div>';
+                    topErr.forEach(function(k,i){
+                        var cnt=errFreq[k];
+                        var display=k;
+                        if(k.indexOf('→')>-1){
+                            var parts=k.split('→');
+                            display='Expected <span style="color:#00ff88">'+ph(parts[0])+'</span> but heard <span style="color:#ff4444">'+ph(parts[1])+'</span>';
+                        } else if(k.startsWith('missing:')){
+                            display='Missing sound <span style="color:#ff4444">'+ph(k.replace('missing:',''))+'</span>';
+                        } else if(k.startsWith('extra:')){
+                            display='Extra sound <span style="color:#ff4444">'+ph(k.replace('extra:',''))+'</span>';
+                        }
+                        eh+='<div style="font-size:13px;color:#ddd;margin-bottom:6px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;">#'+(i+1)+' '+display+' <span style="color:#888;font-size:11px;">('+cnt+' student'+(cnt>1?'s':'')+')</span></div>';
+                    });
+                    errDiv.innerHTML=eh;
+                    console.log('Round top errors:',topErr.map(function(k){return k+' ('+errFreq[k]+')';}));
+                }
+            }catch(errE){console.log('Phoneme error aggregation failed:',errE);}
         }
 
         function qgBuildPodium(board, label, labelColor) {
@@ -31588,6 +31632,194 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         // ── TEVELLO ACCOUNT SYSTEM ──
         var TEVELLO_COLLECTION = 'tevello_accounts';
+        var TEVELLO_GAME_HISTORY = 'tevello_game_history';
+
+        // Save game summary to Tevello history after game finishes
+        async function qsTevSaveGameSummary(){
+            if(!qs.tevelloUser||!qs.sessionId)return;
+            try{
+                // Fetch all this user's graded submissions from the session
+                var allSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).where('playerId','==',qs.playerId).where('status','==','graded').get();
+                var scores=[];
+                var allErrors=[];
+                allSubs.forEach(function(doc){
+                    var d=doc.data();
+                    if(typeof d.gradeScore==='number'){
+                        scores.push(d.gradeScore);
+                        if(d.phonemeErrors&&d.phonemeErrors.length>0){
+                            d.phonemeErrors.forEach(function(e){allErrors.push(e);});
+                        }
+                    }
+                });
+                if(scores.length===0)return;
+                var avg=Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
+                // Build error frequency map
+                var errorFreq={};
+                allErrors.forEach(function(e){
+                    var key=e.type==='substitution'?(e.expected+'→'+e.actual):e.type==='deletion'?('missing:'+e.expected):('extra:'+e.actual);
+                    errorFreq[key]=(errorFreq[key]||0)+1;
+                });
+                // Sort by frequency, take top 3
+                var topErrors=Object.keys(errorFreq).sort(function(a,b){return errorFreq[b]-errorFreq[a];}).slice(0,3).map(function(k){return{error:k,count:errorFreq[k]};});
+
+                // Get current date info
+                var now=new Date();
+                var estStr=now.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+                var parts=estStr.split('/');
+                var dateStr=parts[2]+'-'+parts[0]+'-'+parts[1]; // YYYY-MM-DD
+
+                await db.collection(TEVELLO_GAME_HISTORY).add({
+                    tevelloId:qs.tevelloUser.id,
+                    tevelloUsername:qs.tevelloUser.username,
+                    sessionId:qs.sessionId,
+                    date:dateStr,
+                    level:qs.playerLevel,
+                    roundCount:scores.length,
+                    avgScore:avg,
+                    scores:scores,
+                    topErrors:topErrors,
+                    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('Game summary saved: avg='+avg+', rounds='+scores.length+', topErrors='+topErrors.length);
+            }catch(e){console.error('Save game summary error:',e);}
+        }
+
+        // Fetch and display stats for this Tevello user
+        async function qsTevShowStats(){
+            if(!qs.tevelloUser)return;
+            var overlay=document.getElementById('qsTevStatsOverlay');
+            if(overlay){overlay.remove();}
+            overlay=document.createElement('div');
+            overlay.id='qsTevStatsOverlay';
+            overlay.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.92);z-index:10002;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+            overlay.innerHTML='<div style="text-align:center;padding:40px;"><div style="font-size:30px;">⏳</div><div style="color:#ccc;margin-top:8px;font-size:13px;">Loading your stats...</div></div>';
+            document.body.appendChild(overlay);
+
+            try{
+                var snap=await db.collection(TEVELLO_GAME_HISTORY).where('tevelloId','==',qs.tevelloUser.id).orderBy('createdAt','asc').get();
+                var games=[];
+                snap.forEach(function(doc){games.push(doc.data());});
+
+                var psFont='font-family:\'Press Start 2P\'';
+                var ts='text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024';
+                var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #41c0ff;border-radius:16px;padding:24px;max-width:500px;width:100%;max-height:85vh;overflow-y:auto;position:relative;">';
+                h+='<button onclick="document.getElementById(\'qsTevStatsOverlay\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;z-index:2;">✕</button>';
+                h+='<div style="text-align:center;margin-bottom:20px;">';
+                h+='<div style="font-size:28px;margin-bottom:6px;">📊</div>';
+                h+='<div style="'+psFont+';font-size:12px;color:#41c0ff;'+ts+';">MY STATS</div>';
+                h+='<div style="font-size:12px;color:#888;margin-top:6px;">'+escapeHtml(qs.tevelloUser.displayName)+'</div></div>';
+
+                if(games.length===0){
+                    h+='<div style="text-align:center;padding:30px;"><div style="font-size:13px;color:#888;">No game history yet. Play some rounds to see your stats!</div></div>';
+                } else {
+                    // Group games by week (Mon-Sun)
+                    var weeks={};
+                    games.forEach(function(g){
+                        var d=new Date(g.date+'T12:00:00');
+                        // Get Monday of that week
+                        var day=d.getDay();
+                        var diff=d.getDate()-day+(day===0?-6:1);
+                        var monday=new Date(d);
+                        monday.setDate(diff);
+                        var weekKey=monday.toISOString().slice(0,10);
+                        if(!weeks[weekKey])weeks[weekKey]={games:[],monday:monday};
+                        weeks[weekKey].games.push(g);
+                    });
+
+                    var weekKeys=Object.keys(weeks).sort();
+                    var chartData=[];
+
+                    // 1. WEEKLY AVERAGES TABLE
+                    h+='<div style="margin-bottom:24px;">';
+                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">📈 WEEKLY AVERAGES</div>';
+
+                    weekKeys.forEach(function(wk,wi){
+                        var w=weeks[wk];
+                        var mon=w.monday;
+                        var sun=new Date(mon);sun.setDate(mon.getDate()+6);
+                        var dateLabel=(mon.getMonth()+1)+'/'+mon.getDate();
+                        var allScores=[];
+                        w.games.forEach(function(g){allScores.push(g.avgScore);});
+                        var weekAvg=Math.round(allScores.reduce(function(a,b){return a+b;},0)/allScores.length);
+                        var sc=weekAvg>=80?'#00ff88':weekAvg>=50?'#FFD700':'#ff4444';
+                        chartData.push({week:wi+1,label:dateLabel,avg:weekAvg});
+
+                        h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;margin-bottom:6px;border-left:3px solid '+sc+';">';
+                        h+='<div><span style="color:#ccc;font-size:13px;font-weight:600;">'+dateLabel+'</span>';
+                        h+='<span style="color:#888;font-size:11px;margin-left:8px;">Week '+(wi+1)+'</span>';
+                        h+='<span style="color:#666;font-size:10px;margin-left:8px;">('+w.games.length+' game'+(w.games.length>1?'s':'')+')</span></div>';
+                        h+='<div style="'+psFont+';font-size:12px;color:'+sc+';">'+weekAvg+'%</div>';
+                        h+='</div>';
+                    });
+                    h+='</div>';
+
+                    // 2. MINI CHART (CSS bar chart)
+                    if(chartData.length>1){
+                        h+='<div style="margin-bottom:24px;">';
+                        h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">📉 PROGRESS</div>';
+                        h+='<div style="display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px;">';
+                        chartData.forEach(function(cd){
+                            var pct=Math.max(cd.avg,5);
+                            var bc=cd.avg>=80?'#00ff88':cd.avg>=50?'#FFD700':'#ff4444';
+                            h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">';
+                            h+='<div style="font-size:9px;color:#ccc;'+psFont+';">'+cd.avg+'</div>';
+                            h+='<div style="width:100%;height:'+pct+'%;max-height:100px;background:linear-gradient(180deg,'+bc+','+bc+'44);border-radius:4px 4px 0 0;min-height:4px;"></div>';
+                            h+='<div style="font-size:8px;color:#888;">W'+cd.week+'</div>';
+                            h+='</div>';
+                        });
+                        h+='</div></div>';
+                    }
+
+                    // 3. TOP STRUGGLES PER WEEK
+                    h+='<div>';
+                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">🔤 TOP STRUGGLES BY WEEK</div>';
+                    weekKeys.forEach(function(wk,wi){
+                        var w=weeks[wk];
+                        var mon=w.monday;
+                        var dateLabel=(mon.getMonth()+1)+'/'+mon.getDate();
+                        // Aggregate all errors for this week
+                        var weekErrors={};
+                        w.games.forEach(function(g){
+                            if(g.topErrors){
+                                g.topErrors.forEach(function(e){weekErrors[e.error]=(weekErrors[e.error]||0)+e.count;});
+                            }
+                        });
+                        var sorted=Object.keys(weekErrors).sort(function(a,b){return weekErrors[b]-weekErrors[a];}).slice(0,3);
+
+                        h+='<div style="padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:6px;">';
+                        h+='<div style="display:flex;justify-content:space-between;margin-bottom:4px;">';
+                        h+='<span style="color:#ccc;font-size:12px;font-weight:600;">'+dateLabel+' — Week '+(wi+1)+'</span></div>';
+                        if(sorted.length===0){
+                            h+='<div style="font-size:11px;color:#39ff14;">✨ No errors recorded!</div>';
+                        } else {
+                            sorted.forEach(function(k){
+                                var cnt=weekErrors[k];
+                                var display=k;
+                                // Make it readable
+                                if(k.indexOf('→')>-1){
+                                    var parts=k.split('→');
+                                    display='Expected <span style=color:#00ff88>'+escapeHtml(parts[0])+'</span> but said <span style=color:#ff4444>'+escapeHtml(parts[1])+'</span>';
+                                } else if(k.startsWith('missing:')){
+                                    display='Missing sound <span style=color:#ff4444>'+escapeHtml(k.replace('missing:',''))+'</span>';
+                                } else if(k.startsWith('extra:')){
+                                    display='Extra sound <span style=color:#ff4444>'+escapeHtml(k.replace('extra:',''))+'</span>';
+                                }
+                                h+='<div style="font-size:11px;color:#ddd;margin-bottom:3px;">• '+display+' <span style=color:#888>(×'+cnt+')</span></div>';
+                            });
+                        }
+                        h+='</div>';
+                    });
+                    h+='</div>';
+                }
+
+                h+='<div style="text-align:center;margin-top:20px;"><button onclick="document.getElementById(\'qsTevStatsOverlay\').remove()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:12px 30px;border-radius:8px;'+psFont+';font-size:9px;cursor:pointer;">CLOSE</button></div>';
+                h+='</div>';
+                overlay.innerHTML=h;
+            }catch(e){
+                console.error('Stats load error:',e);
+                overlay.innerHTML='<div style="text-align:center;padding:40px;"><div style="font-size:30px;">❌</div><div style="color:#ff4444;margin-top:8px;font-size:13px;">Error loading stats: '+e.message+'</div><button onclick="document.getElementById(\'qsTevStatsOverlay\').remove()" style="margin-top:16px;background:none;border:1px solid #888;color:#888;padding:8px 20px;border-radius:8px;cursor:pointer;">Close</button></div>';
+            }
+        }
 
         function qsTevelloLogin(){
             var overlay=document.getElementById('qsTevelloOverlay');
@@ -32612,9 +32844,21 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var finalTranscript = grade.transcript || transcript || '';
                 var points = Math.round(finalScore / 10);
 
+                // Collect phoneme error summary for stats
+                var phonemeErrorSummary=[];
+                if(phonemeResult&&phonemeResult.errors){
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                    });
+                }
+
                 await pendingRef.update({
                     transcript:finalTranscript,
                     score:points, gradeScore:finalScore, feedback:finalFeedback,
+                    phonemeErrors:phonemeErrorSummary,
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
                     status:'graded'
                 });
 
@@ -33120,6 +33364,8 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsShowFinished(area,status) {
             if(status){status.textContent='\u{1F3C1} GAME OVER';status.style.color='#00ff88';}
+            // Save game summary to Tevello history
+            qsTevSaveGameSummary();
             // Fetch final leaderboard and show podium for their level
             if(qs.sessionId){
                 db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
@@ -33138,8 +33384,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(myIdx>=0){
                         h+='<div style="margin-top:14px;font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">You finished #'+(myIdx+1)+' with '+board[myIdx].score+' pts!</div>';
                     }
+                    // Stats button (only if logged in with Tevello)
+                    if(qs.tevelloUser){
+                        h+='<div style="margin-top:18px;"><button id="qsStatsBtn" onclick="qsTevShowStats()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86,0 -2px 0 #005a86,0 2px 0 #005a86,-2px 0 0 #005a86,2px 0 0 #005a86;padding:12px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">📊 MY STATS</button></div>';
+                    }
                     h+='</div>';
                     area.innerHTML=h;
+                    if(qs.tevelloUser){setTimeout(function(){var sb=document.getElementById('qsStatsBtn');if(sb)addSparkles(sb);},50);}
                 });
             } else {
                 area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">\u{1F3C1}</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
