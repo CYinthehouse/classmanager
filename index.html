@@ -31760,6 +31760,39 @@ Return ONLY this JSON (no markdown, no code blocks):
         };
         function ph(label){return phoneToHangul[label]||label;}
 
+        // Filter out known confusion pairs the wav2vec2 model can't reliably distinguish.
+        // These substitutions are dropped from the error list and score recalculated.
+        // GPT still hears the audio independently and can catch real errors in these pairs.
+        var confusionPairs={
+            'A-EO':true,'EO-A':true,   // ㅏ↔ㅓ
+            'O-U':true,'U-O':true,     // ㅗ↔ㅜ
+            'N-R':true,'R-N':true,     // ㄴ↔ㄹ
+            'N-L':true,'L-N':true,     // ㄴ↔ㄹ (L variant)
+            'R-L':true,'L-R':true      // ㄹ variants
+        };
+        function filterPhonemeErrors(result){
+            if(!result||!result.errors)return result;
+            var original=result.errors.length;
+            result.errors=result.errors.filter(function(err){
+                if(err.type!=='substitution')return true;
+                var key=(err.expected||'')+'-'+(err.actual||'');
+                if(confusionPairs[key]){
+                    console.log('Phoneme filter: dropping confusion pair '+ph(err.expected)+'→'+ph(err.actual));
+                    return false;
+                }
+                return true;
+            });
+            // Recalculate score if errors were removed
+            if(result.errors.length<original && typeof result.total_phonemes==='number'){
+                var dropped=original-result.errors.length;
+                var errorsNow=result.errors.length;
+                var total=result.total_phonemes||1;
+                result.score=Math.round(Math.max(0,Math.min(100,(1-errorsNow/total)*100)));
+                console.log('Phoneme score recalculated: dropped '+dropped+' confusion errors, new score='+result.score);
+            }
+            return result;
+        }
+
         async function qsDrillSubmit(blob,mimeType,drillText,drillId){
             var statusEl=document.getElementById('qsDrillStatus');
             var resultEl=document.getElementById('qsDrillResult');
@@ -31806,6 +31839,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
                     if(phResp.ok){phonemeResult=await phResp.json();}
                     console.log('Drill phoneme result:',phonemeResult);
+                    phonemeResult=filterPhonemeErrors(phonemeResult);
                 }catch(e){console.log('Drill phoneme error:',e);}
 
                 // Call GPT for score + feedback
@@ -32038,6 +32072,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(phResp.ok){
                         phonemeResult=await phResp.json();
                         console.log('Phoneme result:',JSON.stringify(phonemeResult));
+                        phonemeResult=filterPhonemeErrors(phonemeResult);
                     }
                 }catch(e){console.log('Phoneme service unavailable, falling back to GPT only:',e);}
 
@@ -32455,6 +32490,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
                     if(phResp.ok){phonemeResult=await phResp.json();}
                     console.log('Bonus phoneme:',phonemeResult);
+                    phonemeResult=filterPhonemeErrors(phonemeResult);
                 }catch(e){console.log('Bonus phoneme error:',e);}
 
                 // GPT grading (same as normal round)
