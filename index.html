@@ -30494,6 +30494,44 @@ Return ONLY this JSON (no markdown, no code blocks):
                 container.innerHTML = '<div style="text-align:center;padding:30px;"><p style="color:#888;font-size:13px;">No sets loaded yet.</p><p style="color:#666;font-size:12px;margin-top:8px;">Add sets in the Tuesday Reading tab (TEXT or IMAGE input), then come back.</p></div>';
                 return;
             }
+            qgRenderPreview(container);
+            // Generate abs beginner words in background if not already done
+            var needsGen=false;
+            for(var i=0;i<qg.sets.length;i++){if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){needsGen=true;break;}}
+            if(needsGen) qgGenerateAbsBeginnerWords(container);
+        }
+
+        async function qgGenerateAbsBeginnerWords(container){
+            try{
+                var aiUrl='https://generateflashcardai-386010826708.us-central1.run.app';
+                var abPrompt='For each round below, generate 5 simple Korean syllable blocks (1-3 syllables each, common concrete nouns) that relate to key words in that round\'s sentences. If a sentence contains a noun that is itself 1-3 syllables, extract it. Fill remaining slots with basic vocabulary (e.g. 밥, 물, 집, 손, 눈, 귀, 코, 산, 달, 별, 꽃, 책, 차, 개, 말).\n\nRounds:\n';
+                for(var i=0;i<qg.sets.length;i++){
+                    abPrompt+='Round '+(i+1)+': '+qg.sets[i].sentences.map(function(s){return s.korean;}).join(' / ')+'\n';
+                }
+                abPrompt+='\nReturn ONLY a JSON array: [["word1","word2","word3","word4","word5"], ...] one inner array per round. No markdown.';
+                var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
+                var data=await resp.json();
+                var rt=data.text||data.result||data.response||JSON.stringify(data);
+                var parsed=[];var arrMatch=rt.match(/\[\s*\[[\s\S]*?\]\s*\]/);if(arrMatch)try{parsed=JSON.parse(arrMatch[0]);}catch(e){}
+                for(var i=0;i<qg.sets.length;i++){
+                    if(i<parsed.length&&Array.isArray(parsed[i])&&parsed[i].length>=3){
+                        qg.sets[i].absoluteBeginnerWords=parsed[i].slice(0,5);
+                    } else {
+                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
+                    }
+                }
+            }catch(e){
+                console.error('Abs beginner word preview gen error:',e);
+                for(var i=0;i<qg.sets.length;i++){
+                    if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){
+                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
+                    }
+                }
+            }
+            qgRenderPreview(container);
+        }
+
+        function qgRenderPreview(container){
             var html = '<div style="font-family:\'Press Start 2P\';font-size:12px;color:#41c0ff;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:12px;">' + qg.sets.length + ' ROUNDS LOADED</div>';
             for (var i = 0; i < qg.sets.length; i++) {
                 var s = qg.sets[i];
@@ -30505,7 +30543,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 html += '<div style="background:rgba(255,105,180,0.05);border:1px solid rgba(255,105,180,0.2);border-radius:6px;padding:8px;">';
                 html += '<div style="font-size:10px;color:#ff69b4;margin-bottom:4px;font-weight:600;">🐣 ABS (5 words)</div>';
                 var abw=s.absoluteBeginnerWords||[];
-                html += '<div style="font-size:12px;color:#fff;">'+(abw.length>0?escapeHtml(abw.join(', ')):'<span style=color:#666>pending...</span>')+'</div></div>';
+                html += '<div style="font-size:12px;color:#fff;">'+(abw.length>0?escapeHtml(abw.join(', ')):'<span style=color:#FFD700>⏳ generating...</span>')+'</div></div>';
                 html += '<div style="background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.2);border-radius:6px;padding:8px;">';
                 html += '<div style="font-size:10px;color:#41c0ff;margin-bottom:4px;font-weight:600;">🌱 BEG (1st only)</div>';
                 html += '<div style="font-size:12px;color:#fff;">' + escapeHtml(s.sentences[0].korean) + '</div></div>';
@@ -30545,7 +30583,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                         ti++;
                     }
 
-                // Generate Absolute Beginner syllable blocks for each round
+                // Generate Absolute Beginner syllable blocks for each round (skip if already generated at preview)
+                var abNeedsGen=false;
+                for(var i=0;i<qg.sets.length;i++){if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){abNeedsGen=true;break;}}
+                if(abNeedsGen){
                 btn.innerHTML = '<span class="quiz-loading-dots">⏳ GENERATING ABS. BEG WORDS</span>';
                 try {
                     var abPrompt = 'You are a Korean language teaching assistant for ABSOLUTE BEGINNERS.\n';
@@ -30575,6 +30616,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                         qg.sets[i].absoluteBeginnerWords = ['밥', '물', '집', '손', '눈'];
                     }
                 }
+
+                } // end abNeedsGen
 
                 // Pre-generate bonus clauses for absolute beginners (goal-aware)
                 // These are stored per-round so they're instant when a student triggers bonus
@@ -31840,8 +31883,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             modal+='</div>';
             // Login form
             modal+='<div id="qsTevLoginForm">';
-            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Username</label>';
-            modal+='<input type="text" id="qsTevLoginUser" placeholder="Your username" autocomplete="username" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
+            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Email</label>';
+            modal+='<input type="email" id="qsTevLoginUser" placeholder="Your email" autocomplete="email" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
             modal+='<div style="margin-bottom:16px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Password</label>';
             modal+='<input type="password" id="qsTevLoginPass" placeholder="Your password" autocomplete="current-password" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')qsTevDoLogin()"></div>';
             modal+='<div id="qsTevLoginMsg" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>';
@@ -31849,8 +31892,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             modal+='</div>';
             // Signup form (hidden)
             modal+='<div id="qsTevSignupForm" style="display:none;">';
-            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Choose a Username</label>';
-            modal+='<input type="text" id="qsTevSignupUser" placeholder="Pick a username" autocomplete="username" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
+            modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Email</label>';
+            modal+='<input type="email" id="qsTevSignupUser" placeholder="Your email" autocomplete="email" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
             modal+='<div style="margin-bottom:12px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Password</label>';
             modal+='<input type="password" id="qsTevSignupPass" placeholder="Create a password" autocomplete="new-password" style="width:100%;padding:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;"></div>';
             modal+='<div style="margin-bottom:16px;"><label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;">Confirm Password</label>';
@@ -31892,7 +31935,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             var user=(document.getElementById('qsTevLoginUser').value||'').trim().toLowerCase();
             var pass=document.getElementById('qsTevLoginPass').value||'';
             var msg=document.getElementById('qsTevLoginMsg');
-            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter username and password.';return;}
+            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter email and password.';return;}
             msg.style.color='#888';msg.textContent='Logging in...';
             try{
                 var snap=await db.collection(TEVELLO_COLLECTION).where('username','==',user).limit(1).get();
@@ -31920,17 +31963,17 @@ Return ONLY this JSON (no markdown, no code blocks):
             var pass=document.getElementById('qsTevSignupPass').value||'';
             var confirm=document.getElementById('qsTevSignupConfirm').value||'';
             var msg=document.getElementById('qsTevSignupMsg');
-            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Fill in all fields.';return;}
-            if(user.length<3){msg.style.color='#ff4444';msg.textContent='Username must be 3+ characters.';return;}
+            if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter email and password.';return;}
+            if(!user||user.indexOf('@')<1||user.indexOf('.')<3){msg.style.color='#ff4444';msg.textContent='Please enter a valid email.';return;}
             if(pass.length<4){msg.style.color='#ff4444';msg.textContent='Password must be 4+ characters.';return;}
             if(pass!==confirm){msg.style.color='#ff4444';msg.textContent='Passwords do not match.';return;}
             var userLower=user.toLowerCase();
-            if(!/^[a-z0-9._-]+$/.test(userLower)){msg.style.color='#ff4444';msg.textContent='Username: letters, numbers, . _ - only.';return;}
+            
             msg.style.color='#888';msg.textContent='Creating account...';
             try{
                 // Check if username taken
                 var existing=await db.collection(TEVELLO_COLLECTION).where('username','==',userLower).limit(1).get();
-                if(!existing.empty){msg.style.color='#ff4444';msg.textContent='Username already taken!';return;}
+                if(!existing.empty){msg.style.color='#ff4444';msg.textContent='Email already registered! Try logging in.';return;}
                 var hashed=await qsTevHash(pass);
                 var docRef=await db.collection(TEVELLO_COLLECTION).add({
                     username:userLower,
