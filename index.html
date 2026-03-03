@@ -15870,6 +15870,7 @@ Generate 4-6 ending variations per sentence.\`;
         // If it's a string, try to extract JSON
         if (typeof data === 'string') {
           console.log('Data is a string, parsing...');
+          var bt=String.fromCharCode(96); data = data.replace(new RegExp(bt+bt+bt+'json\\s*','gi'),'').replace(new RegExp(bt+bt+bt+'\\s*','g'),'').trim();
           const match = data.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);
           if (match) return JSON.parse(match[0]);
           return JSON.parse(data);
@@ -30505,19 +30506,24 @@ Return ONLY this JSON (no markdown, no code blocks):
             console.log('qgGenerateAbsBeginnerWords: starting for',qg.sets.length,'rounds');
             try{
                 var aiUrl='https://generateflashcardai-386010826708.us-central1.run.app';
-                var abPrompt='You are extracting simple Korean words from sentences for ABSOLUTE BEGINNERS who are just learning to read Hangul.\n\n';
-                abPrompt+='TASK: For each round, pick 5 Korean words (1-3 syllables each) directly from the sentences provided. These words will be shown to absolute beginners as reading practice.\n\n';
+                var abPrompt='You are selecting single Korean syllable blocks for ABSOLUTE BEGINNER reading practice.\n\n';
+                abPrompt+='TASK: For each round, find 5 single-syllable Korean blocks (exactly 1 Korean character each, like 큰, 그, 집, 물, 안) for beginners to practice reading.\n\n';
+                abPrompt+='STEP 1: Look at every word in the sentences. Split compound words into syllables. Find any single-character words or syllables that appear.\n';
+                abPrompt+='Examples:\n';
+                abPrompt+='- "제가 찾고 있었던건 큰 회색 고양이였지만" → eligible: 큰 (appears as-is in sentence)\n';
+                abPrompt+='- "그 고양이의 이름을 물었어요" → eligible: 그 (appears as-is in sentence)\n';
+                abPrompt+='- "밥을 먹고 물을 마셨어요" → eligible: 밥, 물 (appear as roots in the sentence)\n\n';
+                abPrompt+='STEP 2: If a round has fewer than 5 extractable single-character blocks, generate simple common ones to fill the remaining slots (e.g. 밥, 물, 집, 손, 눈, 귀, 코, 산, 달, 별, 꽃, 책, 차, 개, 말, 불, 문, 밤, 해, 비, 눈, 강, 섬).\n\n';
                 abPrompt+='RULES:\n';
-                abPrompt+='1. EXTRACT words directly from the sentences whenever possible. Look for short words like particles (그, 큰, 이, 한), nouns (고양이, 이름, 사과), verbs stems (가, 와, 봐)\n';
-                abPrompt+='2. Each word must be 1-3 syllables (1-3 Korean characters)\n';
-                abPrompt+='3. NEVER repeat a word across rounds. Every word must be unique across ALL rounds.\n';
-                abPrompt+='4. If you cannot find 5 extractable words from a round, fill with common beginner vocabulary that has NOT been used in any other round\n';
-                abPrompt+='5. Prefer concrete, recognizable words over abstract ones\n\n';
+                abPrompt+='- Every word MUST be exactly 1 Korean character (1 syllable block). NOT 2 or 3 characters.\n';
+                abPrompt+='- NEVER repeat a word across rounds.\n';
+                abPrompt+='- Always prioritize words extracted from the actual sentences first.\n\n';
                 abPrompt+='Rounds:\n';
                 for(var i=0;i<qg.sets.length;i++){
-                    abPrompt+='Round '+(i+1)+': '+qg.sets[i].sentences.map(function(s){return s.korean;}).join(' / ')+'\n';
+                    abPrompt+='Round '+(i+1)+':\n';
+                    qg.sets[i].sentences.forEach(function(s){abPrompt+='  '+s.korean+'\n';});
                 }
-                abPrompt+='\nReturn ONLY valid JSON, no markdown, no explanation:\n[{"round":1,"words":["word1","word2","word3","word4","word5"]},{"round":2,"words":["word1","word2","word3","word4","word5"]}]';
+                abPrompt+='\nReturn ONLY valid JSON, no markdown:\n[{"round":1,"words":["w","w","w","w","w"]},{"round":2,"words":["w","w","w","w","w"]}]';
                 var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1500})});
                 var data=await resp.json();
                 var rt=(typeof data==='string'?data:data.data||data.text||data.result||data.response||JSON.stringify(data));
@@ -30623,19 +30629,24 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(abNeedsGen){
                 btn.innerHTML = '<span class="quiz-loading-dots">⏳ GENERATING ABS. BEG WORDS</span>';
                 try {
-                    var abPrompt = 'You are extracting simple Korean words from sentences for ABSOLUTE BEGINNERS who are just learning to read Hangul.\n\n';
-                    abPrompt += 'TASK: For each round, pick 5 Korean words (1-3 syllables each) directly from the sentences provided. These words will be shown to absolute beginners as reading practice.\n\n';
+                    var abPrompt = 'You are selecting single Korean syllable blocks for ABSOLUTE BEGINNER reading practice.\n\n';
+                    abPrompt += 'TASK: For each round, find 5 single-syllable Korean blocks (exactly 1 Korean character each, like 큰, 그, 집, 물, 안) for beginners to practice reading.\n\n';
+                    abPrompt += 'STEP 1: Look at every word in the sentences. Split compound words into syllables. Find any single-character words or syllables that appear.\n';
+                    abPrompt += 'Examples:\n';
+                    abPrompt += '- "제가 찾고 있었던건 큰 회색 고양이였지만" → eligible: 큰 (appears as-is in sentence)\n';
+                    abPrompt += '- "그 고양이의 이름을 물었어요" → eligible: 그 (appears as-is in sentence)\n';
+                    abPrompt += '- "밥을 먹고 물을 마셨어요" → eligible: 밥, 물 (appear as roots in the sentence)\n\n';
+                    abPrompt += 'STEP 2: If a round has fewer than 5 extractable single-character blocks, generate simple common ones to fill the remaining slots (e.g. 밥, 물, 집, 손, 눈, 귀, 코, 산, 달, 별, 꽃, 책, 차, 개, 말, 불, 문, 밤, 해, 비, 눈, 강, 섬).\n\n';
                     abPrompt += 'RULES:\n';
-                    abPrompt += '1. EXTRACT words directly from the sentences whenever possible. Look for short words like particles (그, 큰, 이, 한), nouns (고양이, 이름, 사과), verbs stems (가, 와, 봐)\n';
-                    abPrompt += '2. Each word must be 1-3 syllables (1-3 Korean characters)\n';
-                    abPrompt += '3. NEVER repeat a word across rounds. Every word must be unique across ALL rounds.\n';
-                    abPrompt += '4. If you cannot find 5 extractable words from a round, fill with common beginner vocabulary that has NOT been used in any other round\n';
-                    abPrompt += '5. Prefer concrete, recognizable words over abstract ones\n\n';
+                    abPrompt += '- Every word MUST be exactly 1 Korean character (1 syllable block). NOT 2 or 3 characters.\n';
+                    abPrompt += '- NEVER repeat a word across rounds.\n';
+                    abPrompt += '- Always prioritize words extracted from the actual sentences first.\n\n';
                     abPrompt += 'Rounds:\n';
                     for (var i = 0; i < qg.sets.length; i++) {
-                        abPrompt += 'Round ' + (i+1) + ': ' + qg.sets[i].sentences.map(function(s){return s.korean;}).join(' / ') + '\n';
+                        abPrompt += 'Round ' + (i+1) + ':\n';
+                        qg.sets[i].sentences.forEach(function(s){abPrompt += '  ' + s.korean + '\n';});
                     }
-                    abPrompt += '\nReturn ONLY valid JSON, no markdown, no explanation:\n[{"round":1,"words":["word1","word2","word3","word4","word5"]},{"round":2,"words":["word1","word2","word3","word4","word5"]}]';
+                    abPrompt += '\nReturn ONLY valid JSON, no markdown:\n[{"round":1,"words":["w","w","w","w","w"]},{"round":2,"words":["w","w","w","w","w"]}]';
 
                     var abResp = await fetch(aiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:abPrompt, max_tokens:1500}) });
                     var abData = await abResp.json();
@@ -32057,10 +32068,8 @@ Return ONLY this JSON (no markdown, no code blocks):
             var indicator=document.getElementById('qsTevelloStatus');
             if(qs.tevelloUser){
                 if(btn){btn.innerHTML='🔑 '+escapeHtml(qs.tevelloUser.displayName);btn.style.background='linear-gradient(135deg,#2d6a1e,#1a4a10)';btn.style.borderColor='#39ff14';btn.style.color='#39ff14';}
-                if(indicator)indicator.innerHTML='<span style="color:#39ff14;font-size:11px;">✓ Logged in as <strong>'+escapeHtml(qs.tevelloUser.displayName)+'</strong></span>';
-                // Pre-fill name from account
-                var nameInput=document.getElementById('qsName');
-                if(nameInput && !nameInput.value) nameInput.value=qs.tevelloUser.displayName;
+                if(indicator)indicator.innerHTML='<span style="color:#39ff14;font-size:11px;">✓ Logged in as <strong>'+escapeHtml(qs.tevelloUser.displayName)+'</strong></span> <button onclick="qsTevLogout()" style="background:none;border:1px solid rgba(255,255,255,0.2);color:#888;font-size:9px;padding:3px 8px;border-radius:4px;cursor:pointer;margin-left:6px;vertical-align:middle;" onmouseover="this.style.color=\'#ff4444\';this.style.borderColor=\'#ff4444\'" onmouseout="this.style.color=\'#888\';this.style.borderColor=\'rgba(255,255,255,0.2)\'">logout</button>';
+                // Do NOT pre-fill name from email
                 // Restore saved preferences
                 if(qs.tevelloUser.emoji && typeof qs.tevelloUser.emoji==='number'){
                     qs.playerEmoji=qs.tevelloUser.emoji;
@@ -32102,7 +32111,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(existing)existing.remove();
             var overlay=document.createElement('div');
             overlay.id='qsTevGoalOverlay';
-            overlay.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+            overlay.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;transition:background 0.3s ease;';
             var currentGoal=(qs.tevelloUser&&qs.tevelloUser.goal)||'';
             var psFont='font-family:\'Press Start 2P\'';
             var goldTS='text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024';
@@ -32144,6 +32153,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             m+='</div>';
             overlay.innerHTML=m;
             document.body.appendChild(overlay);
+            // Animate in: zoom from small + fade
+            var goalCard=overlay.firstChild;
+            if(goalCard){goalCard.style.transform='scale(0.3)';goalCard.style.opacity='0';goalCard.style.transition='transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease';}
+            requestAnimationFrame(function(){requestAnimationFrame(function(){overlay.style.background='rgba(0,0,0,0.88)';if(goalCard){goalCard.style.transform='scale(1)';goalCard.style.opacity='1';}});});
             var input=document.getElementById('qsTevGoalInput');
             var counter=document.getElementById('qsTevGoalCount');
             if(input&&counter){input.addEventListener('input',function(){counter.textContent=input.value.length;});}
@@ -32267,7 +32280,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div id="qsTevelloStatus" style="text-align:center;min-height:18px;margin-bottom:10px;"></div>'+
                 '<button id="qsJoinBtn" onclick="qsJoin(\''+roomCode+'\')" style="width:100%;background:linear-gradient(135deg,#ff7777,#e85555);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;padding:14px;border-radius:10px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:12px;cursor:pointer;">JOIN GAME</button>'+
                 '</div></div>';
-            setTimeout(function(){var jb=document.getElementById('qsJoinBtn');if(jb)addSparkles(jb);var tb=document.getElementById('qsTevelloBtn');if(tb)addSparkles(tb);qsTevAutoLogin();},50);
+            setTimeout(function(){var jb=document.getElementById('qsJoinBtn');if(jb)addSparkles(jb);var tb=document.getElementById('qsTevelloBtn');if(tb)addSparkles(tb);},50);
         }
 
         function qsPickEmoji(e,btn){
