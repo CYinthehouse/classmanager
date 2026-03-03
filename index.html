@@ -4047,6 +4047,11 @@
             return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\\/g, '\\\\');
         }
 
+        function sanitizeName(str) {
+            if (!str) return '';
+            return String(str).replace(/\\/g, '').trim();
+        }
+
         // ==================== EST TIMEZONE HELPERS ====================
         // All date/time operations should use these functions to ensure consistent EST behavior
         
@@ -4699,7 +4704,7 @@
         }
 
         async function submitStudentRegistration() {
-            const name = document.getElementById('studentName').value.trim();
+            const name = sanitizeName(document.getElementById('studentName').value);
             const email = document.getElementById('studentEmail').value.trim();
             const phone = document.getElementById('studentPhone').value.trim();
             const discord = document.getElementById('studentDiscord').value.trim();
@@ -19725,67 +19730,62 @@ Return ONLY valid JSON (single object, not array):
         async function openClassDetails(classId) {
             const cls = allClasses.find(c => c.id === classId) || allClassesForTeacher.find(c => c.id === classId);
             if (!cls) return;
-            
+
+            // Show modal immediately with loading state
+            document.getElementById('classDetailsHeader').innerHTML = '<p style="color:#888;">Loading class details...</p>';
+            document.getElementById('classDetailsStudents').innerHTML = '';
+            openModal('classDetailsModal');
+
             const teacher = allTeachers.find(t => t.id === cls.teacherId);
-            
-            // Load attendance data for this class
+
+            // Load attendance + contacted data in parallel
             let attendanceMap = {};
             let contactedMap = {};
             try {
-                const attendanceSnap = await db.collection('scheduler_attendance').where('classId', '==', classId).get();
+                const [attendanceSnap, contactedSnap] = await Promise.all([
+                    db.collection('scheduler_attendance').where('classId', '==', classId).get(),
+                    db.collection('scheduler_contacted').where('classId', '==', classId).get()
+                ]);
                 attendanceSnap.docs.forEach(d => {
                     const data = d.data();
                     attendanceMap[`${data.studentId}_${data.week}`] = { status: data.status, reason: data.reason || null };
                 });
-                
-                // Load contacted status
-                const contactedSnap = await db.collection('scheduler_contacted').where('classId', '==', classId).get();
                 contactedSnap.docs.forEach(d => {
                     const data = d.data();
                     contactedMap[data.studentId] = data.contacted;
                 });
             } catch (e) { console.error(e); }
-            
-            // Get full student data - for teachers, load directly from Firebase if allStudents is empty
+
+            // Get full student data
             const studentIds = (cls.students || []).map(s => s.id);
             const fullStudentData = {};
-            
-            // First try to get from allStudents (admin/support)
+
             for (const sid of studentIds) {
                 const studentDoc = allStudents.find(s => s.id === sid);
-                if (studentDoc) {
-                    fullStudentData[sid] = studentDoc;
-                }
+                if (studentDoc) fullStudentData[sid] = studentDoc;
             }
-            
-            // For teachers or if allStudents is empty, load directly from Firebase
+
+            // Load missing students in parallel
             if (Object.keys(fullStudentData).length < studentIds.length) {
                 try {
-                    for (const sid of studentIds) {
-                        if (!fullStudentData[sid]) {
-                            const studentDoc = await db.collection('scheduler_students').doc(sid).get();
-                            if (studentDoc.exists) {
-                                fullStudentData[sid] = { id: studentDoc.id, ...studentDoc.data() };
-                            } else {
-                                // Fallback to embedded student data from class
-                                const embeddedStudent = cls.students.find(s => s.id === sid);
-                                if (embeddedStudent) {
-                                    fullStudentData[sid] = embeddedStudent;
-                                }
-                            }
+                    const missing = studentIds.filter(sid => !fullStudentData[sid]);
+                    const results = await Promise.all(missing.map(sid => db.collection('scheduler_students').doc(sid).get()));
+                    results.forEach((studentDoc, i) => {
+                        if (studentDoc.exists) {
+                            fullStudentData[missing[i]] = { id: studentDoc.id, ...studentDoc.data() };
+                        } else {
+                            const embedded = cls.students.find(s => s.id === missing[i]);
+                            if (embedded) fullStudentData[missing[i]] = embedded;
                         }
-                    }
-                } catch (e) { 
+                    });
+                } catch (e) {
                     console.error('Error loading student data:', e);
-                    // Use embedded student data as fallback
                     for (const student of (cls.students || [])) {
-                        if (!fullStudentData[student.id]) {
-                            fullStudentData[student.id] = student;
-                        }
+                        if (!fullStudentData[student.id]) fullStudentData[student.id] = student;
                     }
                 }
             }
-            
+
             // Format start date for display
             const startDateDisplay = cls.startDate ? formatDateInEST(cls.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
             
@@ -22057,7 +22057,7 @@ Return ONLY valid JSON (single object, not array):
 
             const modal = document.createElement('div');
             modal.id = 'noteModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100002;display:flex;align-items:center;justify-content:center;';
             modal.innerHTML = `
                 <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
                     <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Add Note</h3>
@@ -22115,7 +22115,7 @@ Return ONLY valid JSON (single object, not array):
 
                 const modal = document.createElement('div');
                 modal.id = 'noteModal';
-                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100002;display:flex;align-items:center;justify-content:center;';
 
                 // View mode
                 function showViewMode() {
@@ -25059,7 +25059,7 @@ ${daySpecific}
         async function saveOCStudent() {
             const classId = document.getElementById('ocStudentClassId').value;
             const editId = document.getElementById('ocStudentEditId').value;
-            const name = document.getElementById('ocStudentName').value.trim();
+            const name = sanitizeName(document.getElementById('ocStudentName').value);
 
             if (!name) { alert('Please enter a name.'); return; }
 
@@ -26015,7 +26015,7 @@ ${daySpecific}
         
         // ==================== DIRECT ADD STUDENT TO SLOT ====================
         async function addStudentToSlotDirectly() {
-            const studentName = document.getElementById('directAddStudentName').value.trim();
+            const studentName = sanitizeName(document.getElementById('directAddStudentName').value);
             if (!studentName) {
                 alert('Please enter a student name.');
                 return;
@@ -26334,7 +26334,7 @@ ${daySpecific}
                 return;
             }
             
-            const name = document.getElementById('addActiveManualName').value.trim();
+            const name = sanitizeName(document.getElementById('addActiveManualName').value);
             if (!name) {
                 alert('Please enter a student name.');
                 return;
@@ -28486,7 +28486,7 @@ ${additionalText}
 
         async function submitCreateCustomerAccount() {
             const shopifyId = document.getElementById('createAcctShopifyId').value;
-            const name = document.getElementById('createAcctName').value;
+            const name = sanitizeName(document.getElementById('createAcctName').value);
             const email = document.getElementById('createAcctEmail').value;
             const phone = document.getElementById('createAcctPhone').value;
             const city = document.getElementById('createAcctCity').value;
