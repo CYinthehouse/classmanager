@@ -1718,12 +1718,12 @@
                         
                         <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                             <button class="btn btn-info" onclick="loadAdminAttendance()">🔄 Refresh</button>
-                            <button id="archiveToggleBtn" class="btn btn-sm" style="background: rgba(155,89,182,0.15); border: 1px solid #9b59b6; color: #9b59b6;" onclick="toggleArchivedAttendance()">📦 Show Archived</button>
                             <div class="form-group" style="margin: 0;">
                                 <select id="adminAttendanceClassFilter" onchange="loadAdminAttendance()" style="padding: 8px; font-size: 12px;">
                                     <option value="all">All Classes</option>
                                 </select>
                             </div>
+                            <button id="archiveToggleBtn" class="btn btn-sm" style="background: rgba(255,51,102,0.15); border: 1px solid #ff3366; color: #ff3366;" onclick="openArchivedAttendanceModal()">📦 Show Archived</button>
                         </div>
                         
                         <!-- Attendance Stats -->
@@ -21696,13 +21696,165 @@ Return ONLY valid JSON (single object, not array):
 
         var showArchivedAttendance = false;
         function toggleArchivedAttendance() {
-            showArchivedAttendance = !showArchivedAttendance;
-            var btn = document.getElementById('archiveToggleBtn');
-            if (btn) {
-                if (showArchivedAttendance) { btn.style.background = '#9b59b6'; btn.style.color = '#fff'; btn.textContent = '📦 Hide Archived'; }
-                else { btn.style.background = 'rgba(155,89,182,0.15)'; btn.style.color = '#9b59b6'; btn.textContent = '📦 Show Archived'; }
+            // Legacy - now handled by modal
+        }
+
+        async function openArchivedAttendanceModal() {
+            const existing = document.getElementById('archivedAttModal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'archivedAttModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99998;display:flex;align-items:center;justify-content:center;';
+
+            const inner = document.createElement('div');
+            inner.style.cssText = 'background:#1a1a2e;border:1px solid #ff3366;border-radius:12px;padding:24px;max-width:900px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 0 40px rgba(255,51,102,0.3);';
+
+            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ff3366;margin:0;">📦 Archived Classes</h3><button onclick="document.getElementById(\'archivedAttModal\').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;">✕</button></div><div id="archivedDateFilter" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;"><span style="color:#aaa;font-size:12px;font-weight:bold;">Filter by date:</span><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">From</label><input type="date" id="archivedFilterFrom" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;" /></div><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">To</label><input type="date" id="archivedFilterTo" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;" /></div><button id="archivedFilterApply" style="padding:6px 14px;background:#ff3366;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:12px;font-weight:bold;">Apply</button><button id="archivedFilterClear" style="padding:6px 14px;background:rgba(255,255,255,0.08);border:1px solid #555;border-radius:6px;color:#aaa;cursor:pointer;font-size:12px;">Clear</button><span id="archivedFilterCount" style="color:#888;font-size:11px;margin-left:auto;"></span></div><div id="archivedAttContent"><p style="color:#888;">Loading...</p></div>';
+            modal.appendChild(inner);
+            modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+            document.body.appendChild(modal);
+
+            // Load archived classes and data
+            try {
+                const allArchived = allClasses.filter(c => c.status === 'completed');
+                allArchived.sort((a, b) => {
+                    const dateA = a.startDate ? new Date(a.startDate) : new Date(0);
+                    const dateB = b.startDate ? new Date(b.startDate) : new Date(0);
+                    return dateA - dateB;
+                });
+
+                if (allArchived.length === 0) {
+                    document.getElementById('archivedAttContent').innerHTML = '<p style="color:#888;">No archived classes.</p>';
+                    return;
+                }
+
+                // Load attendance data
+                const archivedAttData = {};
+                const archivedNotesMap = {};
+                for (const cls of allArchived) {
+                    const attSnap = await db.collection('scheduler_attendance').where('classId', '==', cls.id).get();
+                    archivedAttData[cls.id] = {};
+                    attSnap.docs.forEach(d => {
+                        const data = d.data();
+                        archivedAttData[cls.id][data.studentId + '_' + data.week] = data.status;
+                    });
+                }
+                const notesSnap = await db.collection('attendance_notes').get();
+                notesSnap.docs.forEach(d => {
+                    const nd = d.data();
+                    archivedNotesMap[nd.classId + '_' + nd.studentId + '_' + nd.week] = { id: d.id, note: nd.note };
+                });
+
+                const pastelColors = [
+                    { bg: 'rgba(255,150,150,0.15)', border: '#ff9696', text: '#ffb0b0' },
+                    { bg: 'rgba(255,200,130,0.15)', border: '#ffc882', text: '#ffd4a0' },
+                    { bg: 'rgba(255,255,150,0.15)', border: '#ffff96', text: '#e0e080' },
+                    { bg: 'rgba(150,255,150,0.15)', border: '#96ff96', text: '#a0e0a0' },
+                    { bg: 'rgba(150,180,255,0.15)', border: '#96b4ff', text: '#a0c0ff' },
+                    { bg: 'rgba(200,150,255,0.15)', border: '#c896ff', text: '#d0a0ff' },
+                ];
+
+                function renderArchivedList(classList) {
+                    const countEl = document.getElementById('archivedFilterCount');
+                    if (countEl) countEl.textContent = 'Showing ' + classList.length + ' of ' + allArchived.length + ' classes';
+
+                    if (classList.length === 0) {
+                        document.getElementById('archivedAttContent').innerHTML = '<p style="color:#888;text-align:center;padding:20px;">No archived classes match this date range.</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    classList.forEach((cls, idx) => {
+                        const color = pastelColors[idx % pastelColors.length];
+                        const teacher = allTeachers.find(t => t.id === cls.teacherId);
+                        const startStr = cls.startDate ? formatDateInEST(cls.startDate) : '?';
+                        const endDate = cls.startDate ? new Date(parseESTDate(cls.startDate).getTime() + 5*7*24*60*60*1000) : null;
+                        const endStr = endDate ? endDate.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '?';
+                        const totalWeeks = CLASS_TYPE_WEEKS[cls.level] || 6;
+
+                        html += `
+                        <div style="margin-bottom:10px;">
+                            <button onclick="var content=this.nextElementSibling;var arrow=this.querySelector('.arch-arrow');if(content.style.maxHeight && content.style.maxHeight!=='0px'){content.style.maxHeight='0px';content.style.opacity='0';arrow.textContent='\u25B6';}else{content.style.maxHeight=content.scrollHeight+'px';content.style.opacity='1';arrow.textContent='\u25BC';}" style="width:100%;text-align:left;padding:14px 18px;background:${color.bg};border:2px solid ${color.border};border-radius:10px;color:#ccc;cursor:pointer;font-size:13px;transition:all 0.2s;" onmouseover="this.style.background='${color.bg.replace('0.15','0.25')}'" onmouseout="this.style.background='${color.bg}'">
+                                <span class="arch-arrow" style="margin-right:8px;transition:transform 0.2s;">\u25B6</span>
+                                <span class="level-badge level-${cls.level}" style="vertical-align:middle;">${LEVELS[cls.level]}</span>
+                                <span style="margin-left:10px;color:${color.text};">${startStr} \u2013 ${endStr}</span>
+                                <span style="margin-left:10px;color:#888;font-size:11px;">${cls.day} @ ${cls.time}</span>
+                                ${teacher ? '<span style="color:#39ff14;font-size:11px;margin-left:10px;">\uD83D\uDC68\u200D\uD83C\uDFEB ' + escapeHtml(teacher.name) + '</span>' : ''}
+                            </button>
+                            <div style="max-height:0px;opacity:0;overflow:hidden;transition:max-height 0.35s ease, opacity 0.3s ease;margin-top:0;">
+                                <div style="padding:15px;background:${color.bg};border:1px solid ${color.border};border-top:none;border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                        <div>
+                                            <h4 style="color:${color.text};margin:0;">${cls.day} @ ${cls.time}</h4>
+                                            <span class="level-badge level-${cls.level}">${LEVELS[cls.level]}</span>
+                                            ${teacher ? '<span style="color:#39ff14;font-size:12px;margin-left:10px;">\uD83D\uDC68\u200D\uD83C\uDFEB ' + escapeHtml(teacher.name) + '</span>' : ''}
+                                        </div>
+                                        <div style="display:flex;gap:5px;">
+                                            <button class="btn btn-sm" style="background:${color.border};border-color:${color.border};color:#000;" onclick="openAttendanceNotes('${cls.id}')">\uD83D\uDCDD Notes</button>
+                                            <button class="btn btn-sm btn-info" onclick="openClassDetails('${cls.id}')">View Details</button>
+                                        </div>
+                                    </div>
+                                    <table class="data-table" style="width:100%;">
+                                        <thead><tr><th style="color:${color.text};">Student</th>`;
+
+                        for (let w = 1; w <= totalWeeks; w++) {
+                            html += `<th style="color:${color.text};">W${w}</th>`;
+                        }
+                        html += '</tr></thead><tbody>';
+
+                        (cls.students || []).forEach(student => {
+                            const escapedName = (student.name || 'Unknown').replace(/'/g, "\\'");
+                            html += '<tr><td><span style="color:#00ffff;cursor:pointer;text-decoration:underline;" onclick="openStudentAnalyticsMenu(\'' + student.id + "', '" + escapedName + "', '" + ((student.email || '').replace(/'/g, "\\'")) + '\')">' + escapeHtml(student.name || 'Unknown') + '</span></td>';
+                            for (let w = 1; w <= totalWeeks; w++) {
+                                const key = student.id + '_' + w;
+                                const status = archivedAttData[cls.id]?.[key] || '';
+                                const noteKey = cls.id + '_' + student.id + '_' + w;
+                                const hasNote = archivedNotesMap[noteKey];
+                                const noteIndicator = hasNote ? '<span style="color:#FFD700;font-size:10px;vertical-align:super;">\u2B50</span>' : '';
+
+                                let badge = '-', clr = '#555', bg = 'transparent';
+                                if (status === 'present') { badge = '\u2713'; clr = '#39ff14'; bg = 'rgba(57,255,20,0.15)'; }
+                                else if (status === 'late') { badge = '\u23F0'; clr = '#ff9800'; bg = 'rgba(255,152,0,0.15)'; }
+                                else if (status === 'absent') { badge = '\u2715'; clr = '#ff3366'; bg = 'rgba(255,51,102,0.15)'; }
+
+                                html += '<td style="text-align:center;color:' + clr + ';font-weight:bold;font-size:16px;background:' + bg + ';border-radius:4px;">' + badge + noteIndicator + '</td>';
+                            }
+                            html += '</tr>';
+                        });
+
+                        html += '</tbody></table></div></div></div>';
+                    });
+
+                    document.getElementById('archivedAttContent').innerHTML = html;
+                }
+
+                // Initial render
+                renderArchivedList(allArchived);
+
+                // Wire up filter buttons
+                document.getElementById('archivedFilterApply').onclick = function() {
+                    const fromVal = document.getElementById('archivedFilterFrom').value;
+                    const toVal = document.getElementById('archivedFilterTo').value;
+                    const filtered = allArchived.filter(cls => {
+                        if (!cls.startDate) return false;
+                        const start = cls.startDate;
+                        if (fromVal && start < fromVal) return false;
+                        if (toVal && start > toVal) return false;
+                        return true;
+                    });
+                    renderArchivedList(filtered);
+                };
+
+                document.getElementById('archivedFilterClear').onclick = function() {
+                    document.getElementById('archivedFilterFrom').value = '';
+                    document.getElementById('archivedFilterTo').value = '';
+                    renderArchivedList(allArchived);
+                };
+
+            } catch (e) {
+                document.getElementById('archivedAttContent').innerHTML = '<p style="color:#ff3366;">Error: ' + escapeHtml(e.message) + '</p>';
             }
-            loadAdminAttendance();
         }
         
         async function loadAdminAttendance() {
@@ -21711,7 +21863,7 @@ Return ONLY valid JSON (single object, not array):
             
             // Populate class filter dropdown
             const classFilter = document.getElementById('adminAttendanceClassFilter');
-            const activeClasses = showArchivedAttendance ? allClasses : allClasses.filter(c => c.status !== 'completed');
+            const activeClasses = allClasses.filter(c => c.status !== 'completed');
             classFilter.innerHTML = '<option value="all">All Classes</option>' + 
                 activeClasses.map(c => `<option value="${c.id}">${c.day} ${c.time} - ${LEVELS[c.level]}${c.status === 'completed' ? ' (Archived)' : ''}</option>`).join('');
             
@@ -21753,38 +21905,8 @@ Return ONLY valid JSON (single object, not array):
                 
                 for (const cls of classesToShow) {
                     const teacher = allTeachers.find(t => t.id === cls.teacherId);
-                    const isArchived = cls.status === 'completed';
-                    
-                    if (isArchived) {
-                        const startStr = cls.startDate ? new Date(cls.startDate).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '?';
-                        const endDate = cls.startDate ? new Date(new Date(cls.startDate).getTime() + 5*7*24*60*60*1000) : null;
-                        const endStr = endDate ? endDate.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '?';
-                        
-                        html += `
-                        <div style="margin-bottom: 10px;">
-                            <button onclick="var el=document.getElementById('archiveGrid_${cls.id}');if(el.style.display==='none'){el.style.display='block';this.querySelector('.arch-arrow').textContent='\u25BC';}else{el.style.display='none';this.querySelector('.arch-arrow').textContent='\u25B6';}" style="width:100%;text-align:left;padding:12px 16px;background:rgba(155,89,182,0.12);border:2px solid rgba(155,89,182,0.4);border-radius:10px;color:#ccc;cursor:pointer;font-size:13px;transition:all 0.2s;" onmouseover="this.style.borderColor='#9b59b6';this.style.background='rgba(155,89,182,0.2)'" onmouseout="this.style.borderColor='rgba(155,89,182,0.4)';this.style.background='rgba(155,89,182,0.12)'">
-                                <span class="arch-arrow" style="margin-right:8px;">\u25B6</span>
-                                <span class="level-badge level-${cls.level}" style="vertical-align:middle;">${LEVELS[cls.level]}</span>
-                                <span style="margin-left:10px;color:#aaa;">${startStr} \u2013 ${endStr}</span>
-                                <span style="margin-left:10px;color:#666;font-size:11px;">${cls.day} @ ${cls.time}</span>
-                                ${teacher ? `<span style="color:#39ff14;font-size:11px;margin-left:10px;">👨‍🏫 ${escapeHtml(teacher.name)}</span>` : ''}
-                            </button>
-                            <div id="archiveGrid_${cls.id}" style="display:none;margin-top:8px;">
-                                <div class="card" style="margin-bottom:0;border-color:rgba(155,89,182,0.3);">
-                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                                        <div>
-                                            <h4 style="color:#9b59b6;margin:0;">${cls.day} @ ${cls.time} <span style="color:#888;font-size:11px;">(Archived)</span></h4>
-                                            <span class="level-badge level-${cls.level}">${LEVELS[cls.level]}</span>
-                                            ${teacher ? `<span style="color: #39ff14; font-size: 12px; margin-left: 10px;">👨‍🏫 ${escapeHtml(teacher.name)}</span>` : ''}
-                                        </div>
-                                        <div style="display:flex;gap:5px;">
-                                            <button class="btn btn-sm btn-info" onclick="openClassDetails('${cls.id}')">View Details</button>
-                                            <button class="btn btn-sm" style="background:#9b59b6;border-color:#9b59b6;color:#fff;" onclick="openAttendanceNotes('${cls.id}')">📝 Notes</button>
-                                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;" onclick="var el=document.getElementById('archiveGrid_${cls.id}');el.style.display='none';el.previousElementSibling.querySelector('.arch-arrow').textContent='\u25B6';">\u25B2 Collapse</button>
-                                        </div>
-                                    </div>
-                                    <div id="noteIndicator_${cls.id}" style="display:none; color: #ccc; font-size: 10px; margin-bottom: 8px; font-style: italic;">Boxes with <span style="color:#FFD700;">*</span> indicate a note for that student. Click 📝 Notes to view.</div>`;
-                    } else {
+                    if (cls.status === 'completed') continue; // Archived handled in modal
+
                         html += `
                         <div class="card" style="margin-bottom: 15px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -21793,11 +21915,13 @@ Return ONLY valid JSON (single object, not array):
                                     <span class="level-badge level-${cls.level}">${LEVELS[cls.level]}</span>
                                     ${teacher ? `<span style="color: #39ff14; font-size: 12px; margin-left: 10px;">👨‍🏫 ${escapeHtml(teacher.name)}</span>` : ''}
                                 </div>
-                                <button class="btn btn-sm btn-info" onclick="openClassDetails('${cls.id}')">View Details</button>
-                                <button class="btn btn-sm" style="background: #9b59b6; border-color: #9b59b6; color: #fff; margin-left: 5px;" onclick="openAttendanceNotes('${cls.id}')">📝 Notes</button>
+                                <div style="display:flex;gap:5px;">
+                                    <button class="btn btn-sm" style="background: #9b59b6; border-color: #9b59b6; color: #fff;" onclick="openAttendanceNotes('${cls.id}')">📝 Notes</button>
+                                    <button class="btn btn-sm btn-info" onclick="openClassDetails('${cls.id}')">View Details</button>
+                                </div>
                             </div>
-                            <div id="noteIndicator_${cls.id}" style="display:none; color: #ccc; font-size: 10px; margin-bottom: 8px; font-style: italic;">Boxes with <span style="color:#FFD700;">*</span> indicate a note for that student. Click 📝 Notes to view.</div>`;
-                    }
+                            <div id="noteIndicator_${cls.id}" style="display:none; color: #ccc; font-size: 10px; margin-bottom: 8px; font-style: italic;">Boxes with <span style="color:#FFD700;">⭐</span> indicate a note for that student. Click 📝 Notes to view.</div>`;
+
 
                     html += `
                             <table class="data-table" style="width: 100%;">
@@ -21832,7 +21956,7 @@ Return ONLY valid JSON (single object, not array):
                             
                             var noteKey = cls.id + '_' + student.id + '_' + w;
                             var hasNote = attendanceNotesMap && attendanceNotesMap[noteKey];
-                            var noteIndicator = hasNote ? '<span style="color:#FFD700;font-size:10px;vertical-align:super;">*</span>' : '';
+                            var noteIndicator = hasNote ? '<span style="color:#FFD700;font-size:10px;vertical-align:super;">⭐</span>' : '';
                             if (hasNote) cls._noteIndicatorShown = true;
                             html += `<td onclick="toggleAdminAttendance('${cls.id}', '${student.id}', ${w}, '${status || 'none'}')" style="text-align: center; color: ${color}; font-weight: bold; font-size: 16px; cursor: pointer; background: ${bg}; border-radius: 4px; transition: all 0.15s; user-select: none;" onmouseover="this.style.outline='2px solid #00ffff'" onmouseout="this.style.outline='none'" title="Click to toggle">${badge}${noteIndicator}</td>`;
                         }
@@ -21932,24 +22056,48 @@ Return ONLY valid JSON (single object, not array):
         }
         
         async function addAttendanceNote(classId, studentId, week, studentName) {
-            const note = prompt('Add note for ' + studentName + ' (Week ' + week + '):');
-            if (!note || !note.trim()) return;
-            
-            try {
-                await db.collection('attendance_notes').add({
-                    classId: classId,
-                    studentId: studentId,
-                    week: week,
-                    note: note.trim(),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                document.getElementById('attendanceNotesOverlay')?.remove();
-                openAttendanceNotes(classId);
-                if (typeof loadAdminAttendance === 'function') loadAdminAttendance();
-            } catch (e) {
-                console.error(e);
-                alert('Error saving note: ' + e.message);
-            }
+            const existing = document.getElementById('noteModal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'noteModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
+                    <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Add Note</h3>
+                    <p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">${escapeHtml(studentName)} \u2014 Week ${week}</p>
+                    <textarea id="noteModalInput" rows="3" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:13px;resize:vertical;box-sizing:border-box;" placeholder="Enter note..."></textarea>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;">
+                        <button onclick="document.getElementById('noteModal').remove()" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Cancel</button>
+                        <button id="noteModalSave" style="padding:8px 18px;background:#00ffff;border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">Save</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            document.getElementById('noteModalInput').focus();
+
+            document.getElementById('noteModalSave').onclick = async function() {
+                const note = document.getElementById('noteModalInput').value.trim();
+                if (!note) return;
+                try {
+                    await db.collection('attendance_notes').add({
+                        classId: classId,
+                        studentId: studentId,
+                        week: week,
+                        note: note,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    modal.remove();
+                    document.getElementById('attendanceNotesOverlay')?.remove();
+                    openAttendanceNotes(classId);
+                    if (typeof loadAdminAttendance === 'function') {
+                        const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                        await loadAdminAttendance();
+                        window.scrollTo(0, scrollPos);
+                    }
+                } catch (e) {
+                    alert('Error saving note: ' + e.message);
+                }
+            };
         }
         
         async function viewAttendanceNote(classId, studentId, week, studentName) {
@@ -21959,37 +22107,97 @@ Return ONLY valid JSON (single object, not array):
                     .where('studentId', '==', studentId)
                     .where('week', '==', week)
                     .limit(1).get();
-                
-                if (snap.empty) { alert('Note not found.'); return; }
-                
+
+                if (snap.empty) { showToast('Note not found.', 'error'); return; }
+
                 const doc = snap.docs[0];
                 const noteData = doc.data();
-                
-                const action = prompt(
-                    'Note for ' + studentName + ' (Week ' + week + '):\n\n' +
-                    '"' + noteData.note + '"\n\n' +
-                    'Type "edit" to edit, "delete" to remove, or press Cancel to close:'
-                );
-                
-                if (!action) return;
-                
-                if (action.toLowerCase() === 'delete') {
-                    if (confirm('Are you sure you want to delete this note?')) {
-                        await db.collection('attendance_notes').doc(doc.id).delete();
-                        document.getElementById('attendanceNotesOverlay')?.remove();
-                        openAttendanceNotes(classId);
-                        if (typeof loadAdminAttendance === 'function') loadAdminAttendance();
-                    }
-                } else if (action.toLowerCase() === 'edit') {
-                    const newNote = prompt('Edit note for ' + studentName + ' (Week ' + week + '):', noteData.note);
-                    if (newNote && newNote.trim()) {
-                        await db.collection('attendance_notes').doc(doc.id).update({ note: newNote.trim() });
-                        document.getElementById('attendanceNotesOverlay')?.remove();
-                        openAttendanceNotes(classId);
-                    }
+                const docId = doc.id;
+
+                const existing = document.getElementById('noteModal');
+                if (existing) existing.remove();
+
+                const modal = document.createElement('div');
+                modal.id = 'noteModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+
+                // View mode
+                function showViewMode() {
+                    modal.innerHTML = `
+                        <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
+                            <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Note</h3>
+                            <p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">${escapeHtml(studentName)} \u2014 Week ${week}</p>
+                            <div style="background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;padding:12px;color:#fff;font-size:13px;line-height:1.5;white-space:pre-wrap;">${escapeHtml(noteData.note)}</div>
+                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;">
+                                <button id="noteModalClose" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Close</button>
+                                <button id="noteModalEdit" style="padding:8px 18px;background:#ff9800;border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">\u270F\uFE0F Edit</button>
+                                <button id="noteModalDelete" style="padding:8px 18px;background:#ff3366;border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:bold;font-size:13px;">\uD83D\uDDD1\uFE0F Delete</button>
+                            </div>
+                        </div>`;
+
+                    document.getElementById('noteModalClose').onclick = () => modal.remove();
+
+                    document.getElementById('noteModalEdit').onclick = function() {
+                        showEditMode();
+                    };
+
+                    document.getElementById('noteModalDelete').onclick = async function() {
+                        if (!confirm('Delete this note?')) return;
+                        try {
+                            await db.collection('attendance_notes').doc(docId).delete();
+                            modal.remove();
+                            document.getElementById('attendanceNotesOverlay')?.remove();
+                            openAttendanceNotes(classId);
+                            if (typeof loadAdminAttendance === 'function') {
+                                const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                                await loadAdminAttendance();
+                                window.scrollTo(0, scrollPos);
+                            }
+                        } catch (e) {
+                            alert('Error deleting note: ' + e.message);
+                        }
+                    };
                 }
+
+                function showEditMode() {
+                    modal.innerHTML = `
+                        <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
+                            <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Edit Note</h3>
+                            <p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">${escapeHtml(studentName)} \u2014 Week ${week}</p>
+                            <textarea id="noteModalEditInput" rows="3" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:13px;resize:vertical;box-sizing:border-box;">${escapeHtml(noteData.note)}</textarea>
+                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;">
+                                <button id="noteModalEditCancel" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Cancel</button>
+                                <button id="noteModalEditSave" style="padding:8px 18px;background:#00ffff;border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">Save</button>
+                            </div>
+                        </div>`;
+                    document.getElementById('noteModalEditInput').focus();
+
+                    document.getElementById('noteModalEditCancel').onclick = () => showViewMode();
+
+                    document.getElementById('noteModalEditSave').onclick = async function() {
+                        const newNote = document.getElementById('noteModalEditInput').value.trim();
+                        if (!newNote) return;
+                        try {
+                            await db.collection('attendance_notes').doc(docId).update({ note: newNote });
+                            noteData.note = newNote;
+                            modal.remove();
+                            document.getElementById('attendanceNotesOverlay')?.remove();
+                            openAttendanceNotes(classId);
+                            if (typeof loadAdminAttendance === 'function') {
+                                const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                                await loadAdminAttendance();
+                                window.scrollTo(0, scrollPos);
+                            }
+                        } catch (e) {
+                            alert('Error updating note: ' + e.message);
+                        }
+                    };
+                }
+
+                document.body.appendChild(modal);
+                showViewMode();
+
             } catch (e) {
-                console.error(e);
                 alert('Error: ' + e.message);
             }
         }
