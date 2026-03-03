@@ -30856,13 +30856,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                             }
                         }
                     }catch(aiErr){console.error('AI fill error:',aiErr);}
-                    // Final fallback pool
-                    var pool=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208','\uADC0','\uCF54','\uC0B0','\uB2EC','\uBCC4','\uAF43','\uCC45','\uCC28','\uAC1C','\uB9D0','\uBC24','\uCEF5','\uBB38','\uBD88','\uBC1C'];
+                    // Final fallback pool (60 common single-syllable words)
+                    var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발','배','돈','강','길','풀','곰','빵','떡','새','옷','밭','뼈','팔','볕','뜻','숲','잎','빛','쌀','값','삶','꿈','맛','힘','칼','탑','섬','벽','봄','돌','피','금','은','솥','낮','북','남','해','뱀','양','숯','빗','씨','벌','잔','콩','숨','벗','잠'];
                     for(var i=0;i<qg.sets.length;i++){
                         while(qg.sets[i].absoluteBeginnerWords.length<5){
                             var found=false;
                             for(var pi=0;pi<pool.length;pi++){if(!usedWords[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);usedWords[pool[pi]]=true;found=true;break;}}
-                            if(!found)break;
+                            if(!found){
+                                // Pool exhausted - allow reuse from pool for remaining slots
+                                for(var pi=0;pi<pool.length;pi++){
+                                    var alreadyInRound=qg.sets[i].absoluteBeginnerWords.indexOf(pool[pi])!==-1;
+                                    if(!alreadyInRound){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);break;}
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -30870,7 +30877,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 console.error('Abs beginner word preview gen error:',e);
                 for(var i=0;i<qg.sets.length;i++){
                     if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){
-                        qg.sets[i].absoluteBeginnerWords=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208'];
+                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
                     }
                 }
             }
@@ -30988,19 +30995,26 @@ Return ONLY this JSON (no markdown, no code blocks):
                             }
                         }catch(aiErr){console.error('AI fill error:',aiErr);}
                     }
-                    // Final fallback pool
-                    var pool=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208','\uADC0','\uCF54','\uC0B0','\uB2EC','\uBCC4','\uAF43','\uCC45','\uCC28','\uAC1C','\uB9D0','\uBC24','\uCEF5','\uBB38','\uBD88','\uBC1C'];
+                    // Final fallback pool (60 common single-syllable words)
+                    var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발','배','돈','강','길','풀','곰','빵','떡','새','옷','밭','뼈','팔','볕','뜻','숲','잎','빛','쌀','값','삶','꿈','맛','힘','칼','탑','섬','벽','봄','돌','피','금','은','솥','낮','북','남','해','뱀','양','숯','빗','씨','벌','잔','콩','숨','벗','잠'];
                     for(var i=0;i<qg.sets.length;i++){
                         while(qg.sets[i].absoluteBeginnerWords.length<5){
                             var found=false;
                             for(var pi=0;pi<pool.length;pi++){if(!abUsed[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);abUsed[pool[pi]]=true;found=true;break;}}
-                            if(!found)break;
+                            if(!found){
+                                // Pool exhausted - allow reuse from pool for remaining slots
+                                for(var pi=0;pi<pool.length;pi++){
+                                    var alreadyInRound=qg.sets[i].absoluteBeginnerWords.indexOf(pool[pi])!==-1;
+                                    if(!alreadyInRound){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);break;}
+                                }
+                                break;
+                            }
                         }
                     }
                 } catch(abErr) {
                     console.error('Abs beginner word generation error:', abErr);
                     for (var i = 0; i < qg.sets.length; i++) {
-                        qg.sets[i].absoluteBeginnerWords = ['\uBC25', '\uBB3C', '\uC9D1', '\uC190', '\uB206'];
+                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
                     }
                 }
 
