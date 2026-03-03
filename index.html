@@ -25574,29 +25574,92 @@ ${daySpecific}
             workloadDiv.innerHTML = html;
         }
         
-        function renderSlotAnalytics() {
+        async function renderSlotAnalytics() {
             const analyticsDiv = document.getElementById('slotAnalytics');
-            
-            let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
-                    <div>
-                        <div style="color: #39ff14; font-weight: bold; margin-bottom: 5px;">📈 Highest Attendance Slots</div>
-                        <div style="font-size: 11px; color: #888;">Based on student presence data</div>
-                        <div style="margin-top: 5px; font-size: 12px;">
-                            Requires attendance data...
-                        </div>
-                    </div>
-                    <div>
-                        <div style="color: #ff3366; font-weight: bold; margin-bottom: 5px;">📉 Highest Absence Slots</div>
-                        <div style="font-size: 11px; color: #888;">Slots with most student absences</div>
-                        <div style="margin-top: 5px; font-size: 12px;">
-                            Requires attendance data...
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            analyticsDiv.innerHTML = html;
+            analyticsDiv.innerHTML = '<p style="color:#888;font-size:12px;">Loading attendance analytics...</p>';
+
+            try {
+                const activeClasses = allClasses.filter(c => c.status !== 'completed' && (c.students || []).length > 0);
+                if (activeClasses.length === 0) {
+                    analyticsDiv.innerHTML = '<p style="color:#888;font-size:12px;">No active classes with students.</p>';
+                    return;
+                }
+
+                const attSnap = await db.collection('scheduler_attendance').get();
+                const attendanceByClass = {};
+                attSnap.docs.forEach(d => {
+                    const data = d.data();
+                    if (!attendanceByClass[data.classId]) attendanceByClass[data.classId] = [];
+                    attendanceByClass[data.classId].push(data);
+                });
+
+                const slotStats = {};
+                for (const cls of activeClasses) {
+                    const slotKey = cls.day + ' @ ' + cls.time;
+                    if (!slotStats[slotKey]) {
+                        slotStats[slotKey] = { day: cls.day, time: cls.time, level: cls.level, present: 0, absent: 0, late: 0, total: 0, studentCount: (cls.students || []).length };
+                    } else {
+                        slotStats[slotKey].studentCount += (cls.students || []).length;
+                    }
+                    const records = attendanceByClass[cls.id] || [];
+                    for (const r of records) {
+                        slotStats[slotKey].total++;
+                        if (r.status === 'present') slotStats[slotKey].present++;
+                        else if (r.status === 'absent') slotStats[slotKey].absent++;
+                        else if (r.status === 'late') slotStats[slotKey].late++;
+                    }
+                }
+
+                const slots = Object.values(slotStats).filter(s => s.total > 0);
+                if (slots.length === 0) {
+                    analyticsDiv.innerHTML = '<p style="color:#888;font-size:12px;">No attendance data recorded yet.</p>';
+                    return;
+                }
+
+                const byAttendance = [...slots].sort((a, b) => ((b.present + b.late) / b.total) - ((a.present + a.late) / a.total));
+                const byAbsence = [...slots].sort((a, b) => (b.absent / b.total) - (a.absent / a.total));
+
+                function renderSlotList(sortedSlots, colorFn) {
+                    return sortedSlots.slice(0, 5).map(s => {
+                        const info = colorFn(s);
+                        return '<div style="margin-bottom:8px;">' +
+                            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                                '<span style="color:#fff;font-size:12px;">' + s.day + ' @ ' + s.time + '</span>' +
+                                '<span style="color:' + info.barColor + ';font-size:11px;font-weight:bold;">' + info.rateText + '</span>' +
+                            '</div>' +
+                            '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">' +
+                                '<span class="level-badge level-' + s.level + '" style="font-size:9px;padding:1px 6px;">' + (LEVELS[s.level] || s.level) + '</span>' +
+                                '<div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">' +
+                                    '<div style="height:100%;width:' + info.barWidth + '%;background:' + info.barColor + ';border-radius:3px;transition:width 0.5s;"></div>' +
+                                '</div>' +
+                                '<span style="color:#888;font-size:10px;">' + s.studentCount + ' students</span>' +
+                            '</div>' +
+                            '<div style="color:#666;font-size:10px;margin-top:2px;">\u2713' + s.present + ' \u23F0' + s.late + ' \u2715' + s.absent + ' / ' + s.total + ' records</div>' +
+                        '</div>';
+                    }).join('');
+                }
+
+                let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;">' +
+                    '<div>' +
+                        '<div style="color:#39ff14;font-weight:bold;margin-bottom:5px;">\uD83D\uDCC8 Highest Attendance Slots</div>' +
+                        '<div style="font-size:11px;color:#888;margin-bottom:10px;">Ranked by attendance rate (present + late)</div>' +
+                        renderSlotList(byAttendance, function(s) {
+                            return { barColor: '#39ff14', barWidth: Math.round(((s.present + s.late) / s.total) * 100), rateText: Math.round(((s.present + s.late) / s.total) * 100) + '% attendance' };
+                        }) +
+                    '</div>' +
+                    '<div>' +
+                        '<div style="color:#ff3366;font-weight:bold;margin-bottom:5px;">\uD83D\uDCC9 Highest Absence Slots</div>' +
+                        '<div style="font-size:11px;color:#888;margin-bottom:10px;">Ranked by absence rate</div>' +
+                        renderSlotList(byAbsence, function(s) {
+                            return { barColor: '#ff3366', barWidth: Math.round((s.absent / s.total) * 100), rateText: Math.round((s.absent / s.total) * 100) + '% absent' };
+                        }) +
+                    '</div>' +
+                '</div>';
+
+                analyticsDiv.innerHTML = html;
+            } catch (e) {
+                analyticsDiv.innerHTML = '<p style="color:#ff3366;font-size:12px;">Error loading analytics: ' + escapeHtml(e.message) + '</p>';
+            }
         }
         
         function openMultiTeacherSlot(day, time) {
@@ -30742,60 +30805,72 @@ Return ONLY this JSON (no markdown, no code blocks):
         async function qgGenerateAbsBeginnerWords(container){
             try{
                 var aiUrl='https://generateflashcardai-386010826708.us-central1.run.app';
-                var abPrompt='You are selecting single Korean syllable blocks for ABSOLUTE BEGINNER reading practice.\n\n';
-                abPrompt+='TASK: For each round, find 5 single-syllable Korean blocks (exactly 1 Korean character each, like 큰, 그, 집, 물, 안) for beginners to practice reading.\n\n';
-                abPrompt+='STEP 1: Look at every word in the sentences. Split compound words into syllables. Find any single-character words or syllables that appear.\n';
-                abPrompt+='Examples:\n';
-                abPrompt+='- "제가 찾고 있었던건 큰 회색 고양이였지만" → eligible: 큰 (appears as-is in sentence)\n';
-                abPrompt+='- "그 고양이의 이름을 물었어요" → eligible: 그 (appears as-is in sentence)\n';
-                abPrompt+='- "밥을 먹고 물을 마셨어요" → eligible: 밥, 물 (appear as roots in the sentence)\n\n';
-                abPrompt+='STEP 2: If a round has fewer than 5 extractable single-character blocks, generate simple common ones to fill the remaining slots (e.g. 밥, 물, 집, 손, 눈, 귀, 코, 산, 달, 별, 꽃, 책, 차, 개, 말, 불, 문, 밤, 해, 비, 눈, 강, 섬).\n\n';
-                abPrompt+='RULES:\n';
-                abPrompt+='- Every word MUST be exactly 1 Korean character (1 syllable block). NOT 2 or 3 characters.\n';
-                abPrompt+='- NEVER repeat a word across rounds.\n';
-                abPrompt+='- Always prioritize words extracted from the actual sentences first.\n\n';
-                abPrompt+='Rounds:\n';
-                for(var i=0;i<qg.sets.length;i++){
-                    abPrompt+='Round '+(i+1)+':\n';
-                    qg.sets[i].sentences.forEach(function(s){abPrompt+='  '+s.korean+'\n';});
-                }
-                abPrompt+='\nReturn ONLY valid JSON, no markdown:\n[{"round":1,"words":["w","w","w","w","w"]},{"round":2,"words":["w","w","w","w","w"]}]';
-                var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1500})});
-                var data=await resp.json();
-                var rt=(typeof data==='string'?data:data.data||data.text||data.result||data.response||JSON.stringify(data));
-                // Parse — try full array first, then try extracting JSON from markdown
-                var parsed=[];
-                var clean=rt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-                try{parsed=JSON.parse(clean);}catch(e){
-                    var m=clean.match(/\[[\s\S]*\]/);
-                    if(m)try{parsed=JSON.parse(m[0]);}catch(e2){console.error('AbsBegWords parse failed:',e2);}
-                }
                 var usedWords={};
+                var roundsNeedingFill=[];
+
+                // STEP 1: Extract single-syllable Korean words from sentences deterministically
                 for(var i=0;i<qg.sets.length;i++){
-                    var words=null;
-                    if(i<parsed.length){
-                        // Handle both formats: [{round:1,words:[...]}] and [["w1","w2",...]]
-                        if(parsed[i].words&&Array.isArray(parsed[i].words)) words=parsed[i].words;
-                        else if(Array.isArray(parsed[i])) words=parsed[i];
+                    var extracted=[];
+                    var allText=qg.sets[i].sentences.map(function(s){return s.korean;}).join(' ');
+                    var tokens=allText.replace(/[.,!?;:“”‘’()~…\u3000\u3001\u3002]/g,' ').split(/\s+/);
+                    for(var t=0;t<tokens.length;t++){
+                        var tok=tokens[t];
+                        if(/^[\uAC00-\uD7A3]$/.test(tok) && !usedWords[tok]){
+                            extracted.push(tok);
+                            usedWords[tok]=true;
+                        }
                     }
-                    if(words&&words.length>=3){
-                        // Filter out already-used words
-                        var unique=words.filter(function(w){return !usedWords[w];}).slice(0,5);
-                        unique.forEach(function(w){usedWords[w]=true;});
-                        qg.sets[i].absoluteBeginnerWords=unique.length>=3?unique:words.slice(0,5);
-                    } else {
-                        // Fallback — pick from pool, avoiding used words
-                        var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발'];
-                        var fb=pool.filter(function(w){return !usedWords[w];}).slice(0,5);
-                        fb.forEach(function(w){usedWords[w]=true;});
-                        qg.sets[i].absoluteBeginnerWords=fb;
+                    qg.sets[i].absoluteBeginnerWords=extracted.slice(0,5);
+                    if(extracted.length<5) roundsNeedingFill.push({idx:i,need:5-extracted.length});
+                }
+
+                // STEP 2: Only ask AI to fill remaining slots
+                if(roundsNeedingFill.length>0){
+                    var abPrompt='Generate simple single Korean syllable blocks (exactly 1 Korean character each, like \uBC25, \uBB3C, \uC9D1) to fill missing slots for absolute beginner reading practice.\n';
+                    abPrompt+='RULES: Every word MUST be exactly 1 Korean character. Use common beginner vocabulary. Do NOT repeat any already-used word.\n';
+                    abPrompt+='Already used: '+Object.keys(usedWords).join(', ')+'\n\nFill these rounds:\n';
+                    for(var r=0;r<roundsNeedingFill.length;r++){
+                        var ri=roundsNeedingFill[r].idx;
+                        abPrompt+='Round '+(ri+1)+': need '+roundsNeedingFill[r].need+' more (have: '+qg.sets[ri].absoluteBeginnerWords.join(', ')+')\n';
+                    }
+                    abPrompt+='\nReturn ONLY JSON: [{"round":1,"words":["w","w"]},{"round":2,"words":["w"]}]\nOnly the fill words.';
+                    try{
+                        var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
+                        var data=await resp.json();
+                        var rt=(typeof data==='string'?data:data.data||data.text||data.result||data.response||JSON.stringify(data));
+                        var clean=rt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+                        var parsed=[];
+                        try{parsed=JSON.parse(clean);}catch(e){var m=clean.match(/\[[\s\S]*\]/);if(m)try{parsed=JSON.parse(m[0]);}catch(e2){}}
+                        for(var p=0;p<parsed.length;p++){
+                            var roundNum=parsed[p].round;var fillWords=parsed[p].words||[];
+                            var ri2=-1;
+                            for(var r=0;r<roundsNeedingFill.length;r++){if(roundsNeedingFill[r].idx+1===roundNum){ri2=roundsNeedingFill[r].idx;break;}}
+                            if(ri2<0 && p<roundsNeedingFill.length) ri2=roundsNeedingFill[p].idx;
+                            if(ri2>=0){
+                                for(var fw=0;fw<fillWords.length;fw++){
+                                    var w=fillWords[fw];
+                                    if(/^[\uAC00-\uD7A3]$/.test(w) && !usedWords[w] && qg.sets[ri2].absoluteBeginnerWords.length<5){
+                                        qg.sets[ri2].absoluteBeginnerWords.push(w);usedWords[w]=true;
+                                    }
+                                }
+                            }
+                        }
+                    }catch(aiErr){console.error('AI fill error:',aiErr);}
+                    // Final fallback pool
+                    var pool=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208','\uADC0','\uCF54','\uC0B0','\uB2EC','\uBCC4','\uAF43','\uCC45','\uCC28','\uAC1C','\uB9D0','\uBC24','\uCEF5','\uBB38','\uBD88','\uBC1C'];
+                    for(var i=0;i<qg.sets.length;i++){
+                        while(qg.sets[i].absoluteBeginnerWords.length<5){
+                            var found=false;
+                            for(var pi=0;pi<pool.length;pi++){if(!usedWords[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);usedWords[pool[pi]]=true;found=true;break;}}
+                            if(!found)break;
+                        }
                     }
                 }
             }catch(e){
                 console.error('Abs beginner word preview gen error:',e);
                 for(var i=0;i<qg.sets.length;i++){
                     if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){
-                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
+                        qg.sets[i].absoluteBeginnerWords=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208'];
                     }
                 }
             }
@@ -30861,58 +30936,71 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var abNeedsGen=false;
                 for(var i=0;i<qg.sets.length;i++){if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){abNeedsGen=true;break;}}
                 if(abNeedsGen){
-                btn.innerHTML = '<span class="quiz-loading-dots">⏳ GENERATING ABS. BEG WORDS</span>';
+                btn.innerHTML = '<span class="quiz-loading-dots">⏳ EXTRACTING ABS. BEG WORDS</span>';
                 try {
-                    var abPrompt = 'You are selecting single Korean syllable blocks for ABSOLUTE BEGINNER reading practice.\n\n';
-                    abPrompt += 'TASK: For each round, find 5 single-syllable Korean blocks (exactly 1 Korean character each, like 큰, 그, 집, 물, 안) for beginners to practice reading.\n\n';
-                    abPrompt += 'STEP 1: Look at every word in the sentences. Split compound words into syllables. Find any single-character words or syllables that appear.\n';
-                    abPrompt += 'Examples:\n';
-                    abPrompt += '- "제가 찾고 있었던건 큰 회색 고양이였지만" → eligible: 큰 (appears as-is in sentence)\n';
-                    abPrompt += '- "그 고양이의 이름을 물었어요" → eligible: 그 (appears as-is in sentence)\n';
-                    abPrompt += '- "밥을 먹고 물을 마셨어요" → eligible: 밥, 물 (appear as roots in the sentence)\n\n';
-                    abPrompt += 'STEP 2: If a round has fewer than 5 extractable single-character blocks, generate simple common ones to fill the remaining slots (e.g. 밥, 물, 집, 손, 눈, 귀, 코, 산, 달, 별, 꽃, 책, 차, 개, 말, 불, 문, 밤, 해, 비, 눈, 강, 섬).\n\n';
-                    abPrompt += 'RULES:\n';
-                    abPrompt += '- Every word MUST be exactly 1 Korean character (1 syllable block). NOT 2 or 3 characters.\n';
-                    abPrompt += '- NEVER repeat a word across rounds.\n';
-                    abPrompt += '- Always prioritize words extracted from the actual sentences first.\n\n';
-                    abPrompt += 'Rounds:\n';
-                    for (var i = 0; i < qg.sets.length; i++) {
-                        abPrompt += 'Round ' + (i+1) + ':\n';
-                        qg.sets[i].sentences.forEach(function(s){abPrompt += '  ' + s.korean + '\n';});
-                    }
-                    abPrompt += '\nReturn ONLY valid JSON, no markdown:\n[{"round":1,"words":["w","w","w","w","w"]},{"round":2,"words":["w","w","w","w","w"]}]';
-
-                    var abResp = await fetch(aiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:abPrompt, max_tokens:1500}) });
-                    var abData = await abResp.json();
-                    var abRt = (typeof abData==='string'?abData:abData.data||abData.text||abData.result||abData.response||JSON.stringify(abData));
-                    var abParsed = [];
-                    var abClean=abRt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-                    try{abParsed=JSON.parse(abClean);}catch(e){
-                        var abM=abClean.match(/\[[\s\S]*\]/);
-                        if(abM)try{abParsed=JSON.parse(abM[0]);}catch(e2){}
-                    }
                     var abUsed={};
-                    for (var i = 0; i < qg.sets.length; i++) {
-                        var words=null;
-                        if(i<abParsed.length){
-                            if(abParsed[i].words&&Array.isArray(abParsed[i].words)) words=abParsed[i].words;
-                            else if(Array.isArray(abParsed[i])) words=abParsed[i];
+                    var abRoundsNeedFill=[];
+                    // STEP 1: Extract single-syllable words from sentences
+                    for(var i=0;i<qg.sets.length;i++){
+                        var extracted=[];
+                        var allText=qg.sets[i].sentences.map(function(s){return s.korean;}).join(' ');
+                        var tokens=allText.replace(/[.,!?;:\u201C\u201D\u2018\u2019()~\u2026\u3000\u3001\u3002]/g,' ').split(/\s+/);
+                        for(var t=0;t<tokens.length;t++){
+                            var tok=tokens[t];
+                            if(/^[\uAC00-\uD7A3]$/.test(tok) && !abUsed[tok]){
+                                extracted.push(tok);abUsed[tok]=true;
+                            }
                         }
-                        if(words&&words.length>=3){
-                            var unique=words.filter(function(w){return !abUsed[w];}).slice(0,5);
-                            unique.forEach(function(w){abUsed[w]=true;});
-                            qg.sets[i].absoluteBeginnerWords=unique.length>=3?unique:words.slice(0,5);
-                        } else {
-                            var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발'];
-                            var fb=pool.filter(function(w){return !abUsed[w];}).slice(0,5);
-                            fb.forEach(function(w){abUsed[w]=true;});
-                            qg.sets[i].absoluteBeginnerWords=fb;
+                        qg.sets[i].absoluteBeginnerWords=extracted.slice(0,5);
+                        if(extracted.length<5) abRoundsNeedFill.push({idx:i,need:5-extracted.length});
+                    }
+                    // STEP 2: AI fill for remaining slots
+                    if(abRoundsNeedFill.length>0){
+                        btn.innerHTML = '<span class="quiz-loading-dots">⏳ FILLING ABS. BEG WORDS</span>';
+                        var abPrompt='Generate simple single Korean syllable blocks (exactly 1 Korean character each) to fill missing slots for absolute beginner reading practice.\n';
+                        abPrompt+='Every word MUST be exactly 1 Korean character. Use common beginner vocabulary. Do NOT repeat used words.\n';
+                        abPrompt+='Already used: '+Object.keys(abUsed).join(', ')+'\n\nFill these rounds:\n';
+                        for(var r=0;r<abRoundsNeedFill.length;r++){
+                            var ri=abRoundsNeedFill[r].idx;
+                            abPrompt+='Round '+(ri+1)+': need '+abRoundsNeedFill[r].need+' more (have: '+qg.sets[ri].absoluteBeginnerWords.join(', ')+')\n';
+                        }
+                        abPrompt+='\nReturn ONLY JSON: [{"round":1,"words":["w","w"]}]. Only fill words.';
+                        try{
+                            var abResp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
+                            var abData=await abResp.json();
+                            var abRt=(typeof abData==='string'?abData:abData.data||abData.text||abData.result||abData.response||JSON.stringify(abData));
+                            var abClean=abRt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+                            var abParsed=[];
+                            try{abParsed=JSON.parse(abClean);}catch(e){var abM=abClean.match(/\[[\s\S]*\]/);if(abM)try{abParsed=JSON.parse(abM[0]);}catch(e2){}}
+                            for(var p=0;p<abParsed.length;p++){
+                                var roundNum=abParsed[p].round;var fillWords=abParsed[p].words||[];
+                                var ri2=-1;
+                                for(var r=0;r<abRoundsNeedFill.length;r++){if(abRoundsNeedFill[r].idx+1===roundNum){ri2=abRoundsNeedFill[r].idx;break;}}
+                                if(ri2<0 && p<abRoundsNeedFill.length) ri2=abRoundsNeedFill[p].idx;
+                                if(ri2>=0){
+                                    for(var fw=0;fw<fillWords.length;fw++){
+                                        var w=fillWords[fw];
+                                        if(/^[\uAC00-\uD7A3]$/.test(w) && !abUsed[w] && qg.sets[ri2].absoluteBeginnerWords.length<5){
+                                            qg.sets[ri2].absoluteBeginnerWords.push(w);abUsed[w]=true;
+                                        }
+                                    }
+                                }
+                            }
+                        }catch(aiErr){console.error('AI fill error:',aiErr);}
+                    }
+                    // Final fallback pool
+                    var pool=['\uBC25','\uBB3C','\uC9D1','\uC190','\uB208','\uADC0','\uCF54','\uC0B0','\uB2EC','\uBCC4','\uAF43','\uCC45','\uCC28','\uAC1C','\uB9D0','\uBC24','\uCEF5','\uBB38','\uBD88','\uBC1C'];
+                    for(var i=0;i<qg.sets.length;i++){
+                        while(qg.sets[i].absoluteBeginnerWords.length<5){
+                            var found=false;
+                            for(var pi=0;pi<pool.length;pi++){if(!abUsed[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);abUsed[pool[pi]]=true;found=true;break;}}
+                            if(!found)break;
                         }
                     }
                 } catch(abErr) {
                     console.error('Abs beginner word generation error:', abErr);
                     for (var i = 0; i < qg.sets.length; i++) {
-                        qg.sets[i].absoluteBeginnerWords = ['밥', '물', '집', '손', '눈'];
+                        qg.sets[i].absoluteBeginnerWords = ['\uBC25', '\uBB3C', '\uC9D1', '\uC190', '\uB206'];
                     }
                 }
 
