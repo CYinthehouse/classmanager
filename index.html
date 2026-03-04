@@ -33495,8 +33495,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 phonemeFormData.append('original_text',expectedKorean);
                 try{
                     var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:phonemeFormData});
-                    if(phResp.ok){var phonemeRaw=await phResp.json();phonemeResult=filterPhonemeErrors(phonemeRaw);}
-                }catch(e){}
+                    console.log('Speech proxy status:', phResp.status);
+                    if(phResp.ok){var phonemeRaw=await phResp.json();console.log('Speech proxy result:', JSON.stringify(phonemeRaw).substring(0,500));phonemeResult=filterPhonemeErrors(phonemeRaw);}
+                }catch(e){console.error('Speech proxy error:', e);}
 
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
@@ -33544,6 +33545,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     })
                 });
                 var aiData=await aiResp.json();
+                console.log('GPT aiData:', JSON.stringify(aiData).substring(0,500));
 
                 // Parse GPT response
                 var rt='';
@@ -33559,6 +33561,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
 
                 rt=rt.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
+                console.log('GPT rt:', rt.substring(0,500));
                 var grade={score:0,feedback:'Grading failed.',transcript:''};
                 var transcript='';
                 try{
