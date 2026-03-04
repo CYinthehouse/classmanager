@@ -16503,7 +16503,7 @@ Return ONLY valid JSON (single object, not array):
           var fd=new FormData();
           fd.append('audio',makeWarmupWav(),'warmup.wav');
           fd.append('phonetic_hangul','안녕');fd.append('original_text','안녕');
-          fetch('https://phoneme-service-lkipqrbc2a-uc.a.run.app/analyze',{method:'POST',body:fd}).catch(function(){});
+          fetch('https://speech-proxy-386010826708.us-central1.run.app/analyze',{method:'POST',body:fd}).catch(function(){});
         }
         // Send 3 requests staggered to hit all 3 min-instances
         sendWarmup();
@@ -30709,6 +30709,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         // ═══════════════════════════════════════════════════
 
         var QUIZ_GAME_COLLECTION = 'quiz_game_sessions';
+        var SPEECH_PROXY_URL = 'https://speech-proxy-386010826708.us-central1.run.app';
         var QUIZ_PLAYERS_SUB = 'players';
         var QUIZ_SUBS_SUB = 'submissions';
 
@@ -31082,6 +31083,41 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var pageUrl = window.location.href.split('?')[0].split('#')[0];
                 var studentUrl = pageUrl + '?quizgame=' + roomCode;
                 await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({studentUrl:studentUrl});
+
+                // Pre-calculate G2PK phonetics for all sentences (runs in background)
+                (async function(){
+                    try{
+                        var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
+                        var allTexts=[];
+                        qg.sets.forEach(function(s){
+                            s.sentences.forEach(function(sent){
+                                if(sent.korean && allTexts.indexOf(sent.korean)<0) allTexts.push(sent.korean);
+                            });
+                            if(s.absoluteBeginnerWords){
+                                s.absoluteBeginnerWords.forEach(function(w){
+                                    if(w && allTexts.indexOf(w)<0) allTexts.push(w);
+                                });
+                            }
+                        });
+                        // Fire all G2PK lookups in parallel
+                        var promises=allTexts.map(function(text){
+                            return fetch(G2PK_URL+'/pronounce',{
+                                method:'POST',headers:{'Content-Type':'application/json'},
+                                body:JSON.stringify({text:text})
+                            }).then(function(r){return r.ok?r.json():null;})
+                              .then(function(data){return{text:text,phonetic:(data&&data.pronunciation)||text};})
+                              .catch(function(){return{text:text,phonetic:text};});
+                        });
+                        var results=await Promise.all(promises);
+                        // Build phonetic map: {korean_text: phonetic_form}
+                        var phoneticMap={};
+                        results.forEach(function(r){phoneticMap[r.text]=r.phonetic;});
+                        // Save to session doc
+                        await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({phoneticMap:phoneticMap});
+                        console.log('G2PK phonetics pre-calculated for',Object.keys(phoneticMap).length,'texts');
+                    }catch(e){console.error('G2PK pre-calc error:',e);}
+                })();
+
                 qgShowLobby(roomCode, studentUrl);
             } catch(err) {
                 console.error('Create error:', err); alert('Error: ' + err.message);
@@ -33206,26 +33242,29 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wavBase64=wav.base64;
                 var wb=wav.buffer;
 
-                // ========== PARALLEL: G2PK + PHONEME at same time ==========
+                // ========== G2PK then SPEECH RECOGNITION ==========
                 var drillPhonetic=drillText;
                 var phonemeResult=null;
-                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var PHONEME_URL=SPEECH_PROXY_URL;
 
-                var g2pPromise=fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({text:drillText})
-                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+                // G2PK first (drill text is short, fast)
+                try{
+                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:drillText})
+                    });
+                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)drillPhonetic=g2pData.pronunciation;}
+                }catch(e){}
 
+                // Speech proxy with correct phonetic form
                 var phFormData=new FormData();
                 phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                phFormData.append('phonetic_hangul',drillText);
+                phFormData.append('phonetic_hangul',drillPhonetic);
                 phFormData.append('original_text',drillText);
-                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([g2pPromise,phonemePromise]);
-                if(parallel[0]&&parallel[0].pronunciation) drillPhonetic=parallel[0].pronunciation;
-                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
+                try{
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData});
+                    if(phResp.ok){phonemeResult=filterPhonemeErrors(await phResp.json());}
+                }catch(e){}
 
                 // Call GPT for score + feedback
                 var gptFeedback='';
@@ -33237,17 +33276,21 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                     var phonemeInfo='';
                     if(phonemeResult){
+                        phonemeInfo='\nAUTOMATED SPEECH RECOGNITION ANALYSIS:\n';
+                        if(phonemeResult.transcript){
+                            phonemeInfo+='- Google Speech-to-Text heard: "'+phonemeResult.transcript+'"\n';
+                        }
                         if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                            phonemeInfo='\nAUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
+                            phonemeInfo+='- Detected errors (comparing recognized text vs expected at character level):\n';
                             phonemeResult.errors.forEach(function(err){
                                 if(err.type==='substitution')phonemeInfo+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
                                 else if(err.type==='deletion')phonemeInfo+='- Missing sound '+ph(err.expected)+'\n';
                                 else if(err.type==='insertion')phonemeInfo+='- Extra sound '+ph(err.actual)+' inserted\n';
                             });
-                            phonemeInfo+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
                         }else{
-                            phonemeInfo='\nAutomated analysis found no pronunciation errors.\n';
+                            phonemeInfo+='- No pronunciation errors detected by speech recognition.\n';
                         }
+                        phonemeInfo+='Use both the speech recognition analysis AND what you actually hear to grade. If they conflict, trust what you hear.\n';
                     }
                     var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\n\nThe student was supposed to say:\nWRITTEN FORM: "'+drillText+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                     if(drillPhonetic && drillPhonetic!==drillText){
@@ -33433,38 +33476,27 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wav=await convertBlobToWav(qs.localBlob);
                 var wavBase64=wav.base64;
 
-                // ========== PARALLEL: G2PK + PHONEME at same time ==========
-                var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
-                var expectedPronunciation='';
+                // ========== SPEECH RECOGNITION ANALYSIS ==========
+                // Use pre-calculated G2PK phonetics from session
+                var phoneticMap=gameData.phoneticMap||{};
+                var expectedPronunciation=phoneticMap[expectedKorean]||expectedKorean;
+                // For multi-word (absolute beginner), build phonetic from individual words
+                if(!phoneticMap[expectedKorean] && expectedSentences.length>1){
+                    expectedPronunciation=expectedSentences.map(function(s){return phoneticMap[s.korean]||s.korean;}).join(' ');
+                }
                 var phonemeResult=null;
-                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var PHONEME_URL=SPEECH_PROXY_URL;
 
                 statusEl.textContent='🔍 Analyzing pronunciation...';
 
-                // Fire both requests in parallel
-                var g2pPromise=fetch(G2PK_URL+'/pronounce',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({text:expectedKorean})
-                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
                 var phonemeFormData=new FormData();
                 phonemeFormData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
-                phonemeFormData.append('phonetic_hangul',expectedKorean);
+                phonemeFormData.append('phonetic_hangul',expectedPronunciation);
                 phonemeFormData.append('original_text',expectedKorean);
-                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phonemeFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([g2pPromise,phonemePromise]);
-                var g2pData=parallel[0];
-                var phonemeRaw=parallel[1];
-                if(g2pData&&g2pData.pronunciation) expectedPronunciation=g2pData.pronunciation;
-                if(phonemeRaw) phonemeResult=filterPhonemeErrors(phonemeRaw);
-
-                // Now re-run phoneme with correct pronunciation if g2pk gave us one different from raw text
-                if(expectedPronunciation && expectedPronunciation!==expectedKorean && phonemeResult){
-                    // We already have phoneme results with raw text, good enough
-                    // (Re-running would add latency; the difference is marginal)
-                }
+                try{
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:phonemeFormData});
+                    if(phResp.ok){var phonemeRaw=await phResp.json();phonemeResult=filterPhonemeErrors(phonemeRaw);}
+                }catch(e){}
 
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
@@ -33477,18 +33509,21 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // If phoneme analysis succeeded, include its data in the GPT prompt for better feedback
                 var phonemeInfo='';
                 if(phonemeResult){
-                    phonemeInfo='\n\nAUTOMATED PRONUNCIATION ANALYSIS (potential errors — verify against what you hear):\n';
+                    phonemeInfo='\n\nAUTOMATED SPEECH RECOGNITION ANALYSIS:\n';
+                    if(phonemeResult.transcript){
+                        phonemeInfo+='- Google Speech-to-Text heard: "'+phonemeResult.transcript+'"\n';
+                    }
                     if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                        phonemeInfo+='- Detected errors:\n';
+                        phonemeInfo+='- Detected errors (comparing recognized text vs expected at character level):\n';
                         phonemeResult.errors.forEach(function(err){
                             if(err.type==='substitution')phonemeInfo+='  • Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
                             else if(err.type==='deletion')phonemeInfo+='  • Missing sound '+ph(err.expected)+'\n';
                             else if(err.type==='insertion')phonemeInfo+='  • Extra sound '+ph(err.actual)+' inserted\n';
                         });
                     }else{
-                        phonemeInfo+='- No pronunciation errors detected.\n';
+                        phonemeInfo+='- No pronunciation errors detected by speech recognition.\n';
                     }
-                    phonemeInfo+='\nONLY comment on errors the analysis detected. Do NOT invent additional errors. Trust the analysis for accuracy.\n';
+                    phonemeInfo+='\nUse both the speech recognition analysis AND what you actually hear in the audio to grade. If they conflict, trust what you hear.\n';
                 }
 
                 var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH — never write full sentences in Korean. It is OK to mention specific Korean words, letters, or sounds (like ㄱ or 집에) but the sentence around them must be English. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH (Korean words/letters OK but sentences must be English)","transcript":"what you ACTUALLY heard"}';
@@ -33890,44 +33925,51 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wavBase64=wav.base64;
                 var wb=wav.buffer;
 
-                // ========== PARALLEL: G2PK + PHONEME at same time ==========
+                // ========== G2PK then SPEECH RECOGNITION ==========
                 var phonetic=expectedKorean;
-                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+                var PHONEME_URL=SPEECH_PROXY_URL;
                 var phonemeResult=null;
 
-                var g2pPromise=fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({text:expectedKorean})
-                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+                // G2PK first
+                try{
+                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:expectedKorean})
+                    });
+                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)phonetic=g2pData.pronunciation;}
+                }catch(e){}
 
+                // Speech proxy with correct phonetic form
                 var phFormData=new FormData();
                 phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                phFormData.append('phonetic_hangul',expectedKorean);
+                phFormData.append('phonetic_hangul',phonetic);
                 phFormData.append('original_text',expectedKorean);
-                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([g2pPromise,phonemePromise]);
-                if(parallel[0]&&parallel[0].pronunciation) phonetic=parallel[0].pronunciation;
-                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
+                try{
+                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData});
+                    if(phResp.ok){phonemeResult=filterPhonemeErrors(await phResp.json());}
+                }catch(e){}
 
                 // GPT grading (same as normal round)
                 var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
                 gptPrompt+='Expected Korean text: "'+expectedKorean+'"\n';
                 gptPrompt+='Phonetic form (correct pronunciation): "'+phonetic+'"\n';
                 gptPrompt+='The written form and phonetic form are THE SAME pronunciation. Both are correct.\n';
-                if(phonemeResult&&phonemeResult.errors&&phonemeResult.errors.length>0){
-                    gptPrompt+='AUTOMATED ANALYSIS (potential errors — verify against what you hear):\n';
-
-                    gptPrompt+='Detected errors:\n';
-                    phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution')gptPrompt+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                        else if(err.type==='deletion')gptPrompt+='- Missing sound '+ph(err.expected)+'\n';
-                        else if(err.type==='insertion')gptPrompt+='- Extra sound '+ph(err.actual)+' inserted\n';
-                    });
-                    gptPrompt+='These are HINTS. Verify each against what you hear. Discard any that sound correct to you.\n';
-                }else if(phonemeResult){
-                    gptPrompt+='Automated analysis found no pronunciation errors.\n';
+                if(phonemeResult){
+                    gptPrompt+='AUTOMATED SPEECH RECOGNITION ANALYSIS:\n';
+                    if(phonemeResult.transcript){
+                        gptPrompt+='- Google Speech-to-Text heard: "'+phonemeResult.transcript+'"\n';
+                    }
+                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                        gptPrompt+='- Detected errors (comparing recognized text vs expected at character level):\n';
+                        phonemeResult.errors.forEach(function(err){
+                            if(err.type==='substitution')gptPrompt+='- Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
+                            else if(err.type==='deletion')gptPrompt+='- Missing sound '+ph(err.expected)+'\n';
+                            else if(err.type==='insertion')gptPrompt+='- Extra sound '+ph(err.actual)+' inserted\n';
+                        });
+                    }else{
+                        gptPrompt+='- No pronunciation errors detected by speech recognition.\n';
+                    }
+                    gptPrompt+='Use both the speech recognition analysis AND what you actually hear to grade. If they conflict, trust what you hear.\n';
                 }
                 gptPrompt+='RULES:\n';
                 gptPrompt+='- ㅔ and ㅐ are IDENTICAL in modern Korean. Never flag this.\n';
