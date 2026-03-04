@@ -31425,24 +31425,81 @@ Return ONLY this JSON (no markdown, no code blocks):
         async function qgPlayAll(){
             if(qgAudioPlaying){qgStopAll();return;}
             if(qgAudioQueue.length===0)return;
+
+            // Sort into Top 5 Best, Top 5 Worst, then the rest
+            var sorted=qgAudioQueue.slice().sort(function(a,b){return (b.gradeScore||0)-(a.gradeScore||0);});
+            var best5=sorted.slice(0,Math.min(5,sorted.length));
+            var worst5=sorted.length>5?sorted.slice(-Math.min(5,sorted.length-5)).reverse():[];
+            // "Rest" = everyone not in best5 or worst5
+            var bestSet={};best5.forEach(function(item){bestSet[item.audioUrl]=true;});
+            var worstSet={};worst5.forEach(function(item){worstSet[item.audioUrl]=true;});
+            var rest=sorted.filter(function(item){return !bestSet[item.audioUrl]&&!worstSet[item.audioUrl];});
+
+            // Build ordered playback queue with section markers
+            qgAudioSortedQueue=[];
+            if(best5.length>0){
+                qgAudioSortedQueue.push({type:'tts_header',text:'Top '+best5.length+' Best'});
+                best5.forEach(function(item){qgAudioSortedQueue.push({type:'student',data:item});});
+            }
+            if(worst5.length>0){
+                qgAudioSortedQueue.push({type:'tts_header',text:'Top '+worst5.length+' Worst'});
+                worst5.forEach(function(item){qgAudioSortedQueue.push({type:'student',data:item});});
+            }
+            if(rest.length>0){
+                qgAudioSortedQueue.push({type:'tts_header',text:'All other students'});
+                rest.forEach(function(item){qgAudioSortedQueue.push({type:'student',data:item});});
+            }
+
             qgAudioPlaying=true;
             var btn=document.getElementById('qgPlayAllBtn');if(btn)btn.innerHTML='⏸ Pause';
             var np=document.getElementById('qgNowPlaying');if(np)np.style.display='block';
-            qgAudioIdx=0;
-            qgPlayNext();
+            qgSortedIdx=0;
+            qgPlayNextSorted();
         }
 
-        async function qgPlayNext(){
-            if(!qgAudioPlaying||qgAudioIdx>=qgAudioQueue.length){qgStopAll();return;}
-            var item=qgAudioQueue[qgAudioIdx];
-            // Highlight current item
-            document.querySelectorAll('.qgListItem').forEach(function(el,i){
-                el.style.background=i===qgAudioIdx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';
-            });
-            var np=document.getElementById('qgNowPlaying');
-            if(np)np.innerHTML='🔊 Now playing: <strong style="color:#ff9800;">'+escapeHtml(item.name)+'</strong> ('+(qgAudioIdx+1)+'/'+qgAudioQueue.length+')';
+        var qgAudioSortedQueue=[];
+        var qgSortedIdx=0;
 
-            // 1. Play TTS name announcement
+        async function qgPlayNextSorted(){
+            if(!qgAudioPlaying||qgSortedIdx>=qgAudioSortedQueue.length){qgStopAll();return;}
+            var entry=qgAudioSortedQueue[qgSortedIdx];
+            var np=document.getElementById('qgNowPlaying');
+
+            if(entry.type==='tts_header'){
+                // Play TTS section announcement
+                if(np)np.innerHTML='🔊 <strong style="color:#ff9800;">'+escapeHtml(entry.text)+'</strong>';
+                try{
+                    var ttsBlob=qgAudioTTSCache[entry.text];
+                    if(!ttsBlob){
+                        var ttsResp=await fetch('https://tts-proxy-386010826708.us-central1.run.app',{
+                            method:'POST',headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({text:entry.text})
+                        });
+                        if(ttsResp.ok){ttsBlob=await ttsResp.blob();qgAudioTTSCache[entry.text]=ttsBlob;}
+                    }
+                    if(ttsBlob) await qgPlayBlob(ttsBlob,1);
+                }catch(e){ }
+                if(!qgAudioPlaying)return;
+                qgSortedIdx++;
+                qgPlayNextSorted();
+                return;
+            }
+
+            // Student entry — play name TTS then recording
+            var item=entry.data;
+            // Count students only for progress display
+            var studentIdx=0,studentTotal=0;
+            for(var si=0;si<=qgSortedIdx;si++){if(qgAudioSortedQueue[si].type==='student')studentIdx++;}
+            for(var si=0;si<qgAudioSortedQueue.length;si++){if(qgAudioSortedQueue[si].type==='student')studentTotal++;}
+            if(np)np.innerHTML='🔊 Now playing: <strong style="color:#ff9800;">'+escapeHtml(item.name)+'</strong> ('+studentIdx+'/'+studentTotal+')';
+
+            // Highlight in list
+            var origIdx=qgAudioQueue.indexOf(item);
+            document.querySelectorAll('.qgListItem').forEach(function(el,i){
+                el.style.background=i===origIdx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';
+            });
+
+            // 1. TTS name
             try{
                 var ttsBlob=qgAudioTTSCache[item.name];
                 if(!ttsBlob){
@@ -31452,25 +31509,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                     });
                     if(ttsResp.ok){ttsBlob=await ttsResp.blob();qgAudioTTSCache[item.name]=ttsBlob;}
                 }
-                if(ttsBlob){
-                    await qgPlayBlob(ttsBlob,1);
-                }
+                if(ttsBlob) await qgPlayBlob(ttsBlob,1);
             }catch(e){ }
-
             if(!qgAudioPlaying)return;
 
-            // 2. Play student recording
+            // 2. Play recording
             try{
-                if(item.audioUrl){
-                    await qgPlayUrl(item.audioUrl,qgAudioSpeed);
-                }
+                if(item.audioUrl) await qgPlayUrl(item.audioUrl,qgAudioSpeed);
             }catch(e){ }
-
             if(!qgAudioPlaying)return;
 
-            // Next
-            qgAudioIdx++;
-            qgPlayNext();
+            qgSortedIdx++;
+            qgPlayNextSorted();
         }
 
         function qgPlayBlob(blob,speed){
@@ -31524,7 +31574,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var queueIdx=-1;
                     if(s.audioUrl && !isGrading){
                         queueIdx=qgAudioQueue.length;
-                        qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0});
+                        qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0,gradeScore:s.gradeScore||0});
                     }
                     var clickAttr=queueIdx>=0?'onclick="qgPlaySingle('+queueIdx+')"':'';
                     lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;'+(queueIdx>=0?'cursor:pointer;':'')+'" '+clickAttr+'>';
@@ -31696,19 +31746,31 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(snap.empty){listEl.innerHTML='<span style="color:#888;">Waiting for students...</span>';return;}
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
                 var lh='';
+                // Speed controls
+                lh+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;">';
+                lh+='<span style="color:#888;font-size:10px;">Speed:</span>';
+                var speeds=[0.5,1,1.5,2,3,5];
+                for(var sp=0;sp<speeds.length;sp++){
+                    var isActive=speeds[sp]===qgDrillAudioSpeed?'background:#9b59b6;color:#fff;border-color:#9b59b6;':'background:rgba(255,255,255,0.08);color:#ccc;border-color:#555;';
+                    lh+='<button onclick="qgDrillSetSpeed('+speeds[sp]+',this)" style="'+isActive+'padding:3px 7px;border-radius:5px;border:1px solid;font-size:10px;cursor:pointer;">'+speeds[sp]+'x</button>';
+                }
+                lh+='<button onclick="qgDrillStopAudio()" style="background:rgba(255,255,255,0.08);border:1px solid #555;color:#ccc;padding:3px 7px;border-radius:5px;font-size:10px;cursor:pointer;">⏹ Stop</button>';
+                lh+='</div>';
                 subs.forEach(function(s,idx){
                     var lc=s.level==='absolute_beginner'?'#ff69b4':s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var scoreColor=s.score>=80?'#39ff14':s.score>=60?'#fbbf24':'#ef4444';
-                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;'+(s.audioUrl?'cursor:pointer;':'')+'" '+(s.audioUrl?'onclick="qgPlayDrillAudio(\''+s.audioUrl+'\',this)"':'')+'>';
+                    lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
                     if(s.status==='grading'){
                         lh+='<div style="font-size:10px;color:#fbbf24;">⏳ Grading...</div></div>';
                         lh+='<span style="font-size:11px;color:#fbbf24;">⏳</span>';
                     }else{
-                        lh+='<div style="font-size:10px;color:'+lc+';">'+(s.feedback||'')+'</div></div>';
+                        lh+='<div style="font-size:10px;color:'+lc+';">'+(escapeHtml(s.feedback||'').replace(/•/g,'<br>•'))+'</div></div>';
                         lh+='<span style="font-size:14px;font-weight:700;color:'+scoreColor+';">'+s.score+'</span>';
-                        lh+='<span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';
+                        if(s.audioUrl){
+                            lh+='<button onclick="qgDrillPlayAudio(\''+s.audioUrl.replace(/'/g,"\\'")+'\')" style="background:rgba(255,152,0,0.15);border:1px solid #ff9800;color:#ff9800;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">▶</button>';
+                        }
                     }
                     lh+='</div>';
                 });
@@ -31716,26 +31778,36 @@ Return ONLY this JSON (no markdown, no code blocks):
             });
         }
 
-        async function qgPlayDrillAudio(url,el){
-            qgStopAll();
-            try{await qgPlayUrl(url,1);}catch(e){ }
+        var qgDrillAudioSpeed=1;
+        var qgDrillAudioEl=null;
+        function qgDrillSetSpeed(spd,btn){
+            qgDrillAudioSpeed=spd;
+            if(qgDrillAudioEl)qgDrillAudioEl.playbackRate=spd;
+            // Update active button
+            var btns=btn.parentElement.querySelectorAll('button');
+            btns.forEach(function(b){if(b.textContent.includes('x')){b.style.background='rgba(255,255,255,0.08)';b.style.color='#ccc';b.style.borderColor='#555';}});
+            btn.style.background='#9b59b6';btn.style.color='#fff';btn.style.borderColor='#9b59b6';
         }
-
+        function qgDrillStopAudio(){
+            if(qgDrillAudioEl){qgDrillAudioEl.pause();qgDrillAudioEl.currentTime=0;qgDrillAudioEl=null;}
+        }
+        function qgDrillPlayAudio(url){
+            qgDrillStopAudio();
+            qgDrillAudioEl=new Audio(url);
+            qgDrillAudioEl.playbackRate=qgDrillAudioSpeed;
+            qgDrillAudioEl.play().catch(function(e){console.error('Play error:',e);});
+        }
         async function qgEndDrill(){
             try{
-                // Clear drill submissions
-                var snap=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection('drill_submissions').get();
-                var batch=db.batch();
-                snap.forEach(function(d){batch.delete(d.ref);});
-                await batch.commit();
-                // Reset status back to playing
-                await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'playing',drillText:firebase.firestore.FieldValue.delete(),drillTarget:firebase.firestore.FieldValue.delete(),drillId:firebase.firestore.FieldValue.delete()});
+                // Stop drill audio if playing
+                if(typeof qgDrillStopAudio==='function') qgDrillStopAudio();
+                // Reset status back to playing (keep drill submissions for reference)
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({status:'playing',drillText:firebase.firestore.FieldValue.delete(),drillTarget:firebase.firestore.FieldValue.delete()});
             }catch(e){console.error('End drill error:',e);}
             if(qg.unsubDrill){qg.unsubDrill();qg.unsubDrill=null;}
-            // Re-render the current round
-            qgShowPreview(qg.currentRound);
+            // Return to the active round view (not preview) — preserve timer and submissions
+            qgShowAdminRound(qg.currentRound, null);
         }
-
 
         async function qgEndRound() {
             clearInterval(qg.timer);
@@ -32831,27 +32903,74 @@ Return ONLY this JSON (no markdown, no code blocks):
         // Filter out known confusion pairs the wav2vec2 model can't reliably distinguish.
         // These substitutions are dropped from the error list and score recalculated.
         // GPT still hears the audio independently and can catch real errors in these pairs.
-        var confusionPairs={
-            'A-EO':true,'EO-A':true,   // ㅏ↔ㅓ
-            'O-U':true,'U-O':true,     // ㅗ↔ㅜ
-            'N-R':true,'R-N':true,     // ㄴ↔ㄹ
-            'N-L':true,'L-N':true,     // ㄴ↔ㄹ (L variant)
-            'R-L':true,'L-R':true      // ㄹ variants
-        };
+        // ========== PHONEME ERROR FILTERING ==========
+        // Consonant groups: plain / tense / aspirated variants + acoustically similar
+        var phonemeConsonantGroups=[
+            ['ㄱ','ㄲ','ㅋ','G','GG','K','KH','Kh','k'],           // velar stops
+            ['ㄷ','ㄸ','ㅌ','D','DD','T','TH','Th','t'],           // alveolar stops
+            ['ㅂ','ㅃ','ㅍ','B','BB','P','PH','Ph','p'],           // bilabial stops
+            ['ㅈ','ㅉ','ㅊ','J','JJ','CH','CHh'],                  // affricates
+            ['ㅅ','ㅆ','S','SS'],                                   // sibilants
+            ['ㄴ','ㄹ','ㄹㄹ','N','R','L','LL'],                   // nasals/liquids
+            ['ㅁ','M'],                                             // bilabial nasal
+            ['ㅇ','NG'],                                            // velar nasal
+            ['ㅎ','H']                                              // glottal
+        ];
+        // Vowel groups: acoustically similar vowels
+        var phonemeVowelGroups=[
+            ['ㅏ','ㅓ','A','EO','Eo','iA','iEO'],                  // open vowels + ya/yeo variants
+            ['ㅗ','ㅜ','O','U','Oo','iO','iU'],                    // rounded vowels + yo/yu variants
+            ['ㅐ','ㅔ','ㅒ','ㅖ','AE','E','YAE','YE','oE'],        // front mid (merged in modern Korean)
+            ['ㅣ','I','EE','uI','euI'],                             // high front + wi/ui variants
+            ['ㅡ','EU','Eu'],                                       // high central
+            ['ㅑ','ㅕ','iA','iEO'],                                 // ya-series
+            ['ㅛ','ㅠ','iO','iU'],                                  // yo/yu
+            ['ㅘ','oA','WA'],['ㅙ','ㅚ','oE','WAE','WE','OE'],     // wa-diphthongs
+            ['ㅝ','uEO','WO','Wo'],['ㅟ','uI','WI'],['ㅢ','euI','UI']
+        ];
+        // Build lookup: sound -> set of plausible confusions
+        var phonemePlausible={};
+        function buildPlausibleMap(groups){
+            for(var g=0;g<groups.length;g++){
+                for(var i=0;i<groups[g].length;i++){
+                    var s=groups[g][i].toUpperCase();
+                    if(!phonemePlausible[s])phonemePlausible[s]={};
+                    for(var j=0;j<groups[g].length;j++){
+                        phonemePlausible[s][groups[g][j].toUpperCase()]=true;
+                    }
+                }
+            }
+        }
+        buildPlausibleMap(phonemeConsonantGroups);
+        buildPlausibleMap(phonemeVowelGroups);
+        // Classify a sound as vowel or consonant
+        var allVowels={};
+        phonemeVowelGroups.forEach(function(g){g.forEach(function(v){allVowels[v.toUpperCase()]=true;});});
+        var allConsonants={};
+        phonemeConsonantGroups.forEach(function(g){g.forEach(function(c){allConsonants[c.toUpperCase()]=true;});});
+        function isVowelSound(s){return !!allVowels[(s||'').toUpperCase()];}
+        function isConsonantSound(s){return !!allConsonants[(s||'').toUpperCase()];}
+
         function filterPhonemeErrors(result){
             if(!result||!result.errors)return result;
             var original=result.errors.length;
             result.errors=result.errors.filter(function(err){
-                if(err.type!=='substitution')return true;
-                var key=(err.expected||'')+'-'+(err.actual||'');
-                if(confusionPairs[key]){
-                    return false;
+                var exp=(err.expected||'').toUpperCase();
+                var act=(err.actual||'').toUpperCase();
+                if(err.type==='substitution'){
+                    // Block vowel↔consonant crossover (nonsensical)
+                    if(isVowelSound(exp) && isConsonantSound(act)) return false;
+                    if(isConsonantSound(exp) && isVowelSound(act)) return false;
+                    // Block if not in same acoustic group
+                    if(phonemePlausible[exp] && !phonemePlausible[exp][act]) return false;
+                    // If sound is unknown to our map, still block obvious vowel↔consonant
+                    // but allow through (benefit of the doubt)
                 }
+                // For deletions/insertions: keep them (they're less prone to nonsense)
                 return true;
             });
             // Recalculate score if errors were removed
             if(result.errors.length<original && typeof result.total_phonemes==='number'){
-                var dropped=original-result.errors.length;
                 var errorsNow=result.errors.length;
                 var total=result.total_phonemes||1;
                 result.score=Math.round(Math.max(0,Math.min(100,(1-errorsNow/total)*100)));
@@ -32970,7 +33089,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                     gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                     gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
-                    gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
+                    gptPrompt+='FEEDBACK STYLE: The entire feedback MUST be written in ENGLISH — never write full sentences in Korean. It is OK to include specific Korean words, letters, or sounds (like ㄱ,ㅋ,ㄲ,ㅏ,ㅓ or a word like 집에) but the sentence around them must be English. Short, informal, use bullet points (•). NEVER use romanized labels like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n';
                     gptPrompt+='- Max 2 bullet points.\n';
                     gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
                     gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
@@ -33010,7 +33129,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var scoreColor=finalScore>=80?'#39ff14':finalScore>=60?'#fbbf24':'#ef4444';
                 resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;">'+
                     '<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-align:center;">'+finalScore+'<span style="font-size:10px;color:#888;">/100</span></div>'+
-                    '<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(feedback)+'</div></div>';
+                    '<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(feedback).replace(/•/g,'<br>•')+'</div></div>';
                 statusEl.textContent='';
                 qs.isBusy=false;qsFlushPending();
                 // Re-enable record button for retry
@@ -33176,7 +33295,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeInfo+='\nONLY comment on errors the analysis detected. Do NOT invent additional errors. Trust the analysis for accuracy.\n';
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- ALWAYS write feedback in ENGLISH. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback using Hangul","transcript":"what you ACTUALLY heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH — never write full sentences in Korean. It is OK to mention specific Korean words, letters, or sounds (like ㄱ or 집에) but the sentence around them must be English. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH (Korean words/letters OK but sentences must be English)","transcript":"what you ACTUALLY heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -33324,7 +33443,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(grade.feedback){
                 h+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-bottom:16px;text-align:left;">';
                 h+='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Feedback</div>';
-                h+='<div style="font-size:14px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback)+'</div></div>';
+                h+='<div style="font-size:14px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
             }
             // What you said vs expected
             if(grade.transcript){
@@ -33617,12 +33736,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                 gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                 gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
-                gptPrompt+='FEEDBACK STYLE: ALWAYS write in ENGLISH. Short, informal, use bullet points (•), ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ) NEVER romanized like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word.\n';
+                gptPrompt+='FEEDBACK STYLE: The entire feedback MUST be written in ENGLISH — never write full sentences in Korean. It is OK to include specific Korean words, letters, or sounds (like ㄱ,ㅋ,ㄲ,ㅏ,ㅓ or a word like 집에) but the sentence around them must be English. Short, informal, use bullet points (•). NEVER use romanized labels like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n';
                 gptPrompt+='- Max 2-4 bullet points. If no real errors, say so positively.\n';
                 gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
                 gptPrompt+='0-10: No Korean speech. 10-40: Many errors. 40-60: Several errors. 60-75: Mostly correct, 1-2 errors. 75-85: Good, one minor error. 85-95: Very accurate. 95-100: Perfect.\n';
                 gptPrompt+='Penalties: plain/tense/aspirated confusion -8 to -12 each, wrong vowel -5 to -8, missed assimilation -5 to -8. Use the FULL range of scores.\n';
-                gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"bulleted feedback using Hangul","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
+                gptPrompt+='Reply ONLY with JSON: {"score":NUMBER 0-100,"feedback":"bulleted feedback in ENGLISH (Korean words/letters OK but sentences must be English)","transcript":"WHAT STUDENT ACTUALLY SAID IN KOREAN"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
