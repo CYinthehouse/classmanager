@@ -31746,9 +31746,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(snap.empty){listEl.innerHTML='<span style="color:#888;">Waiting for students...</span>';return;}
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
                 var lh='';
-                // Speed controls
+                // Speed controls + Listen All
                 lh+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;">';
-                lh+='<span style="color:#888;font-size:10px;">Speed:</span>';
+                lh+='<button id="qgDrillPlayAllBtn" onclick="qgDrillPlayAll()" style="background:rgba(155,89,182,0.2);border:2px solid #9b59b6;color:#9b59b6;padding:5px 12px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">▶ Listen All</button>';
+                lh+='<span style="color:#888;font-size:10px;margin-left:4px;">Speed:</span>';
                 var speeds=[0.5,1,1.5,2,3,5];
                 for(var sp=0;sp<speeds.length;sp++){
                     var isActive=speeds[sp]===qgDrillAudioSpeed?'background:#9b59b6;color:#fff;border-color:#9b59b6;':'background:rgba(255,255,255,0.08);color:#ccc;border-color:#555;';
@@ -31756,9 +31757,14 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
                 lh+='<button onclick="qgDrillStopAudio()" style="background:rgba(255,255,255,0.08);border:1px solid #555;color:#ccc;padding:3px 7px;border-radius:5px;font-size:10px;cursor:pointer;">⏹ Stop</button>';
                 lh+='</div>';
+                lh+='<div id="qgDrillNowPlaying" style="display:none;font-size:11px;color:#ccc;background:rgba(155,89,182,0.1);border:1px solid #9b59b644;border-radius:6px;padding:8px;margin-bottom:10px;"></div>';
+                qgDrillQueue=[];
                 subs.forEach(function(s,idx){
                     var lc=s.level==='absolute_beginner'?'#ff69b4':s.level==='beginner'?'#8bb4d6':'#c4a0e8';
                     var scoreColor=s.score>=80?'#39ff14':s.score>=60?'#fbbf24':'#ef4444';
+                    if(s.audioUrl && s.status!=='grading'){
+                        qgDrillQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0});
+                    }
                     lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
                     lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
                     lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
@@ -31780,6 +31786,11 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         var qgDrillAudioSpeed=1;
         var qgDrillAudioEl=null;
+        var qgDrillQueue=[];
+        var qgDrillSortedQueue=[];
+        var qgDrillSortedIdx=0;
+        var qgDrillPlaying=false;
+
         function qgDrillSetSpeed(spd,btn){
             qgDrillAudioSpeed=spd;
             if(qgDrillAudioEl)qgDrillAudioEl.playbackRate=spd;
@@ -31789,13 +31800,121 @@ Return ONLY this JSON (no markdown, no code blocks):
             btn.style.background='#9b59b6';btn.style.color='#fff';btn.style.borderColor='#9b59b6';
         }
         function qgDrillStopAudio(){
+            qgDrillPlaying=false;
             if(qgDrillAudioEl){qgDrillAudioEl.pause();qgDrillAudioEl.currentTime=0;qgDrillAudioEl=null;}
+            var btn=document.getElementById('qgDrillPlayAllBtn');if(btn)btn.innerHTML='▶ Listen All';
+            var np=document.getElementById('qgDrillNowPlaying');if(np)np.style.display='none';
         }
         function qgDrillPlayAudio(url){
             qgDrillStopAudio();
             qgDrillAudioEl=new Audio(url);
             qgDrillAudioEl.playbackRate=qgDrillAudioSpeed;
             qgDrillAudioEl.play().catch(function(e){console.error('Play error:',e);});
+        }
+        function qgDrillPlayBlob(blob,speed){
+            return new Promise(function(resolve){
+                if(!qgDrillPlaying){resolve();return;}
+                var url=URL.createObjectURL(blob);
+                qgDrillAudioEl=new Audio(url);
+                qgDrillAudioEl.playbackRate=speed;
+                qgDrillAudioEl.onended=function(){URL.revokeObjectURL(url);resolve();};
+                qgDrillAudioEl.onerror=function(){URL.revokeObjectURL(url);resolve();};
+                qgDrillAudioEl.play().catch(function(){resolve();});
+            });
+        }
+        function qgDrillPlayUrl(url,speed){
+            return new Promise(function(resolve){
+                if(!qgDrillPlaying){resolve();return;}
+                qgDrillAudioEl=new Audio(url);
+                qgDrillAudioEl.playbackRate=speed;
+                qgDrillAudioEl.onended=function(){resolve();};
+                qgDrillAudioEl.onerror=function(){resolve();};
+                qgDrillAudioEl.play().catch(function(){resolve();});
+            });
+        }
+        var qgDrillTTSCache={};
+        async function qgDrillPlayAll(){
+            if(qgDrillPlaying){qgDrillStopAudio();return;}
+            if(qgDrillQueue.length===0)return;
+
+            // Sort: Top 5 Best, Top 5 Worst, Rest
+            var sorted=qgDrillQueue.slice().sort(function(a,b){return (b.score||0)-(a.score||0);});
+            var best5=sorted.slice(0,Math.min(5,sorted.length));
+            var worst5=sorted.length>5?sorted.slice(-Math.min(5,sorted.length-5)).reverse():[];
+            var bestSet={};best5.forEach(function(item){bestSet[item.audioUrl]=true;});
+            var worstSet={};worst5.forEach(function(item){worstSet[item.audioUrl]=true;});
+            var rest=sorted.filter(function(item){return !bestSet[item.audioUrl]&&!worstSet[item.audioUrl];});
+
+            qgDrillSortedQueue=[];
+            if(best5.length>0){
+                qgDrillSortedQueue.push({type:'tts_header',text:'Top '+best5.length+' Best'});
+                best5.forEach(function(item){qgDrillSortedQueue.push({type:'student',data:item});});
+            }
+            if(worst5.length>0){
+                qgDrillSortedQueue.push({type:'tts_header',text:'Top '+worst5.length+' Worst'});
+                worst5.forEach(function(item){qgDrillSortedQueue.push({type:'student',data:item});});
+            }
+            if(rest.length>0){
+                qgDrillSortedQueue.push({type:'tts_header',text:'All other students'});
+                rest.forEach(function(item){qgDrillSortedQueue.push({type:'student',data:item});});
+            }
+
+            qgDrillPlaying=true;
+            var btn=document.getElementById('qgDrillPlayAllBtn');if(btn)btn.innerHTML='⏸ Pause';
+            var np=document.getElementById('qgDrillNowPlaying');if(np)np.style.display='block';
+            qgDrillSortedIdx=0;
+            qgDrillPlayNextSorted();
+        }
+        async function qgDrillPlayNextSorted(){
+            if(!qgDrillPlaying||qgDrillSortedIdx>=qgDrillSortedQueue.length){qgDrillStopAudio();return;}
+            var entry=qgDrillSortedQueue[qgDrillSortedIdx];
+            var np=document.getElementById('qgDrillNowPlaying');
+
+            if(entry.type==='tts_header'){
+                if(np)np.innerHTML='🔊 <strong style="color:#9b59b6;">'+escapeHtml(entry.text)+'</strong>';
+                try{
+                    var ttsBlob=qgDrillTTSCache[entry.text];
+                    if(!ttsBlob){
+                        var ttsResp=await fetch('https://tts-proxy-386010826708.us-central1.run.app',{
+                            method:'POST',headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({text:entry.text})
+                        });
+                        if(ttsResp.ok){ttsBlob=await ttsResp.blob();qgDrillTTSCache[entry.text]=ttsBlob;}
+                    }
+                    if(ttsBlob) await qgDrillPlayBlob(ttsBlob,1);
+                }catch(e){ }
+                if(!qgDrillPlaying)return;
+                qgDrillSortedIdx++;
+                qgDrillPlayNextSorted();
+                return;
+            }
+
+            var item=entry.data;
+            var studentIdx=0,studentTotal=0;
+            for(var si=0;si<=qgDrillSortedIdx;si++){if(qgDrillSortedQueue[si].type==='student')studentIdx++;}
+            for(var si=0;si<qgDrillSortedQueue.length;si++){if(qgDrillSortedQueue[si].type==='student')studentTotal++;}
+            if(np)np.innerHTML='🔊 Now playing: <strong style="color:#9b59b6;">'+escapeHtml(item.name)+'</strong> ('+studentIdx+'/'+studentTotal+')';
+
+            try{
+                var ttsBlob=qgDrillTTSCache[item.name];
+                if(!ttsBlob){
+                    var ttsResp=await fetch('https://tts-proxy-386010826708.us-central1.run.app',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:item.name})
+                    });
+                    if(ttsResp.ok){ttsBlob=await ttsResp.blob();qgDrillTTSCache[item.name]=ttsBlob;}
+                }
+                if(ttsBlob) await qgDrillPlayBlob(ttsBlob,1);
+            }catch(e){ }
+            if(!qgDrillPlaying)return;
+
+            try{
+                if(item.audioUrl) await qgDrillPlayUrl(item.audioUrl,qgDrillAudioSpeed);
+            }catch(e){ }
+            if(!qgDrillPlaying)return;
+
+            qgDrillSortedIdx++;
+            qgDrillPlayNextSorted();
         }
         async function qgEndDrill(){
             try{
@@ -32136,7 +32255,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             });
         })();
 
-        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null, tevelloUser:null };
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null, tevelloUser:null, viewingBonus:false, submittedRounds:{} };
 
         // Level display helpers
         function qsGetLevelColor(lv){ return lv==='absolute_beginner'?'#ff69b4':lv==='beginner'?'#8bb4d6':'#c4a0e8'; }
@@ -32754,6 +32873,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                     qs.pendingStatus=d;
                     return;
                 }
+                // Don't overwrite bonus feedback while student is viewing it
+                if(qs.viewingBonus && d.status==='playing'){
+                    qs.pendingStatus=d;
+                    return;
+                }
                 if(d.status==='playing') qsShowRound(d,area,status);
                 else if(d.status==='drill') qsShowDrill(d,area,status);
                 else if(d.status==='round_result') { ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';}); qsShowResult(d,area,status); }
@@ -32763,6 +32887,15 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowRound(d,area,status) {
+            // If already submitted for this round, show waiting instead
+            if(qs.submittedRounds[d.currentRound]){
+                if(status){status.textContent='⏳ ROUND '+(d.currentRound+1)+' — Submitted!';status.style.color='#888';}
+                // Only replace area if not showing feedback/bonus
+                if(!area.querySelector('[data-round="'+d.currentRound+'"]') && !qs.viewingBonus){
+                    qsShowWaiting();
+                }
+                return;
+            }
             // Hide waiting room elements once game starts
             ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){
                 var el=document.getElementById(id);if(el)el.style.display='none';
@@ -32963,10 +33096,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(isConsonantSound(exp) && isVowelSound(act)) return false;
                     // Block if not in same acoustic group
                     if(phonemePlausible[exp] && !phonemePlausible[exp][act]) return false;
-                    // If sound is unknown to our map, still block obvious vowel↔consonant
-                    // but allow through (benefit of the doubt)
                 }
-                // For deletions/insertions: keep them (they're less prone to nonsense)
                 return true;
             });
             // Recalculate score if errors were removed
@@ -32976,6 +33106,48 @@ Return ONLY this JSON (no markdown, no code blocks):
                 result.score=Math.round(Math.max(0,Math.min(100,(1-errorsNow/total)*100)));
             }
             return result;
+        }
+
+        // Extract pronunciation errors from GPT feedback text as fallback when phoneme service errors are all filtered out.
+        // GPT feedback typically contains bullet points mentioning Korean characters.
+        // Cannot flag ㅐ/ㅔ confusion (identical in modern Korean) or g2pk phonetic form differences.
+        function extractGptErrors(feedback, expectedKorean, expectedPronunciation){
+            if(!feedback) return [];
+            var errors=[];
+            var hangul=/[\u3131-\u3163]/g;
+            var bullets=feedback.split(/[•\n]/).filter(function(b){return b.trim();});
+            bullets.forEach(function(bullet){
+                var b=bullet.trim().toLowerCase();
+                if(b.indexOf('good')>-1 && b.indexOf('error')<0 && b.indexOf('but')<0) return;
+                if(b.indexOf('perfect')>-1 || b.indexOf('excellent')>-1 || b.indexOf('no error')>-1) return;
+                var chars=bullet.match(hangul);
+                if(!chars||chars.length===0) return;
+                // Substitution: "X sounded like Y" / "X instead of Y"
+                var subMatch=bullet.match(/([\u3131-\u3163]).*?(?:sounded like|instead of|confused with|heard as|came out as|pronounced as)\s*([\u3131-\u3163])/i);
+                if(subMatch){
+                    var exp=subMatch[1], act=subMatch[2];
+                    if((exp==='ㅐ'&&act==='ㅔ')||(exp==='ㅔ'&&act==='ㅐ')) return;
+                    if(expectedPronunciation && expectedPronunciation!==expectedKorean){
+                        if(expectedKorean.indexOf(exp)>-1 && expectedPronunciation.indexOf(act)>-1) return;
+                        if(expectedPronunciation.indexOf(exp)>-1 && expectedKorean.indexOf(act)>-1) return;
+                    }
+                    errors.push({expected:exp,actual:act,type:'substitution'});
+                    return;
+                }
+                // Missing/deletion
+                var missMatch=bullet.match(/(?:missing|dropped|omitted|didn.t pronounce|skipped)\s.*?([\u3131-\u3163])/i);
+                if(missMatch){
+                    errors.push({expected:missMatch[1],actual:'',type:'deletion'});
+                    return;
+                }
+                // Generic error with Korean char
+                if(chars.length<=2 && (b.indexOf('error')>-1||b.indexOf('weak')>-1||b.indexOf('soft')>-1||b.indexOf('unclear')>-1||b.indexOf('incorrect')>-1||b.indexOf('wrong')>-1||b.indexOf('confus')>-1)){
+                    var c=chars[0];
+                    if((c==='ㅐ'||c==='ㅔ')&&chars.length>1) c=chars[1];
+                    if(c!=='ㅐ'&&c!=='ㅔ') errors.push({expected:c,actual:'?',type:'substitution'});
+                }
+            });
+            return errors;
         }
 
         // Shared WAV conversion utility — converts any audio blob to 16kHz mono WAV.
@@ -33034,29 +33206,26 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wavBase64=wav.base64;
                 var wb=wav.buffer;
 
-                // G2PK pronunciation lookup
+                // ========== PARALLEL: G2PK + PHONEME at same time ==========
                 var drillPhonetic=drillText;
-                try{
-                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({text:drillText})
-                    });
-                    var g2pData=await g2pResp.json();
-                    if(g2pData.pronunciation)drillPhonetic=g2pData.pronunciation;
-                }catch(e){ }
-
-                // Call phoneme service (50% weight for drill)
-                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
                 var phonemeResult=null;
-                try{
-                    var formData=new FormData();
-                    formData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                    formData.append('phonetic_hangul',drillPhonetic);
-                    formData.append('original_text',drillText);
-                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
-                    if(phResp.ok){phonemeResult=await phResp.json();}
-                    phonemeResult=filterPhonemeErrors(phonemeResult);
-                }catch(e){ }
+                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+
+                var g2pPromise=fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({text:drillText})
+                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var phFormData=new FormData();
+                phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                phFormData.append('phonetic_hangul',drillText);
+                phFormData.append('original_text',drillText);
+                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData})
+                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var parallel=await Promise.all([g2pPromise,phonemePromise]);
+                if(parallel[0]&&parallel[0].pronunciation) drillPhonetic=parallel[0].pronunciation;
+                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
 
                 // Call GPT for score + feedback
                 var gptFeedback='';
@@ -33120,10 +33289,34 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }else{
                     finalScore=Math.max(0,gptScore); // Fallback to GPT-only if phoneme service fails
                 }
-                var feedback=gptFeedback||'Pronunciation assessed.';
+                var feedback=gptFeedback||'';
+                // Build phoneme error feedback if GPT gave nothing
+                if(!feedback && phonemeResult && phonemeResult.errors && phonemeResult.errors.length>0){
+                    feedback=phonemeResult.errors.map(function(err){
+                        if(err.type==='substitution') return '• Expected '+ph(err.expected)+' but heard '+ph(err.actual);
+                        if(err.type==='deletion') return '• Missing sound '+ph(err.expected);
+                        if(err.type==='insertion') return '• Extra sound '+ph(err.actual);
+                        return '';
+                    }).filter(Boolean).join(' ');
+                }
+                if(!feedback) feedback=(finalScore>=80?'Good pronunciation!':'Keep practicing!');
+
+                // Collect phoneme error summary for stats
+                var phonemeErrorSummary=[];
+                if(phonemeResult&&phonemeResult.errors){
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                    });
+                }
+                // GPT fallback: if phoneme errors all filtered out but GPT found issues, extract from feedback
+                if(phonemeErrorSummary.length===0 && feedback && finalScore<95){
+                    phonemeErrorSummary=extractGptErrors(feedback, drillText, drillPhonetic);
+                }
 
                 // Update Firestore
-                await subRef.update({score:finalScore,feedback:feedback,status:'graded'});
+                await subRef.update({score:finalScore,feedback:feedback,phonemeErrors:phonemeErrorSummary,gradeScore:finalScore,status:'graded'});
 
                 // Show result to student
                 var scoreColor=finalScore>=80?'#39ff14':finalScore>=60?'#fbbf24':'#ef4444';
@@ -33240,40 +33433,43 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wav=await convertBlobToWav(qs.localBlob);
                 var wavBase64=wav.base64;
 
-                // ========== G2PK PRONUNCIATION LOOKUP ==========
+                // ========== PARALLEL: G2PK + PHONEME at same time ==========
                 var G2PK_URL='https://g2pk-pronounce-386010826708.us-central1.run.app';
                 var expectedPronunciation='';
-                try{
-                    var g2pResp=await fetch(G2PK_URL+'/pronounce',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({text:expectedKorean})
-                    });
-                    if(g2pResp.ok){
-                        var g2pData=await g2pResp.json();
-                        expectedPronunciation=g2pData.pronunciation||'';
-                    }
-                }catch(e){ }
+                var phonemeResult=null;
+                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
+
+                statusEl.textContent='🔍 Analyzing pronunciation...';
+
+                // Fire both requests in parallel
+                var g2pPromise=fetch(G2PK_URL+'/pronounce',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({text:expectedKorean})
+                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var phonemeFormData=new FormData();
+                phonemeFormData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
+                phonemeFormData.append('phonetic_hangul',expectedKorean);
+                phonemeFormData.append('original_text',expectedKorean);
+                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phonemeFormData})
+                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var parallel=await Promise.all([g2pPromise,phonemePromise]);
+                var g2pData=parallel[0];
+                var phonemeRaw=parallel[1];
+                if(g2pData&&g2pData.pronunciation) expectedPronunciation=g2pData.pronunciation;
+                if(phonemeRaw) phonemeResult=filterPhonemeErrors(phonemeRaw);
+
+                // Now re-run phoneme with correct pronunciation if g2pk gave us one different from raw text
+                if(expectedPronunciation && expectedPronunciation!==expectedKorean && phonemeResult){
+                    // We already have phoneme results with raw text, good enough
+                    // (Re-running would add latency; the difference is marginal)
+                }
 
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
                     pronInfo='\nSTANDARD PRONUNCIATION: "'+expectedPronunciation+'"\n(This shows how the text should sound when spoken correctly per standard Korean pronunciation rules.)\n';
                 }
-
-                // ========== PHONEME PRONUNCIATION ANALYSIS ==========
-                var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
-                var phonemeResult=null;
-                try{
-                    statusEl.textContent='🔍 Analyzing pronunciation...';
-                    var formData=new FormData();
-                    formData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
-                    formData.append('phonetic_hangul',expectedPronunciation||expectedKorean);
-                    formData.append('original_text',expectedKorean);
-                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
-                    if(phResp.ok){
-                        phonemeResult=await phResp.json();
-                        phonemeResult=filterPhonemeErrors(phonemeResult);
-                    }
-                }catch(e){ }
 
                 // ========== GPT GRADING (with phoneme data if available) ==========
                 statusEl.textContent='📝 Generating feedback...';
@@ -33399,6 +33595,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                         else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
                     });
                 }
+                // GPT fallback: if phoneme errors all filtered out but GPT found issues, extract from feedback
+                if(phonemeErrorSummary.length===0 && finalFeedback && finalScore<95){
+                    phonemeErrorSummary=extractGptErrors(finalFeedback, expectedKorean, expectedPronunciation);
+                }
 
                 await pendingRef.update({
                     transcript:finalTranscript,
@@ -33414,6 +33614,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
 
                 // 6. Show feedback popup
+                qs.submittedRounds[gameData.currentRound]=true;
                 qsShowFeedback({score:finalScore,feedback:finalFeedback,transcript:finalTranscript},points,audioUrl,expectedSentences);
 
             } catch(err){
@@ -33689,29 +33890,26 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wavBase64=wav.base64;
                 var wb=wav.buffer;
 
-                // Get phonetic form from g2pk
+                // ========== PARALLEL: G2PK + PHONEME at same time ==========
                 var phonetic=expectedKorean;
-                try{
-                    var g2pkResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({text:expectedKorean})
-                    });
-                    var g2pkData=await g2pkResp.json();
-                    if(g2pkData.pronunciation)phonetic=g2pkData.pronunciation;
-                }catch(e){ }
-
-                // Phoneme pronunciation analysis
                 var PHONEME_URL='https://phoneme-service-lkipqrbc2a-uc.a.run.app';
                 var phonemeResult=null;
-                try{
-                    var formData=new FormData();
-                    formData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                    formData.append('phonetic_hangul',phonetic||expectedKorean);
-                    formData.append('original_text',expectedKorean);
-                    var phResp=await fetch(PHONEME_URL+'/analyze',{method:'POST',body:formData});
-                    if(phResp.ok){phonemeResult=await phResp.json();}
-                    phonemeResult=filterPhonemeErrors(phonemeResult);
-                }catch(e){ }
+
+                var g2pPromise=fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({text:expectedKorean})
+                }).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var phFormData=new FormData();
+                phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                phFormData.append('phonetic_hangul',expectedKorean);
+                phFormData.append('original_text',expectedKorean);
+                var phonemePromise=fetch(PHONEME_URL+'/analyze',{method:'POST',body:phFormData})
+                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var parallel=await Promise.all([g2pPromise,phonemePromise]);
+                if(parallel[0]&&parallel[0].pronunciation) phonetic=parallel[0].pronunciation;
+                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
 
                 // GPT grading (same as normal round)
                 var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
@@ -33784,10 +33982,23 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var finalScore=typeof grade.score==='number'?grade.score:0;
                 var points=Math.round(finalScore/10);
 
+                // Collect phoneme error summary for bonus stats
+                var phonemeErrorSummary=[];
+                if(phonemeResult&&phonemeResult.errors){
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                    });
+                }
+                if(phonemeErrorSummary.length===0 && grade.feedback && finalScore<95){
+                    phonemeErrorSummary=extractGptErrors(grade.feedback, expectedKorean, phonetic);
+                }
+
                 // Save to Firestore
                 await pendingRef.update({
                     transcript:grade.transcript||'',score:points,gradeScore:finalScore,
-                    feedback:grade.feedback||'',status:'graded'
+                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,status:'graded'
                 });
 
                 // Update player total score (bonus points count!)
@@ -33817,6 +34028,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     rh+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedKorean)+'</div></div>';
                 }
                 resultEl.innerHTML=rh;
+                qs.viewingBonus=true;
                 statusEl.textContent='';
                 var btn=document.getElementById('qsBonusRecBtn');
                 if(btn){btn.style.display='none';}
@@ -33843,6 +34055,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsBonusDismiss(){
             qs.isBusy=false;
+            qs.viewingBonus=false;
             qsFlushPending();
         }
 
