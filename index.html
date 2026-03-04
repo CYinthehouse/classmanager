@@ -32408,10 +32408,6 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter email and password.';return;}
             msg.style.color='#888';msg.textContent='Logging in...';
             try{
-                // Ensure authenticated before Firestore query
-                if(!firebase.auth().currentUser){
-                    await firebase.auth().signInAnonymously();
-                }
                 var snap=await db.collection(TEVELLO_COLLECTION).where('username','==',user).limit(1).get();
                 if(snap.empty){msg.style.color='#ff4444';msg.textContent='Account not found. Try signing up!';return;}
                 var doc=snap.docs[0];
@@ -32445,10 +32441,6 @@ Return ONLY this JSON (no markdown, no code blocks):
             
             msg.style.color='#888';msg.textContent='Creating account...';
             try{
-                // Ensure authenticated before Firestore query
-                if(!firebase.auth().currentUser){
-                    await firebase.auth().signInAnonymously();
-                }
                 // Check if username taken
                 var existing=await db.collection(TEVELLO_COLLECTION).where('username','==',userLower).limit(1).get();
                 if(!existing.empty){msg.style.color='#ff4444';msg.textContent='Email already registered! Try logging in.';return;}
@@ -32657,10 +32649,6 @@ Return ONLY this JSON (no markdown, no code blocks):
 ];
 
         function qsInit(roomCode) {
-            // Ensure Firebase auth for Firestore access (students may not be signed in)
-            if(!firebase.auth().currentUser){
-                firebase.auth().signInAnonymously().catch(function(e){console.error('Anon auth error:',e);});
-            }
             // Inject sparkle CSS into head so it survives body.innerHTML clearing
             if(!document.querySelector('#sparkleStyles')){var ss=document.createElement('style');ss.id='sparkleStyles';ss.textContent='.sparkle-btn{position:relative;overflow:visible;transition:transform 0.2s,box-shadow 0.2s;}.sparkle-btn:hover{transform:scale(1.05) translateY(-2px) !important;box-shadow:0 6px 20px rgba(255,119,119,0.4) !important;}.sparkle-btn:active{transform:scale(0.98) !important;}.sparkle-btn .sparkle-svg{opacity:0;}.sparkle-btn:hover .sparkle-svg{animation:qgSparkle 0.75s both;}.sparkle-btn:hover .sparkle-svg:nth-of-type(1){animation-delay:0.15s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(2){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(3){animation-delay:0.45s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(4){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(5){animation-delay:0.6s;}@keyframes qgSparkle{0%{transform:translate(-50%,-50%) scale(0);opacity:0;}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}.sparkle-btn::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(108deg,transparent 0% 40%,rgba(255,255,255,0.3) 40% 45%,transparent 45% 55%,rgba(255,255,255,0.2) 55% 65%,transparent 65%);background-size:200% 100%;background-position:200% 0;transition:background-position 0s;pointer-events:none;z-index:2;}.sparkle-btn:hover::after{background-position:-200% 0;transition:background-position 1.2s 0.2s ease-out;}';document.head.appendChild(ss);}
             // Inject btnPress animation CSS + JS into head
