@@ -32408,6 +32408,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(!user||!pass){msg.style.color='#ff4444';msg.textContent='Enter email and password.';return;}
             msg.style.color='#888';msg.textContent='Logging in...';
             try{
+                // Ensure authenticated before Firestore query
+                if(!firebase.auth().currentUser){
+                    await firebase.auth().signInAnonymously();
+                }
                 var snap=await db.collection(TEVELLO_COLLECTION).where('username','==',user).limit(1).get();
                 if(snap.empty){msg.style.color='#ff4444';msg.textContent='Account not found. Try signing up!';return;}
                 var doc=snap.docs[0];
@@ -32441,6 +32445,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             
             msg.style.color='#888';msg.textContent='Creating account...';
             try{
+                // Ensure authenticated before Firestore query
+                if(!firebase.auth().currentUser){
+                    await firebase.auth().signInAnonymously();
+                }
                 // Check if username taken
                 var existing=await db.collection(TEVELLO_COLLECTION).where('username','==',userLower).limit(1).get();
                 if(!existing.empty){msg.style.color='#ff4444';msg.textContent='Email already registered! Try logging in.';return;}
@@ -32618,37 +32626,41 @@ Return ONLY this JSON (no markdown, no code blocks):
             }catch(e){}
         }
         var emojis=[
-'https://www.dropbox.com/scl/fi/dvki6jr4vougyhqh2euaa/_FO2BAC315742-final-1.gif?rlkey=tnrie3eu2d0gwmfmix9dstmfg&st=wj02p5wq&dl=1',
-'https://www.dropbox.com/scl/fi/ebgp46m47sbwrzt48nutf/Eating-crazy.gif?rlkey=qzgx54jtnxva6ahr1wlhsfrzs&st=u14ec51o&dl=1',
-'https://www.dropbox.com/scl/fi/d09bmyq3ujoswnyo078ls/Focus-focus.gif?rlkey=efvm3h7o5311wkkb9iiksntj2&st=uc75ppu4&dl=1',
-'https://www.dropbox.com/scl/fi/o92r5vv7hyf6fxmhoakip/Give-me-the-notes.gif?rlkey=ha6nb9d8dfpwt1ys42ewyx78g&st=sxk3ufqv&dl=1',
-'https://www.dropbox.com/scl/fi/rzvpnypli5h3d1ydbqfm0/Good-luck-on-your-quiz.gif?rlkey=zkdw2l52wiv8l77t231luqs08&st=5p440bhs&dl=1',
-'https://www.dropbox.com/scl/fi/lvhznzgpuwong3ud4ymqt/I-have-an-exam-tomorrow.gif?rlkey=oig2dagcc1uxu0xxiz29vla2x&st=mczw97og&dl=1',
-'https://www.dropbox.com/scl/fi/scgpqa8wpzxm6m51c8xuu/I-have-too-much-homework.gif?rlkey=j8b9el0yj2b5a401azmjg5xqo&st=et7mfq4z&dl=1',
-'https://www.dropbox.com/scl/fi/1wcnjo9eomyvkm9n9qu6k/I-love-studying.gif?rlkey=05hy7xik8j39werht095jb6d7&st=oimmydqf&dl=1',
-'https://www.dropbox.com/scl/fi/fzb02qn1c1l89log9mwoo/If-hard-lets-study-together.gif?rlkey=glo3bc57fr228ghwnea1x3c3w&st=ngqhtbe3&dl=1',
-'https://www.dropbox.com/scl/fi/hp6ygalqwghfdugtydgmk/I-want-to-study-with-you.gif?rlkey=naqjx82hwuqkxvw2ecjisxs95&st=2tup9fag&dl=1',
-'https://www.dropbox.com/scl/fi/geka7m1ultk194rvnei6y/Its-study-time-now.gif?rlkey=16vw3t1kywnjx9mxnwdvk8w81&st=0j8f46ok&dl=1',
-'https://www.dropbox.com/scl/fi/2ikr4ijyw60p26536myp2/Lets-all-study-together.gif?rlkey=6tr3een8q1987qgxvw296q1tg&st=eu5p3rxr&dl=1',
-'https://www.dropbox.com/scl/fi/72dp3a76vczu4zv547qkl/Lets-go-study-now.gif?rlkey=jsxrugitencpvshyhw0zr25t1&st=p5uldifo&dl=1',
-'https://www.dropbox.com/scl/fi/kdjaue6vdaypjol413jft/Lets-take-a-short-break.gif?rlkey=zxznwrlbizgltl00fk1bx1i8p&st=zjej6t54&dl=1',
-'https://www.dropbox.com/scl/fi/xzdcsii42kjon7td450na/More-Coffee.gif?rlkey=gt5yp0terpbp718x4w7vpo5yi&st=ou7iho2b&dl=1',
-'https://www.dropbox.com/scl/fi/t5cj8d3ii12589dbn0iwk/My-head-hurts.gif?rlkey=7fgpdsjko34e1r7fr1grwyb9q&st=as1tnyc4&dl=1',
-'https://www.dropbox.com/scl/fi/7z2vfbhkt6a2efuev19nb/Recommend-me-the-study-music.gif?rlkey=xuv0ao2s7q19hv0rvv3dt6zn1&st=u774ywcv&dl=1',
-'https://www.dropbox.com/scl/fi/kbbh2o0oi4idnkei5n0g6/No.gif?rlkey=lyph2ej9ehsrg1gwg2thb9lte&st=1ysj9i80&dl=1',
-'https://www.dropbox.com/scl/fi/5h3r3l53eyir5pu8oa23e/Sleep.gif?rlkey=fuzjunf3al3r3xf4i64staczg&st=3j6aiws3&dl=1',
-'https://www.dropbox.com/scl/fi/yt3syg1afnb9hovgy9gt8/Study-time.gif?rlkey=lpw53m9b66d17pk8ul3ss9qbe&st=b1a1jk78&dl=1',
-'https://www.dropbox.com/scl/fi/0fm6xtumn0qa5flfjvdot/Study-hard-again-today.gif?rlkey=h469g2hkl6uzbti93fr9drxmn&st=y7urp14q&dl=1',
-'https://www.dropbox.com/scl/fi/yyol3zagijf1l0q2q5zo1/Suddenly-Angry.gif?rlkey=rs6acovfo458q17pgriojaw7w&st=usuhrcdc&dl=1',
-'https://www.dropbox.com/scl/fi/qvwsu2acnojj46vhxfvol/Suspicious-Smile.gif?rlkey=k3cc5pfs6o2fywobcytenk7sz&st=ktcidsxp&dl=1',
-'https://www.dropbox.com/scl/fi/6tsa1logp63klaui47uqc/Tell-me-the-study-magic.gif?rlkey=giid1j3f2t36yz37s5uzdvkcg&st=3aoedpb5&dl=1',
-'https://www.dropbox.com/scl/fi/mlnu4rrhv00o5r272qddw/Want-to-study-together-at-school.gif?rlkey=g0jied9af7q1rzs02k87l56re&st=ilz3vhnv&dl=1',
-'https://www.dropbox.com/scl/fi/tgcw9snu7yys62rmny0lz/What.gif?rlkey=4ldyhnnbxale3y6li15iwltbj&st=c42x8zzh&dl=1',
-'https://www.dropbox.com/scl/fi/z4cqg35dc6n0zx6nyjelb/Youre-the-star-of-studying.gif?rlkey=6v30xqj4d92by9unrm8kptni0&st=gxvetoog&dl=1',
-'https://www.dropbox.com/scl/fi/n5wbcz35gsqpv25tbmv11/Kickballs.gif?rlkey=mzc3otvmh2363eheb2ns4np52&st=wl7dzqvr&dl=1'
+'https://www.dropbox.com/scl/fi/dvki6jr4vougyhqh2euaa/_FO2BAC315742-final-1.gif?rlkey=tnrie3eu2d0gwmfmix9dstmfg&st=wj02p5wq&raw=1',
+'https://www.dropbox.com/scl/fi/ebgp46m47sbwrzt48nutf/Eating-crazy.gif?rlkey=qzgx54jtnxva6ahr1wlhsfrzs&st=u14ec51o&raw=1',
+'https://www.dropbox.com/scl/fi/d09bmyq3ujoswnyo078ls/Focus-focus.gif?rlkey=efvm3h7o5311wkkb9iiksntj2&st=uc75ppu4&raw=1',
+'https://www.dropbox.com/scl/fi/o92r5vv7hyf6fxmhoakip/Give-me-the-notes.gif?rlkey=ha6nb9d8dfpwt1ys42ewyx78g&st=sxk3ufqv&raw=1',
+'https://www.dropbox.com/scl/fi/rzvpnypli5h3d1ydbqfm0/Good-luck-on-your-quiz.gif?rlkey=zkdw2l52wiv8l77t231luqs08&st=5p440bhs&raw=1',
+'https://www.dropbox.com/scl/fi/lvhznzgpuwong3ud4ymqt/I-have-an-exam-tomorrow.gif?rlkey=oig2dagcc1uxu0xxiz29vla2x&st=mczw97og&raw=1',
+'https://www.dropbox.com/scl/fi/scgpqa8wpzxm6m51c8xuu/I-have-too-much-homework.gif?rlkey=j8b9el0yj2b5a401azmjg5xqo&st=et7mfq4z&raw=1',
+'https://www.dropbox.com/scl/fi/1wcnjo9eomyvkm9n9qu6k/I-love-studying.gif?rlkey=05hy7xik8j39werht095jb6d7&st=oimmydqf&raw=1',
+'https://www.dropbox.com/scl/fi/fzb02qn1c1l89log9mwoo/If-hard-lets-study-together.gif?rlkey=glo3bc57fr228ghwnea1x3c3w&st=ngqhtbe3&raw=1',
+'https://www.dropbox.com/scl/fi/hp6ygalqwghfdugtydgmk/I-want-to-study-with-you.gif?rlkey=naqjx82hwuqkxvw2ecjisxs95&st=2tup9fag&raw=1',
+'https://www.dropbox.com/scl/fi/geka7m1ultk194rvnei6y/Its-study-time-now.gif?rlkey=16vw3t1kywnjx9mxnwdvk8w81&st=0j8f46ok&raw=1',
+'https://www.dropbox.com/scl/fi/2ikr4ijyw60p26536myp2/Lets-all-study-together.gif?rlkey=6tr3een8q1987qgxvw296q1tg&st=eu5p3rxr&raw=1',
+'https://www.dropbox.com/scl/fi/72dp3a76vczu4zv547qkl/Lets-go-study-now.gif?rlkey=jsxrugitencpvshyhw0zr25t1&st=p5uldifo&raw=1',
+'https://www.dropbox.com/scl/fi/kdjaue6vdaypjol413jft/Lets-take-a-short-break.gif?rlkey=zxznwrlbizgltl00fk1bx1i8p&st=zjej6t54&raw=1',
+'https://www.dropbox.com/scl/fi/xzdcsii42kjon7td450na/More-Coffee.gif?rlkey=gt5yp0terpbp718x4w7vpo5yi&st=ou7iho2b&raw=1',
+'https://www.dropbox.com/scl/fi/t5cj8d3ii12589dbn0iwk/My-head-hurts.gif?rlkey=7fgpdsjko34e1r7fr1grwyb9q&st=as1tnyc4&raw=1',
+'https://www.dropbox.com/scl/fi/7z2vfbhkt6a2efuev19nb/Recommend-me-the-study-music.gif?rlkey=xuv0ao2s7q19hv0rvv3dt6zn1&st=u774ywcv&raw=1',
+'https://www.dropbox.com/scl/fi/kbbh2o0oi4idnkei5n0g6/No.gif?rlkey=lyph2ej9ehsrg1gwg2thb9lte&st=1ysj9i80&raw=1',
+'https://www.dropbox.com/scl/fi/5h3r3l53eyir5pu8oa23e/Sleep.gif?rlkey=fuzjunf3al3r3xf4i64staczg&st=3j6aiws3&raw=1',
+'https://www.dropbox.com/scl/fi/yt3syg1afnb9hovgy9gt8/Study-time.gif?rlkey=lpw53m9b66d17pk8ul3ss9qbe&st=b1a1jk78&raw=1',
+'https://www.dropbox.com/scl/fi/0fm6xtumn0qa5flfjvdot/Study-hard-again-today.gif?rlkey=h469g2hkl6uzbti93fr9drxmn&st=y7urp14q&raw=1',
+'https://www.dropbox.com/scl/fi/yyol3zagijf1l0q2q5zo1/Suddenly-Angry.gif?rlkey=rs6acovfo458q17pgriojaw7w&st=usuhrcdc&raw=1',
+'https://www.dropbox.com/scl/fi/qvwsu2acnojj46vhxfvol/Suspicious-Smile.gif?rlkey=k3cc5pfs6o2fywobcytenk7sz&st=ktcidsxp&raw=1',
+'https://www.dropbox.com/scl/fi/6tsa1logp63klaui47uqc/Tell-me-the-study-magic.gif?rlkey=giid1j3f2t36yz37s5uzdvkcg&st=3aoedpb5&raw=1',
+'https://www.dropbox.com/scl/fi/mlnu4rrhv00o5r272qddw/Want-to-study-together-at-school.gif?rlkey=g0jied9af7q1rzs02k87l56re&st=ilz3vhnv&raw=1',
+'https://www.dropbox.com/scl/fi/tgcw9snu7yys62rmny0lz/What.gif?rlkey=4ldyhnnbxale3y6li15iwltbj&st=c42x8zzh&raw=1',
+'https://www.dropbox.com/scl/fi/z4cqg35dc6n0zx6nyjelb/Youre-the-star-of-studying.gif?rlkey=6v30xqj4d92by9unrm8kptni0&st=gxvetoog&raw=1',
+'https://www.dropbox.com/scl/fi/n5wbcz35gsqpv25tbmv11/Kickballs.gif?rlkey=mzc3otvmh2363eheb2ns4np52&st=wl7dzqvr&raw=1'
 ];
 
         function qsInit(roomCode) {
+            // Ensure Firebase auth for Firestore access (students may not be signed in)
+            if(!firebase.auth().currentUser){
+                firebase.auth().signInAnonymously().catch(function(e){console.error('Anon auth error:',e);});
+            }
             // Inject sparkle CSS into head so it survives body.innerHTML clearing
             if(!document.querySelector('#sparkleStyles')){var ss=document.createElement('style');ss.id='sparkleStyles';ss.textContent='.sparkle-btn{position:relative;overflow:visible;transition:transform 0.2s,box-shadow 0.2s;}.sparkle-btn:hover{transform:scale(1.05) translateY(-2px) !important;box-shadow:0 6px 20px rgba(255,119,119,0.4) !important;}.sparkle-btn:active{transform:scale(0.98) !important;}.sparkle-btn .sparkle-svg{opacity:0;}.sparkle-btn:hover .sparkle-svg{animation:qgSparkle 0.75s both;}.sparkle-btn:hover .sparkle-svg:nth-of-type(1){animation-delay:0.15s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(2){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(3){animation-delay:0.45s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(4){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(5){animation-delay:0.6s;}@keyframes qgSparkle{0%{transform:translate(-50%,-50%) scale(0);opacity:0;}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}.sparkle-btn::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(108deg,transparent 0% 40%,rgba(255,255,255,0.3) 40% 45%,transparent 45% 55%,rgba(255,255,255,0.2) 55% 65%,transparent 65%);background-size:200% 100%;background-position:200% 0;transition:background-position 0s;pointer-events:none;z-index:2;}.sparkle-btn:hover::after{background-position:-200% 0;transition:background-position 1.2s 0.2s ease-out;}';document.head.appendChild(ss);}
             // Inject btnPress animation CSS + JS into head
