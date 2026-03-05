@@ -653,37 +653,6 @@
         .suggestion-status.declined { background: rgba(255,51,102,0.2); color: #ff3366; }
         .suggestion-actions { display: flex; gap: 8px; margin-top: 10px; }
         
-        /* Proposals Layout */
-        .proposals-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-        .proposals-left, .proposals-right { min-width: 0; }
-        @media (max-width: 1024px) { .proposals-layout { grid-template-columns: 1fr; } }
-        
-        /* Proposal Card */
-        .proposal-card { background: rgba(0,0,0,0.3); border: 2px solid #333; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-        .proposal-card.status-draft { border-left: 4px solid #888; }
-        .proposal-card.status-sent { border-left: 4px solid #ffff00; }
-        .proposal-card.status-all_agreed { border-left: 4px solid #39ff14; }
-        .proposal-card.status-has_rejections { border-left: 4px solid #ff3366; }
-        .proposal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-        .proposal-info { flex: 1; }
-        .proposal-day { color: #00ffff; font-size: 12px; }
-        .proposal-time { color: #888; font-size: 13px; }
-        .proposal-status { padding: 3px 8px; border-radius: 4px; font-size: 11px; }
-        .proposal-status.draft { background: rgba(136,136,136,0.3); color: #888; }
-        .proposal-status.sent { background: rgba(255,255,0,0.3); color: #ffff00; }
-        .proposal-status.all_agreed { background: rgba(57,255,20,0.3); color: #39ff14; }
-        .proposal-status.has_rejections { background: rgba(255,51,102,0.3); color: #ff3366; }
-        .proposal-students { margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px; min-height: 60px; }
-        .proposal-students.drag-over { border: 2px dashed #00ffff; background: rgba(0,255,255,0.1); }
-        .proposal-student { display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 5px 0; background: rgba(0,0,0,0.3); border-radius: 5px; border: 1px solid #333; }
-        .proposal-student-name { font-size: 12px; color: #fff; }
-        .proposal-student-response { font-size: 11px; padding: 2px 6px; border-radius: 3px; }
-        .proposal-student-response.pending { background: rgba(255,255,0,0.2); color: #ffff00; }
-        .proposal-student-response.agreed { background: rgba(57,255,20,0.2); color: #39ff14; }
-        .proposal-student-response.rejected { background: rgba(255,51,102,0.2); color: #ff3366; }
-        .proposal-date-picker { margin: 10px 0; padding: 10px; background: rgba(255,255,0,0.1); border: 1px solid #ffff00; border-radius: 5px; }
-        .proposal-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-        
         /* Available Students for Drag */
         .available-student { padding: 10px; margin: 5px 0; background: rgba(0,0,0,0.3); border: 2px solid #333; border-radius: 8px; cursor: grab; transition: all 0.2s; }
         .available-student:hover { border-color: #00ffff; background: rgba(0,255,255,0.1); }
@@ -1337,14 +1306,11 @@
                     <button class="nav-tab" onclick="showAdminTab('calendar')">🗓️ Calendar</button>
                     <button class="nav-tab" onclick="showAdminTab('schedule')">📅 Schedule</button>
                     <button class="nav-tab" onclick="showAdminTab('students')">📋 Students</button>
-                    <button class="nav-tab" onclick="showAdminTab('proposals')">📝 Proposals</button>
                     <button class="nav-tab" onclick="showAdminTab('classes')">📚 Classes</button>
                     <button class="nav-tab" onclick="showAdminTab('checkin')">✅ Check-in</button>
                     <button class="nav-tab" onclick="showAdminTab('outreach')">📞 Outreach</button>
                     <button class="nav-tab" onclick="showAdminTab('attendance')">📊 Attendance</button>
                     <button class="nav-tab" onclick="showAdminTab('absences')">🚫 Absences</button>
-                    <button class="nav-tab" onclick="showAdminTab('movehistory')">🔄 Move History</button>
-                    <button class="nav-tab" onclick="showAdminTab('completed')">🎓 Completed</button>
                     <button class="nav-tab" onclick="showAdminTab('teachers')">👨‍🏫 Teachers</button>
                     <button class="nav-tab" onclick="showAdminTab('materials')">📖 Materials</button>
                     <button class="nav-tab" onclick="showAdminTab('tuesdayreading')">📖 Tuesday Reading</button>
@@ -1454,29 +1420,6 @@
                             <button class="btn btn-warning" onclick="openExistingStudentSearch()">🔍 Add Existing Student</button>
                         </div>
                         <div style="overflow-x: auto;"><table><thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Timezone</th><th>Availability</th><th>Video</th><th>Class</th><th>Status</th><th>Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="9" style="text-align: center; color: #888;">Loading...</td></tr></tbody></table></div>
-                    </div>
-                </div>
-
-                <!-- Proposals Tab -->
-                <div id="adminTabProposals" class="tab-content">
-                    <div class="proposals-layout">
-                        <!-- Left Side - Proposed Classes -->
-                        <div class="proposals-left">
-                            <div class="card">
-                                <h3>📝 Proposed Classes</h3>
-                                <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Review and manage class proposals before finalizing.</p>
-                                <div id="proposalsContainer"><p style="color: #888; font-size: 12px;">No proposals yet. Use "Auto-Generate Classes" to create proposals.</p></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Right Side - Available Students -->
-                        <div class="proposals-right">
-                            <div class="card">
-                                <h3>👥 Available Students</h3>
-                                <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Drag students into proposed classes. <span style="color: #ff00ff;">🌈 Rainbow = good fit</span></p>
-                                <div id="availableStudentsForProposals"><p style="color: #888; font-size: 12px;">No available students.</p></div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1794,90 +1737,6 @@
                     </div>
                 </div>
 
-                <!-- Move History Tab -->
-                <div id="adminTabMovehistory" class="tab-content">
-                    <div class="card">
-                        <h3>🔄 Student Move History</h3>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Track all student movements between classes, returns to pool, and drops.</p>
-                        
-                        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
-                            <button class="btn btn-info" onclick="loadMoveHistory()">🔄 Refresh</button>
-                            <input type="text" id="moveHistorySearch" placeholder="🔍 Search by student name..." oninput="filterMoveHistory()" style="padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; font-size: 12px; width: 200px;">
-                            <select id="moveHistoryFilter" onchange="filterMoveHistory()" style="padding: 8px 10px; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; font-size: 12px;">
-                                <option value="all">All Actions</option>
-                                <option value="moved">Moved to Class</option>
-                                <option value="pool">Returned to Pool</option>
-                                <option value="dropped">Dropped</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Stats -->
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
-                            <div style="background: rgba(0,255,255,0.1); border: 2px solid #00ffff; border-radius: 10px; padding: 15px; text-align: center;">
-                                <div id="moveHistoryTotal" style="font-size: 24px; font-weight: 700; color: #00ffff;">0</div>
-                                <div style="font-size: 11px; color: #888;">Total Moves</div>
-                            </div>
-                            <div style="background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 10px; padding: 15px; text-align: center;">
-                                <div id="moveHistoryMoved" style="font-size: 24px; font-weight: 700; color: #39ff14;">0</div>
-                                <div style="font-size: 11px; color: #888;">Class Transfers</div>
-                            </div>
-                            <div style="background: rgba(255,170,0,0.1); border: 2px solid #ffaa00; border-radius: 10px; padding: 15px; text-align: center;">
-                                <div id="moveHistoryPool" style="font-size: 24px; font-weight: 700; color: #ffaa00;">0</div>
-                                <div style="font-size: 11px; color: #888;">Returned to Pool</div>
-                            </div>
-                            <div style="background: rgba(255,51,102,0.1); border: 2px solid #ff3366; border-radius: 10px; padding: 15px; text-align: center;">
-                                <div id="moveHistoryDropped" style="font-size: 24px; font-weight: 700; color: #ff3366;">0</div>
-                                <div style="font-size: 11px; color: #888;">Dropped</div>
-                            </div>
-                        </div>
-                        
-                        <!-- History List -->
-                        <div id="moveHistoryList" style="max-height: 500px; overflow-y: auto;">
-                            <p style="color: #888; font-size: 12px; text-align: center;">Click Refresh to load move history...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Completed Tab -->
-                <div id="adminTabCompleted" class="tab-content">
-                    <div class="card">
-                        <h3>🎓 Completed Classes</h3>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">View all completed classes and track 1-Year Academy enrollment status.</p>
-                        
-                        <!-- Date Filter -->
-                        <div style="margin-bottom: 15px;">
-                            <label style="font-size: 12px; color: #888; margin-bottom: 5px; display: block;">Filter by completion date:</label>
-                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                <button class="btn btn-sm admin-completed-filter-btn" onclick="filterAdminCompletedClasses('all')" data-days="all">All time</button>
-                                <button class="btn btn-sm admin-completed-filter-btn active" onclick="filterAdminCompletedClasses('7')" data-days="7">Last 7 days</button>
-                                <button class="btn btn-sm admin-completed-filter-btn" onclick="filterAdminCompletedClasses('14')" data-days="14">Last 14 days</button>
-                                <button class="btn btn-sm admin-completed-filter-btn" onclick="filterAdminCompletedClasses('28')" data-days="28">Last 28 days</button>
-                                <button class="btn btn-sm admin-completed-filter-btn" onclick="filterAdminCompletedClasses('90')" data-days="90">Last 3 months</button>
-                                <button class="btn btn-sm admin-completed-filter-btn" onclick="filterAdminCompletedClasses('180')" data-days="180">Last 6 months</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Completed Stats -->
-                        <div class="schedule-summary" style="margin-bottom: 20px;">
-                            <div class="summary-box" style="border-color: #ff00ff;"><div class="summary-number" id="completedTotalCount" style="color: #ff00ff;">0</div><div class="summary-label">TOTAL STUDENTS</div></div>
-                            <div class="summary-box" style="border-color: #39ff14;"><div class="summary-number" id="completedJoinedCount" style="color: #39ff14;">0</div><div class="summary-label">JOINED (YES)</div></div>
-                            <div class="summary-box" style="border-color: #ff3366;"><div class="summary-number" id="completedNotInterestedCount" style="color: #ff3366;">0</div><div class="summary-label">DECLINED (NO)</div></div>
-                            <div class="summary-box" style="border-color: #ffff00;"><div class="summary-number" id="completedPendingCount" style="color: #ffff00;">0</div><div class="summary-label">PENDING</div></div>
-                        </div>
-                        
-                        <!-- Legend -->
-                        <div class="schedule-legend" style="margin-bottom: 15px;">
-                            <div class="legend-item"><div class="legend-bar" style="background: #39ff14;"></div><span>Yes - Joined Academy</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: #ff3366;"></div><span>No - Declined</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: #ffff00;"></div><span>Pending Decision</span></div>
-                        </div>
-                        
-                        <!-- Completed Classes List -->
-                        <div id="adminCompletedClassesContainer">
-                            <p style="color: #888; font-size: 12px;">Loading completed classes...</p>
-                        </div>
-                    </div>
-                </div>
 
                 <div id="adminTabTeachers" class="tab-content">
                     <div class="grid-2">
@@ -3052,59 +2911,6 @@
     </div>
 
     <!-- Student Analytics Menu Popup -->
-    <div class="modal-overlay" id="studentAnalyticsMenuModal">
-        <div class="modal" style="max-width: 400px;">
-            <button class="modal-close" onclick="closeStudentAnalyticsMenu()">✕</button>
-            <h3 class="modal-title">📊 <span id="analyticsStudentName">Student</span> Analytics</h3>
-            <p style="font-size: 12px; color: #888; margin-bottom: 20px; text-align: center;">Select an analytics category to view</p>
-            <div style="display: grid; gap: 12px;">
-                <button class="btn" style="width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-size: 14px;" onclick="openAnalyticsDatePicker('pronunciation')">
-                    🎤 Pronunciation Analytics
-                </button>
-                <button class="btn" style="width: 100%; padding: 15px; background: linear-gradient(135deg, #48bb78 0%, #38b2ac 100%); font-size: 14px;" onclick="openAnalyticsDatePicker('grammar')">
-                    📖 Grammar Analytics
-                </button>
-                <button class="btn" style="width: 100%; padding: 15px; background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); font-size: 14px;" onclick="openAnalyticsDatePicker('vocabulary')">
-                    📚 Vocabulary Analytics
-                </button>
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                <button class="btn btn-info" id="backToStudentLookupBtn" onclick="backToStudentLookup()" style="display: none;">← Back to List</button>
-                <button class="btn btn-secondary" onclick="closeStudentAnalyticsMenu()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Analytics Date Picker Modal -->
-    <div class="modal-overlay" id="analyticsDatePickerModal">
-        <div class="modal" style="max-width: 500px;">
-            <button class="modal-close" onclick="closeAnalyticsDatePicker()">✕</button>
-            <h3 class="modal-title" id="analyticsDatePickerTitle">📊 Select Date</h3>
-            <p style="font-size: 12px; color: #888; margin-bottom: 15px; text-align: center;">Select a date to view analytics</p>
-            <div id="analyticsDatesList" style="max-height: 400px; overflow-y: auto;">
-                <p style="color: #888; font-size: 12px; text-align: center;">Loading dates...</p>
-            </div>
-            <div style="text-align: center; margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="closeAnalyticsDatePicker()">Back</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Analytics Display Modal -->
-    <div class="modal-overlay" id="analyticsDisplayModal">
-        <div class="modal" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-            <button class="modal-close" onclick="closeAnalyticsDisplay()">✕</button>
-            <h3 class="modal-title" id="analyticsDisplayTitle">📊 Analytics</h3>
-            <div id="analyticsDisplayContent" style="padding: 15px 0;">
-                <p style="color: #888; font-size: 12px; text-align: center;">Loading analytics...</p>
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                <button class="btn btn-info" id="backToStudentLookupFromDisplayBtn" onclick="backToStudentLookup()" style="display: none;">← Back to Student List</button>
-                <button class="btn btn-secondary" onclick="closeAnalyticsDisplay()">Close</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ==================== STUDENT LOOKUP MODAL ==================== -->
     <div class="modal-overlay" id="studentLookupModal">
         <div class="modal" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
@@ -6590,15 +6396,7 @@
                 '</div>';
         }
         
-        function getUpcomingSaturdaysHTML(proposalId, selectedDate) {
-            const saturdays = getUpcomingSaturdays(5);
-            return saturdays.map(sat => {
-                const dateStr = toESTDateStr(sat);
-                const label = sat.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
-                const isSelected = selectedDate === dateStr;
-                return `<button type="button" class="saturday-quick-btn ${isSelected ? 'selected' : ''}" onclick="updateProposalDate('${proposalId}', '${dateStr}')">${label}</button>`;
-            }).join('');
-        }
+        function getUpcomingSaturdaysHTML(proposalId, selectedDate) { }
         
         function setPreviewClassDate(idx, date) {
             if (previewedClasses[idx]) {
@@ -20571,38 +20369,9 @@ Return ONLY valid JSON (single object, not array):
         let adminCompletedFilterDays = '7';
         let allAdminCompletedClasses = [];
         
-        async function loadAdminCompletedClasses() {
-            const container = document.getElementById('adminCompletedClassesContainer');
-            if (!container) return;
-            container.innerHTML = '<p style="color: #888; font-size: 12px;">Loading completed classes...</p>';
-            
-            try {
-                // Get ALL completed classes (from all teachers)
-                const snap = await db.collection('scheduler_classes')
-                    .where('status', '==', 'completed')
-                    .get();
-                
-                allAdminCompletedClasses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                
-                renderAdminFilteredCompletedClasses();
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error: ${escapeHtml(e.message)}</p>`;
-            }
-        }
+        async function loadAdminCompletedClasses(){ }
         
-        function filterAdminCompletedClasses(days) {
-            adminCompletedFilterDays = days;
-            
-            document.querySelectorAll('.admin-completed-filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.days === days) {
-                    btn.classList.add('active');
-                }
-            });
-            
-            renderAdminFilteredCompletedClasses();
-        }
+        function filterAdminCompletedClasses(days){ }
         
         function renderAdminFilteredCompletedClasses() {
             const container = document.getElementById('adminCompletedClassesContainer');
@@ -21421,36 +21190,7 @@ Return ONLY valid JSON (single object, not array):
         
         let allMoveHistory = [];
         
-        async function loadMoveHistory() {
-            const container = document.getElementById('moveHistoryList');
-            container.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center;">Loading move history...</p>';
-            
-            try {
-                const snap = await db.collection('scheduler_move_history')
-                    .orderBy('movedAt', 'desc')
-                    .limit(100)
-                    .get();
-                
-                allMoveHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                
-                // Update stats
-                const totalMoves = allMoveHistory.length;
-                const movedToClass = allMoveHistory.filter(m => m.toClassId && m.toClassInfo !== 'Returned to Pool' && m.toClassInfo !== 'Dropped').length;
-                const returnedToPool = allMoveHistory.filter(m => m.toClassInfo === 'Returned to Pool').length;
-                const dropped = allMoveHistory.filter(m => m.toClassInfo === 'Dropped').length;
-                
-                document.getElementById('moveHistoryTotal').textContent = totalMoves;
-                document.getElementById('moveHistoryMoved').textContent = movedToClass;
-                document.getElementById('moveHistoryPool').textContent = returnedToPool;
-                document.getElementById('moveHistoryDropped').textContent = dropped;
-                
-                renderMoveHistoryList();
-                
-            } catch (e) {
-                console.error('Error loading move history:', e);
-                container.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error loading move history: ${escapeHtml(e.message)}</p>`;
-            }
-        }
+        async function loadMoveHistory(){ }
         
         function filterMoveHistory() {
             renderMoveHistoryList();
@@ -22518,7 +22258,6 @@ Return ONLY valid JSON (single object, not array):
                 '<div id="scCannedEditArea"></div>'+
 
                 '<div style="display:flex;gap:8px;margin-top:16px;">'+
-                '<button onclick="scOpenAnalytics()" style="flex:1;padding:10px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">\uD83D\uDCCA Analytics</button>'+
                 '<button onclick="document.getElementById(\'studentContactModal\').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;font-size:12px;cursor:pointer;">Close</button>'+
                 '</div></div>';
             }
@@ -22650,11 +22389,6 @@ Return ONLY valid JSON (single object, not array):
             };
 
             // Analytics
-            window.scOpenAnalytics=function(){
-                modal.remove();
-                document.getElementById('analyticsStudentName').textContent=studentName;
-                document.getElementById('studentAnalyticsMenuModal').classList.add('active');
-            };
 
             document.body.appendChild(modal);
             modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
@@ -22665,194 +22399,9 @@ Return ONLY valid JSON (single object, not array):
             document.getElementById('studentAnalyticsMenuModal').classList.remove('active');
         }
         
-        async function openAnalyticsDatePicker(type) {
-            currentAnalyticsType = type;
-            const typeLabels = {
-                pronunciation: '🎤 Pronunciation',
-                grammar: '📖 Grammar',
-                vocabulary: '📚 Vocabulary'
-            };
-            
-            document.getElementById('analyticsDatePickerTitle').textContent = `${typeLabels[type]} Analytics`;
-            document.getElementById('analyticsDatePickerModal').classList.add('active');
-            document.getElementById('studentAnalyticsMenuModal').classList.remove('active');
-            
-            const datesList = document.getElementById('analyticsDatesList');
-            datesList.innerHTML = '<p style="color: #00ffff; font-size: 12px; text-align: center;"><span style="display: inline-block; width: 12px; height: 12px; border: 2px solid #00ffff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span> Loading...</p>';
-            
-            try {
-                let dates = [];
-                let hasData = false;
-                
-                if (type === 'pronunciation') {
-                    const submissions = await db.collection('submissions2')
-                        .where('studentEmail', '==', currentAnalyticsStudentEmail)
-                        .where('status', '==', 'graded')
-                        .get();
-                    hasData = !submissions.empty;
-                    
-                    submissions.docs.forEach(doc => {
-                        const data = doc.data();
-                        if (data.gradedAt) {
-                            const date = data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt);
-                            dates.push({
-                                id: doc.id,
-                                date: date,
-                                testTitle: data.testTitle || 'Pronunciation Test',
-                                overallScore: data.overallScore
-                            });
-                        }
-                    });
-                } else if (type === 'grammar') {
-                    const submissions = await db.collection('submissions')
-                        .where('studentEmail', '==', currentAnalyticsStudentEmail)
-                        .where('status', '==', 'graded')
-                        .get();
-                    hasData = !submissions.empty;
-                    
-                    submissions.docs.forEach(doc => {
-                        const data = doc.data();
-                        if (data.gradedAt) {
-                            const date = data.gradedAt.toDate ? data.gradedAt.toDate() : new Date(data.gradedAt);
-                            dates.push({
-                                id: doc.id,
-                                date: date,
-                                testTitle: data.testTitle || 'Grammar Test',
-                                overallScore: data.overallScore
-                            });
-                        }
-                    });
-                } else if (type === 'vocabulary') {
-                    // For vocabulary, we need to check multiple data sources
-                    // First, find the student's UID from users collection
-                    let studentUid = null;
-                    try {
-                        const userQuery = await db.collection('users').where('email', '==', currentAnalyticsStudentEmail).limit(1).get();
-                        if (!userQuery.empty) {
-                            studentUid = userQuery.docs[0].id;
-                        }
-                    } catch (e) {
-                    }
-                    
-                    // Check flashcardResults by email
-                    try {
-                        const results = await db.collection('flashcardResults')
-                            .where('studentEmail', '==', currentAnalyticsStudentEmail)
-                            .get();
-                        
-                        if (!results.empty) {
-                            hasData = true;
-                            results.docs.forEach(doc => {
-                                const data = doc.data();
-                                if (data.completedAt) {
-                                    const date = data.completedAt.toDate ? data.completedAt.toDate() : new Date(data.completedAt);
-                                    dates.push({
-                                        id: doc.id,
-                                        date: date,
-                                        testTitle: data.setTitle || 'Vocabulary Set',
-                                        overallScore: data.score
-                                    });
-                                }
-                            });
-                        }
-                    } catch (e) {
-                    }
-                    
-                    // Check leitnerProgress by studentId (UID)
-                    if (studentUid) {
-                        try {
-                            const leitnerSnap = await db.collection('leitnerProgress').where('studentId', '==', studentUid).limit(1).get();
-                            if (!leitnerSnap.empty) {
-                                hasData = true;
-                            }
-                        } catch (e) {
-                        }
-                        
-                        // Also check leitnerStats
-                        try {
-                            const statsDoc = await db.collection('leitnerStats').doc(studentUid).get();
-                            if (statsDoc.exists && statsDoc.data().totalReviews > 0) {
-                                hasData = true;
-                            }
-                        } catch (e) {
-                        }
-                        
-                        // Also check masteryDeck
-                        try {
-                            const masterySnap = await db.collection('masteryDeck').where('studentId', '==', studentUid).limit(1).get();
-                            if (!masterySnap.empty) {
-                                hasData = true;
-                            }
-                        } catch (e) {
-                        }
-                    }
-                }
-                
-                // Sort by date descending
-                dates.sort((a, b) => b.date - a.date);
-                
-                if (!hasData && dates.length === 0) {
-                    datesList.innerHTML = `
-                        <div style="text-align: center; padding: 30px;">
-                            <div style="font-size: 40px; margin-bottom: 15px;">📭</div>
-                            <p style="color: #888; font-size: 13px;">No ${type} analytics found for this student.</p>
-                            <p style="color: #666; font-size: 12px; margin-top: 10px;">Analytics will appear here once the student completes ${type} evaluations.</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                // Show "View All Analytics" button at top
-                let html = `
-                    <div onclick="loadAnalyticsForDate('all')" style="cursor: pointer; background: linear-gradient(135deg, rgba(0,255,255,0.2), rgba(255,0,255,0.2)); border: 3px solid #00ffff; border-radius: 10px; padding: 20px; margin-bottom: 20px; text-align: center; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                        <p style="font-size: 12px; color: #00ffff; margin: 0 0 5px 0; font-weight: bold;">📊 View All Analytics</p>
-                        <p style="font-size: 12px; color: #888; margin: 0;">Comprehensive overview with charts & improvement stats</p>
-                    </div>
-                `;
-                
-                if (dates.length > 0) {
-                    html += `<p style="font-size: 12px; color: #888; margin-bottom: 10px; text-align: center;">Or view individual sessions (${dates.length} total):</p>`;
-                    html += `<div style="max-height: 300px; overflow-y: auto;">`;
-                    html += dates.slice(0, 10).map(d => {
-                        const dateStr = d.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                        const timeStr = d.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                        const scoreColor = d.overallScore >= 80 ? '#39ff14' : d.overallScore >= 60 ? '#ffff00' : '#ff3366';
-                        
-                        return `
-                            <div onclick="loadAnalyticsForDate('${d.id}')" style="cursor: pointer; background: rgba(0,0,0,0.3); border: 2px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 8px; transition: all 0.2s;" onmouseover="this.style.borderColor='#00ffff'" onmouseout="this.style.borderColor='#333'">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <p style="font-size: 13px; color: #00ffff; margin: 0 0 3px 0;">${d.testTitle}</p>
-                                        <p style="font-size: 11px; color: #888; margin: 0;">📅 ${dateStr}</p>
-                                    </div>
-                                    ${d.overallScore !== undefined ? `
-                                        <div style="background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 6px; border: 2px solid ${scoreColor};">
-                                            <span style="font-size: 14px; color: ${scoreColor}; font-weight: bold;">${d.overallScore}%</span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                    html += `</div>`;
-                    
-                    if (dates.length > 10) {
-                        html += `<p style="font-size: 11px; color: #666; text-align: center; margin-top: 10px;">Showing 10 of ${dates.length} sessions</p>`;
-                    }
-                }
-                
-                datesList.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Error loading analytics dates:', error);
-                datesList.innerHTML = `<p style="color: #ff3366; font-size: 12px; text-align: center;">Error loading dates: ${escapeHtml(error.message)}</p>`;
-            }
-        }
+        async function openAnalyticsDatePicker(type){ }
         
-        function closeAnalyticsDatePicker() {
-            document.getElementById('analyticsDatePickerModal').classList.remove('active');
-            document.getElementById('studentAnalyticsMenuModal').classList.add('active');
-        }
+        function closeAnalyticsDatePicker(){ }
         
         async function loadAnalyticsForDate(submissionId) {
             document.getElementById('analyticsDatePickerModal').classList.remove('active');
@@ -24081,148 +23630,11 @@ Return ONLY valid JSON (single object, not array):
 
         // ==================== PROPOSALS ====================
         
-        async function loadProposals() {
-            try {
-                const snap = await db.collection('scheduler_proposals').orderBy('createdAt', 'desc').get();
-                allProposals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderProposals();
-            } catch (e) {
-                console.error('Error loading proposals:', e);
-            }
-        }
+        async function loadProposals() { }
         
-        function renderProposals() {
-            const container = document.getElementById('proposalsContainer');
-            if (!container) return;
-            
-            if (allProposals.length === 0) {
-                container.innerHTML = '<p style="color: #888; font-size: 12px;">No proposals yet. Use "Auto-Generate Classes" to create proposals.</p>';
-                return;
-            }
-            
-            container.innerHTML = allProposals.map(p => {
-                const teacher = allTeachers.find(t => t.id === p.teacherId);
-                const statusLabel = {
-                    'draft': 'Draft - Select Date',
-                    'sent': 'Awaiting Responses',
-                    'all_agreed': 'All Students Agreed! ✓',
-                    'has_rejections': 'Has Rejections'
-                }[p.status] || p.status;
-                
-                const agreedCount = (p.students || []).filter(s => s.response === 'agreed').length;
-                const rejectedCount = (p.students || []).filter(s => s.response === 'rejected').length;
-                const pendingCount = (p.students || []).filter(s => s.response === 'pending').length;
-                
-                return `
-                    <div class="proposal-card status-${p.status}" id="proposal-${p.id}">
-                        <div class="proposal-header">
-                            <div class="proposal-info">
-                                <div class="proposal-day">${p.day} @ ${p.time}</div>
-                                <div class="proposal-time">
-                                    <span class="level-badge level-${p.level}">${LEVELS[p.level]}</span>
-                                    ${teacher ? `<span style="margin-left: 10px;">👨‍🏫 ${escapeHtml(teacher.name)}</span>` : '<span style="margin-left: 10px; color: #888;">No teacher assigned</span>'}
-                                </div>
-                            </div>
-                            <span class="proposal-status ${p.status}">${statusLabel}</span>
-                        </div>
-                        
-                        <div class="proposal-students" 
-                            ondragover="handleProposalDragOver(event)" 
-                            ondragleave="handleProposalDragLeave(event)" 
-                            ondrop="handleProposalDrop(event, '${p.id}')"
-                            data-proposal-id="${p.id}">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 8px;">
-                                Students: ${(p.students || []).length} 
-                                ${p.status !== 'draft' ? `(✓ ${agreedCount} | ✗ ${rejectedCount} | ⏳ ${pendingCount})` : ''}
-                            </div>
-                            ${(p.students || []).map(s => `
-                                <div class="proposal-student">
-                                    <span class="proposal-student-name">${escapeHtml(s.name)}</span>
-                                    <div style="display: flex; align-items: center; gap: 5px;">
-                                        <span class="proposal-student-response ${s.response}">${s.response === 'agreed' ? '✓ Agreed' : s.response === 'rejected' ? '✗ Rejected' : '⏳ Pending'}</span>
-                                        <button class="btn btn-sm btn-danger" onclick="removeStudentFromProposal('${p.id}', '${s.id}')" title="Remove from proposal" style="padding: 2px 5px; font-size: 10px;">✕</button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                            ${(p.students || []).length === 0 ? '<p style="color: #666; font-size: 11px; text-align: center;">Drop students here</p>' : ''}
-                        </div>
-                        
-                        <div class="proposal-date-picker" style="${p.proposedStartDate ? 'background: rgba(57,255,20,0.1); border-color: #39ff14;' : ''}">
-                            <label style="font-size: 12px; color: ${p.proposedStartDate ? '#39ff14' : '#ffff00'};">
-                                📅 ${p.proposedStartDate ? 'Proposed Start Date:' : 'Select Proposed Start Date:'}
-                            </label>
-                            <input type="date" 
-                                id="proposalDate-${p.id}" 
-                                value="${p.proposedStartDate || ''}"
-                                style="margin-left: 10px; font-family: 'Noto Sans', sans-serif; font-size: 12px; padding: 5px; background: #1a1a2e; color: ${p.proposedStartDate ? '#39ff14' : '#00ffff'}; border: 1px solid ${p.proposedStartDate ? '#39ff14' : '#00ffff'}; border-radius: 4px;" 
-                                onchange="updateProposalDate('${p.id}', this.value)">
-                            <div class="saturday-quick-btns" style="margin-top: 8px;">
-                                ${getUpcomingSaturdaysHTML(p.id, p.proposedStartDate)}
-                            </div>
-                        </div>
-                        
-                        <div class="proposal-actions">
-                            ${p.proposedStartDate ? `
-                                <button class="btn btn-sm btn-success" onclick="initiateProposal('${p.id}')" style="background: linear-gradient(135deg, #39ff14, #00ff88);">🚀 Initiate Class</button>
-                            ` : ''}
-                            ${p.status === 'draft' && p.proposedStartDate ? `
-                                <button class="btn btn-sm btn-info" onclick="sendProposalToStudents('${p.id}')">📧 Send to Students</button>
-                            ` : ''}
-                            <button class="btn btn-sm btn-warning" onclick="reclassProposal('${p.id}')">🔄 ReClass</button>
-                            ${canDelete() ? `<button class="btn btn-sm btn-danger admin-delete-btn" onclick="deleteProposal('${p.id}')">🗑️ Delete</button>` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+        function renderProposals() { }
         
-        function renderAvailableStudentsForProposals() {
-            const container = document.getElementById('availableStudentsForProposals');
-            if (!container) return;
-            
-            // Get students who are not assigned, not in proposals, and have a level
-            const available = allStudents.filter(s => 
-                s.level && 
-                s.status !== 'assigned' && 
-                s.status !== 'proposed' && 
-                s.status !== 'completed'
-            );
-            
-            if (available.length === 0) {
-                container.innerHTML = '<p style="color: #888; font-size: 12px;">No available students.</p>';
-                return;
-            }
-            
-            container.innerHTML = available.map(s => {
-                // Check if student is a good fit for any proposal
-                const isGoodFit = allProposals.some(p => {
-                    if (p.level !== s.level) return false;
-                    const slot = `${p.day}-${p.time}`;
-                    return Object.values(s.availabilities || {}).includes(slot);
-                });
-                
-                const availSlots = Object.entries(s.availabilities || {})
-                    .map(([rank, slot]) => `${rank}: ${slot}`)
-                    .join(', ');
-                
-                return `
-                    <div class="available-student ${isGoodFit ? 'rainbow-fit' : ''}" 
-                        draggable="true" 
-                        ondragstart="handleAvailableStudentDragStart(event, '${s.id}')"
-                        ondragend="handleAvailableStudentDragEnd(event)"
-                        data-student-id="${s.id}">
-                        <div class="available-student-name">${escapeHtml(s.name)} ${isGoodFit ? '🌈' : ''}</div>
-                        <div class="available-student-info">
-                            <span class="level-badge level-${s.level}" style="font-size: 10px; padding: 2px 4px;">${LEVELS[s.level]}</span>
-                            <span style="margin-left: 5px;">${s.status || 'pending'}</span>
-                        </div>
-                        <div class="available-student-info" style="margin-top: 3px; font-size: 10px; color: #666;">
-                            ${availSlots || 'No availability set'}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+        function renderAvailableStudentsForProposals() { }
         
         // Drag and drop for proposals
         function handleAvailableStudentDragStart(event, studentId) {
@@ -24236,184 +23648,19 @@ Return ONLY valid JSON (single object, not array):
             draggedProposalStudentId = null;
         }
         
-        function handleProposalDragOver(event) {
-            event.preventDefault();
-            event.currentTarget.classList.add('drag-over');
-        }
+        function handleProposalDragOver(event) { }
         
-        function handleProposalDragLeave(event) {
-            event.currentTarget.classList.remove('drag-over');
-        }
+        function handleProposalDragLeave(event) { }
         
-        async function handleProposalDrop(event, proposalId) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('drag-over');
-            
-            if (!draggedProposalStudentId) return;
-            
-            const student = allStudents.find(s => s.id === draggedProposalStudentId);
-            const proposal = allProposals.find(p => p.id === proposalId);
-            
-            if (!student || !proposal) return;
-            
-            // Check level match
-            if (student.level !== proposal.level) {
-                if (!confirm(`Level mismatch: Student is ${LEVELS[student.level]}, class is ${LEVELS[proposal.level]}. Add anyway?`)) {
-                    return;
-                }
-            }
-            
-            // Check if already in this proposal
-            if ((proposal.students || []).some(s => s.id === student.id)) {
-                alert('Student is already in this proposal.');
-                return;
-            }
-            
-            // Check availability match
-            const slot = `${proposal.day}-${proposal.time}`;
-            const availRank = Object.entries(student.availabilities || {}).find(([r, s]) => s === slot)?.[0] || 3;
-            
-            try {
-                // Add student to proposal
-                const newStudent = {
-                    id: student.id,
-                    name: student.name,
-                    email: student.email,
-                    discord: student.discord || '',
-                    rank: parseInt(availRank),
-                    timezone: student.timezone,
-                    response: proposal.status === 'draft' ? 'pending' : 'pending'
-                };
-                
-                proposal.students = proposal.students || [];
-                proposal.students.push(newStudent);
-                
-                await db.collection('scheduler_proposals').doc(proposalId).update({
-                    students: proposal.students
-                });
-                
-                // Update student status
-                await db.collection('scheduler_students').doc(student.id).update({
-                    status: 'proposed',
-                    proposalId: proposalId
-                });
-                
-                const idx = allStudents.findIndex(s => s.id === student.id);
-                if (idx !== -1) {
-                    allStudents[idx].status = 'proposed';
-                    allStudents[idx].proposalId = proposalId;
-                }
-                
-                renderProposals();
-                renderAvailableStudentsForProposals();
-            } catch (e) {
-                console.error('Error adding student to proposal:', e);
-                alert('Error: ' + e.message);
-            }
-        }
+        async function handleProposalDrop(event, proposalId) { }
         
-        async function removeStudentFromProposal(proposalId, studentId) {
-            if (!confirm('Remove this student from the proposal? They will be returned to the available students list.')) return;
-            
-            try {
-                const proposal = allProposals.find(p => p.id === proposalId);
-                if (!proposal) return;
-                
-                proposal.students = (proposal.students || []).filter(s => s.id !== studentId);
-                
-                await db.collection('scheduler_proposals').doc(proposalId).update({
-                    students: proposal.students
-                });
-                
-                // Update student status back to pending/limbo
-                await db.collection('scheduler_students').doc(studentId).update({
-                    status: 'pending',
-                    proposalId: null
-                });
-                
-                const idx = allStudents.findIndex(s => s.id === studentId);
-                if (idx !== -1) {
-                    allStudents[idx].status = 'pending';
-                    allStudents[idx].proposalId = null;
-                }
-                
-                // Recalculate proposal status
-                await updateProposalStatus(proposalId);
-                
-                renderProposals();
-                renderAvailableStudentsForProposals();
-            } catch (e) {
-                console.error('Error removing student:', e);
-                alert('Error: ' + e.message);
-            }
-        }
+        async function removeStudentFromProposal(proposalId, studentId) { }
         
-        async function updateProposalDate(proposalId, date) {
-            try {
-                await db.collection('scheduler_proposals').doc(proposalId).update({
-                    proposedStartDate: date
-                });
-                
-                const proposal = allProposals.find(p => p.id === proposalId);
-                if (proposal) proposal.proposedStartDate = date;
-                
-                renderProposals();
-            } catch (e) {
-                console.error('Error updating proposal date:', e);
-            }
-        }
+        async function updateProposalDate(proposalId, date) { }
         
-        async function sendProposalToStudents(proposalId) {
-            const proposal = allProposals.find(p => p.id === proposalId);
-            if (!proposal || !proposal.proposedStartDate) {
-                alert('Please select a proposed start date first.');
-                return;
-            }
-            
-            if ((proposal.students || []).length === 0) {
-                alert('No students in this proposal.');
-                return;
-            }
-            
-            // Show Discord names modal
-            showDiscordNamesModal(proposal);
-        }
+        async function sendProposalToStudents(proposalId) { }
         
-        function showDiscordNamesModal(proposal) {
-            const students = proposal.students || [];
-            const discordNames = students.map(s => s.discord || `${s.name} (no Discord)`).join('\n');
-            const startDate = formatDateInEST(proposal.proposedStartDate, { 
-                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' 
-            });
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay active';
-            modal.id = 'discordNamesModal';
-            modal.innerHTML = `
-                <div class="modal" style="max-width: 500px;">
-                    <button class="modal-close" onclick="closeDiscordNamesModal()">✕</button>
-                    <h3 class="modal-title">📋 Discord Names to Contact</h3>
-                    <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
-                        Class: <span style="color: #00ffff;">${proposal.day} @ ${proposal.time}</span> | 
-                        Level: <span class="level-badge level-${proposal.level}">${LEVELS[proposal.level]}</span> |
-                        Start: <span style="color: #39ff14;">${startDate}</span>
-                    </p>
-                    
-                    <div style="background: rgba(0,0,0,0.3); border: 2px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                        <textarea id="discordNamesList" readonly style="width: 100%; height: 150px; background: transparent; border: none; color: #fff; font-family: 'Noto Sans', sans-serif; font-size: 12px; resize: none; outline: none;">${discordNames}</textarea>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button class="btn btn-success" onclick="copyDiscordNames()">📋 Copy All Names</button>
-                        <button class="btn btn-info" onclick="confirmSendProposal('${proposal.id}')">📧 Mark as Sent</button>
-                        <button class="btn btn-secondary" onclick="closeDiscordNamesModal()">Close</button>
-                    </div>
-                    
-                    <p id="copyConfirmation" style="font-size: 12px; color: #39ff14; text-align: center; margin-top: 10px; display: none;">✓ Copied to clipboard!</p>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
+        function showDiscordNamesModal(proposal) { }
         
         function copyDiscordNames() {
             const textarea = document.getElementById('discordNamesList');
@@ -24433,152 +23680,14 @@ Return ONLY valid JSON (single object, not array):
             if (modal) modal.remove();
         }
         
-        async function confirmSendProposal(proposalId) {
-            const proposal = allProposals.find(p => p.id === proposalId);
-            if (!proposal) return;
-            
-            try {
-                await db.collection('scheduler_proposals').doc(proposalId).update({
-                    status: 'sent'
-                });
-                
-                proposal.status = 'sent';
-                closeDiscordNamesModal();
-                renderProposals();
-                
-                alert(`Proposal marked as sent to ${proposal.students.length} students!`);
-            } catch (e) {
-                console.error('Error sending proposal:', e);
-                alert('Error: ' + e.message);
-            }
-        }
+        async function confirmSendProposal(proposalId) { }
         
-        async function updateProposalStatus(proposalId) {
-            const proposal = allProposals.find(p => p.id === proposalId);
-            if (!proposal || proposal.status === 'draft') return;
-            
-            const students = proposal.students || [];
-            const allAgreed = students.length > 0 && students.every(s => s.response === 'agreed');
-            const hasRejections = students.some(s => s.response === 'rejected');
-            
-            let newStatus = 'sent';
-            if (allAgreed) newStatus = 'all_agreed';
-            else if (hasRejections) newStatus = 'has_rejections';
-            
-            if (newStatus !== proposal.status) {
-                await db.collection('scheduler_proposals').doc(proposalId).update({ status: newStatus });
-                proposal.status = newStatus;
-            }
-        }
+        async function updateProposalStatus(proposalId) { }
         
         // Simulate student response (for testing - in production this would be done by students)
-        async function simulateStudentResponse(proposalId, studentId, response) {
-            try {
-                const proposal = allProposals.find(p => p.id === proposalId);
-                if (!proposal) return;
-                
-                const student = proposal.students.find(s => s.id === studentId);
-                if (student) student.response = response;
-                
-                await db.collection('scheduler_proposals').doc(proposalId).update({
-                    students: proposal.students
-                });
-                
-                await updateProposalStatus(proposalId);
-                renderProposals();
-            } catch (e) {
-                console.error('Error updating response:', e);
-            }
-        }
+        async function simulateStudentResponse(proposalId, studentId, response) { }
         
-        async function proceedWithClass(proposalId) {
-            const proposal = allProposals.find(p => p.id === proposalId);
-            if (!proposal) return;
-            
-            const agreedStudents = (proposal.students || []).filter(s => s.response === 'agreed' || proposal.status === 'draft');
-            
-            if (agreedStudents.length < schedulerSettings.minStudents) {
-                if (!confirm(`Only ${agreedStudents.length} students agreed (minimum is ${schedulerSettings.minStudents}). Proceed anyway?`)) return;
-            }
-            
-            if (!proposal.proposedStartDate) {
-                alert('Please set a start date before proceeding.');
-                return;
-            }
-            
-            try {
-                // Create actual class from proposal
-                const classData = {
-                    day: proposal.day,
-                    time: proposal.time,
-                    level: proposal.level,
-                    students: agreedStudents.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        rank: s.rank,
-                        timezone: s.timezone
-                    })),
-                    teacherId: proposal.teacherId,
-                    startDate: proposal.proposedStartDate,
-                    status: 'active',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                const classRef = await db.collection('scheduler_classes').add(classData);
-                
-                // Update students to assigned status
-                for (const s of agreedStudents) {
-                    await db.collection('scheduler_students').doc(s.id).update({
-                        status: 'assigned',
-                        classId: classRef.id,
-                        proposalId: null
-                    });
-                    
-                    const idx = allStudents.findIndex(st => st.id === s.id);
-                    if (idx !== -1) {
-                        allStudents[idx].status = 'assigned';
-                        allStudents[idx].classId = classRef.id;
-                        allStudents[idx].proposalId = null;
-                    }
-                }
-                
-                // Handle rejected students - return to pending
-                const rejectedStudents = (proposal.students || []).filter(s => s.response === 'rejected');
-                for (const s of rejectedStudents) {
-                    await db.collection('scheduler_students').doc(s.id).update({
-                        status: 'pending',
-                        proposalId: null
-                    });
-                    
-                    const idx = allStudents.findIndex(st => st.id === s.id);
-                    if (idx !== -1) {
-                        allStudents[idx].status = 'pending';
-                        allStudents[idx].proposalId = null;
-                    }
-                }
-                
-                // Delete proposal
-                await db.collection('scheduler_proposals').doc(proposalId).delete();
-                allProposals = allProposals.filter(p => p.id !== proposalId);
-                
-                // Add to classes list
-                allClasses.push({ id: classRef.id, ...classData });
-                
-                // Update settings with start date
-                schedulerSettings.startDate = proposal.proposedStartDate;
-                await db.collection('scheduler_settings').doc('main').set(schedulerSettings, { merge: true });
-                
-                renderProposals();
-                renderAvailableStudentsForProposals();
-                renderClasses();
-                updateDashboardStats();
-                
-                alert(`Class created successfully with ${agreedStudents.length} students!`);
-            } catch (e) {
-                console.error('Error creating class:', e);
-                alert('Error: ' + e.message);
-            }
-        }
+        async function proceedWithClass(proposalId) { }
         
         async function initiateProposal(proposalId) {
             const proposal = allProposals.find(p => p.id === proposalId);
@@ -31504,7 +30613,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                         results.forEach(function(r){phoneticMap[r.text]=r.phonetic;});
                         // Save to session doc
                         await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({phoneticMap:phoneticMap});
-                        console.log('G2PK phonetics pre-calculated for',Object.keys(phoneticMap).length,'texts');
                     }catch(e){console.error('G2PK pre-calc error:',e);}
                 })();
 
@@ -33462,78 +32570,6 @@ Return ONLY this JSON (no markdown, no code blocks):
         // Filter out known confusion pairs the wav2vec2 model can't reliably distinguish.
         // These substitutions are dropped from the error list and score recalculated.
         // GPT still hears the audio independently and can catch real errors in these pairs.
-        // ========== PHONEME ERROR FILTERING ==========
-        // Consonant groups: plain / tense / aspirated variants + acoustically similar
-        var phonemeConsonantGroups=[
-            ['ㄱ','ㄲ','ㅋ','G','GG','K','KH','Kh','k'],           // velar stops
-            ['ㄷ','ㄸ','ㅌ','D','DD','T','TH','Th','t'],           // alveolar stops
-            ['ㅂ','ㅃ','ㅍ','B','BB','P','PH','Ph','p'],           // bilabial stops
-            ['ㅈ','ㅉ','ㅊ','J','JJ','CH','CHh'],                  // affricates
-            ['ㅅ','ㅆ','S','SS'],                                   // sibilants
-            ['ㄴ','ㄹ','ㄹㄹ','N','R','L','LL'],                   // nasals/liquids
-            ['ㅁ','M'],                                             // bilabial nasal
-            ['ㅇ','NG'],                                            // velar nasal
-            ['ㅎ','H']                                              // glottal
-        ];
-        // Vowel groups: acoustically similar vowels
-        var phonemeVowelGroups=[
-            ['ㅏ','ㅓ','A','EO','Eo','iA','iEO'],                  // open vowels + ya/yeo variants
-            ['ㅗ','ㅜ','O','U','Oo','iO','iU'],                    // rounded vowels + yo/yu variants
-            ['ㅐ','ㅔ','ㅒ','ㅖ','AE','E','YAE','YE','oE'],        // front mid (merged in modern Korean)
-            ['ㅣ','I','EE','uI','euI'],                             // high front + wi/ui variants
-            ['ㅡ','EU','Eu'],                                       // high central
-            ['ㅑ','ㅕ','iA','iEO'],                                 // ya-series
-            ['ㅛ','ㅠ','iO','iU'],                                  // yo/yu
-            ['ㅘ','oA','WA'],['ㅙ','ㅚ','oE','WAE','WE','OE'],     // wa-diphthongs
-            ['ㅝ','uEO','WO','Wo'],['ㅟ','uI','WI'],['ㅢ','euI','UI']
-        ];
-        // Build lookup: sound -> set of plausible confusions
-        var phonemePlausible={};
-        function buildPlausibleMap(groups){
-            for(var g=0;g<groups.length;g++){
-                for(var i=0;i<groups[g].length;i++){
-                    var s=groups[g][i].toUpperCase();
-                    if(!phonemePlausible[s])phonemePlausible[s]={};
-                    for(var j=0;j<groups[g].length;j++){
-                        phonemePlausible[s][groups[g][j].toUpperCase()]=true;
-                    }
-                }
-            }
-        }
-        buildPlausibleMap(phonemeConsonantGroups);
-        buildPlausibleMap(phonemeVowelGroups);
-        // Classify a sound as vowel or consonant
-        var allVowels={};
-        phonemeVowelGroups.forEach(function(g){g.forEach(function(v){allVowels[v.toUpperCase()]=true;});});
-        var allConsonants={};
-        phonemeConsonantGroups.forEach(function(g){g.forEach(function(c){allConsonants[c.toUpperCase()]=true;});});
-        function isVowelSound(s){return !!allVowels[(s||'').toUpperCase()];}
-        function isConsonantSound(s){return !!allConsonants[(s||'').toUpperCase()];}
-
-        function filterPhonemeErrors(result){
-            if(!result||!result.errors)return result;
-            var original=result.errors.length;
-            result.errors=result.errors.filter(function(err){
-                var exp=(err.expected||'').toUpperCase();
-                var act=(err.actual||'').toUpperCase();
-                if(err.type==='substitution'){
-                    // Block vowel↔consonant crossover (nonsensical)
-                    if(isVowelSound(exp) && isConsonantSound(act)) return false;
-                    if(isConsonantSound(exp) && isVowelSound(act)) return false;
-                    // Block if not in same acoustic group
-                    if(phonemePlausible[exp] && !phonemePlausible[exp][act]) return false;
-                }
-                return true;
-            });
-            // Recalculate score if errors were removed
-            if(result.errors.length<original && typeof result.total_phonemes==='number'){
-                var errorsNow=result.errors.length;
-                var total=result.total_phonemes||1;
-                result.score=Math.round(Math.max(0,Math.min(100,(1-errorsNow/total)*100)));
-            }
-            return result;
-        }
-
         // Extract pronunciation errors from GPT feedback text as fallback when phoneme service errors are all filtered out.
         // GPT feedback typically contains bullet points mentioning Korean characters.
         // Cannot flag ㅐ/ㅔ confusion (identical in modern Korean) or g2pk phonetic form differences.
@@ -33664,7 +32700,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var parallel=await Promise.all([azurePromise,sttPromise]);
                 azureResult=parallel[0];
-                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
+                if(parallel[1]) phonemeResult=parallel[1];
 
                 // Call GPT for score + feedback
                 var gptFeedback='';
@@ -33920,9 +32956,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var parallel=await Promise.all([azurePromise,sttPromise]);
                 azureResult=parallel[0];
                 var sttRaw=parallel[1];
-                if(sttRaw) phonemeResult=filterPhonemeErrors(sttRaw);
-                console.log('Azure result:',azureResult?JSON.stringify(azureResult).substring(0,500):'null');
-                console.log('STT result:',sttRaw?JSON.stringify(sttRaw).substring(0,500):'null');
+                if(sttRaw) phonemeResult=sttRaw;
 
                 var pronInfo='';
                 if(expectedPronunciation && expectedPronunciation!==expectedKorean){
@@ -33991,7 +33025,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                     })
                 });
                 var aiData=await aiResp.json();
-                console.log('GPT aiData:', JSON.stringify(aiData).substring(0,500));
 
                 // Parse GPT response
                 var rt='';
@@ -34007,7 +33040,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(typeof rt!=='string')rt=JSON.stringify(rt);
 
                 rt=rt.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-                console.log('GPT rt:', rt.substring(0,500));
                 var grade={score:0,feedback:'Grading failed.',transcript:''};
                 var transcript='';
                 try{
@@ -34406,7 +33438,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var parallel=await Promise.all([azurePromise,sttPromise]);
                 azureResult=parallel[0];
-                if(parallel[1]) phonemeResult=filterPhonemeErrors(parallel[1]);
+                if(parallel[1]) phonemeResult=parallel[1];
 
                 // GPT grading with Azure flags + STT analysis
                 var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
