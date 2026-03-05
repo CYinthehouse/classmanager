@@ -21888,7 +21888,17 @@ Return ONLY valid JSON (single object, not array):
                     const notesSnap = await db.collection('attendance_notes').get();
                     notesSnap.docs.forEach(d => {
                         const nd = d.data();
-                        attendanceNotesMap[nd.classId + '_' + nd.studentId + '_' + nd.week] = { id: d.id, note: nd.note };
+                        const key = nd.classId + '_' + nd.studentId + '_' + nd.week;
+                        if (!attendanceNotesMap[key]) attendanceNotesMap[key] = [];
+                        attendanceNotesMap[key].push({ id: d.id, note: nd.note, createdAt: nd.createdAt });
+                    });
+                    // Sort each array by createdAt descending (most recent first)
+                    Object.keys(attendanceNotesMap).forEach(function(key) {
+                        attendanceNotesMap[key].sort(function(a, b) {
+                            var ta = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+                            var tb = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+                            return tb - ta;
+                        });
                     });
                 } catch(ne) { }
                 
@@ -21955,10 +21965,14 @@ Return ONLY valid JSON (single object, not array):
                             else { notMarkedCount++; }
                             
                             var noteKey = cls.id + '_' + student.id + '_' + w;
-                            var hasNote = attendanceNotesMap && attendanceNotesMap[noteKey];
-                            var noteIndicator = hasNote ? '<span style="color:#FFD700;font-size:10px;vertical-align:super;">⭐</span>' : '';
+                            var notesArr = attendanceNotesMap && attendanceNotesMap[noteKey];
+                            var hasNote = notesArr && notesArr.length > 0;
+                            var noteCount = hasNote ? notesArr.length : 0;
+                            var noteIndicator = hasNote ? '<span style="color:#FFD700;font-size:10px;vertical-align:super;">⭐' + (noteCount > 1 ? '<span style="font-size:8px;">'+noteCount+'</span>' : '') + '</span>' : '';
                             if (hasNote) cls._noteIndicatorShown = true;
-                            html += `<td onclick="toggleAdminAttendance('${cls.id}', '${student.id}', ${w}, '${status || 'none'}')" style="text-align: center; color: ${color}; font-weight: bold; font-size: 16px; cursor: pointer; background: ${bg}; border-radius: 4px; transition: all 0.15s; user-select: none;" onmouseover="this.style.outline='2px solid #00ffff'" onmouseout="this.style.outline='none'" title="Click to toggle">${badge}${noteIndicator}</td>`;
+                            var notePreview = hasNote ? escapeHtml(notesArr[0].note || '').replace(/"/g,'&quot;').substring(0,120) : '';
+                            var tooltipAttr = hasNote ? 'data-note="'+notePreview+(noteCount>1?' ... ('+(noteCount-1)+' more)':'')+'"' : '';
+                            html += `<td onclick="attendanceCellClick(event,'${cls.id}', '${student.id}', ${w}, '${status || 'none'}', ${hasNote ? 'true' : 'false'}, '${escapeHtml(student.name||'Student').replace(/'/g,"\\\\'")}')" ${tooltipAttr} style="text-align: center; color: ${color}; font-weight: bold; font-size: 16px; cursor: pointer; background: ${bg}; border-radius: 4px; transition: all 0.15s; user-select: none; position:relative;" onmouseover="showNoteTooltip(this)" onmouseout="hideNoteTooltip(this)">${badge}${noteIndicator}</td>`;
                         }
                         
                         html += '</tr>';
@@ -22102,100 +22116,196 @@ Return ONLY valid JSON (single object, not array):
                     .where('classId', '==', classId)
                     .where('studentId', '==', studentId)
                     .where('week', '==', week)
-                    .limit(1).get();
+                    .get();
 
-                if (snap.empty) { showToast('Note not found.', 'error'); return; }
+                var notes = [];
+                snap.docs.forEach(function(d) {
+                    var nd = d.data();
+                    var ts = nd.createdAt ? (nd.createdAt.toDate ? nd.createdAt.toDate() : new Date(nd.createdAt)) : null;
+                    notes.push({ id: d.id, note: nd.note || '', createdAt: ts });
+                });
+                notes.sort(function(a, b) { return (a.createdAt||0) - (b.createdAt||0); }); // oldest first for timeline
 
-                const doc = snap.docs[0];
-                const noteData = doc.data();
-                const docId = doc.id;
+                if (notes.length === 0) { showToast('No notes found.', 'error'); return; }
 
-                const existing = document.getElementById('noteModal');
+                var existing = document.getElementById('noteModal');
                 if (existing) existing.remove();
 
-                const modal = document.createElement('div');
+                var modal = document.createElement('div');
                 modal.id = 'noteModal';
                 modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100002;display:flex;align-items:center;justify-content:center;';
 
-                // View mode
-                function showViewMode() {
-                    modal.innerHTML = `
-                        <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
-                            <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Note</h3>
-                            <p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">${escapeHtml(studentName)} \u2014 Week ${week}</p>
-                            <div style="background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;padding:12px;color:#fff;font-size:13px;line-height:1.5;white-space:pre-wrap;">${escapeHtml(noteData.note)}</div>
-                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;">
-                                <button id="noteModalClose" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Close</button>
-                                <button id="noteModalEdit" style="padding:8px 18px;background:#ff9800;border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">\u270F\uFE0F Edit</button>
-                                <button id="noteModalDelete" style="padding:8px 18px;background:#ff3366;border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:bold;font-size:13px;">\uD83D\uDDD1\uFE0F Delete</button>
-                            </div>
-                        </div>`;
+                function renderNotesList() {
+                    var notesHtml = notes.map(function(n, idx) {
+                        var dateStr = n.createdAt ? n.createdAt.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : 'Unknown date';
+                        var isFirst = idx === 0;
+                        var label = isFirst ? 'Initial Note' : 'Follow-up #' + idx;
+                        var labelColor = isFirst ? '#00ffff' : '#FFD700';
+                        return '<div style="position:relative;padding:12px 12px 12px 24px;background:rgba(0,0,0,0.3);border-left:3px solid ' + labelColor + ';border-radius:0 6px 6px 0;margin-bottom:8px;">' +
+                            '<div style="position:absolute;left:-8px;top:14px;width:12px;height:12px;border-radius:50%;background:' + labelColor + ';border:2px solid #1a1a2e;"></div>' +
+                            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+                            '<span style="color:' + labelColor + ';font-size:10px;font-weight:700;text-transform:uppercase;">' + label + '</span>' +
+                            '<div style="display:flex;gap:6px;align-items:center;">' +
+                            '<span style="color:#666;font-size:10px;">' + dateStr + '</span>' +
+                            '<button onclick="editSingleNote(\'' + n.id + '\',' + idx + ')" style="background:none;border:none;color:#ff9800;cursor:pointer;font-size:12px;padding:2px;" title="Edit">✏️</button>' +
+                            '<button onclick="deleteSingleNote(\'' + n.id + '\',\'' + classId + '\',\'' + studentId + '\',' + week + ',\'' + escapeHtml(studentName).replace(/'/g, "\\\\'") + '\')" style="background:none;border:none;color:#ff3366;cursor:pointer;font-size:12px;padding:2px;" title="Delete">🗑️</button>' +
+                            '</div></div>' +
+                            '<div style="color:#ddd;font-size:13px;line-height:1.5;white-space:pre-wrap;">' + escapeHtml(n.note) + '</div>' +
+                            '</div>';
+                    }).join('');
 
-                    document.getElementById('noteModalClose').onclick = () => modal.remove();
+                    modal.innerHTML =
+                        '<div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:500px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);max-height:80vh;display:flex;flex-direction:column;">' +
+                        '<h3 style="color:#00ffff;margin:0 0 4px 0;font-size:15px;">📝 Notes &amp; Follow-ups</h3>' +
+                        '<p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">' + escapeHtml(studentName) + ' — Week ' + week + ' <span style="color:#888;">(' + notes.length + ' note' + (notes.length > 1 ? 's' : '') + ')</span></p>' +
+                        '<div style="overflow-y:auto;flex:1;margin-bottom:15px;padding-right:4px;">' + notesHtml + '</div>' +
+                        '<div style="display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;">' +
+                        '<button id="noteModalClose" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Close</button>' +
+                        '<button id="noteModalFollowUp" style="padding:8px 18px;background:linear-gradient(135deg,#FFD700,#ff9800);border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">+ Add Follow-up</button>' +
+                        '</div></div>';
 
-                    document.getElementById('noteModalEdit').onclick = function() {
-                        showEditMode();
-                    };
+                    document.getElementById('noteModalClose').onclick = function() { modal.remove(); };
+                    document.getElementById('noteModalFollowUp').onclick = function() { showFollowUpInput(); };
+                }
 
-                    document.getElementById('noteModalDelete').onclick = async function() {
-                        if (!confirm('Delete this note?')) return;
+                function showFollowUpInput() {
+                    var addDiv = document.createElement('div');
+                    addDiv.id = 'noteFollowUpArea';
+                    addDiv.style.cssText = 'background:#1a1a2e;border:1px solid #FFD700;border-radius:10px;padding:24px;max-width:500px;width:90%;box-shadow:0 0 30px rgba(255,215,0,0.2);';
+                    addDiv.innerHTML =
+                        '<h3 style="color:#FFD700;margin:0 0 8px 0;font-size:15px;">Follow-up & Actions Taken</h3>' +
+                        '<p style="color:#ccc;margin:0 0 6px 0;font-size:12px;">' + escapeHtml(studentName) + ' — Week ' + week + '</p>' +
+                        '<p style="color:#ff9800;margin:0 0 12px 0;font-size:12px;font-style:italic;">Did you follow up? Were any actions taken?</p>' +
+                        '<textarea id="noteFollowUpInput" rows="3" placeholder="e.g. Called student, discussed absence reason. Will monitor next week..." style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid #FFD700;border-radius:6px;color:#fff;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>' +
+                        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">' +
+                        '<button id="noteFollowUpCancel" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Cancel</button>' +
+                        '<button id="noteFollowUpSave" style="padding:8px 18px;background:linear-gradient(135deg,#FFD700,#ff9800);border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">Save Follow-up</button>' +
+                        '</div>';
+
+                    modal.querySelector('div').replaceWith(addDiv);
+                    document.getElementById('noteFollowUpInput').focus();
+
+                    document.getElementById('noteFollowUpCancel').onclick = function() { renderNotesList(); };
+                    document.getElementById('noteFollowUpSave').onclick = async function() {
+                        var text = document.getElementById('noteFollowUpInput').value.trim();
+                        if (!text) return;
                         try {
-                            await db.collection('attendance_notes').doc(docId).delete();
-                            modal.remove();
-                            document.getElementById('attendanceNotesOverlay')?.remove();
-                            openAttendanceNotes(classId);
+                            var docRef = await db.collection('attendance_notes').add({
+                                classId: classId, studentId: studentId, week: week,
+                                note: text, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            notes.push({ id: docRef.id, note: text, createdAt: new Date() });
+                            renderNotesList();
                             if (typeof loadAdminAttendance === 'function') {
-                                const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                                var scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
                                 await loadAdminAttendance();
                                 window.scrollTo(0, scrollPos);
                             }
-                        } catch (e) {
-                            alert('Error deleting note: ' + e.message);
-                        }
+                        } catch (e) { alert('Error: ' + e.message); }
                     };
                 }
 
-                function showEditMode() {
-                    modal.innerHTML = `
-                        <div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:450px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);">
-                            <h3 style="color:#00ffff;margin:0 0 8px 0;font-size:15px;">Edit Note</h3>
-                            <p style="color:#ccc;margin:0 0 15px 0;font-size:13px;">${escapeHtml(studentName)} \u2014 Week ${week}</p>
-                            <textarea id="noteModalEditInput" rows="3" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:13px;resize:vertical;box-sizing:border-box;">${escapeHtml(noteData.note)}</textarea>
-                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;">
-                                <button id="noteModalEditCancel" style="padding:8px 18px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:13px;">Cancel</button>
-                                <button id="noteModalEditSave" style="padding:8px 18px;background:#00ffff;border:none;border-radius:6px;color:#000;cursor:pointer;font-weight:bold;font-size:13px;">Save</button>
-                            </div>
-                        </div>`;
-                    document.getElementById('noteModalEditInput').focus();
+                // Edit a single note inline
+                window.editSingleNote = function(noteId, idx) {
+                    var n = notes[idx];
+                    if (!n) return;
+                    var newText = prompt('Edit note:', n.note);
+                    if (newText === null) return;
+                    newText = newText.trim();
+                    if (!newText) return;
+                    db.collection('attendance_notes').doc(noteId).update({ note: newText }).then(function() {
+                        notes[idx].note = newText;
+                        renderNotesList();
+                        if (typeof loadAdminAttendance === 'function') {
+                            var scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                            loadAdminAttendance().then(function() { window.scrollTo(0, scrollPos); });
+                        }
+                    }).catch(function(e) { alert('Error: ' + e.message); });
+                };
 
-                    document.getElementById('noteModalEditCancel').onclick = () => showViewMode();
-
-                    document.getElementById('noteModalEditSave').onclick = async function() {
-                        const newNote = document.getElementById('noteModalEditInput').value.trim();
-                        if (!newNote) return;
-                        try {
-                            await db.collection('attendance_notes').doc(docId).update({ note: newNote });
-                            noteData.note = newNote;
+                // Delete a single note
+                window.deleteSingleNote = function(noteId, cId, sId, wk, sName) {
+                    if (!confirm('Delete this note?')) return;
+                    db.collection('attendance_notes').doc(noteId).delete().then(function() {
+                        notes = notes.filter(function(n) { return n.id !== noteId; });
+                        if (notes.length === 0) {
                             modal.remove();
-                            document.getElementById('attendanceNotesOverlay')?.remove();
-                            openAttendanceNotes(classId);
-                            if (typeof loadAdminAttendance === 'function') {
-                                const scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
-                                await loadAdminAttendance();
-                                window.scrollTo(0, scrollPos);
-                            }
-                        } catch (e) {
-                            alert('Error updating note: ' + e.message);
+                        } else {
+                            renderNotesList();
                         }
-                    };
-                }
+                        if (typeof loadAdminAttendance === 'function') {
+                            var scrollPos = document.documentElement.scrollTop || document.body.scrollTop;
+                            loadAdminAttendance().then(function() { window.scrollTo(0, scrollPos); });
+                        }
+                    }).catch(function(e) { alert('Error: ' + e.message); });
+                };
 
                 document.body.appendChild(modal);
-                showViewMode();
+                modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+                renderNotesList();
 
             } catch (e) {
                 alert('Error: ' + e.message);
             }
+        }
+
+        // Note tooltip on hover (desktop)
+        function showNoteTooltip(td) {
+            td.style.outline = '2px solid #00ffff';
+            var note = td.getAttribute('data-note');
+            if (!note) return;
+            var existing = td.querySelector('.note-tooltip');
+            if (existing) return;
+            var tip = document.createElement('div');
+            tip.className = 'note-tooltip';
+            tip.style.cssText = 'position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #FFD700;color:#ddd;padding:8px 12px;border-radius:8px;font-size:11px;font-weight:normal;white-space:pre-wrap;max-width:220px;z-index:999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.5);line-height:1.4;';
+            tip.textContent = note;
+            td.appendChild(tip);
+        }
+        function hideNoteTooltip(td) {
+            td.style.outline = 'none';
+            var tip = td.querySelector('.note-tooltip');
+            if (tip) tip.remove();
+        }
+
+        // Detect mobile/tablet: mobile ≤ 768px, tablet ≤ 1024px
+        function isMobileOrTablet() {
+            return window.matchMedia('(max-width: 1024px)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+        }
+
+        function attendanceCellClick(event, classId, studentId, week, currentStatus, hasNote, studentName) {
+            if (isMobileOrTablet() && hasNote) {
+                // On touch device with a note: show choice menu
+                event.stopPropagation();
+                showAttendanceChoiceMenu(event.target.closest('td'), classId, studentId, week, currentStatus, studentName);
+            } else {
+                // Desktop or no note: just toggle attendance directly
+                toggleAdminAttendance(classId, studentId, week, currentStatus);
+            }
+        }
+
+        function showAttendanceChoiceMenu(td, classId, studentId, week, currentStatus, studentName) {
+            // Remove any existing menu
+            var old = document.getElementById('attendanceChoiceMenu');
+            if (old) old.remove();
+
+            var menu = document.createElement('div');
+            menu.id = 'attendanceChoiceMenu';
+            menu.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            var statusLabel = currentStatus === 'present' ? '✓ Present' : currentStatus === 'absent' ? '✕ Absent' : currentStatus === 'late' ? 'L Late' : '— Not marked';
+            menu.innerHTML = `
+                <div style="background:#1a1a2e;border:2px solid #FFD700;border-radius:12px;padding:20px;max-width:280px;width:90%;text-align:center;">
+                    <div style="font-size:13px;color:#FFD700;font-weight:700;margin-bottom:4px;">⭐ This cell has a note</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:16px;">Current: ${statusLabel}</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <button onclick="document.getElementById('attendanceChoiceMenu').remove();toggleAdminAttendance('${classId}','${studentId}',${week},'${currentStatus}')" style="background:rgba(57,255,20,0.15);border:2px solid #39ff14;color:#39ff14;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Toggle Attendance</button>
+                        <button onclick="document.getElementById('attendanceChoiceMenu').remove();viewAttendanceNote('${classId}','${studentId}',${week},'${studentName.replace(/'/g,"\\'")}')" style="background:rgba(255,215,0,0.15);border:2px solid #FFD700;color:#FFD700;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">📝 View Note</button>
+                        <button onclick="document.getElementById('attendanceChoiceMenu').remove()" style="background:rgba(255,255,255,0.08);border:1px solid #555;color:#888;padding:10px;border-radius:8px;font-size:12px;cursor:pointer;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(menu);
+            menu.addEventListener('click', function(e) { if (e.target === menu) menu.remove(); });
         }
 
         async function toggleAdminAttendance(classId, studentId, week, currentStatus) {
@@ -22323,85 +22433,232 @@ Return ONLY valid JSON (single object, not array):
         let currentAnalyticsStudentEmail = null;
         let currentAnalyticsType = null;
         
-        async function openStudentAnalyticsMenu(studentId, studentName, studentEmail = null) {
-            // Try to find student email from multiple sources
-            let email = studentEmail;
-            
-            if (!email || email === 'undefined' || email === '') {
-                // First try allStudents (scheduler_students collection) - admin only
-                const student = allStudents.find(s => s.id === studentId);
-                if (student && student.email) {
-                    email = student.email;
+        async function openStudentAnalyticsMenu(studentId, studentName, studentEmail) {
+            var student = allStudents.find(function(s){return s.id===studentId;});
+            if(!student){
+                try{var sd=await db.collection('scheduler_students').doc(studentId).get();
+                if(sd.exists)student=Object.assign({id:sd.id},sd.data());}catch(e){}
+            }
+            if(!student){
+                for(var ci=0;ci<allClasses.length;ci++){
+                    var fo=(allClasses[ci].students||[]).find(function(s){return s.id===studentId;});
+                    if(fo){student=fo;break;}
                 }
             }
-            
-            if (!email || email === 'undefined' || email === '') {
-                // Try to find in class students (embedded in allClasses - admin)
-                for (const cls of allClasses) {
-                    const classStudent = (cls.students || []).find(s => s.id === studentId);
-                    if (classStudent && classStudent.email) {
-                        email = classStudent.email;
-                        break;
-                    }
+            if(!student) student={id:studentId,name:studentName};
+
+            var discord=student.discord||'';
+            var phone=student.phoneNumber||student.phone||'';
+            var email=studentEmail||student.email||'';
+            if(!email||email==='undefined'){
+                for(var ci=0;ci<allClasses.length;ci++){
+                    var cs=(allClasses[ci].students||[]).find(function(s){return s.id===studentId;});
+                    if(cs&&cs.email){email=cs.email;break;}
                 }
             }
-            
-            if (!email || email === 'undefined' || email === '') {
-                // Try to find in teacher's classes (allClassesForTeacher)
-                for (const cls of (allClassesForTeacher || [])) {
-                    const classStudent = (cls.students || []).find(s => s.id === studentId);
-                    if (classStudent && classStudent.email) {
-                        email = classStudent.email;
-                        break;
-                    }
+            currentAnalyticsStudentId=studentId;
+            currentAnalyticsStudentName=studentName;
+            currentAnalyticsStudentEmail=email||'';
+
+            var cannedMessages=[];
+            try{
+                var cs=await db.collection('canned_messages').orderBy('createdAt','asc').get();
+                cs.docs.forEach(function(d){cannedMessages.push({id:d.id,text:d.data().text});});
+            }catch(e){}
+
+            var ex=document.getElementById('studentContactModal');
+            if(ex)ex.remove();
+
+            var modal=document.createElement('div');
+            modal.id='studentContactModal';
+            modal.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100002;display:flex;align-items:center;justify-content:center;';
+
+            function render(){
+                var cannedHtml='';
+                if(cannedMessages.length>0){
+                    cannedHtml='<div style="margin-top:14px;"><div style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Canned Messages <span style="color:#555;font-weight:400;">(click to copy)</span></div>';
+                    cannedMessages.forEach(function(cm,idx){
+                        cannedHtml+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'+
+                        '<button onclick="scCopyCanned('+idx+')" style="flex:1;text-align:left;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;padding:8px 10px;color:#ddd;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(cm.text).replace(/"/g,'&quot;')+'">'+escapeHtml(cm.text)+'</button>'+
+                        '<button onclick="scEditCanned(\''+cm.id+'\','+idx+')" style="background:none;border:none;color:#ff9800;cursor:pointer;font-size:14px;padding:4px;" title="Edit">\u270F\uFE0F</button>'+
+                        '<button onclick="scDelCanned(\''+cm.id+'\','+idx+')" style="background:none;border:none;color:#ff3366;cursor:pointer;font-size:14px;padding:4px;" title="Delete">\uD83D\uDDD1\uFE0F</button>'+
+                        '</div>';
+                    });
+                    cannedHtml+='</div>';
                 }
+
+                modal.innerHTML=
+                '<div style="background:#1a1a2e;border:1px solid #00ffff;border-radius:10px;padding:24px;max-width:420px;width:90%;box-shadow:0 0 30px rgba(0,255,255,0.2);max-height:85vh;overflow-y:auto;">'+
+                '<h3 style="color:#00ffff;margin:0 0 12px 0;font-size:16px;">\uD83D\uDCC7 '+escapeHtml(studentName)+'</h3>'+
+
+                '<div style="background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:8px;padding:12px;margin-bottom:10px;">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+                '<div><span style="color:#888;font-size:10px;text-transform:uppercase;font-weight:700;">Discord</span><br>'+
+                (discord?'<span style="color:#7289da;font-size:14px;font-weight:700;">'+escapeHtml(discord)+'</span>':'<span style="color:#555;font-size:13px;">Not set</span>')+
+                '</div>'+
+                '<button onclick="scShowEditField(\'discord\',\''+escapeHtml(discord).replace(/'/g,"\\\\'")+'\',\'Discord username\')" style="background:rgba(114,137,218,0.15);border:1px solid #7289da;color:#7289da;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;">'+(discord?'\u270F\uFE0F Edit':'+ Add')+'</button>'+
+                '</div></div>'+
+
+                '<div style="background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:8px;padding:12px;margin-bottom:10px;">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+                '<div><span style="color:#888;font-size:10px;text-transform:uppercase;font-weight:700;">Phone</span><br>'+
+                (phone?'<span style="color:#39ff14;font-size:14px;font-weight:700;">'+escapeHtml(phone)+'</span>':'<span style="color:#555;font-size:13px;">Not set</span>')+
+                '</div>'+
+                '<div style="display:flex;gap:6px;">'+
+                (phone?'<a href="tel:'+escapeHtml(phone)+'" style="background:rgba(57,255,20,0.15);border:1px solid #39ff14;color:#39ff14;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;text-decoration:none;">\uD83D\uDCDE Call</a>':'')+
+                '<button onclick="scShowEditField(\'phoneNumber\',\''+escapeHtml(phone).replace(/'/g,"\\\\'")+'\',\'Phone number\')" style="background:rgba(57,255,20,0.15);border:1px solid #39ff14;color:#39ff14;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;">'+(phone?'\u270F\uFE0F Edit':'+ Add')+'</button>'+
+                '</div></div></div>'+
+
+                '<div id="scInlineEditArea"></div>'+
+
+                cannedHtml+
+
+                '<button onclick="scShowAddCanned()" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.05);border:1px dashed #555;border-radius:6px;padding:10px;color:#888;font-size:12px;cursor:pointer;">+ Add Canned Message</button>'+
+
+                '<div id="scCannedEditArea"></div>'+
+
+                '<div style="display:flex;gap:8px;margin-top:16px;">'+
+                '<button onclick="scOpenAnalytics()" style="flex:1;padding:10px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">\uD83D\uDCCA Analytics</button>'+
+                '<button onclick="document.getElementById(\'studentContactModal\').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;font-size:12px;cursor:pointer;">Close</button>'+
+                '</div></div>';
             }
-            
-            if (!email || email === 'undefined' || email === '') {
-                // Try to find in admin's viewed teacher classes (adminViewingTeacherClasses)
-                for (const cls of (adminViewingTeacherClasses || [])) {
-                    const classStudent = (cls.students || []).find(s => s.id === studentId);
-                    if (classStudent && classStudent.email) {
-                        email = classStudent.email;
-                        break;
-                    }
-                }
-            }
-            
-            if (!email || email === 'undefined' || email === '') {
-                // Try to find in admin completed classes (allAdminCompletedClasses)
-                for (const cls of (allAdminCompletedClasses || [])) {
-                    const classStudent = (cls.students || []).find(s => s.id === studentId);
-                    if (classStudent && classStudent.email) {
-                        email = classStudent.email;
-                        break;
-                    }
-                }
-            }
-            
-            if (!email || email === 'undefined' || email === '') {
-                // Last resort - look up directly from scheduler_students collection
-                try {
-                    const studentDoc = await db.collection('scheduler_students').doc(studentId).get();
-                    if (studentDoc.exists && studentDoc.data().email) {
-                        email = studentDoc.data().email;
-                    }
-                } catch (e) {
-                    console.error('Error looking up student:', e);
-                }
-            }
-            
-            if (!email || email === 'undefined' || email === '') {
-                alert('Could not find student email. Please ensure the student has an email address on record.');
-                return;
-            }
-            
-            currentAnalyticsStudentId = studentId;
-            currentAnalyticsStudentName = studentName;
-            currentAnalyticsStudentEmail = email;
-            
-            document.getElementById('analyticsStudentName').textContent = studentName;
-            document.getElementById('studentAnalyticsMenuModal').classList.add('active');
+
+            // Show inline edit field (HTML, not browser prompt)
+            window.scShowEditField=function(field,current,label){
+                var area=document.getElementById('scInlineEditArea');
+                if(!area)return;
+                area.innerHTML=
+                    '<div style="background:rgba(0,0,0,0.4);border:1px solid #00ffff;border-radius:8px;padding:12px;margin-bottom:10px;">'+
+                    '<div style="color:#00ffff;font-size:11px;font-weight:700;margin-bottom:6px;">Edit '+escapeHtml(label)+'</div>'+
+                    '<input id="scEditInput" type="text" value="'+escapeHtml(current).replace(/"/g,'&quot;')+'" style="width:100%;padding:8px 10px;background:rgba(0,0,0,0.3);border:1px solid #00ffff;border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box;" placeholder="Enter '+escapeHtml(label)+'..." />'+
+                    '<div style="display:flex;gap:8px;margin-top:8px;">'+
+                    '<button onclick="scSaveField(\''+field+'\',\''+label.replace(/'/g,"\\\\'")+'\' )" style="flex:1;padding:8px;background:#00ffff;border:none;border-radius:6px;color:#000;font-weight:700;font-size:12px;cursor:pointer;">Save</button>'+
+                    '<button onclick="document.getElementById(\'scInlineEditArea\').innerHTML=\'\'" style="flex:1;padding:8px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;font-size:12px;cursor:pointer;">Cancel</button>'+
+                    '</div></div>';
+                document.getElementById('scEditInput').focus();
+                document.getElementById('scEditInput').select();
+            };
+
+            window.scSaveField=async function(field,label){
+                var val=(document.getElementById('scEditInput')||{}).value;
+                if(val===undefined)return;
+                val=val.trim();
+                try{
+                    var upd={};upd[field]=val;
+                    await db.collection('scheduler_students').doc(studentId).update(upd);
+                    var loc=allStudents.find(function(s){return s.id===studentId;});
+                    if(loc)loc[field]=val;
+                    if(field==='discord')discord=val;
+                    if(field==='phoneNumber')phone=val;
+                    allClasses.forEach(function(cls){
+                        (cls.students||[]).forEach(function(s){
+                            if(s.id===studentId){s[field]=val;if(field==='phoneNumber')s.phone=val;}
+                        });
+                    });
+                    render();
+                    showToast('\u2705 '+label+' updated','success');
+                }catch(e){alert('Error: '+e.message);}
+            };
+
+            // Canned messages - copy
+            window.scCopyCanned=function(idx){
+                var text=cannedMessages[idx]?cannedMessages[idx].text:'';
+                if(!text)return;
+                text=text.replace(/\{name\}/gi,studentName);
+                if(navigator.clipboard&&navigator.clipboard.writeText){
+                    navigator.clipboard.writeText(text).then(function(){
+                        showToast('\uD83D\uDCCB Copied!','success');
+                    }).catch(function(){
+                        scShowCopyFallback(text);
+                    });
+                }else{scShowCopyFallback(text);}
+            };
+
+            window.scShowCopyFallback=function(text){
+                var area=document.getElementById('scCannedEditArea');
+                if(!area)return;
+                area.innerHTML=
+                    '<div style="background:rgba(0,0,0,0.4);border:1px solid #FFD700;border-radius:8px;padding:12px;margin-top:10px;">'+
+                    '<div style="color:#FFD700;font-size:11px;font-weight:700;margin-bottom:6px;">Copy this message:</div>'+
+                    '<textarea id="scCopyText" rows="3" readonly style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;box-sizing:border-box;">'+escapeHtml(text)+'</textarea>'+
+                    '<button onclick="document.getElementById(\'scCopyText\').select();document.execCommand(\'copy\');showToast(\'Copied!\',\'success\');document.getElementById(\'scCannedEditArea\').innerHTML=\'\'" style="width:100%;margin-top:6px;padding:8px;background:#FFD700;border:none;border-radius:6px;color:#000;font-weight:700;font-size:12px;cursor:pointer;">Select & Copy</button>'+
+                    '</div>';
+                document.getElementById('scCopyText').focus();
+                document.getElementById('scCopyText').select();
+            };
+
+            // Edit canned - inline HTML
+            window.scEditCanned=function(docId,idx){
+                var current=cannedMessages[idx]?cannedMessages[idx].text:'';
+                var area=document.getElementById('scCannedEditArea');
+                if(!area)return;
+                area.innerHTML=
+                    '<div style="background:rgba(0,0,0,0.4);border:1px solid #ff9800;border-radius:8px;padding:12px;margin-top:10px;">'+
+                    '<div style="color:#ff9800;font-size:11px;font-weight:700;margin-bottom:4px;">Edit Canned Message</div>'+
+                    '<div style="color:#888;font-size:10px;margin-bottom:6px;">Use {name} for student name placeholder</div>'+
+                    '<textarea id="scCannedInput" rows="3" style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid #ff9800;border-radius:6px;color:#fff;font-size:12px;box-sizing:border-box;">'+escapeHtml(current)+'</textarea>'+
+                    '<div style="display:flex;gap:8px;margin-top:8px;">'+
+                    '<button onclick="scSaveCanned(\''+docId+'\','+idx+')" style="flex:1;padding:8px;background:#ff9800;border:none;border-radius:6px;color:#000;font-weight:700;font-size:12px;cursor:pointer;">Save</button>'+
+                    '<button onclick="document.getElementById(\'scCannedEditArea\').innerHTML=\'\'" style="flex:1;padding:8px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;font-size:12px;cursor:pointer;">Cancel</button>'+
+                    '</div></div>';
+                document.getElementById('scCannedInput').focus();
+            };
+
+            window.scSaveCanned=function(docId,idx){
+                var val=(document.getElementById('scCannedInput')||{}).value;
+                if(!val||!val.trim())return;
+                db.collection('canned_messages').doc(docId).update({text:val.trim()}).then(function(){
+                    cannedMessages[idx].text=val.trim();
+                    render();
+                    showToast('\u2705 Message updated','success');
+                }).catch(function(e){alert('Error: '+e.message);});
+            };
+
+            // Delete canned
+            window.scDelCanned=function(docId,idx){
+                if(!confirm('Delete this canned message?'))return;
+                db.collection('canned_messages').doc(docId).delete().then(function(){
+                    cannedMessages.splice(idx,1);
+                    render();
+                }).catch(function(e){alert('Error: '+e.message);});
+            };
+
+            // Add canned - inline HTML
+            window.scShowAddCanned=function(){
+                var area=document.getElementById('scCannedEditArea');
+                if(!area)return;
+                area.innerHTML=
+                    '<div style="background:rgba(0,0,0,0.4);border:1px solid #39ff14;border-radius:8px;padding:12px;margin-top:10px;">'+
+                    '<div style="color:#39ff14;font-size:11px;font-weight:700;margin-bottom:4px;">New Canned Message</div>'+
+                    '<div style="color:#888;font-size:10px;margin-bottom:6px;">Use {name} for student name placeholder</div>'+
+                    '<textarea id="scNewCannedInput" rows="3" placeholder="e.g. Hi {name}, this is Calvin from KoreanLearnin. Just checking in about your absence last class." style="width:100%;padding:8px;background:rgba(0,0,0,0.3);border:1px solid #39ff14;border-radius:6px;color:#fff;font-size:12px;box-sizing:border-box;"></textarea>'+
+                    '<div style="display:flex;gap:8px;margin-top:8px;">'+
+                    '<button onclick="scSaveNewCanned()" style="flex:1;padding:8px;background:#39ff14;border:none;border-radius:6px;color:#000;font-weight:700;font-size:12px;cursor:pointer;">Save</button>'+
+                    '<button onclick="document.getElementById(\'scCannedEditArea\').innerHTML=\'\'" style="flex:1;padding:8px;background:rgba(255,255,255,0.1);border:1px solid #555;border-radius:6px;color:#ccc;font-size:12px;cursor:pointer;">Cancel</button>'+
+                    '</div></div>';
+                document.getElementById('scNewCannedInput').focus();
+            };
+
+            window.scSaveNewCanned=function(){
+                var val=(document.getElementById('scNewCannedInput')||{}).value;
+                if(!val||!val.trim())return;
+                db.collection('canned_messages').add({text:val.trim(),createdAt:firebase.firestore.FieldValue.serverTimestamp()}).then(function(ref){
+                    cannedMessages.push({id:ref.id,text:val.trim()});
+                    render();
+                    showToast('\u2705 Canned message saved','success');
+                }).catch(function(e){alert('Error: '+e.message);});
+            };
+
+            // Analytics
+            window.scOpenAnalytics=function(){
+                modal.remove();
+                document.getElementById('analyticsStudentName').textContent=studentName;
+                document.getElementById('studentAnalyticsMenuModal').classList.add('active');
+            };
+
+            document.body.appendChild(modal);
+            modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
+            render();
         }
         
         function closeStudentAnalyticsMenu() {
@@ -25827,9 +26084,11 @@ ${daySpecific}
                         </div>
                         <div style="font-size: 13px; margin-bottom: 5px;">
                             <strong>Teacher:</strong> ${teacher?.name || 'Unassigned'}
+                            <button onclick="transferClassTeacher('${cls.id}','${cls.teacherId||''}')" style="margin-left:8px;background:rgba(255,165,0,0.15);border:1px solid #ffa500;color:#ffa500;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;" title="Hand off to another teacher">🔄 Transfer</button>
                         </div>
                         <div style="font-size: 13px; margin-bottom: 5px;">
                             <strong>Progress:</strong> Week ${currentWeek} of ${weeksTotal}
+                            <button onclick="adjustClassWeek('${cls.id}','${cls.startDate||''}',${weeksTotal})" style="margin-left:8px;background:rgba(0,200,255,0.15);border:1px solid #00c8ff;color:#00c8ff;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;" title="Adjust which week the class is on">✏️ Adjust</button>
                         </div>
                         ${cls.startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDateDisplay}</div>` : ''}
                         ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDateDisplay}</div>` : ''}
@@ -25861,10 +26120,10 @@ ${daySpecific}
                         const absentTag = isAbsent ? '<span style="background:#ff4757; color:#fff; font-size:9px; padding:1px 6px; border-radius:4px; margin-left:5px; font-weight:700;">2+ Absent</span>' : '';
                         rosterHtml += `
                             <tr>
-                                <td style="padding: 8px;">${studentName}${repeatTag}${absentTag}</td>
-                                <td style="padding: 8px;">${escapeHtml(fullStudent.phoneNumber) || fullStudent.phone || '-'}</td>
-                                <td style="padding: 8px;">${fullStudent.discord || '-'}</td>
-                                <td style="padding: 8px;">${escapeHtml(fullStudent.email) || s.email || '-'}</td>
+                                <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','name','${escapedName}')" title="Click to edit">${studentName}${repeatTag}${absentTag}</td>
+                                <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','phoneNumber','${(fullStudent.phoneNumber||fullStudent.phone||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${escapeHtml(fullStudent.phoneNumber) || fullStudent.phone || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
+                                <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','discord','${(fullStudent.discord||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${fullStudent.discord || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
+                                <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','email','${(fullStudent.email||s.email||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${escapeHtml(fullStudent.email) || s.email || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
                                 <td style="padding: 8px; text-align: center;">
                                     <button class="btn btn-warning btn-sm" onclick="openMoveStudentFromClassModal('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px;" title="Move to another class">🔄</button>
                                     <button class="btn btn-sm" onclick="openTagMenu('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px; background: ${isAbsent ? '#ff4757' : (isRepeat ? '#00ffff' : '#666')}; color: ${isRepeat && !isAbsent ? '#000' : '#fff'}; border: none; border-radius: 4px; cursor: pointer;" title="Tag student">🏷️</button>
@@ -26760,6 +27019,136 @@ ${daySpecific}
             }
         }
         
+        async function editActiveStudentField(classId, studentId, field, currentValue) {
+
+        async function transferClassTeacher(classId, currentTeacherId) {
+            var otherTeachers = allTeachers.filter(function(t) { return t.id !== currentTeacherId; });
+            if (otherTeachers.length === 0) { alert('No other teachers available.'); return; }
+
+            var options = otherTeachers.map(function(t, i) { return (i + 1) + '. ' + t.name; }).join('\n');
+            var choice = prompt('Transfer class to which teacher?\n\n' + options + '\n\nEnter number:');
+            if (!choice) return;
+            var idx = parseInt(choice) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= otherTeachers.length) { alert('Invalid selection.'); return; }
+
+            var newTeacher = otherTeachers[idx];
+            if (!confirm('Transfer this class to ' + newTeacher.name + '?')) return;
+
+            try {
+                await db.collection('scheduled_classes').doc(classId).update({
+                    teacherId: newTeacher.id,
+                    teacherName: newTeacher.name
+                });
+                showToast('✅ Class transferred to ' + newTeacher.name, 'success');
+                renderSlotGrid();
+                // Close and reopen details to refresh
+                document.getElementById('slotDetailsModal').classList.remove('active');
+            } catch (e) {
+                console.error('Transfer error:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+
+        async function adjustClassWeek(classId, currentStartDate, totalWeeks) {
+            var currentWeek = 1;
+            if (currentStartDate) {
+                var start = parseLocalDate(currentStartDate);
+                if (start) {
+                    var daysDiff = Math.floor((new Date() - start) / (1000 * 60 * 60 * 24));
+                    currentWeek = Math.floor(daysDiff / 7) + 1;
+                }
+            }
+
+            var newWeek = prompt('This class is currently on Week ' + currentWeek + ' of ' + totalWeeks + '.\n\nSet to which week? (1-' + totalWeeks + '):', currentWeek);
+            if (!newWeek) return;
+            var weekNum = parseInt(newWeek);
+            if (isNaN(weekNum) || weekNum < 1 || weekNum > totalWeeks) { alert('Please enter a number between 1 and ' + totalWeeks); return; }
+
+            // Calculate new start date: if they want Week N now, start date should be (N-1) weeks ago from today
+            // Find the most recent matching day of week
+            var classDoc = await db.collection('scheduled_classes').doc(classId).get();
+            if (!classDoc.exists) { alert('Class not found'); return; }
+            var classData = classDoc.data();
+
+            var today = new Date();
+            var classDayOfWeek = -1;
+            if (classData.day === 'Saturday') classDayOfWeek = 6;
+            else if (classData.day === 'Sunday') classDayOfWeek = 0;
+            else if (classData.day === 'Tuesday') classDayOfWeek = 2;
+            else if (classData.day === 'Friday') classDayOfWeek = 5;
+            else {
+                // Try to infer from current start date
+                if (currentStartDate) {
+                    var s = parseLocalDate(currentStartDate);
+                    if (s) classDayOfWeek = s.getDay();
+                }
+            }
+
+            // Find the most recent occurrence of that day
+            var recentDay = new Date(today);
+            if (classDayOfWeek >= 0) {
+                while (recentDay.getDay() !== classDayOfWeek) {
+                    recentDay.setDate(recentDay.getDate() - 1);
+                }
+            }
+
+            // New start date = recentDay minus (weekNum - 1) weeks
+            var newStart = new Date(recentDay);
+            newStart.setDate(newStart.getDate() - ((weekNum - 1) * 7));
+            var newStartStr = newStart.getFullYear() + '-' + String(newStart.getMonth() + 1).padStart(2, '0') + '-' + String(newStart.getDate()).padStart(2, '0');
+
+            if (!confirm('Set class to Week ' + weekNum + '?\nThis will change the start date to ' + newStartStr + '.')) return;
+
+            try {
+                await db.collection('scheduled_classes').doc(classId).update({
+                    startDate: newStartStr
+                });
+                showToast('✅ Class set to Week ' + weekNum + ' (start: ' + newStartStr + ')', 'success');
+                renderSlotGrid();
+                document.getElementById('slotDetailsModal').classList.remove('active');
+            } catch (e) {
+                console.error('Adjust week error:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+
+            var fieldLabels = {name:'Name',phoneNumber:'Phone',discord:'Discord',email:'Email'};
+            var label = fieldLabels[field] || field;
+            var newValue = prompt('Edit ' + label + ':', currentValue || '');
+            if (newValue === null) return;
+            try {
+                // Update in scheduler_students collection
+                var studentDoc = await db.collection('scheduler_students').doc(studentId).get();
+                if (studentDoc.exists) {
+                    var updateObj = {};
+                    updateObj[field] = newValue || '';
+                    await db.collection('scheduler_students').doc(studentId).update(updateObj);
+                }
+                // Also update in the class's students array
+                var classDoc = await db.collection('scheduled_classes').doc(classId).get();
+                if (classDoc.exists) {
+                    var classData = classDoc.data();
+                    var students = classData.students || [];
+                    var idx = students.findIndex(function(s) { return s.id === studentId; });
+                    if (idx !== -1) {
+                        students[idx][field] = newValue || '';
+                        if (field === 'phoneNumber') students[idx].phone = newValue || '';
+                        await db.collection('scheduled_classes').doc(classId).update({ students: students });
+                    }
+                }
+                // Update local cache
+                var localIdx = allStudents.findIndex(function(s) { return s.id === studentId; });
+                if (localIdx !== -1) allStudents[localIdx][field] = newValue || '';
+                showToast('✅ ' + label + ' updated', 'success');
+                // Refresh the slot details
+                var dayEl = document.querySelector('#slotDetailsContent');
+                if (dayEl) renderSlotGrid();
+            } catch (e) {
+                console.error('Error updating student field:', e);
+                alert('❌ Error: ' + e.message);
+            }
+        }
+
         async function editStudentDiscord(studentIndex) {
             if (!selectedSlotInfo?.prescheduled) return;
             
