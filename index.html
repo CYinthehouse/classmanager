@@ -4848,7 +4848,7 @@
             document.querySelectorAll('#teacherDashboard .tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('#teacherDashboard .nav-tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`teacherTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
-            event.target.classList.add('active');
+            if (event && event.target) event.target.classList.add('active');
             if (tab === 'materials') loadTeacherMaterials();
             if (tab === 'schedule') renderTeacherSchedule();
             if (tab === 'calendar') renderTeacherCalendar();
@@ -11943,7 +11943,7 @@
             h += 'var ARROW_IMG = "https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Copy_of_Press_Start_2P_16.png?v=1770863077";\n';
             h += 'var tutStep = -1;\n';
             h += 'var tutActive = false;\n';
-            h += 'var TUT_DEBUG = true;\n';
+            h += 'var TUT_DEBUG = false;\n';
             h += 'document.addEventListener("click", function(e) {\n';
             h += '  if (TUT_DEBUG) {\n';
             h += '    var el = e.target;\n';
