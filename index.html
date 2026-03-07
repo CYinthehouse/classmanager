@@ -15626,7 +15626,8 @@ Generate 4-6 ending variations per sentence.\`;
               { role: 'system', content: 'You are a Korean language expert. Respond only with valid JSON.' },
               { role: 'user', content: prompt }
             ],
-            temperature: 0.7
+            temperature: 0.7,
+            max_tokens: 4000
           })
         });
         
