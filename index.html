@@ -26359,9 +26359,6 @@ ${daySpecific}
             }
         }
         
-        async function editActiveStudentField(classId, studentId, field, currentValue) {
-        }
-
         async function transferClassTeacher(classId, currentTeacherId) {
             var otherTeachers = allTeachers.filter(function(t) { return t.id !== currentTeacherId; });
             if (otherTeachers.length === 0) { alert('No other teachers available.'); return; }
@@ -26453,6 +26450,7 @@ ${daySpecific}
             }
         }
 
+        async function editActiveStudentField(classId, studentId, field, currentValue) {
             var fieldLabels = {name:'Name',phoneNumber:'Phone',discord:'Discord',email:'Email'};
             var label = fieldLabels[field] || field;
             var newValue = prompt('Edit ' + label + ':', currentValue || '');
