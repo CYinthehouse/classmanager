@@ -15373,12 +15373,46 @@ IMPORTANT FOR BEGINNER SENTENCES:
                 promptEnglish: 'Use one of these Korean expressions appropriately.',
                 promptKeywords: [],
                 answers: batch.map(function(a) {
-                  return { korean: a.korean, english: '', color: 'blue', beginnerKorean: a.korean, beginnerEnglish: '' };
+                  return { korean: a.korean, english: a.english || '', color: 'blue', beginnerKorean: a.korean, beginnerEnglish: '' };
                 })
               });
             }
           }
         })();
+
+        // Fetch English translations for any answers missing them
+        const needsTranslation = [];
+        gameData.forEach(card => {
+          card.answers.forEach(a => {
+            if (!a.english) needsTranslation.push(a);
+          });
+        });
+        if (needsTranslation.length > 0) {
+          try {
+            const translatePrompt = \\`Translate each Korean sentence to English. Return ONLY a JSON object where keys are the Korean sentences and values are English translations.
+Sentences to translate:
+\\${needsTranslation.map(a => a.korean).join('\\n')}
+Return format: {"Korean sentence": "English translation", ...}\\`;
+            const transResponse = await yodafyCallAI(translatePrompt);
+            let transData = transResponse;
+            if (typeof transResponse === 'string') {
+              try {
+                const m = transResponse.match(/\\{[\\s\\S]*\\}/);
+                transData = m ? JSON.parse(m[0]) : JSON.parse(transResponse);
+              } catch(e) { transData = {}; }
+            }
+            if (typeof transData === 'object' && transData !== null) {
+              needsTranslation.forEach(a => {
+                if (transData[a.korean]) {
+                  a.english = transData[a.korean];
+                  a.beginnerEnglish = transData[a.korean];
+                }
+              });
+            }
+          } catch(e) {
+            console.warn('Translation call failed:', e);
+          }
+        }
 
         // SECOND AI CALL: Generate vocabulary for all unique WORDS (not sentences)
         updateProgress('Generating vocabulary definitions...', 50);
@@ -15478,6 +15512,10 @@ IMPORTANT: Return a definition for EVERY word in the list above. Do not skip any
             });
             
             answer.vocabulary = vocabArray;
+            // Fill in missing english translations from vocabulary data
+            if (!answer.english && answer.vocabulary && answer.vocabulary.length > 0) {
+              answer.english = answer.vocabulary.map(v => v.definition || '').filter(Boolean).join(' / ');
+            }
           });
         });
         
