@@ -16250,8 +16250,10 @@ Return ONLY valid JSON (single object, not array):
           }
         } catch(e) {
           console.error('Rename error:', e);
+          showToast('❌ Rename failed: ' + (e && e.message ? e.message : String(e)));
+          return;
         }
-        showToast('❌ Rename failed');
+        showToast('❌ Rename failed (no success response)');
       } else if (game.isLocal) {
         // Update localStorage
         try {
@@ -25428,7 +25430,7 @@ ${daySpecific}
                         </div>
                         <div style="font-size: 13px; margin-bottom: 5px;">
                             <strong>Progress:</strong> Week ${currentWeek} of ${weeksTotal}
-                            <button onclick="adjustClassWeek('${cls.id}','${cls.startDate||''}',${weeksTotal})" style="margin-left:8px;background:rgba(0,200,255,0.15);border:1px solid #00c8ff;color:#00c8ff;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;" title="Adjust which week the class is on">✏️ Adjust</button>
+                            <button onclick="adjustClassWeek('${cls.id}','${cls.startDate||''}',${weeksTotal},'${cls.day||''}')" style="margin-left:8px;background:rgba(0,200,255,0.15);border:1px solid #00c8ff;color:#00c8ff;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;" title="Adjust which week the class is on">✏️ Adjust</button>
                         </div>
                         ${cls.startDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Started:</strong> ${startDateDisplay}</div>` : ''}
                         ${endDate ? `<div style="font-size: 13px; margin-bottom: 5px;"><strong>Ends:</strong> ${endDateDisplay}</div>` : ''}
@@ -26373,7 +26375,7 @@ ${daySpecific}
             if (!confirm('Transfer this class to ' + newTeacher.name + '?')) return;
 
             try {
-                await db.collection('scheduled_classes').doc(classId).update({
+                await db.collection('scheduler_classes').doc(classId).update({
                     teacherId: newTeacher.id,
                     teacherName: newTeacher.name
                 });
@@ -26387,7 +26389,7 @@ ${daySpecific}
             }
         }
 
-        async function adjustClassWeek(classId, currentStartDate, totalWeeks) {
+        async function adjustClassWeek(classId, currentStartDate, totalWeeks, classDay) {
             var currentWeek = 1;
             if (currentStartDate) {
                 var start = parseLocalDate(currentStartDate);
@@ -26402,20 +26404,18 @@ ${daySpecific}
             var weekNum = parseInt(newWeek);
             if (isNaN(weekNum) || weekNum < 1 || weekNum > totalWeeks) { alert('Please enter a number between 1 and ' + totalWeeks); return; }
 
-            // Calculate new start date: if they want Week N now, start date should be (N-1) weeks ago from today
-            // Find the most recent matching day of week
-            var classDoc = await db.collection('scheduled_classes').doc(classId).get();
-            if (!classDoc.exists) { alert('Class not found'); return; }
-            var classData = classDoc.data();
-
+            // Calculate new start date from passed day name (no Firestore lookup needed)
             var today = new Date();
             var classDayOfWeek = -1;
-            if (classData.day === 'Saturday') classDayOfWeek = 6;
-            else if (classData.day === 'Sunday') classDayOfWeek = 0;
-            else if (classData.day === 'Tuesday') classDayOfWeek = 2;
-            else if (classData.day === 'Friday') classDayOfWeek = 5;
+            if (classDay === 'Saturday') classDayOfWeek = 6;
+            else if (classDay === 'Sunday') classDayOfWeek = 0;
+            else if (classDay === 'Tuesday') classDayOfWeek = 2;
+            else if (classDay === 'Friday') classDayOfWeek = 5;
+            else if (classDay === 'Monday') classDayOfWeek = 1;
+            else if (classDay === 'Wednesday') classDayOfWeek = 3;
+            else if (classDay === 'Thursday') classDayOfWeek = 4;
             else {
-                // Try to infer from current start date
+                // Fallback: infer from current start date
                 if (currentStartDate) {
                     var s = parseLocalDate(currentStartDate);
                     if (s) classDayOfWeek = s.getDay();
@@ -26438,7 +26438,7 @@ ${daySpecific}
             if (!confirm('Set class to Week ' + weekNum + '?\nThis will change the start date to ' + newStartStr + '.')) return;
 
             try {
-                await db.collection('scheduled_classes').doc(classId).update({
+                await db.collection('scheduler_classes').doc(classId).update({
                     startDate: newStartStr
                 });
                 showToast('✅ Class set to Week ' + weekNum + ' (start: ' + newStartStr + ')', 'success');
@@ -26464,7 +26464,7 @@ ${daySpecific}
                     await db.collection('scheduler_students').doc(studentId).update(updateObj);
                 }
                 // Also update in the class's students array
-                var classDoc = await db.collection('scheduled_classes').doc(classId).get();
+                var classDoc = await db.collection('scheduler_classes').doc(classId).get();
                 if (classDoc.exists) {
                     var classData = classDoc.data();
                     var students = classData.students || [];
@@ -26472,7 +26472,7 @@ ${daySpecific}
                     if (idx !== -1) {
                         students[idx][field] = newValue || '';
                         if (field === 'phoneNumber') students[idx].phone = newValue || '';
-                        await db.collection('scheduled_classes').doc(classId).update({ students: students });
+                        await db.collection('scheduler_classes').doc(classId).update({ students: students });
                     }
                 }
                 // Update local cache
