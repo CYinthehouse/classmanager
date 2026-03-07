@@ -15389,10 +15389,10 @@ IMPORTANT FOR BEGINNER SENTENCES:
         });
         if (needsTranslation.length > 0) {
           try {
-            const translatePrompt = \\`Translate each Korean sentence to English. Return ONLY a JSON object where keys are the Korean sentences and values are English translations.
+            const translatePrompt = \`Translate each Korean sentence to English. Return ONLY a JSON object where keys are the Korean sentences and values are English translations.
 Sentences to translate:
-\\${needsTranslation.map(a => a.korean).join('\\n')}
-Return format: {"Korean sentence": "English translation", ...}\\`;
+\${needsTranslation.map(a => a.korean).join('\\n')}
+Return format: {"Korean sentence": "English translation", ...}\`;
             const transResponse = await yodafyCallAI(translatePrompt);
             let transData = transResponse;
             if (typeof transResponse === 'string') {
