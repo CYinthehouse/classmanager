@@ -15001,10 +15001,17 @@ Example:
         })
         .filter(line => line.length > 0);
       
+      // Expand slash-separated alternates (e.g. "\xec\xa3\x84\xec\x86\xa1..." -> two entries)
+      const expanded = [];
+      lines.forEach(line => {
+        const parts = line.split(' / ');
+        parts.forEach(p => { const t = p.trim(); if (t) expanded.push(t); });
+      });
+
       // Update answers array (avoid duplicates)
       answers = [];
       const seen = new Set();
-      lines.forEach(korean => {
+      expanded.forEach(korean => {
         if (!seen.has(korean)) {
           seen.add(korean);
           answers.push({ korean });
@@ -15255,6 +15262,20 @@ BAD MATCHING (AVOID):
 - Answer: "아니요" (No) with Question: "뭐 먹었어요?" (What did you eat?) ❌
   → "아니요" answers YES/NO questions, not "what" questions
 
+INTERJECTIONS AND SHORT RESPONSES (네, 아니요, 실례합니다, etc.):
+These ARE valid answers — build a prompt that naturally elicits them:
+- "네" → Question: "한국어 공부해요?" or Situational: "Someone asks if you understand. Confirm."
+- "아니요" → Question: "배고파요?" or Situational: "Someone asks if you want to leave. Say no."
+- "실례합니다" → Situational: "You need to get past someone on the subway."
+- "죄송합니다" or "미안해요" → Situational: "You bump into someone. Apologize."
+Do NOT skip interjections. Every word on the list has a natural context.
+
+QUESTION SENTENCES IN THE LIST (e.g. 이름이 뭐예요?, 어디 가요?, 뭐 해요?):
+These are things the STUDENT SAYS — they are initiating a conversation or asking back.
+Build a situational prompt where asking is natural:
+- "이름이 뭐예요?" → Situational: "You meet someone new at a party. Ask their name." or Statement: "A new classmate introduces themselves. Ask their name."
+Do NOT skip sentences just because they end in ?.
+
 \${varietyInstructions}
 
 Generate prompts in this EXACT distribution:
@@ -15270,24 +15291,29 @@ DIFFICULTY DISTRIBUTION:
 \${modeInstruction}
 
 Each prompt should fit 2-3 answers that would ALL be natural responses to it.
-Every sentence from the list should be used at least once across all prompts.
+MANDATORY: EVERY sentence from the list MUST appear as an answer in at least one prompt. No exceptions. If any sentence is missing after generating, add extra prompt cards to include it — the card count may exceed the configured number.
 
 For EACH prompt, provide promptKeywords (key vocabulary from the Korean prompt itself).
 
-Return ONLY valid JSON array:
+Return ONLY a valid JSON array. Do NOT include any text before or after the JSON. Do NOT use | characters anywhere in the JSON.
+
+The "type" field must be exactly one of these strings: "question", "situational", or "statement"
+The "tier" field must be exactly the number 1 or the number 2
+The "color" field must be exactly one of: "green", "blue", "yellow", or "red"
+
 [
   {
-    "type": "question" | "situational" | "statement",
-    "tier": 1 | 2,
+    "type": "question",
+    "tier": 1,
     "prompt": "The prompt text (Korean for questions, English for situational/statement)",
-    "promptKorean": "Korean version (same as prompt for questions, translation for others)",
-    "promptEnglish": "English version (translation for questions, same as prompt for others)",
+    "promptKorean": "Korean version of the prompt",
+    "promptEnglish": "English version of the prompt",
     "promptKeywords": [{"word": "뭐", "definition": "what"}],
     "answers": [
       {
         "korean": "EXACT sentence from the provided list",
         "english": "English translation",
-        "color": "green|blue|yellow|red",
+        "color": "green",
         "beginnerKorean": "Simplified 1-2 clause version for beginners",
         "beginnerEnglish": "English translation of beginner version"
       }
@@ -15599,28 +15625,35 @@ Generate 4-6 ending variations per sentence.\`;
     // Parse JSON from AI response
     function parseJSON(data) {
       try {
-        // If it's already an array, return it
-        if (Array.isArray(data)) {
-          return data;
-        }
-        
-        // If it's an object but not array, check if it has the data we need
+        if (Array.isArray(data)) return data;
+
         if (typeof data === 'object' && data !== null) {
-          // Maybe the array is inside a property
           if (Array.isArray(data.questions)) return data.questions;
           if (Array.isArray(data.data)) return data.data;
           if (Array.isArray(data.results)) return data.results;
           return null;
         }
-        
-        // If it's a string, try to extract JSON
+
         if (typeof data === 'string') {
-          var bt=String.fromCharCode(96); data = data.replace(new RegExp(bt+bt+bt+'json\\s*','gi'),'').replace(new RegExp(bt+bt+bt+'\\s*','g'),'').trim();
+          // Strip markdown code fences
+          var bt=String.fromCharCode(96); 
+          data = data.replace(new RegExp(bt+bt+bt+'json\\s*','gi'),'').replace(new RegExp(bt+bt+bt+'\\s*','g'),'').trim();
+          
+          // Extract the JSON array (greedy match to get the full array)
           const match = data.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);
-          if (match) return JSON.parse(match[0]);
-          return JSON.parse(data);
+          let jsonStr = match ? match[0] : data;
+          
+          // Fix common AI JSON mistakes before parsing:
+          // 1. Remove trailing commas before } or ]
+          jsonStr = jsonStr.replace(/,\\s*([}\\]])/g, '$1');
+          // 2. Replace literal pipe characters used as schema notation
+          jsonStr = jsonStr.replace(/"(question|situational|statement)\s*\|\s*(question|situational|statement)[^"]*"/g, '"question"');
+          jsonStr = jsonStr.replace(/:\\s*(1|2)\s*\|\s*(1|2)/g, ': 1');
+          jsonStr = jsonStr.replace(/"(green|blue|yellow|red)\s*\|\s*[^"]*"/g, '"green"');
+          
+          return JSON.parse(jsonStr);
         }
-        
+
         return null;
       } catch (e) {
         console.error('Parse error:', e);
@@ -33848,4 +33881,3 @@ Return ONLY this JSON (no markdown, no code blocks):
 })();
 </script>
 </html>
-
