@@ -15001,11 +15001,11 @@ Example:
         })
         .filter(line => line.length > 0);
       
-      // Expand slash-separated alternates (e.g. "\xec\xa3\x84\xec\x86\xa1..." -> two entries)
+      // Expand slash-separated alternates e.g. "네 / 아니요" -> two entries
       const expanded = [];
-      lines.forEach(line => {
-        const parts = line.split(' / ');
-        parts.forEach(p => { const t = p.trim(); if (t) expanded.push(t); });
+      lines.forEach(function(line) {
+        var parts = line.split(' / ');
+        parts.forEach(function(p) { var t = p.trim(); if (t) expanded.push(t); });
       });
 
       // Update answers array (avoid duplicates)
@@ -15268,12 +15268,11 @@ These ARE valid answers — build a prompt that naturally elicits them:
 - "아니요" → Question: "배고파요?" or Situational: "Someone asks if you want to leave. Say no."
 - "실례합니다" → Situational: "You need to get past someone on the subway."
 - "죄송합니다" or "미안해요" → Situational: "You bump into someone. Apologize."
-Do NOT skip interjections. Every word on the list has a natural context.
+Do NOT skip interjections.
 
-QUESTION SENTENCES IN THE LIST (e.g. 이름이 뭐예요?, 어디 가요?, 뭐 해요?):
-These are things the STUDENT SAYS — they are initiating a conversation or asking back.
-Build a situational prompt where asking is natural:
-- "이름이 뭐예요?" → Situational: "You meet someone new at a party. Ask their name." or Statement: "A new classmate introduces themselves. Ask their name."
+QUESTION SENTENCES IN THE LIST (e.g. 이름이 뭐예요?):
+These are things the STUDENT SAYS to initiate conversation. Build a situation where asking is natural:
+- "이름이 뭐예요?" → Situational: "You meet someone new. Ask their name."
 Do NOT skip sentences just because they end in ?.
 
 \${varietyInstructions}
@@ -15291,15 +15290,19 @@ DIFFICULTY DISTRIBUTION:
 \${modeInstruction}
 
 Each prompt should fit 2-3 answers that would ALL be natural responses to it.
-MANDATORY: EVERY sentence from the list MUST appear as an answer in at least one prompt. No exceptions. If any sentence is missing after generating, add extra prompt cards to include it — the card count may exceed the configured number.
+MANDATORY: EVERY sentence from the list MUST appear as an answer card. Count the sentences. Count how many appear in your answers arrays. They must match exactly. Common sentences that get incorrectly skipped:
+- Greeting sentences (안녕하세요, 안녕히 계세요) → Situational: "You arrive at class / You say goodbye to someone"
+- Question sentences ending in ? (이름이 뭐예요?) → Situational: "You meet someone new. Ask their name."
+- Nationality/intro sentences (저는 미국사람이에요) → Situational: "Someone asks where you're from."
+- Single words (네, 아니요, 실례합니다) → YES/NO questions or situational prompts
+DO NOT group similar sentences and drop one. Each sentence = one entry in someone's answers array.
 
 For EACH prompt, provide promptKeywords (key vocabulary from the Korean prompt itself).
 
-Return ONLY a valid JSON array. Do NOT include any text before or after the JSON. Do NOT use | characters anywhere in the JSON.
-
-The "type" field must be exactly one of these strings: "question", "situational", or "statement"
-The "tier" field must be exactly the number 1 or the number 2
-The "color" field must be exactly one of: "green", "blue", "yellow", or "red"
+Return ONLY valid JSON. NO text before or after the JSON. NO pipe | characters anywhere.
+The "type" value must be one of: "question", "situational", "statement"
+The "tier" value must be 1 or 2 (number, not string)
+The "color" value must be one of: "green", "blue", "yellow", "red"
 
 [
   {
@@ -15350,7 +15353,33 @@ IMPORTANT FOR BEGINNER SENTENCES:
         }
         
         gameData = parsed;
-        
+
+        // POST-PROCESSING: ensure every input sentence appears in at least one card
+        (function() {
+          var usedSentences = new Set();
+          gameData.forEach(function(card) {
+            card.answers.forEach(function(a) { usedSentences.add(a.korean.trim()); });
+          });
+          var missing = answers.filter(function(a) { return !usedSentences.has(a.korean.trim()); });
+          if (missing.length > 0) {
+            console.log('Auto-injecting missing sentences:', missing.map(function(a){ return a.korean; }));
+            for (var i = 0; i < missing.length; i += 3) {
+              var batch = missing.slice(i, i + 3);
+              gameData.push({
+                type: 'situational',
+                tier: 1,
+                prompt: 'Use one of these Korean expressions appropriately.',
+                promptKorean: '다음 표현 중 하나를 상황에 맞게 사용하세요.',
+                promptEnglish: 'Use one of these Korean expressions appropriately.',
+                promptKeywords: [],
+                answers: batch.map(function(a) {
+                  return { korean: a.korean, english: '', color: 'blue', beginnerKorean: a.korean, beginnerEnglish: '' };
+                })
+              });
+            }
+          }
+        })();
+
         // SECOND AI CALL: Generate vocabulary for all unique WORDS (not sentences)
         updateProgress('Generating vocabulary definitions...', 50);
         
@@ -15624,39 +15653,41 @@ Generate 4-6 ending variations per sentence.\`;
     
     // Parse JSON from AI response
     function parseJSON(data) {
-      try {
-        if (Array.isArray(data)) return data;
+      // Step 1: already an array
+      if (Array.isArray(data)) return data;
 
-        if (typeof data === 'object' && data !== null) {
-          if (Array.isArray(data.questions)) return data.questions;
-          if (Array.isArray(data.data)) return data.data;
-          if (Array.isArray(data.results)) return data.results;
-          return null;
-        }
-
-        if (typeof data === 'string') {
-          // Strip markdown code fences
-          var bt=String.fromCharCode(96); 
-          data = data.replace(new RegExp(bt+bt+bt+'json\\s*','gi'),'').replace(new RegExp(bt+bt+bt+'\\s*','g'),'').trim();
-          
-          // Extract the JSON array (greedy match to get the full array)
-          const match = data.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);
-          let jsonStr = match ? match[0] : data;
-          
-          // Fix common AI JSON mistakes before parsing:
-          // 1. Remove trailing commas before } or ]
-          jsonStr = jsonStr.replace(/,\\s*([}\\]])/g, '$1');
-          // 2. Replace literal pipe characters used as schema notation
-          jsonStr = jsonStr.replace(/"(question|situational|statement)\s*\|\s*(question|situational|statement)[^"]*"/g, '"question"');
-          jsonStr = jsonStr.replace(/:\\s*(1|2)\s*\|\s*(1|2)/g, ': 1');
-          jsonStr = jsonStr.replace(/"(green|blue|yellow|red)\s*\|\s*[^"]*"/g, '"green"');
-          
-          return JSON.parse(jsonStr);
-        }
-
+      // Step 2: already an object, look for wrapped array
+      if (typeof data === 'object' && data !== null) {
+        if (Array.isArray(data.questions)) return data.questions;
+        if (Array.isArray(data.data)) return data.data;
+        if (Array.isArray(data.results)) return data.results;
         return null;
-      } catch (e) {
-        console.error('Parse error:', e);
+      }
+
+      if (typeof data !== 'string') return null;
+
+      // Step 3: try raw parse (clean response from AI)
+      try { return JSON.parse(data); } catch(e) {}
+
+      // Step 4: strip markdown fences
+      var bt = String.fromCharCode(96);
+      data = data.replace(new RegExp(bt+bt+bt+'json[^\\n]*\\n?', 'gi'), '');
+      data = data.replace(new RegExp(bt+bt+bt, 'g'), '');
+      data = data.trim();
+      try { return JSON.parse(data); } catch(e) {}
+
+      // Step 5: extract the JSON array
+      var match = data.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);
+      if (!match) { console.error('parseJSON: no array found in:', data.slice(0,200)); return null; }
+      var jsonStr = match[0];
+
+      // Step 6: fix trailing commas
+      jsonStr = jsonStr.replace(/,\\s*([}\\]])/g, '$1');
+
+      try {
+        return JSON.parse(jsonStr);
+      } catch(e) {
+        console.error('Parse error:', e.message, '| input:', jsonStr.slice(0, 300));
         return null;
       }
     }
