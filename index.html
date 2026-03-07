@@ -15004,7 +15004,7 @@ Example:
       // Expand slash-separated alternates (e.g. "죄송합니다. / 미안해요." → two entries)
       const expanded = [];
       lines.forEach(line => {
-        const parts = line.split(/\s*\/\s*/).map(p => p.trim()).filter(p => p.length > 0);
+        const parts = line.split(/\\s*\/\\s*/).map(p => p.trim()).filter(p => p.length > 0);
         parts.forEach(p => expanded.push(p));
       });
 
