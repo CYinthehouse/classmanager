@@ -15001,17 +15001,10 @@ Example:
         })
         .filter(line => line.length > 0);
       
-      // Expand slash-separated alternates (e.g. "죄송합니다. / 미안해요." → two entries)
-      const expanded = [];
-      lines.forEach(line => {
-        const parts = line.split(/\\s*\/\\s*/).map(p => p.trim()).filter(p => p.length > 0);
-        parts.forEach(p => expanded.push(p));
-      });
-
       // Update answers array (avoid duplicates)
       answers = [];
       const seen = new Set();
-      expanded.forEach(korean => {
+      lines.forEach(korean => {
         if (!seen.has(korean)) {
           seen.add(korean);
           answers.push({ korean });
@@ -15262,15 +15255,6 @@ BAD MATCHING (AVOID):
 - Answer: "아니요" (No) with Question: "뭐 먹었어요?" (What did you eat?) ❌
   → "아니요" answers YES/NO questions, not "what" questions
 
-INTERJECTIONS AND SHORT RESPONSES (네, 아니요, 실례합니다, 죄송합니다, etc.):
-These ARE valid answers — just build a prompt that naturally elicits them:
-- Answer: "네" → Question: "한국어 공부해요?" or Situational: "Someone asks if you understand. Confirm."
-- Answer: "아니요" → Question: "배고파요?" or Situational: "Someone asks if you want to leave. Say no."
-- Answer: "실례합니다" → Situational: "You need to get past someone on the subway. Get their attention politely."
-- Answer: "죄송합니다" → Situational: "You accidentally bump into someone. Apologize formally."
-- Answer: "미안해요" → Situational: "You're late to meet a friend. Apologize casually."
-Do NOT skip interjections. Every word on the list has a natural context — find it.
-
 \${varietyInstructions}
 
 Generate prompts in this EXACT distribution:
@@ -15286,8 +15270,7 @@ DIFFICULTY DISTRIBUTION:
 \${modeInstruction}
 
 Each prompt should fit 2-3 answers that would ALL be natural responses to it.
-MANDATORY: EVERY sentence from the list MUST appear as an answer in at least one prompt. No exceptions.
-Before finalizing your response, check each sentence in the list against your answers arrays. If any sentence is missing, add an extra prompt card to include it. The number of cards may exceed \${promptCount} if needed to cover all sentences.
+Every sentence from the list should be used at least once across all prompts.
 
 For EACH prompt, provide promptKeywords (key vocabulary from the Korean prompt itself).
 
@@ -33865,3 +33848,4 @@ Return ONLY this JSON (no markdown, no code blocks):
 })();
 </script>
 </html>
+
