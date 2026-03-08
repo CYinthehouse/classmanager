@@ -16244,7 +16244,7 @@ Return ONLY valid JSON (single object, not array):
           const result = await window.parent.updateYodafyGameTitle(game.id, trimmed);
           if (result && result.success) {
             game.title = trimmed;
-            renderGamesList();
+            renderGamesGrid();
             showToast('✅ Renamed to: ' + trimmed);
             return;
           }
@@ -16264,7 +16264,7 @@ Return ONLY valid JSON (single object, not array):
             localStorage.setItem('yodafyGames', JSON.stringify(saved));
           }
           game.title = trimmed;
-          renderGamesList();
+          renderGamesGrid();
           showToast('✅ Renamed to: ' + trimmed);
         } catch(e) {
           showToast('❌ Rename failed');
@@ -26380,9 +26380,8 @@ ${daySpecific}
                     teacherName: newTeacher.name
                 });
                 showToast('✅ Class transferred to ' + newTeacher.name, 'success');
-                renderSlotGrid();
-                // Close and reopen details to refresh
-                document.getElementById('slotDetailsModal').classList.remove('active');
+                await loadAllClasses();
+                if (selectedSlotInfo) openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
             } catch (e) {
                 console.error('Transfer error:', e);
                 alert('❌ Error: ' + e.message);
@@ -26442,8 +26441,8 @@ ${daySpecific}
                     startDate: newStartStr
                 });
                 showToast('✅ Class set to Week ' + weekNum + ' (start: ' + newStartStr + ')', 'success');
-                renderSlotGrid();
-                document.getElementById('slotDetailsModal').classList.remove('active');
+                await loadAllClasses();
+                if (selectedSlotInfo) openSlotDetails(selectedSlotInfo.day, selectedSlotInfo.time);
             } catch (e) {
                 console.error('Adjust week error:', e);
                 alert('❌ Error: ' + e.message);
