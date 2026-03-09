@@ -3340,8 +3340,6 @@
                             <option value="11:10 PM">11:10 PM EST</option>
                             <option value="6:10 PM-7:10 PM">6:10–7:10 PM EST (1hr)</option>
                             <option value="7:20 PM-8:20 PM">7:20–8:20 PM EST (1hr)</option>
-                            <option value="8:30 PM-9:30 PM">8:30–9:30 PM EST (1hr)</option>
-                            <option value="9:50 PM-10:50 PM">9:50–10:50 PM EST (1hr)</option>
                             <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM EST (1hr)</option>
                         </select>
                     </div>
@@ -3821,8 +3819,6 @@
                     <option value="11:10 PM">11:10 PM</option>
                     <option value="6:10 PM-7:10 PM">6:10–7:10 PM (1hr)</option>
                     <option value="7:20 PM-8:20 PM">7:20–8:20 PM (1hr)</option>
-                    <option value="8:30 PM-9:30 PM">8:30–9:30 PM (1hr)</option>
-                    <option value="9:50 PM-10:50 PM">9:50–10:50 PM (1hr)</option>
                     <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM (1hr)</option>
                 </select>
             </div>
@@ -4158,7 +4154,7 @@
         window.moveYodafyGameToFolder = moveYodafyGameToFolder;
 
         // Constants
-        const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '8:30 PM-9:30 PM', '9:50 PM-10:50 PM', '11:00 PM-12:00 AM'];
+        const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '11:00 PM-12:00 AM'];
         const DAYS = ['Saturday', 'Sunday'];
         
         // Helper function to parse date strings as local time (avoids timezone issues)
@@ -5234,7 +5230,7 @@
             const hasLegacyAvail = avail[1] || avail[2] || avail[3];
             
             // Build time slot options
-            const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '8:30 PM-9:30 PM', '9:50 PM-10:50 PM', '11:00 PM-12:00 AM'];
+            const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '11:00 PM-12:00 AM'];
             const DAYS = ['Saturday', 'Sunday'];
             let optionsHtml = '<option value="">-- Select Time --</option>';
             DAYS.forEach(day => {
