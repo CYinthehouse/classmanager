@@ -3338,6 +3338,11 @@
                             <option value="9:50 PM">9:50 PM EST</option>
                             <option value="10:30 PM">10:30 PM EST</option>
                             <option value="11:10 PM">11:10 PM EST</option>
+                            <option value="6:10 PM-7:10 PM">6:10–7:10 PM EST (1hr)</option>
+                            <option value="7:20 PM-8:20 PM">7:20–8:20 PM EST (1hr)</option>
+                            <option value="8:30 PM-9:30 PM">8:30–9:30 PM EST (1hr)</option>
+                            <option value="9:50 PM-10:50 PM">9:50–10:50 PM EST (1hr)</option>
+                            <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM EST (1hr)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -3814,6 +3819,11 @@
                     <option value="9:50 PM">9:50 PM</option>
                     <option value="10:30 PM">10:30 PM</option>
                     <option value="11:10 PM">11:10 PM</option>
+                    <option value="6:10 PM-7:10 PM">6:10–7:10 PM (1hr)</option>
+                    <option value="7:20 PM-8:20 PM">7:20–8:20 PM (1hr)</option>
+                    <option value="8:30 PM-9:30 PM">8:30–9:30 PM (1hr)</option>
+                    <option value="9:50 PM-10:50 PM">9:50–10:50 PM (1hr)</option>
+                    <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM (1hr)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -4148,7 +4158,7 @@
         window.moveYodafyGameToFolder = moveYodafyGameToFolder;
 
         // Constants
-        const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM'];
+        const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '8:30 PM-9:30 PM', '9:50 PM-10:50 PM', '11:00 PM-12:00 AM'];
         const DAYS = ['Saturday', 'Sunday'];
         
         // Helper function to parse date strings as local time (avoids timezone issues)
@@ -5224,7 +5234,7 @@
             const hasLegacyAvail = avail[1] || avail[2] || avail[3];
             
             // Build time slot options
-            const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM'];
+            const TIME_SLOTS = ['6:30 PM', '7:10 PM', '7:50 PM', '8:30 PM', '9:10 PM', '9:50 PM', '10:30 PM', '11:10 PM', '6:10 PM-7:10 PM', '7:20 PM-8:20 PM', '8:30 PM-9:30 PM', '9:50 PM-10:50 PM', '11:00 PM-12:00 AM'];
             const DAYS = ['Saturday', 'Sunday'];
             let optionsHtml = '<option value="">-- Select Time --</option>';
             DAYS.forEach(day => {
@@ -24830,7 +24840,24 @@ ${daySpecific}
             const container = document.getElementById('slotGridContainer');
             const selectedTeacherId = document.getElementById('slotManagerTeacher')?.value || '';
             const weeksToShow = parseInt(document.getElementById('slotManagerView')?.value || '8');
-            
+
+            // Helper: get display label (start time only, no end time)
+            function slotLabel(time) {
+                return time.includes('-') ? time.split('-')[0].trim() : time;
+            }
+
+            // Helper: convert slot to minutes for sorting
+            function slotToMinutes(time) {
+                const t = slotLabel(time);
+                const [rawTime, period] = t.split(' ');
+                let [h, m] = rawTime.split(':').map(Number);
+                if (period === 'PM' && h !== 12) h += 12;
+                if (period === 'AM' && h === 12) h = 0;
+                return h * 60 + m;
+            }
+
+            const sortedTimeSlots = [...TIME_SLOTS].sort((a, b) => slotToMinutes(a) - slotToMinutes(b));
+
             const relevantTeachers = selectedTeacherId 
                 ? allTeachers.filter(t => t.id === selectedTeacherId)
                 : allTeachers;
@@ -24949,9 +24976,9 @@ ${daySpecific}
             DAYS.forEach(day => {
                 html += `<div style="margin-bottom: 20px;">`;
                 html += `<h4 style="color: #00ffff; margin-bottom: 10px;">${day}</h4>`;
-                html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;">`;
+                html += `<div style="overflow-x: auto; padding-bottom: 8px;"><div style="display: flex; gap: 10px; min-width: max-content;">`;
                 
-                TIME_SLOTS.forEach(time => {
+                sortedTimeSlots.forEach(time => {
                     const key = `${day}-${time}`;
                     const entries = slotEntries[key] || [];
                     const isAllView = !selectedTeacherId;
@@ -24963,9 +24990,9 @@ ${daySpecific}
                         html += `
                             <div class="slot-card" onclick="openMultiTeacherSlot('${day}', '${time}')" 
                                  style="background: rgba(59,130,246,0.3); border: 2px solid #3b82f6; border-radius: 8px; padding: 10px; 
-                                        cursor: pointer; transition: all 0.2s; text-align: center; position: relative;">
+                                        cursor: pointer; transition: all 0.2s; text-align: center; position: relative; width: 140px; flex-shrink: 0;">
                                 <div style="position: absolute; top: -8px; right: -8px; background: #3b82f6; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${entries.length} classes</div>
-                                <div style="font-size: 14px; font-weight: bold; color: #fff;">${time}</div>
+                                <div style="font-size: 14px; font-weight: bold; color: #fff;">${slotLabel(time)}</div>
                                 <div style="font-size: 18px; margin: 5px 0;">🔵</div>
                                 <div style="font-size: 11px; color: #3b82f6;">Multi-Teacher</div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px;">👨‍🏫 ${teacherNames}</div>
@@ -25053,9 +25080,9 @@ ${daySpecific}
                     html += `
                         <div class="slot-card" onclick="${clickable ? `openSlotDetails('${day}', '${time}')` : ''}" 
                              style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 8px; padding: 10px; 
-                                    cursor: ${clickable ? 'pointer' : 'not-allowed'}; transition: all 0.2s; text-align: center; position: relative;">
+                                    cursor: ${clickable ? 'pointer' : 'not-allowed'}; transition: all 0.2s; text-align: center; position: relative; width: 140px; flex-shrink: 0;">
                             ${xBadge}
-                            <div style="font-size: 14px; font-weight: bold; color: #fff;">${time}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: #fff;">${slotLabel(time)}</div>
                             <div style="font-size: 18px; margin: 5px 0;">${statusIcon}</div>
                             <div style="font-size: 11px; color: ${borderColor};">${statusText}</div>
                             ${classInfo}
@@ -25066,7 +25093,7 @@ ${daySpecific}
                     `;
                 });
                 
-                html += `</div></div>`;
+                html += `</div></div></div>`;
             });
             
             container.innerHTML = html;
