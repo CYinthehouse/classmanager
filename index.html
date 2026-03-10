@@ -33054,6 +33054,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                     gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                     gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
+                    gptPrompt+='CONSONANT GUIDE \xe2\x80\x94 use when giving consonant feedback:\n - TENSED (\xe3\x84\xb2 \xe3\x84\xb8 \xe3\x85\x83 \xe3\x85\x86 \xe3\x85\x89): no air \xe2\x80\x94 if student used plain, say tense up and hold the air in\n - PLAIN (\xe3\x84\xb1 \xe3\x84\xb7 \xe3\x85\x82 \xe3\x85\x85 \xe3\x85\x88): moderate puff of air \xe2\x80\x94 do NOT call these aspirated\n - ASPIRATED (\xe3\x85\x8a \xe3\x85\x8b \xe3\x85\x8c \xe3\x85\x8d): big burst of air \xe2\x80\x94 if student used plain, say bigger puff of air\n - \xe3\x84\xb4 misheard at word start: say it like ND as in and I\n - \xe3\x85\x81 misheard at word start: say it like MB as in Simba\n - \xe3\x84\xb9 misheard mid-word: quickly tap tongue on roof of mouth (soft D/R flap)\n - \xe3\x84\xb9 misheard at word end: curl tongue back without releasing (like an L that does not finish)\n';
                     gptPrompt+='FEEDBACK STYLE: The entire feedback MUST be written in ENGLISH — never write full sentences in Korean. It is OK to include specific Korean words, letters, or sounds (like ㄱ,ㅋ,ㄲ,ㅏ,ㅓ or a word like 집에) but the sentence around them must be English. Short, informal, use bullet points (•). NEVER use romanized labels like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n';
                     gptPrompt+='- Max 2 bullet points.\n';
                     gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
@@ -33321,6 +33322,24 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
         // ─────────────────────────────────────────────────────────────────────
 
+        // Normalize Korean text for STT comparison:
+        // strips spaces/punctuation and maps liaison equivalences to canonical forms
+        function qsNormalizeKorean(str){
+            var s=(str||'').replace(/[\s.,!?。、·]/g,'');
+            var liaisons=[
+                ['구이','귀'],['주이','쥐'],['우이','위'],['으이','의'],
+                ['의','에'],['위','우이'],['귀','구이'],
+                ['니오','뇨'],['디어','뎌'],['리에','례'],
+                ['루아','롸'],['루이','뢰'],['부에','봬'],
+                ['시어','셔'],['쑤에','쐐'],['이에','얘'],
+                ['우에','왜'],['우에','웨']
+            ];
+            liaisons.forEach(function(pair){
+                s=s.replace(new RegExp(pair[0],'g'),pair[1]);
+            });
+            return s;
+        }
+
         async function qsSubmitRecording(mimeType) {
             var statusEl=document.getElementById('qsRecStatus');
             try {
@@ -33465,7 +33484,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH — never write full sentences in Korean. It is OK to mention specific Korean words, letters, or sounds (like ㄱ or 집에) but the sentence around them must be English. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH (Korean words/letters OK but sentences must be English)","transcript":"what you ACTUALLY heard"}';
+                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\nBefore grading pronunciation, check if the audio actually contains Korean speech.\n- If you hear SILENCE, background noise, or no speech at all → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or another non-Korean language → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you actually heard\n- If the audio is too short or garbled to understand → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess or assume what the student said. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe written form and phonetic form look different but are pronounced THE SAME. Both are correct.\nExample: 있었던건 (written) = 이썯떤건 (phonetic) — these are THE SAME pronunciation.\nDo NOT flag differences between written and phonetic forms as errors.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe detected errors above are HINTS from an automated system. They may contain false positives.\n- Verify each flagged error against what you ACTUALLY hear in the audio.\n- If a flagged error sounds correct to you, DISCARD it — do not mention it.\n- If you hear an error that was NOT flagged, you may mention it.\n- Synthesize both sources: your own hearing + the automated hints.\n\nCRITICAL RULES:\n\n1. ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n\n2. DO NOT INVENT ERRORS. If a consonant IS plain (ㄱㄷㅂㅅㅈ) in the expected text, do NOT say it "lacked tensification". Only flag tensification when the expected has ㄲㄸㅃㅆㅉ but the student used ㄱㄷㅂㅅㅈ.\n\n3. If a flagged error is hard to hear, explain the pronunciation RULE instead:\n - e.g. "있었던 follows batchim linking: 받침 ㅆ links to next syllable → 이써떤"\n - e.g. "않았어요 has a silent ㅎ → 아나써요"\n\n4. CONSONANT GUIDE — use when giving consonant feedback:\n - TENSED (ㄲ ㄸ ㅃ ㅆ ㅉ): no air — if student used plain, say 'tense up and hold the air in'\n - PLAIN (ㄱ ㄷ ㅂ ㅅ ㅈ): moderate puff of air — do NOT call these aspirated\n - ASPIRATED (ㅊ ㅋ ㅌ ㅍ): big burst of air — if student used plain, say 'bigger puff of air'\n - ㄴ misheard at word start: say it like 'ND' as in 'and I'\n - ㅁ misheard at word start: say it like 'MB' as in 'Simba'\n - ㄹ misheard mid-word: quickly tap tongue on roof of mouth (soft D/R flap)\n - ㄹ misheard at word end: curl tongue back without releasing (like an L that does not finish)\n\n5. Keep feedback to 2-4 bullet points max. If no real errors, say so positively.\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH — never write full sentences in Korean. It is OK to mention specific Korean words, letters, or sounds (like ㄱ or 집에) but the sentence around them must be English. Students are English speakers learning Korean.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•)\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ,ㅏ,ㅓ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme"\n- Reference the actual Korean word where the error occurred\n- Example good feedback: "• \'따뜻한\' — the ㄸ sounded more like ㄷ, needs more tensification\\n• \'않았어요\' — the ㅎ should be silent here, pronounced 아나써요"\n\nSCORING RUBRIC — grade based on what you hear:\n- 0-10: No Korean speech, silence, or completely wrong language\n- 10-40: Many errors throughout — multiple plain/tense/aspirated mix-ups, several wrong vowels, assimilation rules consistently wrong\n- 40-60: Several noticeable errors — a few consonant type mistakes (e.g. ㄷ instead of ㄸ), some vowel confusion, some assimilation rules missed\n- 60-75: Mostly correct but with clear issues — one or two consonant/vowel errors, an assimilation rule missed\n- 75-85: Good — maybe one minor error, mostly sounds right\n- 85-95: Very accurate — all consonants and vowels correct, assimilation rules followed, natural flow\n- 95-100: Perfect, native-like\n\nPer-error penalties:\n- Plain/tense/aspirated confusion (e.g. ㄷ↔ㄸ↔ㅌ): -8 to -12 per instance\n- Wrong vowel (e.g. ㅗ↔ㅓ): -5 to -8 per instance\n- Missed assimilation rule (e.g. not applying silent ㅎ, nasalization): -5 to -8 per instance\n- Minor accent/rhythm issues: -2 to -3\n\nUse the FULL range of scores. Grade based on what you genuinely hear.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH (Korean words/letters OK but sentences must be English)","transcript":"what you ACTUALLY heard"}';
 
                 var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -33517,6 +33536,35 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
+                // ========== STT SCORE: always recalculate from transcript ==========
+                // The proxy's internal score is unreliable — it doesn't handle:
+                //   - Liaison (연음): 궀이 and 궀이 are the same sound
+                //   - Space differences: STT may merge/split syllables
+                //   - Azure-cleared words it still penalizes
+                // So we ALWAYS recompute the STT score ourselves from the transcript.
+                if(phonemeResult && phonemeResult.transcript){
+                    var normSttHeard=qsNormalizeKorean(phonemeResult.transcript);
+                    var expectedWords=expectedKorean.split(/\s+/).filter(Boolean);
+                    var azureFlaggedMap={};
+                    if(azureResult && azureResult.words){
+                        azureResult.words.forEach(function(w){
+                            if(w.word) azureFlaggedMap[w.word.trim()]=w.error_type&&w.error_type!=='None';
+                        });
+                    }
+                    var totalWords=expectedWords.length;
+                    var correctWords=0;
+                    expectedWords.forEach(function(word){
+                        // If Azure explicitly cleared this word, count it correct
+                        var azureCleared=azureFlaggedMap.hasOwnProperty(word)&&!azureFlaggedMap[word];
+                        if(azureCleared){ correctWords++; return; }
+                        // Otherwise check if liaison-normalized STT transcript contains the word
+                        if(normSttHeard.indexOf(qsNormalizeKorean(word))>=0){ correctWords++; }
+                    });
+                    var recalcScore=totalWords>0?Math.round((correctWords/totalWords)*100):0;
+                    console.log('  STT score (recalc): '+phonemeResult.score+' → '+recalcScore+' ('+correctWords+'/'+totalWords+' words matched)');
+                    phonemeResult.score=recalcScore;
+                }
+
                 // ========== HYBRID SCORING: Azure-aware weighting ==========
                 // If Azure reports zero flagged words → STT 10% / GPT 90%
                 // Otherwise → STT 50% / GPT 50%
@@ -33525,8 +33573,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var phonemeScore=phonemeResult.score;
                     var azureFlagged=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
                     var azureAllClear=azureResult && azureFlagged && azureFlagged.length===0;
-                    var sttW=azureAllClear ? 0.1 : 0.5;
-                    var gptW=azureAllClear ? 0.9 : 0.5;
+                    var sttW=azureAllClear ? 0.1 : 0.25;
+                    var gptW=azureAllClear ? 0.9 : 0.75;
                     var hybridScore=Math.round(phonemeScore*sttW + gptScore*gptW);
                     grade.score=hybridScore;
                 }else{
@@ -34009,6 +34057,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 gptPrompt+='- Do NOT invent errors. Only mention what you can genuinely hear.\n';
                 gptPrompt+='- If a consonant IS plain (ㄱㄷㅂㅅㅈ) in expected text, do NOT say it "lacked tensification".\n';
                 gptPrompt+='- If a flagged error is hard to hear, explain the pronunciation rule instead.\n';
+                gptPrompt+='CONSONANT GUIDE \xe2\x80\x94 use when giving consonant feedback:\n - TENSED (\xe3\x84\xb2 \xe3\x84\xb8 \xe3\x85\x83 \xe3\x85\x86 \xe3\x85\x89): no air \xe2\x80\x94 if student used plain, say tense up and hold the air in\n - PLAIN (\xe3\x84\xb1 \xe3\x84\xb7 \xe3\x85\x82 \xe3\x85\x85 \xe3\x85\x88): moderate puff of air \xe2\x80\x94 do NOT call these aspirated\n - ASPIRATED (\xe3\x85\x8a \xe3\x85\x8b \xe3\x85\x8c \xe3\x85\x8d): big burst of air \xe2\x80\x94 if student used plain, say bigger puff of air\n - \xe3\x84\xb4 misheard at word start: say it like ND as in and I\n - \xe3\x85\x81 misheard at word start: say it like MB as in Simba\n - \xe3\x84\xb9 misheard mid-word: quickly tap tongue on roof of mouth (soft D/R flap)\n - \xe3\x84\xb9 misheard at word end: curl tongue back without releasing (like an L that does not finish)\n';
                 gptPrompt+='FEEDBACK STYLE: The entire feedback MUST be written in ENGLISH — never write full sentences in Korean. It is OK to include specific Korean words, letters, or sounds (like ㄱ,ㅋ,ㄲ,ㅏ,ㅓ or a word like 집에) but the sentence around them must be English. Short, informal, use bullet points (•). NEVER use romanized labels like /G/,/O/. Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n';
                 gptPrompt+='- Max 2-4 bullet points. If no real errors, say so positively.\n';
                 gptPrompt+='SCORING RUBRIC — grade based on what you hear:\n';
@@ -34048,13 +34097,33 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
 
                 // Hybrid: Azure-aware weighting (10% STT / 90% GPT if Azure all clear, else 50/50)
+                // Always recompute STT score from transcript (proxy score is unreliable)
+                if(phonemeResult && phonemeResult.transcript){
+                    var bNormSttHeard=qsNormalizeKorean(phonemeResult.transcript);
+                    var bExpectedWords=expectedKorean.split(/\s+/).filter(Boolean);
+                    var bAzureFlaggedMap={};
+                    if(azureResult && azureResult.words){
+                        azureResult.words.forEach(function(w){
+                            if(w.word) bAzureFlaggedMap[w.word.trim()]=w.error_type&&w.error_type!=='None';
+                        });
+                    }
+                    var bCorrect=0;
+                    bExpectedWords.forEach(function(word){
+                        var cleared=bAzureFlaggedMap.hasOwnProperty(word)&&!bAzureFlaggedMap[word];
+                        if(cleared){ bCorrect++; return; }
+                        if(bNormSttHeard.indexOf(qsNormalizeKorean(word))>=0){ bCorrect++; }
+                    });
+                    var bRecalc=bExpectedWords.length>0?Math.round((bCorrect/bExpectedWords.length)*100):0;
+                    console.log('  STT score (recalc bonus): '+phonemeResult.score+' → '+bRecalc+' ('+bCorrect+'/'+bExpectedWords.length+' words)');
+                    phonemeResult.score=bRecalc;
+                }
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 if(phonemeResult&&typeof phonemeResult.score==='number'){
                     var phonemeScore=phonemeResult.score;
                     var azureFlaggedB=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
                     var azureAllClearB=azureResult && azureFlaggedB && azureFlaggedB.length===0;
-                    var sttWB=azureAllClearB ? 0.1 : 0.5;
-                    var gptWB=azureAllClearB ? 0.9 : 0.5;
+                    var sttWB=azureAllClearB ? 0.1 : 0.25;
+                    var gptWB=azureAllClearB ? 0.9 : 0.75;
                     grade.score=Math.round(phonemeScore*sttWB+gptScore*gptWB);
                 }
 
