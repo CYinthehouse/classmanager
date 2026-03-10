@@ -33027,7 +33027,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Score: 50% Phoneme + 50% GPT
                 var finalScore=0;
                 if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    finalScore=Math.round(phonemeResult.score*0.5 + gptScore*0.5);
+                    finalScore=Math.round(phonemeResult.score*0.25 + gptScore*0.75);
                 }else{
                     finalScore=Math.max(0,gptScore); // Fallback to GPT-only if phoneme service fails
                 }
@@ -33060,11 +33060,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Update Firestore
                 await subRef.update({score:finalScore,feedback:feedback,phonemeErrors:phonemeErrorSummary,gradeScore:finalScore,status:'graded'});
 
-                // Show result to student
-                var scoreColor=finalScore>=80?'#39ff14':finalScore>=60?'#fbbf24':'#ef4444';
-                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;">'+
-                    '<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-align:center;">'+finalScore+'<span style="font-size:10px;color:#888;">/100</span></div>'+
-                    '<div style="font-size:12px;color:#ccc;text-align:center;margin-top:8px;">'+escapeHtml(feedback).replace(/•/g,'<br>•')+'</div></div>';
+                // Show feedback only — no score shown to student for drills
+                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(155,89,182,0.4);border-radius:12px;padding:16px;margin-top:8px;">'+
+                    '<div style="font-size:12px;color:#ccc;text-align:left;margin-top:4px;">'+escapeHtml(feedback).replace(/•/g,'<br>•')+'</div></div>';
                 statusEl.textContent='';
                 qs.isBusy=false;qsFlushPending();
                 // Re-enable record button for retry
@@ -33136,6 +33134,109 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(btn){btn.style.display='';btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.animation='none';}
             document.getElementById('qsRecStatus').textContent='';
         }
+
+
+        // ── PHONEME ERROR FILTER ──────────────────────────────────────────────
+        // Cross-checks STT jamo-level errors against Azure word-level flags.
+        // Only runs for regular rounds (qsSubmitRecording).
+        //
+        // Decision tree:
+        //   azureResult missing/no words array → return sttErrors unchanged (fallback)
+        //   Azure flagged zero words (all 'None') → return [] and set azureAllClear=true
+        //   Azure flagged some words → keep only STT errors whose jamo maps to a flagged word
+        //
+        // Returns {errors: [...], azureAllClear: bool}
+        //   azureAllClear=true means caller should also skip extractGptErrors.
+        function filterPhonemeErrors(sttErrors, azureResult, expectedKorean) {
+            // No Azure data — can't filter, return as-is
+            if (!azureResult || !azureResult.words || !azureResult.words.length) {
+                return { errors: sttErrors, azureAllClear: false };
+            }
+
+            var flaggedWords = azureResult.words.filter(function(w) {
+                return w.error_type && w.error_type !== 'None';
+            });
+
+            // Azure cleared everything — discard all STT errors
+            if (flaggedWords.length === 0) {
+                return { errors: [], azureAllClear: true };
+            }
+
+            // Build set of flagged word strings (lowercased, trimmed) for lookup
+            var flaggedSet = {};
+            flaggedWords.forEach(function(w) {
+                if (w.word) flaggedSet[w.word.trim().toLowerCase()] = true;
+            });
+
+            // Decompose a Korean syllable block into its constituent jamo.
+            // Returns array of jamo characters (초성, 중성, 받침 if present).
+            // Only processes syllable blocks in range AC00–D7A3.
+            // Non-syllable characters (standalone jamo, punctuation) are returned as-is.
+            var CHOSUNG  = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+            var JUNGSUNG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+            var JONGSUNG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+            function decomposeWord(word) {
+                var jamo = [];
+                for (var i = 0; i < word.length; i++) {
+                    var cp = word.charCodeAt(i);
+                    if (cp >= 0xAC00 && cp <= 0xD7A3) {
+                        var offset = cp - 0xAC00;
+                        var jong = offset % 28;
+                        var jung = Math.floor(offset / 28) % 21;
+                        var cho  = Math.floor(offset / 28 / 21);
+                        jamo.push(CHOSUNG[cho]);
+                        jamo.push(JUNGSUNG[jung]);
+                        if (jong > 0) jamo.push(JONGSUNG[jong]);
+                    } else {
+                        // standalone jamo or other character — include directly
+                        jamo.push(word[i]);
+                    }
+                }
+                return jamo;
+            }
+
+            // Build map: jamo character → array of space-separated words that contain it.
+            // We use the original expectedKorean text (not phonetic form) to match Azure's words.
+            var words = expectedKorean.split(/\s+/).filter(Boolean);
+            // jamoToWords[jamo] = {wordStr: true, ...}
+            var jamoToWords = {};
+            words.forEach(function(word) {
+                var clean = word.replace(/[^\uAC00-\uD7A3\u3131-\u314E\u314F-\u3163]/g, '');
+                var jamo = decomposeWord(clean);
+                jamo.forEach(function(j) {
+                    if (!jamoToWords[j]) jamoToWords[j] = {};
+                    jamoToWords[j][word.toLowerCase()] = true;
+                });
+            });
+
+            // Filter: keep STT error only if its expected jamo maps to an Azure-flagged word.
+            // Conservative rule: if the jamo appears in ANY flagged word, keep it.
+            // If the jamo can't be mapped to any word (not found in decomposition), keep it.
+            var filtered = [];
+            sttErrors.forEach(function(err) {
+                var jamoChar = err.expected || err.actual || '';
+                if (!jamoChar) return; // skip empty
+
+                var wordSet = jamoToWords[jamoChar];
+                if (!wordSet) {
+                    // Jamo not found in any word's decomposition — can't map, keep it
+                    filtered.push(err);
+                    return;
+                }
+
+                // Check if any word containing this jamo is Azure-flagged
+                var inFlaggedWord = Object.keys(wordSet).some(function(w) {
+                    return flaggedSet[w] || flaggedSet[w.replace(/[^\uAC00-\uD7A3a-z0-9]/gi, '')];
+                });
+
+                if (inFlaggedWord) filtered.push(err);
+                // else: Azure cleared every word this jamo appears in — discard
+            });
+
+            return { errors: filtered, azureAllClear: false };
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         async function qsSubmitRecording(mimeType) {
             var statusEl=document.getElementById('qsRecStatus');
@@ -33357,17 +33458,24 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var finalTranscript = grade.transcript || transcript || '';
                 var points = Math.round(finalScore / 10);
 
-                // Collect phoneme error summary for stats
-                var phonemeErrorSummary=[];
+                // Collect phoneme error summary for stats.
+                // Filtered through Azure word-level flags via filterPhonemeErrors():
+                //   - azureAllClear=true  → Azure said all words correct; discard all STT errors
+                //                           and skip extractGptErrors (would re-introduce false positives)
+                //   - azureAllClear=false → Azure had flagged words or was unavailable;
+                //                           only keep STT errors whose jamo maps to a flagged word
+                var rawSttErrors=[];
                 if(phonemeResult&&phonemeResult.errors){
                     phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
-                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
-                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                        if(err.type==='substitution') rawSttErrors.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion') rawSttErrors.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion') rawSttErrors.push({expected:'',actual:err.actual||'',type:'insertion'});
                     });
                 }
-                // GPT fallback: if phoneme errors all filtered out but GPT found issues, extract from feedback
-                if(phonemeErrorSummary.length===0 && finalFeedback && finalScore<95){
+                var filterResult=filterPhonemeErrors(rawSttErrors, azureResult, expectedKorean);
+                var phonemeErrorSummary=filterResult.errors;
+                // GPT fallback: only run if Azure did NOT clear everything
+                if(phonemeErrorSummary.length===0 && !filterResult.azureAllClear && finalFeedback && finalScore<95){
                     phonemeErrorSummary=extractGptErrors(finalFeedback, expectedKorean, expectedPronunciation);
                 }
 
@@ -33863,6 +33971,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(!area)return;
                 if(d.status==='round_result'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});qsShowResult(d,area,status);}
                 else if(d.status==='finished'){['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});qsShowFinished(area,status);}
+                // Fix: replay a missed 'playing' snapshot so student isn't stuck on drill/bonus result
+                else if(d.status==='playing'){qsShowRound(d,area,status);}
             }
         }
 
@@ -33897,10 +34007,12 @@ Return ONLY this JSON (no markdown, no code blocks):
         function qsShowResult(d,area,status) {
             if(status){status.textContent='\u{1F3C6} ROUND RESULTS';status.style.color='#FFD700';}
             var board=d[qsGetLeaderboardKey(qs.playerLevel)]||[];
-            if(area.querySelector('[data-round]'))return;
+            // Fix: guard only against an existing *results* div, not a round prompt card.
+            // Previously used [data-round] which blocked re-render when a round card was present.
+            if(area.querySelector('[data-results]'))return;
             var levelLabel=qsGetLevelLabel(qs.playerLevel);
             var levelColor=qsGetLevelColor(qs.playerLevel);
-            var h='<div style="margin-top:16px;background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;">';
+            var h='<div data-results style="margin-top:16px;background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;">';
             h+=qgBuildList(board,levelLabel,levelColor,qs.playerName);
             h+='</div>';
             area.innerHTML=h;
@@ -34058,6 +34170,340 @@ Return ONLY this JSON (no markdown, no code blocks):
         background-position: -200% 0;
         transition: background-position 1.2s 0.2s ease-out;
     }
+
+/* ══════════════════════════════════════════════════════════
+   STUDENT QUIZ GAME — MOBILE RESPONSIVE (max-width: 768px)
+   All student HTML is generated as inline styles, so we use
+   !important and structural selectors to override them.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Body reset when student page is active ── */
+@media (max-width: 768px) {
+    /* Prevent horizontal scroll globally on student page */
+    body:has(#qsApp) {
+        overflow-x: hidden !important;
+    }
+
+    /* ── App container ── */
+    #qsApp {
+        padding: 12px !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    /* ── JOIN SCREEN ── */
+
+    /* Room code: big pixel font on small screen — scale down */
+    #qsApp > div > div[style*="letter-spacing:6px"],
+    #qsApp > div > div[style*="letter-spacing: 6px"] {
+        font-size: clamp(14px, 6vw, 24px) !important;
+        letter-spacing: 3px !important;
+    }
+
+    /* "QUIZ GAME" heading */
+    #qsApp > div > div[style*="font-size:16px"],
+    #qsApp > div > div[style*="font-size: 16px"] {
+        font-size: 13px !important;
+    }
+
+    /* Main join card */
+    #qsApp > div > div[style*="border-radius:16px"],
+    #qsApp > div > div[style*="border-radius: 16px"] {
+        padding: 16px !important;
+    }
+
+    /* Emoji grid: allow tighter wrap on small screens */
+    #qsEmojiGrid {
+        gap: 4px !important;
+        justify-content: flex-start !important;
+    }
+    #qsEmojiGrid button {
+        width: 42px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        padding: 1px !important;
+    }
+    #qsEmojiGrid button img {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    /* Level selector: 3-col grid stays but buttons scale */
+    #qsLvlAB, #qsLvlB, #qsLvlA {
+        padding: 12px 4px !important;
+        font-size: 10px !important;
+        min-height: 44px !important;
+    }
+
+    /* Name input */
+    #qsName {
+        font-size: 16px !important; /* prevent iOS zoom on focus */
+        padding: 12px !important;
+    }
+
+    /* Tevello + Join buttons */
+    #qsTevelloBtn, #qsJoinBtn {
+        padding: 14px !important;
+        font-size: 10px !important;
+        min-height: 44px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── WAITING ROOM ── */
+    #qsPlayers {
+        padding: 10px !important;
+    }
+    #qsPlayers span {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+    }
+    #qsStatus {
+        font-size: 8px !important;
+        padding: 0 4px;
+    }
+
+    /* ── ROUND / DRILL / BONUS CARDS ── */
+
+    /* The main word display card (border around Korean text) */
+    #qsApp div[style*="border-radius:14px"],
+    #qsApp div[style*="border-radius: 14px"] {
+        padding: 14px 12px !important;
+    }
+
+    /* Korean sentence text in round card */
+    #qsApp div[style*="font-size:20px"][style*="text-align:center"],
+    #qsApp div[style*="font-size: 20px"][style*="text-align: center"] {
+        font-size: clamp(16px, 5vw, 20px) !important;
+        line-height: 1.6 !important;
+    }
+
+    /* Korean text in drill card */
+    #qsApp div[style*="font-size:22px"][style*="line-height:1.8"],
+    #qsApp div[style*="font-size: 22px"][style*="line-height: 1.8"] {
+        font-size: clamp(18px, 5.5vw, 22px) !important;
+    }
+
+    /* Absolute beginner syllable blocks: wrap naturally on mobile */
+    #qsApp div[style*="flex-wrap:wrap"][style*="gap:12px"],
+    #qsApp div[style*="flex-wrap: wrap"][style*="gap: 12px"] {
+        gap: 8px !important;
+    }
+    #qsApp div[style*="border:2px solid #ff69b4"][style*="min-width:70px"],
+    #qsApp div[style*="border: 2px solid #ff69b4"][style*="min-width: 70px"] {
+        padding: 10px 14px !important;
+        min-width: 56px !important;
+    }
+    #qsApp div[style*="border:2px solid #ff69b4"] > div[style*="font-size:28px"],
+    #qsApp div[style*="border: 2px solid #ff69b4"] > div[style*="font-size: 28px"] {
+        font-size: 22px !important;
+    }
+
+    /* ── RECORD BUTTONS (START RECORDING / STOP) ── */
+    #qsRecBtn, #qsDrillRecBtn, #qsBonusRecBtn {
+        width: 100% !important;
+        padding: 16px 20px !important;
+        font-size: 10px !important;
+        min-height: 52px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Confirm/Redo row after recording */
+    #qsRecStatus > div[style*="display:flex"],
+    #qsDrillStatus > div[style*="display:flex"],
+    #qsBonusStatus > div[style*="display:flex"] {
+        flex-direction: row !important;
+        gap: 8px !important;
+        justify-content: center !important;
+    }
+    /* SUBMIT and REDO buttons */
+    #qsRecStatus button,
+    #qsDrillStatus button,
+    #qsBonusStatus button {
+        flex: 1 !important;
+        min-height: 48px !important;
+        font-size: 9px !important;
+        padding: 12px 10px !important;
+        min-width: 0 !important;
+    }
+
+    /* ── FEEDBACK SCREEN ── */
+
+    /* Score % number */
+    #qsGameArea div[style*="font-size:28px"][style*="font-family"] {
+        font-size: 22px !important;
+    }
+    /* +N POINTS */
+    #qsGameArea div[style*="font-size:10px"][style*="color:#FFD700"] {
+        font-size: 9px !important;
+    }
+    /* Feedback text box */
+    #qsGameArea div[style*="font-size:14px"][style*="line-height:1.6"] {
+        font-size: 13px !important;
+    }
+    /* YOU SAID / EXPECTED block */
+    #qsGameArea div[style*="font-size:13px"][style*="color:#a855f7"],
+    #qsGameArea div[style*="font-size:13px"][style*="color:#00ff88"] {
+        font-size: 12px !important;
+        word-break: break-word !important;
+    }
+    /* Teacher Example / My Recording buttons: stack on very small */
+    #qsGameArea div[style*="display:flex"][style*="gap:10px"][style*="justify-content:center"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    #qsGameArea div[style*="display:flex"][style*="gap:10px"][style*="justify-content:center"] button {
+        min-height: 44px !important;
+        font-size: 13px !important;
+        padding: 12px 14px !important;
+        width: 100% !important;
+    }
+    /* Close button */
+    #qsGameArea div[style*="border-radius:16px"] > button[style*="padding:10px 28px"] {
+        width: 100% !important;
+        min-height: 44px !important;
+        padding: 12px !important;
+    }
+
+    /* ── BONUS UI ── */
+    #qsBonusRecBtn {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* Bonus score result */
+    #qsBonusResult div[style*="font-size:20px"] {
+        font-size: 18px !important;
+    }
+
+    /* ── LEADERBOARD / RESULTS ── */
+    /* qgBuildList renders inline — target the outer wrapper */
+    #qsApp div[style*="border:3px solid #FFD700"][style*="border-radius:14px"] {
+        padding: 14px 10px !important;
+    }
+
+    /* ── GAME OVER / FINAL STANDINGS ── */
+    #qsApp div[style*="font-size:14px"][style*="color:#FFD700"][style*="font-family"] {
+        font-size: 11px !important;
+    }
+    #qsApp div[style*="font-size:9px"][style*="color:#FFD700"][style*="font-family"] {
+        font-size: 8px !important;
+    }
+    /* MY STATS button */
+    #qsStatsBtn {
+        min-height: 44px !important;
+        padding: 12px 20px !important;
+        font-size: 9px !important;
+    }
+
+    /* ── TEVELLO LOGIN MODAL ── */
+    #qsTevelloOverlay {
+        padding: 12px !important;
+        align-items: flex-end !important; /* sheet from bottom on mobile */
+    }
+    #qsTevelloOverlay > div {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 22px 16px !important;
+        border-radius: 16px 16px 0 0 !important; /* bottom sheet style */
+        max-height: 92vh !important;
+        overflow-y: auto !important;
+    }
+    /* Tab buttons */
+    #qsTevelloTabs button {
+        min-height: 44px !important;
+        font-size: 11px !important;
+    }
+    /* Inputs: font-size 16px prevents iOS auto-zoom */
+    #qsTevLoginUser, #qsTevLoginPass,
+    #qsTevSignupUser, #qsTevSignupPass, #qsTevSignupConfirm {
+        font-size: 16px !important;
+        padding: 12px !important;
+    }
+    /* Login/Signup action button */
+    #qsTevLoginForm button[style*="padding:13px"],
+    #qsTevSignupForm button[style*="padding:13px"] {
+        min-height: 48px !important;
+        font-size: 10px !important;
+    }
+
+    /* ── TEVELLO STATS OVERLAY ── */
+    #qsTevStatsOverlay {
+        padding: 0 !important;
+        align-items: flex-end !important;
+    }
+    #qsTevStatsOverlay > div {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 20px 14px !important;
+        border-radius: 16px 16px 0 0 !important;
+        max-height: 88vh !important;
+        overflow-y: auto !important;
+    }
+    /* Weekly averages rows */
+    #qsTevStatsOverlay div[style*="justify-content:space-between"] {
+        gap: 6px !important;
+    }
+
+    /* ── GOAL PROMPT OVERLAY ── */
+    #qsTevGoalOverlay {
+        padding: 12px !important;
+        align-items: flex-end !important;
+    }
+    #qsTevGoalOverlay > div {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 22px 16px !important;
+        border-radius: 16px 16px 0 0 !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+    }
+    #qsTevGoalInput {
+        font-size: 16px !important;
+    }
+    /* Goal action button rows */
+    #qsTevGoalOverlay div[style*="display:flex"][style*="gap:10px"] {
+        gap: 8px !important;
+    }
+    #qsTevGoalOverlay div[style*="display:flex"][style*="gap:10px"] button {
+        min-height: 48px !important;
+        font-size: 9px !important;
+        padding: 12px 10px !important;
+    }
+    /* Save goal full-width button */
+    #qsTevGoalOverlay button[style*="width:100%"] {
+        min-height: 48px !important;
+        font-size: 10px !important;
+    }
+}
+
+/* ── Extra small: ≤400px ── */
+@media (max-width: 400px) {
+    #qsApp {
+        padding: 10px !important;
+    }
+    /* Level buttons: squeeze further if needed */
+    #qsLvlAB, #qsLvlB, #qsLvlA {
+        font-size: 9px !important;
+        padding: 10px 2px !important;
+    }
+    /* Room code even smaller */
+    #qsApp > div > div[style*="letter-spacing:6px"],
+    #qsApp > div > div[style*="letter-spacing: 6px"] {
+        font-size: clamp(12px, 5.5vw, 18px) !important;
+        letter-spacing: 2px !important;
+    }
+    /* Emoji grid tighter */
+    #qsEmojiGrid button {
+        width: 38px !important;
+        height: 38px !important;
+    }
+    #qsEmojiGrid button img {
+        width: 32px !important;
+        height: 32px !important;
+    }
+}
+
 </style>
 
 <script>
