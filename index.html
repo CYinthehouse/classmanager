@@ -32135,9 +32135,15 @@ Return ONLY this JSON (no markdown, no code blocks):
             document.body.appendChild(overlay);
 
             try{
-                var snap=await db.collection(TEVELLO_GAME_HISTORY).where('tevelloId','==',qs.tevelloUser.id).orderBy('createdAt','asc').get();
+                var snap=await db.collection(TEVELLO_GAME_HISTORY).where('tevelloId','==',qs.tevelloUser.id).get();
                 var games=[];
                 snap.forEach(function(doc){games.push(doc.data());});
+                // Sort locally to avoid needing a composite index
+                games.sort(function(a,b){
+                    var at=a.createdAt&&a.createdAt.toDate?a.createdAt.toDate():new Date(a.date||0);
+                    var bt=b.createdAt&&b.createdAt.toDate?b.createdAt.toDate():new Date(b.date||0);
+                    return at-bt;
+                });
 
                 var psFont='font-family:\'Press Start 2P\'';
                 var ts='text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024';
@@ -32231,20 +32237,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                         if(sorted.length===0){
                             h+='<div style="font-size:11px;color:#39ff14;">✨ No errors recorded!</div>';
                         } else {
-                            sorted.forEach(function(k){
-                                var cnt=weekErrors[k];
-                                var display=k;
-                                // Make it readable
-                                if(k.indexOf('→')>-1){
-                                    var parts=k.split('→');
-                                    display='Expected <span style=color:#00ff88>'+escapeHtml(parts[0])+'</span> but said <span style=color:#ff4444>'+escapeHtml(parts[1])+'</span>';
-                                } else if(k.startsWith('missing:')){
-                                    display='Missing sound <span style=color:#ff4444>'+escapeHtml(k.replace('missing:',''))+'</span>';
-                                } else if(k.startsWith('extra:')){
-                                    display='Extra sound <span style=color:#ff4444>'+escapeHtml(k.replace('extra:',''))+'</span>';
-                                }
-                                h+='<div style="font-size:11px;color:#ddd;margin-bottom:3px;">• '+display+' <span style=color:#888>(×'+cnt+')</span></div>';
-                            });
+                            h+='<div style="font-size:15px;color:#ff4444;letter-spacing:0.05em;">'+sorted.map(function(k){return escapeHtml(k);}).join('　')+'</div>';
                         }
                         h+='</div>';
                     });
