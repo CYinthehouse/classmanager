@@ -34417,6 +34417,259 @@ body:has(#qsApp) {
     }
 }
 
+/* ══════════════════════════════════════════════════════════
+   STUDENT QUIZ GAME — EXTENDED MOBILE FIXES
+   Covers all screens: round cards, drill, bonus, feedback,
+   leaderboard/podium, Tevello stats, confirm rows.
+   All rules use !important to beat inline styles from JS.
+   ══════════════════════════════════════════════════════════ */
+
+/* Global overflow lock — survives JS body.style.cssText rewrite */
+html {
+    overflow-x: hidden !important;
+}
+html, body {
+    max-width: 100vw !important;
+}
+
+@media (max-width: 768px) {
+
+    /* ── APP CONTAINER ── */
+    #qsApp {
+        padding: 12px !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Every element inside qsApp: never overflow */
+    #qsApp *,
+    #qsGameArea * {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── ROUND / DRILL / BONUS CARDS ── */
+
+    /* Card containers */
+    #qsGameArea > div,
+    #qsGameArea [data-round],
+    #qsGameArea [data-drill],
+    #qsGameArea [data-bonus] {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Korean text in round cards */
+    #qsGameArea [data-round] div[style*="font-size:20px"],
+    #qsGameArea [data-round] div[style*="font-size: 20px"] {
+        font-size: 18px !important;
+        line-height: 1.6 !important;
+        word-break: keep-all !important;
+        overflow-wrap: break-word !important;
+    }
+
+    /* Korean text in drill / bonus cards */
+    #qsGameArea [data-drill] div[style*="font-size:22px"],
+    #qsGameArea [data-bonus] div[style*="font-size:22px"],
+    #qsGameArea div[style*="font-size:22px"] {
+        font-size: 19px !important;
+        word-break: keep-all !important;
+    }
+
+    /* Absolute beginner syllable blocks — prevent wrap overflow */
+    #qsGameArea div[style*="min-width:70px"] {
+        min-width: 60px !important;
+        padding: 10px 14px !important;
+    }
+    #qsGameArea div[style*="min-width:70px"] div[style*="font-size:28px"] {
+        font-size: 22px !important;
+    }
+
+    /* ── RECORD BUTTONS (all 3 variants) ── */
+    /* Remove the wide horizontal padding that shrinks available width */
+    #qsRecBtn,
+    #qsDrillRecBtn,
+    #qsBonusRecBtn {
+        width: 100% !important;
+        padding: 16px 12px !important;
+        font-size: 10px !important;
+        min-height: 52px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── CONFIRM/REDO ROW (post-recording) ── */
+    /* The flex row of Submit + Redo buttons inside #qsRecStatus / #qsBonusStatus / #qsDrillStatus */
+    #qsRecStatus > div[style*="display:flex"],
+    #qsBonusStatus > div[style*="display:flex"],
+    #qsDrillStatus > div[style*="display:flex"],
+    #qsBonusResult > div[style*="display:flex"],
+    #qsRecStatus div[style*="gap:12px"],
+    #qsBonusStatus div[style*="gap:12px"] {
+        flex-direction: column !important;
+        gap: 8px !important;
+        align-items: stretch !important;
+    }
+    /* The individual submit / redo / confirm buttons */
+    #qsRecStatus button,
+    #qsBonusStatus button,
+    #qsDrillStatus button,
+    #qsBonusResult button {
+        width: 100% !important;
+        min-height: 48px !important;
+        padding: 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── FEEDBACK SCREEN ── */
+    /* Score percentage */
+    #qsGameArea div[style*="font-size:28px"][style*="Press Start 2P"] {
+        font-size: 22px !important;
+    }
+    /* Feedback card */
+    #qsGameArea div[style*="font-size:14px"][style*="line-height:1.6"] {
+        font-size: 13px !important;
+        word-break: break-word !important;
+    }
+    /* YOU SAID / EXPECTED text */
+    #qsGameArea div[style*="font-size:13px"][style*="a855f7"],
+    #qsGameArea div[style*="font-size:13px"][style*="00ff88"] {
+        font-size: 13px !important;
+        word-break: keep-all !important;
+        overflow-wrap: break-word !important;
+    }
+    /* Audio buttons row (Teacher Example / My Recording) */
+    #qsGameArea div[style*="display:flex"][style*="flex-wrap:wrap"][style*="gap:10px"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    #qsGameArea div[style*="display:flex"][style*="flex-wrap:wrap"][style*="gap:10px"] button {
+        width: 100% !important;
+        min-height: 48px !important;
+        padding: 12px !important;
+    }
+    /* Close button in feedback */
+    #qsGameArea button[onclick*="qsCloseFeedback"] {
+        min-height: 44px !important;
+        padding: 12px 20px !important;
+    }
+
+    /* ── LEADERBOARD / RESULT SCREEN ── */
+    /* List rows — prevent name overflow */
+    #qsGameArea div[style*="justify-content:space-between"][style*="align-items:center"][style*="padding:8px"] {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+    #qsGameArea div[style*="justify-content:space-between"] span[style*="font-size:13px"] {
+        font-size: 12px !important;
+        max-width: 180px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Podium — scale down for small screens */
+    /* Avatar row above podium */
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="min-height:100px"] > div[style*="width:110px"] {
+        width: 80px !important;
+    }
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="min-height:100px"] > div[style*="width:130px"] {
+        width: 90px !important;
+    }
+    /* Podium blocks row */
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="gap:4px"] > div[style*="width:110px"] {
+        width: 80px !important;
+    }
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="gap:4px"] > div[style*="width:130px"] {
+        width: 90px !important;
+    }
+    /* 4th+ place list inside podium */
+    #qsGameArea div[style*="max-width:350px"] {
+        max-width: 100% !important;
+    }
+
+    /* FINAL STANDINGS MY STATS button */
+    #qsStatsBtn {
+        width: 100% !important;
+        min-height: 48px !important;
+        padding: 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── TEVELLO STATS OVERLAY ── */
+    #qsTevStatsOverlay > div {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 20px 14px !important;
+        max-height: 92vh !important;
+        overflow-y: auto !important;
+        border-radius: 16px 16px 0 0 !important;
+        box-sizing: border-box !important;
+    }
+    /* Weekly bar chart — prevent overflow */
+    #qsTevStatsOverlay div[style*="display:flex"][style*="align-items:flex-end"][style*="height:120px"] {
+        overflow-x: hidden !important;
+        gap: 2px !important;
+    }
+    /* Weekly rows */
+    #qsTevStatsOverlay div[style*="display:flex"][style*="justify-content:space-between"] {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    /* ── WAITING ROOM PLAYER CHIPS ── */
+    #qsPlayers {
+        overflow-x: hidden !important;
+        word-break: break-word !important;
+    }
+    #qsPlayers span[style*="display:inline-block"] {
+        max-width: calc(50% - 8px) !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        vertical-align: top !important;
+    }
+}
+
+/* ── Extra small ≤ 380px — tighter squeeze ── */
+@media (max-width: 380px) {
+    #qsApp {
+        padding: 8px !important;
+    }
+    /* Room code letters */
+    #qsApp > div > div[style*="font-size:24px"][style*="letter-spacing:6px"] {
+        font-size: 18px !important;
+        letter-spacing: 3px !important;
+    }
+    /* QUIZ GAME title */
+    #qsApp > div > div[style*="font-size:16px"][style*="41c0ff"] {
+        font-size: 12px !important;
+    }
+    /* Podium extra squeeze */
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="min-height:100px"] > div[style*="width:110px"],
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="gap:4px"] > div[style*="width:110px"] {
+        width: 68px !important;
+    }
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="min-height:100px"] > div[style*="width:130px"],
+    #qsGameArea div[style*="display:flex"][style*="justify-content:center"][style*="align-items:flex-end"][style*="gap:4px"] > div[style*="width:130px"] {
+        width: 80px !important;
+    }
+    #qsEmojiGrid button {
+        width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+    }
+    #qsEmojiGrid button img {
+        width: 28px !important;
+        height: 28px !important;
+    }
+    #qsLvlAB, #qsLvlB, #qsLvlA {
+        font-size: 7px !important;
+        padding: 8px 2px !important;
+    }
+}
+
 </style>
 
 <script>
