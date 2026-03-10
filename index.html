@@ -31777,14 +31777,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wordFreq={};
                 roundSubs.forEach(function(doc){
                     var d=doc.data();
-                    // Count unique flagged words per student (dedupe within one submission)
+                    // Count unique Azure-flagged words per student
                     var seenWords={};
-                    if(d.phonemeErrors&&d.phonemeErrors.length>0){
-                        d.phonemeErrors.forEach(function(e){
-                            var word=e.expected||e.actual||'';
-                            if(word && !seenWords[word]){
-                                seenWords[word]=true;
-                                wordFreq[word]=(wordFreq[word]||0)+1;
+                    if(d.azureFlaggedWords&&d.azureFlaggedWords.length>0){
+                        d.azureFlaggedWords.forEach(function(w){
+                            if(w && !seenWords[w]){
+                                seenWords[w]=true;
+                                wordFreq[w]=(wordFreq[w]||0)+1;
                             }
                         });
                     }
@@ -32081,24 +32080,22 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Fetch all this user's graded submissions from the session
                 var allSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).where('playerId','==',qs.playerId).where('status','==','graded').get();
                 var scores=[];
-                var allErrors=[];
+                var wordFreqMap={};
                 allSubs.forEach(function(doc){
                     var d=doc.data();
                     if(typeof d.gradeScore==='number'){
                         scores.push(d.gradeScore);
-                        if(d.phonemeErrors&&d.phonemeErrors.length>0){
-                            d.phonemeErrors.forEach(function(e){allErrors.push(e);});
+                        // Use Azure-flagged full words, deduplicated per submission
+                        if(d.azureFlaggedWords&&d.azureFlaggedWords.length>0){
+                            var seen={};
+                            d.azureFlaggedWords.forEach(function(w){
+                                if(w&&!seen[w]){seen[w]=true;wordFreqMap[w]=(wordFreqMap[w]||0)+1;}
+                            });
                         }
                     }
                 });
                 if(scores.length===0)return;
                 var avg=Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
-                // Build word frequency map from Azure-flagged words
-                var wordFreqMap={};
-                allErrors.forEach(function(e){
-                    var word=e.expected||e.actual||'';
-                    if(word){ wordFreqMap[word]=(wordFreqMap[word]||0)+1; }
-                });
                 // Sort by frequency, take top 3
                 var topErrors=Object.keys(wordFreqMap).sort(function(a,b){return wordFreqMap[b]-wordFreqMap[a];}).slice(0,3).map(function(k){return{error:k,count:wordFreqMap[k]};});
 
@@ -33160,7 +33157,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
 
                 // Update Firestore
-                await subRef.update({score:finalScore,feedback:feedback,phonemeErrors:phonemeErrorSummary,gradeScore:finalScore,status:'graded'});
+                var drillAzureWords=[];
+                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')drillAzureWords.push(w.word);});}
+                await subRef.update({score:finalScore,feedback:feedback,phonemeErrors:phonemeErrorSummary,azureFlaggedWords:drillAzureWords,gradeScore:finalScore,status:'graded'});
 
                 // Show feedback only — no score shown to student for drills
                 resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(155,89,182,0.4);border-radius:12px;padding:16px;margin-top:8px;">'+
@@ -33740,10 +33739,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeErrorSummary=extractGptErrors(finalFeedback, expectedKorean, expectedPronunciation);
                 }
 
+                var regAzureWords=[];
+                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')regAzureWords.push(w.word);});}
                 await pendingRef.update({
                     transcript:finalTranscript,
                     score:points, gradeScore:finalScore, feedback:finalFeedback,
                     phonemeErrors:phonemeErrorSummary,
+                    azureFlaggedWords:regAzureWords,
                     tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
                     status:'graded'
                 });
@@ -34280,7 +34282,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Save to Firestore
                 await pendingRef.update({
                     transcript:grade.transcript||'',score:points,gradeScore:finalScore,
-                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,status:'graded'
+                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,azureFlaggedWords:(function(){var bw=[];if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')bw.push(w.word);});}return bw;})(),status:'graded'
                 });
 
                 // Update player total score (bonus points count!)
