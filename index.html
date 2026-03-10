@@ -30838,6 +30838,31 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var studentUrl = pageUrl + '?quizgame=' + roomCode;
                 await db.collection(QUIZ_GAME_COLLECTION).doc(doc.id).update({studentUrl:studentUrl});
 
+                // Warm up speech-proxy so first student submission doesn't hit a cold start
+                (function(){
+                    try{
+                        var sr=16000,dur=0.1,len=Math.floor(sr*dur);
+                        var wb=new ArrayBuffer(44+len*2);var v=new DataView(wb);
+                        function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+                        ws(0,'RIFF');v.setUint32(4,36+len*2,true);ws(8,'WAVE');ws(12,'fmt ');
+                        v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+                        v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
+                        v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,len*2,true);
+                        var warmupBlob=new Blob([new Uint8Array(wb)],{type:'audio/wav'});
+                        function sendWarmup(){
+                            var fd=new FormData();
+                            fd.append('audio',warmupBlob,'warmup.wav');
+                            fd.append('phonetic_hangul','안녕');fd.append('original_text','안녕');
+                            fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:fd}).catch(function(){});
+                        }
+                        // Stagger 3 pings to ensure instance is fully warm
+                        sendWarmup();
+                        setTimeout(sendWarmup,600);
+                        setTimeout(sendWarmup,1200);
+                        console.log('🔥 Speech proxy warmup sent (3 pings)');
+                    }catch(e){}
+                })();
+
                 // Pre-calculate G2PK phonetics for all sentences (runs in background)
                 (async function(){
                     try{
@@ -33362,6 +33387,25 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var parallel=await Promise.all([azurePromise,sttPromise]);
                 azureResult=parallel[0];
                 var sttRaw=parallel[1];
+
+                // Retry STT once if cold-start returned empty/zero result
+                if(!sttRaw || (!sttRaw.transcript && (sttRaw.score===0 || sttRaw.score===null))){
+                    console.warn('⚠️ STT cold-start suspected (empty transcript) — retrying in 1.5s...');
+                    await new Promise(function(res){setTimeout(res,1500);});
+                    var retryFormData=new FormData();
+                    retryFormData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
+                    retryFormData.append('phonetic_hangul',expectedPronunciation);
+                    retryFormData.append('original_text',expectedKorean);
+                    var sttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:retryFormData})
+                        .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+                    if(sttRetry && sttRetry.transcript){
+                        console.log('✅ STT retry succeeded:', sttRetry.transcript);
+                        sttRaw=sttRetry;
+                    } else {
+                        console.warn('❌ STT retry also empty — treating STT as unavailable');
+                    }
+                }
+
                 if(sttRaw) phonemeResult=sttRaw;
 
                 var pronInfo='';
@@ -33465,11 +33509,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // ========== HYBRID SCORING: 50% Phoneme + 50% GPT ==========
+                // ========== HYBRID SCORING: Azure-aware weighting ==========
+                // If Azure reports zero flagged words → STT 10% / GPT 90%
+                // Otherwise → STT 50% / GPT 50%
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 if(phonemeResult && typeof phonemeResult.score==='number'){
                     var phonemeScore=phonemeResult.score;
-                    var hybridScore=Math.round(phonemeScore*0.5 + gptScore*0.5);
+                    var azureFlagged=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
+                    var azureAllClear=azureResult && azureFlagged && azureFlagged.length===0;
+                    var sttW=azureAllClear ? 0.1 : 0.5;
+                    var gptW=azureAllClear ? 0.9 : 0.5;
+                    var hybridScore=Math.round(phonemeScore*sttW + gptScore*gptW);
                     grade.score=hybridScore;
                 }else{
                 }
@@ -33496,9 +33546,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 console.log('  GPT raw score:   ', gptScore, '/ 100');
                 console.log('  GPT transcript:  ', grade.transcript||'(none)');
                 console.log('  GPT feedback:    ', grade.feedback||'(none)');
-                console.log('--- HYBRID SCORE (50% STT + 50% GPT) ---');
+                console.log('--- HYBRID SCORE (STT '+Math.round(sttW*100)+'% + GPT '+Math.round(gptW*100)+'%'+(azureAllClear?' — Azure all clear)':')') +' ---');
                 if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    console.log('  Formula:         ', phonemeResult.score+' × 0.5 + '+gptScore+' × 0.5 = '+grade.score);
+                    console.log('  Formula:         ', phonemeResult.score+' × '+sttW+' + '+gptScore+' × '+gptW+' = '+grade.score);
                 } else {
                     console.log('  Formula:          GPT-only (STT unavailable) = '+grade.score);
                 }
@@ -33895,7 +33945,27 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var parallel=await Promise.all([azurePromise,sttPromise]);
                 azureResult=parallel[0];
-                if(parallel[1]) phonemeResult=parallel[1];
+                var bonusSttRaw=parallel[1];
+
+                // Retry STT once if cold-start returned empty/zero result
+                if(!bonusSttRaw || (!bonusSttRaw.transcript && (bonusSttRaw.score===0 || bonusSttRaw.score===null))){
+                    console.warn('⚠️ STT cold-start suspected (bonus) — retrying in 1.5s...');
+                    await new Promise(function(res){setTimeout(res,1500);});
+                    var bonusRetryFd=new FormData();
+                    bonusRetryFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                    bonusRetryFd.append('phonetic_hangul',phonetic);
+                    bonusRetryFd.append('original_text',expectedKorean);
+                    var bonusSttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:bonusRetryFd})
+                        .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+                    if(bonusSttRetry && bonusSttRetry.transcript){
+                        console.log('✅ STT retry succeeded (bonus):', bonusSttRetry.transcript);
+                        bonusSttRaw=bonusSttRetry;
+                    } else {
+                        console.warn('❌ STT retry also empty (bonus) — treating STT as unavailable');
+                    }
+                }
+
+                if(bonusSttRaw) phonemeResult=bonusSttRaw;
 
                 // GPT grading with Azure flags + STT analysis
                 var gptPrompt='You are a Korean pronunciation grading assistant. Grade using BOTH the automated analysis AND what you actually hear.\nCRITICAL: If you hear SILENCE, no speech, or ENGLISH/non-Korean speech, score 0 and say so. Do NOT guess or copy the expected text as transcript.\n';
@@ -33969,11 +34039,15 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // Hybrid: 50% Phoneme + 50% GPT
+                // Hybrid: Azure-aware weighting (10% STT / 90% GPT if Azure all clear, else 50/50)
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 if(phonemeResult&&typeof phonemeResult.score==='number'){
                     var phonemeScore=phonemeResult.score;
-                    grade.score=Math.round(phonemeScore*0.5+gptScore*0.5);
+                    var azureFlaggedB=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
+                    var azureAllClearB=azureResult && azureFlaggedB && azureFlaggedB.length===0;
+                    var sttWB=azureAllClearB ? 0.1 : 0.5;
+                    var gptWB=azureAllClearB ? 0.9 : 0.5;
+                    grade.score=Math.round(phonemeScore*sttWB+gptScore*gptWB);
                 }
 
                 var finalScore=typeof grade.score==='number'?grade.score:0;
@@ -33999,9 +34073,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 console.log('  GPT score:       ', gptScore, '/ 100');
                 console.log('  GPT transcript:  ', grade.transcript||'(none)');
                 console.log('  GPT feedback:    ', grade.feedback||'(none)');
-                console.log('--- HYBRID SCORE (50% STT + 50% GPT) ---');
+                console.log('--- HYBRID SCORE (STT '+Math.round(sttWB*100)+'% + GPT '+Math.round(gptWB*100)+'%'+(azureAllClearB?' — Azure all clear)':')')+' ---');
                 if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    console.log('  Formula:         ', phonemeResult.score+' × 0.5 + '+gptScore+' × 0.5 = '+finalScore);
+                    console.log('  Formula:         ', phonemeResult.score+' × '+sttWB+' + '+gptScore+' × '+gptWB+' = '+finalScore);
                 } else {
                     console.log('  Formula:          GPT-only (STT unavailable) = '+finalScore);
                 }
