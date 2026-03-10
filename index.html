@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Class Scheduler | KoreanLearnin</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <!-- Chart.js for Analytics -->
@@ -32560,17 +32560,24 @@ Return ONLY this JSON (no markdown, no code blocks):
             // Inject sparkle CSS into head so it survives body.innerHTML clearing
             if(!document.querySelector('#sparkleStyles')){var ss=document.createElement('style');ss.id='sparkleStyles';ss.textContent='.sparkle-btn{position:relative;overflow:visible;transition:transform 0.2s,box-shadow 0.2s;}.sparkle-btn:hover{transform:scale(1.05) translateY(-2px) !important;box-shadow:0 6px 20px rgba(255,119,119,0.4) !important;}.sparkle-btn:active{transform:scale(0.98) !important;}.sparkle-btn .sparkle-svg{opacity:0;}.sparkle-btn:hover .sparkle-svg{animation:qgSparkle 0.75s both;}.sparkle-btn:hover .sparkle-svg:nth-of-type(1){animation-delay:0.15s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(2){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(3){animation-delay:0.45s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(4){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(5){animation-delay:0.6s;}@keyframes qgSparkle{0%{transform:translate(-50%,-50%) scale(0);opacity:0;}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}.sparkle-btn::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(108deg,transparent 0% 40%,rgba(255,255,255,0.3) 40% 45%,transparent 45% 55%,rgba(255,255,255,0.2) 55% 65%,transparent 65%);background-size:200% 100%;background-position:200% 0;transition:background-position 0s;pointer-events:none;z-index:2;}.sparkle-btn:hover::after{background-position:-200% 0;transition:background-position 1.2s 0.2s ease-out;}';document.head.appendChild(ss);}
             // Inject btnPress animation CSS + JS into head
+            if(!document.querySelector('#qsFadeStyles')){var fs=document.createElement('style');fs.id='qsFadeStyles';fs.textContent='@keyframes qsFadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}.qs-fade-in{animation:qsFadeIn 0.25s ease-out both;}';document.head.appendChild(fs);}
             if(!document.querySelector('#btnPressStyles')){
                 var bps=document.createElement('style');bps.id='btnPressStyles';
                 bps.textContent='@keyframes btnPress{0%{transform:translate(0,0) scale(1);filter:brightness(1);}15%{transform:translate(1px,1px) scale(0.98);filter:brightness(0.92);}30%{transform:translate(2px,2px) scale(0.96);filter:brightness(0.85);}50%{transform:translate(3px,3px) scale(0.95);filter:brightness(0.8);}75%{transform:translate(1px,1px) scale(0.98);filter:brightness(0.95);}100%{transform:translate(0,0) scale(1);filter:brightness(1);}}.btn-pressing{animation:btnPress 0.2s ease-out !important;}';
                 document.head.appendChild(bps);
             }
             document.body.innerHTML='';
-            document.body.style.cssText='margin:0;padding:0;min-height:100vh;background:#0a0a15;font-family:"Noto Sans",sans-serif;color:#fff;overflow-x:hidden;box-sizing:border-box;';
+            // Lock viewport: no zoom, no horizontal scroll
+            var vp=document.querySelector('meta[name="viewport"]');
+            if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}
+            vp.content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            window.scrollTo(0,0);
+            document.documentElement.scrollTop=0;
+            document.body.scrollTop=0;
+            document.body.style.cssText='margin:0;padding:0;min-height:100vh;background:#0a0a15;font-family:"Noto Sans",sans-serif;color:#fff;overflow-x:hidden;max-width:100vw;box-sizing:border-box;';
             if(!document.querySelector('link[href*="Press+Start+2P"]')){var fl=document.createElement('link');fl.href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';fl.rel='stylesheet';document.head.appendChild(fl);}
             var app=document.createElement('div');app.id='qsApp';app.style.cssText='max-width:500px;width:100%;margin:0 auto;padding:20px;min-height:100vh;box-sizing:border-box;';
             document.body.appendChild(app);
-            // emojis defined globally as qsEmojis
             var eh='';emojis.forEach(function(e,i){var safeSrc=e.replace(/&/g,'&amp;');eh+='<button onclick="qsPickEmoji('+i+',this)" style="width:48px;height:48px;padding:2px;border-radius:8px;border:1px solid '+(i===0?'#ff7777':'rgba(255,255,255,0.1)')+';background:'+(i===0?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;"><img src="'+safeSrc+'" style="width:40px;height:40px;object-fit:contain;border-radius:4px;"></button>';});
             app.innerHTML='<div style="text-align:center;padding:30px 10px;">'+
                 '<div style="font-size:36px;margin-bottom:8px;">🎮</div>'+
@@ -32632,7 +32639,16 @@ Return ONLY this JSON (no markdown, no code blocks):
             } catch(e){console.error(e);app.innerHTML='<div style="text-align:center;padding:60px;"><div style="font-size:30px;">❌</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#e87777;margin-top:12px;">ERROR</div><p style="color:#888;margin-top:8px;font-size:13px;">'+e.message+'</p></div>';}
         }
 
+        // Fade-in helper — call after setting innerHTML on any screen container
+        function qsFadeIn(el){
+            if(!el) return;
+            el.classList.remove('qs-fade-in');
+            void el.offsetWidth; // force reflow so re-triggering works
+            el.classList.add('qs-fade-in');
+        }
+
         function qsWaitingRoom() {
+            window.scrollTo(0,0);
             var app=document.getElementById('qsApp');
             var lc=qsGetLevelColor(qs.playerLevel);
             app.innerHTML='<div style="text-align:center;padding:20px 0;">'+
@@ -32644,6 +32660,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div id="qsPlayers" style="background:rgba(0,0,0,0.4);border:2px solid rgba(0,255,255,0.15);border-radius:12px;padding:14px;margin-bottom:16px;min-height:50px;"></div>'+
                 '<div id="qsStatus" style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;color:#888;">Waiting for teacher...</div>'+
                 '<div id="qsGameArea"></div></div>';
+            qsFadeIn(app);
             // Listen players
             db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).onSnapshot(function(snap){
                 var el=document.getElementById('qsPlayers');if(!el)return;
@@ -32676,6 +32693,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowRound(d,area,status) {
+            window.scrollTo(0,0);
             // If already submitted for this round, show waiting instead
             if(qs.submittedRounds[d.currentRound]){
                 if(status){status.textContent='⏳ ROUND '+(d.currentRound+1)+' — Submitted!';status.style.color='#888';}
@@ -32728,11 +32746,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div id="qsRecStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
             h+='</div></div>';
             area.innerHTML=h;
+            qsFadeIn(area);
         }
 
         // ── STUDENT DRILL ──
         var qsDrillRecorder=null;
         function qsShowDrill(d,area,status){
+            window.scrollTo(0,0);
             // Check if this drill targets this student's level
             if(d.drillTarget && d.drillTarget!=='both' && d.drillTarget!==qs.playerLevel){
                 if(status){status.textContent='⏸ Waiting...';status.style.color='#888';}
@@ -32755,6 +32775,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div id="qsDrillResult" style="margin-top:12px;"></div>';
             h+='</div></div>';
             area.innerHTML=h;
+            qsFadeIn(area);
         }
 
         function qsDrillRecord(drillText,drillId){
@@ -33582,6 +33603,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowFeedback(grade,points,audioUrl,expectedSentences) {
+            window.scrollTo(0,0);
             var area=document.getElementById('qsGameArea');
             var lc=qsGetLevelColor(qs.playerLevel);
             var scoreColor=grade.score>=80?'#00ff88':grade.score>=50?'#FFD700':'#ff4444';
@@ -33611,6 +33633,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button>';
             h+='</div>';
             area.innerHTML=h;
+            qsFadeIn(area);
         }
 
         var qsTTSAudio=null;
@@ -33735,6 +33758,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowBonusUI(area,bonus,roundNum){
+                window.scrollTo(0,0);
                 var h='<div data-bonus="'+roundNum+'" style="margin-top:16px;">';
                 h+='<div style="text-align:center;margin-bottom:10px;">';
                 h+='<span style="font-family:\'Press Start 2P\';font-size:10px;background:linear-gradient(135deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;">⭐ BONUS SENTENCE ⭐</span>';
@@ -33750,6 +33774,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
                 h+='</div></div>';
                 area.innerHTML=h;
+            qsFadeIn(area);
         }
 
         function qsBonusRecord(){
@@ -34103,6 +34128,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         function qsShowResult(d,area,status) {
+            window.scrollTo(0,0);
             if(status){status.textContent='\u{1F3C6} ROUND RESULTS';status.style.color='#FFD700';}
             var board=d[qsGetLeaderboardKey(qs.playerLevel)]||[];
             // Fix: guard only against an existing *results* div, not a round prompt card.
@@ -34114,9 +34140,11 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+=qgBuildList(board,levelLabel,levelColor,qs.playerName);
             h+='</div>';
             area.innerHTML=h;
+            qsFadeIn(area);
         }
 
         function qsShowFinished(area,status) {
+            window.scrollTo(0,0);
             if(status){status.textContent='\u{1F3C1} GAME OVER';status.style.color='#00ff88';}
             // Save game summary to Tevello history
             qsTevSaveGameSummary();
@@ -34144,10 +34172,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                     h+='</div>';
                     area.innerHTML=h;
+                    qsFadeIn(area);
                     if(qs.tevelloUser){setTimeout(function(){var sb=document.getElementById('qsStatsBtn');if(sb)addSparkles(sb);},50);}
                 });
             } else {
                 area.innerHTML='<div style="margin-top:20px;text-align:center;padding:30px;"><div style="font-size:50px;">\u{1F3C1}</div><div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;margin-top:12px;">GAME OVER</div><p style="color:#888;margin-top:8px;">Thanks for playing!</p></div>';
+                qsFadeIn(area);
             }
         }
     </script>
