@@ -32923,9 +32923,17 @@ Return ONLY this JSON (no markdown, no code blocks):
             var samples=audioBuf.getChannelData(0);
             var sr=audioBuf.sampleRate;
             if(sr>16000){
-                var ratio=sr/16000;var nl=Math.floor(samples.length/ratio);
+                // Proper averaging downsample (box filter) — avoids aliasing that breaks STT
+                var ratio=sr/16000;
+                var nl=Math.floor(samples.length/ratio);
                 var ds=new Float32Array(nl);
-                for(var i=0;i<nl;i++){ds[i]=samples[Math.floor(i*ratio)];}
+                for(var i=0;i<nl;i++){
+                    var start=Math.floor(i*ratio);
+                    var end=Math.min(Math.floor((i+1)*ratio),samples.length);
+                    var sum=0;
+                    for(var j=start;j<end;j++) sum+=samples[j];
+                    ds[i]=sum/(end-start);
+                }
                 samples=ds;sr=16000;
             }
             var bl=44+samples.length*2;
