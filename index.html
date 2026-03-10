@@ -33377,6 +33377,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
                 var wav=await convertBlobToWav(qs.localBlob);
                 var wavBase64=wav.base64;
+                var wavBuf=wav.buffer; // save buffer ref immediately to survive async gaps
 
                 // ========== SPEECH RECOGNITION ANALYSIS ==========
                 // Use pre-calculated G2PK phonetics from session
@@ -33405,7 +33406,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // Google STT (speech proxy)
                 var sttFormData=new FormData();
-                sttFormData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
+                sttFormData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
                 sttFormData.append('phonetic_hangul',expectedPronunciation);
                 sttFormData.append('original_text',expectedKorean);
                 var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:sttFormData})
@@ -33415,21 +33416,23 @@ Return ONLY this JSON (no markdown, no code blocks):
                 azureResult=parallel[0];
                 var sttRaw=parallel[1];
 
-                // Retry STT once if cold-start returned empty/zero result
-                if(!sttRaw || (!sttRaw.transcript && (sttRaw.score===0 || sttRaw.score===null))){
-                    console.warn('⚠️ STT cold-start suspected (empty transcript) — retrying in 1.5s...');
-                    await new Promise(function(res){setTimeout(res,1500);});
+                // Retry STT once after 30s if empty (cold start recovery)
+                console.log('  STT raw response:', sttRaw);
+                if(!sttRaw || !sttRaw.transcript || !sttRaw.transcript.trim()){
+                    console.warn('⚠️ STT empty — retrying in 30s...');
+                    await new Promise(function(res){setTimeout(res,30000);});
                     var retryFormData=new FormData();
-                    retryFormData.append('audio',new Blob([new Uint8Array(wav.buffer)],{type:'audio/wav'}),'audio.wav');
+                    retryFormData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
                     retryFormData.append('phonetic_hangul',expectedPronunciation);
                     retryFormData.append('original_text',expectedKorean);
                     var sttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:retryFormData})
                         .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-                    if(sttRetry && sttRetry.transcript){
-                        console.log('✅ STT retry succeeded:', sttRetry.transcript);
+                    console.log('  STT retry raw response:', sttRetry);
+                    if(sttRetry && sttRetry.transcript && sttRetry.transcript.trim()){
+                        console.log('\u2705 STT retry succeeded:', sttRetry.transcript);
                         sttRaw=sttRetry;
                     } else {
-                        console.warn('❌ STT retry also empty — treating STT as unavailable');
+                        console.warn('\u274c STT retry also empty — falling back to GPT-only');
                     }
                 }
 
@@ -33566,10 +33569,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
 
                 // ========== HYBRID SCORING: Azure-aware weighting ==========
-                // If Azure reports zero flagged words → STT 10% / GPT 90%
-                // Otherwise → STT 50% / GPT 50%
+                // STT unavailable (no transcript) → GPT 100%
+                // Azure all clear → STT 10% / GPT 90%
+                // Otherwise → STT 25% / GPT 75%
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                if(phonemeResult && typeof phonemeResult.score==='number'){
+                var sttAvailable=phonemeResult && phonemeResult.transcript && phonemeResult.transcript.trim();
+                if(sttAvailable && typeof phonemeResult.score==='number'){
                     var phonemeScore=phonemeResult.score;
                     var azureFlagged=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
                     var azureAllClear=azureResult && azureFlagged && azureFlagged.length===0;
@@ -33578,6 +33583,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var hybridScore=Math.round(phonemeScore*sttW + gptScore*gptW);
                     grade.score=hybridScore;
                 }else{
+                    // STT unavailable — GPT only
+                    grade.score=gptScore;
+                    var sttW=0; var gptW=1; var azureAllClear=false;
                 }
                 console.group('%c🎤 REGULAR ROUND GRADING — '+expectedKorean, 'color:#41c0ff;font-weight:bold;font-size:13px');
                 console.log('Expected (written):  ', expectedKorean);
@@ -34003,21 +34011,23 @@ Return ONLY this JSON (no markdown, no code blocks):
                 azureResult=parallel[0];
                 var bonusSttRaw=parallel[1];
 
-                // Retry STT once if cold-start returned empty/zero result
-                if(!bonusSttRaw || (!bonusSttRaw.transcript && (bonusSttRaw.score===0 || bonusSttRaw.score===null))){
-                    console.warn('⚠️ STT cold-start suspected (bonus) — retrying in 1.5s...');
-                    await new Promise(function(res){setTimeout(res,1500);});
+                // Retry STT once after 30s if empty (cold start recovery)
+                console.log('  STT raw response (bonus):', bonusSttRaw);
+                if(!bonusSttRaw || !bonusSttRaw.transcript || !bonusSttRaw.transcript.trim()){
+                    console.warn('⚠️ STT empty (bonus) — retrying in 30s...');
+                    await new Promise(function(res){setTimeout(res,30000);});
                     var bonusRetryFd=new FormData();
                     bonusRetryFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
                     bonusRetryFd.append('phonetic_hangul',phonetic);
                     bonusRetryFd.append('original_text',expectedKorean);
                     var bonusSttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:bonusRetryFd})
                         .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-                    if(bonusSttRetry && bonusSttRetry.transcript){
-                        console.log('✅ STT retry succeeded (bonus):', bonusSttRetry.transcript);
+                    console.log('  STT retry raw response (bonus):', bonusSttRetry);
+                    if(bonusSttRetry && bonusSttRetry.transcript && bonusSttRetry.transcript.trim()){
+                        console.log('\u2705 STT retry succeeded (bonus):', bonusSttRetry.transcript);
                         bonusSttRaw=bonusSttRetry;
                     } else {
-                        console.warn('❌ STT retry also empty (bonus) — treating STT as unavailable');
+                        console.warn('\u274c STT retry also empty (bonus) — falling back to GPT-only');
                     }
                 }
 
@@ -34118,13 +34128,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                     phonemeResult.score=bRecalc;
                 }
                 var gptScore=typeof grade.score==='number'?grade.score:0;
-                if(phonemeResult&&typeof phonemeResult.score==='number'){
+                var sttAvailableB=phonemeResult && phonemeResult.transcript && phonemeResult.transcript.trim();
+                if(sttAvailableB&&typeof phonemeResult.score==='number'){
                     var phonemeScore=phonemeResult.score;
                     var azureFlaggedB=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
                     var azureAllClearB=azureResult && azureFlaggedB && azureFlaggedB.length===0;
                     var sttWB=azureAllClearB ? 0.1 : 0.25;
                     var gptWB=azureAllClearB ? 0.9 : 0.75;
                     grade.score=Math.round(phonemeScore*sttWB+gptScore*gptWB);
+                }else{
+                    // STT unavailable — GPT only
+                    grade.score=gptScore;
+                    var sttWB=0; var gptWB=1; var azureAllClearB=false;
                 }
 
                 var finalScore=typeof grade.score==='number'?grade.score:0;
