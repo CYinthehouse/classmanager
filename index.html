@@ -2383,9 +2383,18 @@
                             <button class="btn" onclick="fixDateMismatches()" id="fixDatesBtn" disabled style="background: linear-gradient(135deg, #a855f7, #ff7777); border-color: #a855f7; color: #fff; font-weight: 700;">🔧 Fix All Dates</button>
                         </div>
                     </div>
+                    <!-- Temp Student ID Repair Section -->
+                    <div class="card" style="margin-top: 20px; border-color: #ff9800;">
+                        <h3 style="color: #ff9800; border-bottom-color: #ff9800;">🔧 Fix Unlinked Student Records</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Scans all active classes for students with temporary IDs (no proper Firestore record). Creates real <code style="color:#ff9800;">scheduler_students</code> docs for each one and updates the class with the correct IDs. Run this once to fix students added before this issue was resolved.</p>
+                        <div id="tempStudentRepairMessage"></div>
+                        <div id="tempStudentRepairPreview" style="display: none; margin-bottom: 15px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; font-family: 'Noto Sans', sans-serif;"></div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-info" onclick="scanTempStudents()">🔍 Scan for Affected Students</button>
+                            <button class="btn" onclick="fixTempStudents()" id="fixTempStudentsBtn" disabled style="background: linear-gradient(135deg, #ff9800, #f57c00); border-color: #ff9800; color: #000; font-weight: 700;">🔧 Fix All</button>
+                        </div>
+                    </div>
                 </div>
-
-                <!-- ===================== DRILL + HOMEWORK MAKER TAB ===================== -->
                 <div id="adminTabDrillmaker" class="tab-content">
                     
                     <!-- Sub-navigation within Drill Maker -->
@@ -19201,6 +19210,112 @@ Return ONLY valid JSON (single object, not array):
             renderClasses();
             updateDashboardStats();
         }
+
+        let tempStudentIssues = []; // { classId, studentIndex, student }
+
+        async function scanTempStudents() {
+            const msgEl = document.getElementById('tempStudentRepairMessage');
+            const preview = document.getElementById('tempStudentRepairPreview');
+            msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Scanning classes...</p>';
+            preview.style.display = 'none';
+            tempStudentIssues = [];
+
+            try {
+                const snap = await db.collection('scheduler_classes').get();
+                snap.docs.forEach(doc => {
+                    const cls = doc.data();
+                    (cls.students || []).forEach((s, idx) => {
+                        if (!s.id || s.id.startsWith('temp_')) {
+                            tempStudentIssues.push({ classId: doc.id, classInfo: `${cls.day} @ ${cls.time} (${LEVELS[cls.level] || cls.level})`, studentIndex: idx, student: s });
+                        }
+                    });
+                });
+
+                if (tempStudentIssues.length === 0) {
+                    msgEl.innerHTML = '<p style="color: #39ff14; font-size: 12px;">✅ No affected students found. All good!</p>';
+                    document.getElementById('fixTempStudentsBtn').disabled = true;
+                    return;
+                }
+
+                preview.style.display = 'block';
+                preview.innerHTML = tempStudentIssues.map(issue => 
+                    `<div style="padding: 6px 0; border-bottom: 1px solid #333; color: #ffff00;">
+                        <strong>${issue.student.name || 'Unknown'}</strong>
+                        <span style="color: #888;"> — ${issue.classInfo}</span>
+                        <span style="color: #ff3366; margin-left: 8px; font-size: 11px;">ID: ${issue.student.id || '(none)'}</span>
+                    </div>`
+                ).join('');
+
+                msgEl.innerHTML = `<p style="color: #ff9800; font-size: 12px;">⚠️ Found ${tempStudentIssues.length} student(s) with missing or temp IDs. Click "Fix All" to create proper Firestore records.</p>`;
+                document.getElementById('fixTempStudentsBtn').disabled = false;
+            } catch (e) {
+                msgEl.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error scanning: ${escapeHtml(e.message)}</p>`;
+            }
+        }
+
+        async function fixTempStudents() {
+            if (tempStudentIssues.length === 0) return;
+            if (!confirm(`Create proper Firestore records for ${tempStudentIssues.length} student(s)?\n\nThis will:\n• Create a scheduler_students doc for each affected student\n• Update their class with the real ID`)) return;
+
+            const msgEl = document.getElementById('tempStudentRepairMessage');
+            msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Fixing students...</p>';
+            document.getElementById('fixTempStudentsBtn').disabled = true;
+
+            let fixed = 0, errors = 0;
+
+            // Group by classId so we can batch the class updates
+            const byClass = {};
+            tempStudentIssues.forEach(issue => {
+                if (!byClass[issue.classId]) byClass[issue.classId] = [];
+                byClass[issue.classId].push(issue);
+            });
+
+            for (const [classId, issues] of Object.entries(byClass)) {
+                try {
+                    // Fetch current class students
+                    const classDoc = await db.collection('scheduler_classes').doc(classId).get();
+                    if (!classDoc.exists) { errors += issues.length; continue; }
+                    const students = [...(classDoc.data().students || [])];
+
+                    for (const issue of issues) {
+                        try {
+                            // Create real scheduler_students doc
+                            const newRef = await db.collection('scheduler_students').add({
+                                name: issue.student.name || 'Unknown',
+                                email: issue.student.email || null,
+                                phone: issue.student.phone || null,
+                                discord: issue.student.discord || null,
+                                status: 'active',
+                                classId: classId,
+                                isLinked: false,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                createdFrom: 'temp_id_repair'
+                            });
+                            // Update the student entry in the local array with real ID
+                            const sIdx = students.findIndex(s => s.id === issue.student.id && s.name === issue.student.name);
+                            if (sIdx !== -1) students[sIdx] = { ...students[sIdx], id: newRef.id };
+                            fixed++;
+                        } catch (e) {
+                            console.error('Error fixing student:', issue.student.name, e);
+                            errors++;
+                        }
+                    }
+
+                    // Write updated students array back to class
+                    await db.collection('scheduler_classes').doc(classId).update({ students });
+                } catch (e) {
+                    console.error('Error processing class:', classId, e);
+                    errors += issues.length;
+                }
+            }
+
+            msgEl.innerHTML = `<p style="color: #39ff14; font-size: 12px;">✅ Fixed ${fixed} student(s).${errors > 0 ? ` <span style="color: #ff3366;">${errors} error(s).</span>` : ''}</p>`;
+            document.getElementById('tempStudentRepairPreview').style.display = 'none';
+            tempStudentIssues = [];
+            await loadAllClasses();
+            renderClasses();
+            updateDashboardStats();
+        }
         
         // Set 1-Year Academy status for a student
         async function setAcademyStatus(classId, studentId, status) {
@@ -21434,10 +21549,10 @@ Return ONLY valid JSON (single object, not array):
                 
                 if (action === 'pool') {
                     // Return to pool for reassignment
-                    await db.collection('scheduler_students').doc(studentId).update({ 
+                    await db.collection('scheduler_students').doc(studentId).set({ 
                         status: 'pending', 
                         classId: null 
-                    });
+                    }, { merge: true });
                     
                     const idx = allStudents.findIndex(s => s.id === studentId);
                     if (idx !== -1) {
@@ -21461,12 +21576,12 @@ Return ONLY valid JSON (single object, not array):
                     alert(`${studentName} has been removed and returned to the student pool.`);
                 } else if (action === 'drop') {
                     // Mark as dropped/inactive
-                    await db.collection('scheduler_students').doc(studentId).update({ 
+                    await db.collection('scheduler_students').doc(studentId).set({ 
                         status: 'dropped', 
                         classId: null,
                         droppedAt: firebase.firestore.FieldValue.serverTimestamp(),
                         droppedFrom: classId
-                    });
+                    }, { merge: true });
                     
                     const idx = allStudents.findIndex(s => s.id === studentId);
                     if (idx !== -1) {
@@ -26763,22 +26878,46 @@ ${daySpecific}
                 // Add to local cache
                 allClasses.push({ id: classRef.id, ...classData, createdAt: new Date() });
                 
-                // Also add linked students to scheduler_students if they aren't already there
-                for (const student of enrolledStudents) {
-                    if (student.odId || student.id) {
-                        // Check if student exists in scheduler_students
-                        const existingDoc = await db.collection('scheduler_students').doc(student.odId || student.id).get();
+                // Save ALL students to scheduler_students (linked or not) and collect real IDs
+                const finalStudents = [];
+                for (const student of classStudents) {
+                    const isTemp = student.id.startsWith('temp_');
+                    if (isTemp) {
+                        // Unlinked student — create a real Firestore doc
+                        const newRef = await db.collection('scheduler_students').add({
+                            name: student.name,
+                            email: student.email || null,
+                            phone: student.phone || null,
+                            discord: student.discord || null,
+                            status: 'active',
+                            classId: classRef.id,
+                            isLinked: false,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            createdFrom: 'prescheduled_class_start'
+                        });
+                        finalStudents.push({ ...student, id: newRef.id });
+                    } else {
+                        // Linked student — ensure scheduler_students doc exists
+                        const existingDoc = await db.collection('scheduler_students').doc(student.id).get();
                         if (!existingDoc.exists) {
-                            // Create the student record
-                            await db.collection('scheduler_students').doc(student.odId || student.id).set({
+                            await db.collection('scheduler_students').doc(student.id).set({
                                 name: student.name,
-                                email: student.email || student.linkedEmail || null,
+                                email: student.email || null,
+                                phone: student.phone || null,
+                                discord: student.discord || null,
+                                status: 'active',
+                                classId: classRef.id,
+                                isLinked: true,
                                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                                 createdFrom: 'prescheduled_class_start'
                             });
                         }
+                        finalStudents.push(student);
                     }
                 }
+                
+                // Write the real student IDs back to the class doc
+                await db.collection('scheduler_classes').doc(classRef.id).update({ students: finalStudents });
                 
                 // Delete the prescheduled slot
                 await db.collection('prescheduled_slots').doc(ps.id).delete();
