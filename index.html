@@ -2392,6 +2392,7 @@
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <button class="btn btn-info" onclick="scanTempStudents()">🔍 Scan for Affected Students</button>
                             <button class="btn" onclick="fixTempStudents()" id="fixTempStudentsBtn" disabled style="background: linear-gradient(135deg, #ff9800, #f57c00); border-color: #ff9800; color: #000; font-weight: 700;">🔧 Fix All</button>
+                            <button class="btn" onclick="restoreAttendanceRecords()" style="background: linear-gradient(135deg, #ff3366, #c0392b); border-color: #ff3366; color: #fff; font-weight: 700;">🩹 Restore Attendance Records</button>
                         </div>
                     </div>
                 </div>
@@ -19315,6 +19316,114 @@ Return ONLY valid JSON (single object, not array):
             await loadAllClasses();
             renderClasses();
             updateDashboardStats();
+        }
+
+        // Known temp ID → name mapping from the migration
+        const KNOWN_TEMP_IDS = [
+            { tempId: 'temp_1772417048810_ijuzs0nkt', name: 'Nautyca Patterson' },
+            { tempId: 'temp_1772417048810_xf80hqet5', name: 'Lizbeth Roman Sanchez' },
+            { tempId: 'temp_1772417048810_3g8xaw1xi', name: 'Sofie Budiarachman' },
+            { tempId: 'temp_1773513723096_s04fcqul2', name: 'Heather Morris' },
+            { tempId: 'temp_1773513723096_reijq8iii', name: 'Neiza Hoyos (Blanca)' },
+            { tempId: 'temp_1773513723096_rnq5fog3b', name: 'Kassandra Pacheco' },
+            { tempId: 'temp_1773513723096_tmszjjlw2', name: 'Kirsten Archibald' },
+            { tempId: 'temp_1773513723096_al5ivx9tu', name: 'Tori wilson' },
+            { tempId: 'temp_1771723520024_fidxiztc1', name: 'Aaliyah Green' },
+            { tempId: 'temp_1771723520024_efy7sahoc', name: 'Clarissa Duncan' },
+            { tempId: 'temp_1771723520024_usjhrd9wt', name: 'Alexis Bloomfield' },
+            { tempId: 'temp_1773444630740_76v62a3qq', name: 'Tammy Hanlin' },
+            { tempId: 'temp_1773444630740_7et82j433', name: 'Cindy (Cynthia) Murray' },
+            { tempId: 'temp_1773444630740_j45dlb25g', name: 'Krista Montes' },
+            { tempId: 'temp_1773444630740_ovulte09z', name: 'Terri Peterson-Galindo' },
+            { tempId: 'temp_1773444630740_l0hb9awml', name: 'Defne Agrali' },
+            { tempId: 'temp_1773444630740_z1sp705hk', name: 'Sangita Mohan' },
+            { tempId: 'temp_1769382301969_aqwxyynqo', name: 'Faith Velez' },
+            { tempId: 'temp_1771637471632_c8ou37vfi', name: 'Jennifer Cummings' },
+            { tempId: 'temp_1771637471632_39ede3dnd', name: 'Jayden Ames' },
+            { tempId: 'temp_1771637471632_4b1hjwl78', name: 'Hanna Ko' },
+            { tempId: 'temp_1771637471632_uxv4whtpx', name: 'Dorothy Ellis' },
+            { tempId: 'temp_1771637471632_m1ker67y4', name: 'Alexis Burnette' },
+            { tempId: 'temp_1771114466740_0jaa1eow3', name: 'Martina Rizq' },
+            { tempId: 'temp_1771114466740_mnqiwll1n', name: 'Chola Omotola' },
+            { tempId: 'temp_1771114466740_usgqc295g', name: 'Erezita McDermott' },
+            { tempId: 'temp_1773369587100_cvcp0w18b', name: 'Allegra Wilson' },
+            { tempId: 'temp_1773369587100_845d127e5', name: 'Maxime' },
+            { tempId: 'temp_1773369587100_lwlb35t0c', name: 'Riley Hanle' },
+            { tempId: 'temp_1773369587100_mhxuk2qcn', name: 'Hailey (Brandon Sampson)' },
+            { tempId: 'temp_1773369587100_fxtxat1f1', name: 'Alexandria Hansen' },
+            { tempId: 'temp_1772417054489_txpco16yw', name: 'Jack Huston' },
+            { tempId: 'temp_1772417054489_cjziw9l0e', name: 'Heather Saunders' },
+            { tempId: 'temp_1772417054489_uux5vhkvp', name: 'Meghan Foran' },
+            { tempId: 'temp_1771198866105_yj40389nq', name: 'Jessika Rivera' },
+            { tempId: 'temp_1771198866105_6d628q5p4', name: 'Josh Lopez' },
+            { tempId: 'temp_1771624347485_g5tuyxhpe', name: 'Erika Becerril' },
+            { tempId: 'temp_1771624347485_w53yfse2j', name: 'Tobi Flick' },
+            { tempId: 'temp_1771624347485_5xf8xnj77', name: 'Kimberly Harris-McConico' },
+            { tempId: 'temp_1771624347485_9jui7jr8m', name: 'Nancy Stacy' },
+            { tempId: 'temp_1771624347485_ggkae1arp', name: 'Kisha Morris (Lakisha)' },
+        ];
+
+        async function restoreAttendanceRecords() {
+            const msgEl = document.getElementById('tempStudentRepairMessage');
+            msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Looking up new student IDs...</p>';
+
+            try {
+                // Build map of name → new Firestore ID from scheduler_students
+                // (only docs created from temp_id_repair or prescheduled_class_start with isLinked:false)
+                const studentsSnap = await db.collection('scheduler_students').get();
+                const nameToNewId = {};
+                studentsSnap.docs.forEach(doc => {
+                    const d = doc.data();
+                    const name = (d.name || '').trim().toLowerCase();
+                    if (!nameToNewId[name]) nameToNewId[name] = doc.id;
+                });
+
+                // Build old→new ID map
+                const idMap = {};
+                const unmapped = [];
+                for (const entry of KNOWN_TEMP_IDS) {
+                    const newId = nameToNewId[entry.name.trim().toLowerCase()];
+                    if (newId) {
+                        idMap[entry.tempId] = newId;
+                    } else {
+                        unmapped.push(entry.name);
+                    }
+                }
+
+                if (unmapped.length > 0) {
+                    console.warn('Could not find new IDs for:', unmapped);
+                }
+
+                // Find all attendance_records with old temp IDs
+                const attendanceSnap = await db.collection('attendance_records').get();
+                const toUpdate = attendanceSnap.docs.filter(doc => idMap[doc.data().studentId]);
+
+                if (toUpdate.length === 0) {
+                    msgEl.innerHTML = '<p style="color: #ffff00; font-size: 12px;">⚠️ No attendance records found with old temp IDs. They may already be correct, or records need manual review.</p>';
+                    return;
+                }
+
+                msgEl.innerHTML = `<p style="color: #00ffff; font-size: 12px;">Found ${toUpdate.length} attendance record(s) to restore. Updating...</p>`;
+
+                // Batch update in groups of 500
+                let updated = 0;
+                const batchSize = 400;
+                for (let i = 0; i < toUpdate.length; i += batchSize) {
+                    const batch = db.batch();
+                    toUpdate.slice(i, i + batchSize).forEach(doc => {
+                        const newId = idMap[doc.data().studentId];
+                        batch.update(doc.ref, { studentId: newId });
+                        updated++;
+                    });
+                    await batch.commit();
+                }
+
+                msgEl.innerHTML = `<p style="color: #39ff14; font-size: 12px;">✅ Restored ${updated} attendance record(s) to their correct student IDs.${unmapped.length > 0 ? `<br><span style="color:#ff9800;">⚠️ Could not find new IDs for: ${unmapped.join(', ')}</span>` : ''}</p>`;
+
+            } catch (e) {
+                console.error('Error restoring attendance:', e);
+                msgEl.innerHTML = `<p style="color: #ff3366; font-size: 12px;">Error: ${escapeHtml(e.message)}</p>`;
+            }
         }
         
         // Set 1-Year Academy status for a student
