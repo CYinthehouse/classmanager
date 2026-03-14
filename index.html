@@ -19369,7 +19369,6 @@ Return ONLY valid JSON (single object, not array):
 
             try {
                 // Build map of name → new Firestore ID from scheduler_students
-                // (only docs created from temp_id_repair or prescheduled_class_start with isLinked:false)
                 const studentsSnap = await db.collection('scheduler_students').get();
                 const nameToNewId = {};
                 studentsSnap.docs.forEach(doc => {
@@ -19378,7 +19377,7 @@ Return ONLY valid JSON (single object, not array):
                     if (!nameToNewId[name]) nameToNewId[name] = doc.id;
                 });
 
-                // Build old→new ID map
+                // Build old tempId → new Firestore ID map
                 const idMap = {};
                 const unmapped = [];
                 for (const entry of KNOWN_TEMP_IDS) {
@@ -19390,35 +19389,48 @@ Return ONLY valid JSON (single object, not array):
                     }
                 }
 
-                if (unmapped.length > 0) {
-                    console.warn('Could not find new IDs for:', unmapped);
-                }
+                msgEl.innerHTML = '<p style="color: #00ffff; font-size: 12px;">Scanning scheduler_attendance for orphaned records...</p>';
 
-                // Find all attendance_records with old temp IDs
-                const attendanceSnap = await db.collection('attendance_records').get();
-                const toUpdate = attendanceSnap.docs.filter(doc => idMap[doc.data().studentId]);
+                // Fetch all scheduler_attendance docs
+                const attendanceSnap = await db.collection('scheduler_attendance').get();
 
-                if (toUpdate.length === 0) {
-                    msgEl.innerHTML = '<p style="color: #ffff00; font-size: 12px;">⚠️ No attendance records found with old temp IDs. They may already be correct, or records need manual review.</p>';
+                // Find docs whose document ID contains a temp ID (format: classId_studentId_week)
+                const toMigrate = [];
+                attendanceSnap.docs.forEach(doc => {
+                    for (const [tempId, newId] of Object.entries(idMap)) {
+                        if (doc.id.includes(tempId)) {
+                            toMigrate.push({ doc, tempId, newId });
+                            break;
+                        }
+                    }
+                });
+
+                if (toMigrate.length === 0) {
+                    msgEl.innerHTML = `<p style="color: #ffff00; font-size: 12px;">⚠️ No orphaned attendance docs found in scheduler_attendance.${unmapped.length > 0 ? '<br>Could not map: ' + unmapped.join(', ') : ''}</p>`;
                     return;
                 }
 
-                msgEl.innerHTML = `<p style="color: #00ffff; font-size: 12px;">Found ${toUpdate.length} attendance record(s) to restore. Updating...</p>`;
+                msgEl.innerHTML = `<p style="color: #00ffff; font-size: 12px;">Found ${toMigrate.length} attendance record(s) to restore. Migrating...</p>`;
 
-                // Batch update in groups of 500
-                let updated = 0;
-                const batchSize = 400;
-                for (let i = 0; i < toUpdate.length; i += batchSize) {
-                    const batch = db.batch();
-                    toUpdate.slice(i, i + batchSize).forEach(doc => {
-                        const newId = idMap[doc.data().studentId];
-                        batch.update(doc.ref, { studentId: newId });
-                        updated++;
-                    });
-                    await batch.commit();
+                let restored = 0, errors = 0;
+                for (const { doc, tempId, newId } of toMigrate) {
+                    try {
+                        const oldData = doc.data();
+                        // New doc key replaces tempId segment with newId
+                        const newKey = doc.id.replace(tempId, newId);
+                        const newData = { ...oldData, studentId: newId };
+                        // Write new doc with correct key
+                        await db.collection('scheduler_attendance').doc(newKey).set(newData);
+                        // Delete old orphaned doc
+                        await db.collection('scheduler_attendance').doc(doc.id).delete();
+                        restored++;
+                    } catch (e) {
+                        console.error('Error migrating attendance doc:', doc.id, e);
+                        errors++;
+                    }
                 }
 
-                msgEl.innerHTML = `<p style="color: #39ff14; font-size: 12px;">✅ Restored ${updated} attendance record(s) to their correct student IDs.${unmapped.length > 0 ? `<br><span style="color:#ff9800;">⚠️ Could not find new IDs for: ${unmapped.join(', ')}</span>` : ''}</p>`;
+                msgEl.innerHTML = `<p style="color: #39ff14; font-size: 12px;">✅ Restored ${restored} attendance record(s).${errors > 0 ? ` <span style="color:#ff3366;">${errors} error(s).</span>` : ''}${unmapped.length > 0 ? `<br><span style="color:#ff9800;">⚠️ Could not map: ${unmapped.join(', ')}</span>` : ''}</p>`;
 
             } catch (e) {
                 console.error('Error restoring attendance:', e);
