@@ -4015,15 +4015,17 @@
 
         function getClassCurrentWeek(cls) {
             if (!cls.startDate) return null;
-            const startDate = parseESTDate(cls.startDate);
-            const todayDate = getESTToday();
-            startDate.setHours(0, 0, 0, 0);
-            if (todayDate < startDate) return 0; // Not started yet
-            const daysSinceStart = getDaysBetween(todayDate, startDate);
+            const todayStr = toESTDateStr(new Date());
+            const startStr = cls.startDate;
+            if (todayStr < startStr) return 0; // Not started yet
+            // Pure day arithmetic on YYYY-MM-DD strings via Date.UTC
+            const [sy, sm, sd] = startStr.split('-').map(Number);
+            const [ty, tm, td] = todayStr.split('-').map(Number);
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const daysSinceStart = Math.floor((Date.UTC(ty, tm-1, td) - Date.UTC(sy, sm-1, sd)) / msPerDay);
             const weekNum = Math.floor(daysSinceStart / 7) + 1;
-            return Math.min(weekNum, 7); // Cap at 7 (meaning past week 6)
+            return Math.min(weekNum, 7);
         }
-        // ==================== END GLOBAL CLASS WEEK HELPERS ====================
 
         // Check if Firebase SDK is loaded
         if (typeof firebase === 'undefined') {
@@ -18506,17 +18508,15 @@ Return ONLY valid JSON (single object, not array):
                 // Helper function to get current week number for a class (using EST)
                 function getClassCurrentWeek(cls) {
                     if (!cls.startDate) return null;
-                    const startDate = parseESTDate(cls.startDate);
-                    const todayDate = getESTToday();
-                    
-                    // Normalize both to midnight for fair same-day comparison
-                    startDate.setHours(0, 0, 0, 0);
-                    
-                    if (todayDate < startDate) return 0; // Not started yet
-                    
-                    const daysSinceStart = getDaysBetween(todayDate, startDate);
+                    const todayStr = toESTDateStr(new Date());
+                    const startStr = cls.startDate;
+                    if (todayStr < startStr) return 0;
+                    const [sy, sm, sd] = startStr.split('-').map(Number);
+                    const [ty, tm, td] = todayStr.split('-').map(Number);
+                    const msPerDay = 1000 * 60 * 60 * 24;
+                    const daysSinceStart = Math.floor((Date.UTC(ty, tm-1, td) - Date.UTC(sy, sm-1, sd)) / msPerDay);
                     const weekNum = Math.floor(daysSinceStart / 7) + 1;
-                    return Math.min(weekNum, 7); // Cap at 7 (meaning past week 6)
+                    return Math.min(weekNum, 7);
                 }
                 
                 // Helper function to check if all students have attendance for a week
