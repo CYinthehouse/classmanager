@@ -3947,11 +3947,11 @@
         // Parse a date string (YYYY-MM-DD) as EST midnight
         function parseESTDate(dateString) {
             if (!dateString) return null;
-            // Parse date as noon in America/New_York (handles EST/EDT automatically)
-            // Strategy: create a local Date at noon, then use the toLocaleString round-trip
-            // to get a Date object whose local methods (.getDate(), etc.) return NY values
-            const nyNoon = new Date(new Date(dateString + 'T12:00:00').toLocaleString('en-US', { timeZone: 'America/New_York' }));
-            return nyNoon;
+            // Parse YYYY-MM-DD as noon UTC-5 (EST) to avoid any timezone boundary issues
+            const [y, m, d] = dateString.split('-').map(Number);
+            // Use noon EST = 17:00 UTC (or 16:00 UTC during EDT, but noon EST is safe for day comparison)
+            const date = new Date(Date.UTC(y, m - 1, d, 17, 0, 0)); // noon EST
+            return date;
         }
         
         // Format a date string (YYYY-MM-DD) for display in EST timezone
@@ -3974,9 +3974,9 @@
         
         // Get start of today in EST (midnight)
         function getESTToday() {
-            const est = getESTDate();
-            est.setHours(0, 0, 0, 0);
-            return est;
+            // Get today's YYYY-MM-DD in EST, then parse as noon EST
+            const todayStr = toESTDateStr(new Date());
+            return parseESTDate(todayStr);
         }
         
         // Compare two dates (ignoring time) - returns true if date1 >= date2
