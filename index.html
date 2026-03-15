@@ -21060,6 +21060,25 @@ Return ONLY valid JSON (single object, not array):
         let adminViewingTeacherId = null;
         let adminViewingTeacherClasses = [];
         
+        function sortClassesByDayTime(classes) {
+            const dayOrder = { 'Saturday': 0, 'Sunday': 1 };
+            function timeToMins(t) {
+                if (!t) return 9999;
+                const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if (!match) return 9999;
+                let h = parseInt(match[1]), m = parseInt(match[2]);
+                const pm = match[3].toUpperCase() === 'PM';
+                if (pm && h !== 12) h += 12;
+                if (!pm && h === 12) h = 0;
+                return h * 60 + m;
+            }
+            return [...classes].sort((a, b) => {
+                const dayDiff = (dayOrder[a.day] ?? 9) - (dayOrder[b.day] ?? 9);
+                if (dayDiff !== 0) return dayDiff;
+                return timeToMins(a.time) - timeToMins(b.time);
+            });
+        }
+
         function loadTeacherButtonsForAdmin() {
             const container = document.getElementById('teacherButtonsContainer');
             if (!container) return;
@@ -21148,7 +21167,7 @@ Return ONLY valid JSON (single object, not array):
         
         function renderAdminTeacherTodayView() {
             const container = document.getElementById('adminTeacherTodayView');
-            const activeClasses = adminViewingTeacherClasses.filter(c => c.status !== 'completed');
+            const activeClasses = sortClassesByDayTime(adminViewingTeacherClasses.filter(c => c.status !== 'completed'));
             
             const todayEST = getESTToday();
             const todayDayName = getESTDayName();
@@ -21240,7 +21259,7 @@ Return ONLY valid JSON (single object, not array):
         
         function renderAdminTeacherClassesView() {
             const container = document.getElementById('adminTeacherClassesView');
-            const activeClasses = adminViewingTeacherClasses.filter(c => c.status !== 'completed');
+            const activeClasses = sortClassesByDayTime(adminViewingTeacherClasses.filter(c => c.status !== 'completed'));
             
             // Get prescheduled slots for this teacher
             const teacherPreschedules = allPrescheduledSlots.filter(ps => ps.teacherId === adminViewingTeacherId);
@@ -22227,9 +22246,9 @@ Return ONLY valid JSON (single object, not array):
                 } catch(ne) { }
                 
                 // Filter classes
-                let classesToShow = activeClasses;
+                let classesToShow = sortClassesByDayTime(activeClasses);
                 if (selectedClass !== 'all') {
-                    classesToShow = activeClasses.filter(c => c.id === selectedClass);
+                    classesToShow = classesToShow.filter(c => c.id === selectedClass);
                 }
                 
                 // Count stats
