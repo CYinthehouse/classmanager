@@ -33137,6 +33137,8 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var abWords=set.absoluteBeginnerWords||[];
                 sentences=abWords.map(function(w){return{korean:w,english:''};});
                 if(sentences.length===0) sentences=[set.sentences[0]]; // fallback
+                // Store words authoritatively here — don't rely on DOM reading later
+                qsAbWords=abWords.slice();
             } else {
                 sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
             }
@@ -33656,12 +33658,25 @@ Return ONLY this JSON (no markdown, no code blocks):
                 });
                 var data=await resp.json();
                 var rt='';
+                // Robust proxy response parsing
                 if(data.data&&typeof data.data==='string') rt=data.data;
-                else if(data.choices&&data.choices[0]){var m2=data.choices[0].message||data.choices[0];rt=m2.content||(m2.audio&&m2.audio.transcript)||'';}
+                else if(data.data&&typeof data.data==='object') rt=JSON.stringify(data.data);
+                else if(data.text) rt=data.text;
+                else if(data.result) rt=data.result;
+                else if(data.response) rt=data.response;
+                else if(data.choices&&data.choices[0]){
+                    var m2=data.choices[0].message||data.choices[0];
+                    rt=m2.content||(m2.audio&&m2.audio.transcript)||'';
+                }
+                else rt=JSON.stringify(data);
                 rt=rt.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+                console.log('[AB] GPT raw response:', rt.slice(0,200));
                 var match=rt.match(/\[[\s\S]*\]/);
                 var results=[];
-                try{results=JSON.parse(match?match[0]:rt);}catch(e){}
+                try{results=JSON.parse(match?match[0]:rt);}catch(e){
+                    console.warn('[AB] JSON parse failed:', e, 'raw:', rt.slice(0,100));
+                }
+                console.log('[AB] Parsed results:', results);
                 results.forEach(function(r){
                     var idx=typeof r.idx==='number'?r.idx:qsAbWords.indexOf(r.word);
                     if(idx<0||idx>=qsAbWords.length) return;
@@ -33677,7 +33692,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                         if(msgEl){msgEl.textContent='✓';msgEl.style.color='#39ff14';}
                     }
                 });
-            }catch(e){console.warn('AbCheck error:',e);}
+            }catch(e){console.warn('[AB] AbCheck error:',e);}
             qsAbGrading=false;
         }
 
@@ -33689,26 +33704,19 @@ Return ONLY this JSON (no markdown, no code blocks):
             qsHoldChunks=[];
             qs.isBusy=true;
 
-            // If abs beginner, reset live-grading state and read word list
+            // If abs beginner, reset live-grading state (words already stored in qsAbWords)
             if(qs.playerLevel==='absolute_beginner'){
                 qsAbConfirmed={};
                 qsAbFirstAttempt={};
                 qsAbGrading=false;
-                // Read words from the DOM tiles
-                qsAbWords=[];
-                var i=0;
-                while(document.getElementById('qsAbWord-'+i)){
-                    var el=document.getElementById('qsAbWord-'+i);
-                    // word text is in the first child div
-                    var wordDiv=el?el.querySelector('div'):null;
-                    var word=wordDiv?wordDiv.textContent.trim():'';
-                    qsAbWords.push(word);
-                    // Reset tile to neutral
-                    el.style.borderColor='#ff69b4';el.style.background='rgba(255,105,180,0.12)';
-                    var msgEl=document.getElementById('qsAbWordMsg-'+i);
-                    if(msgEl){msgEl.textContent='';msgEl.style.color='';}
-                    i++;
+                // Reset tile visuals
+                for(var ri2=0;ri2<qsAbWords.length;ri2++){
+                    var el2=document.getElementById('qsAbWord-'+ri2);
+                    if(el2){el2.style.borderColor='#ff69b4';el2.style.background='rgba(255,105,180,0.12)';}
+                    var msgEl2=document.getElementById('qsAbWordMsg-'+ri2);
+                    if(msgEl2){msgEl2.textContent='';msgEl2.style.color='';}
                 }
+                console.log('[AB] Starting round with words:', qsAbWords);
             }
 
             navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
