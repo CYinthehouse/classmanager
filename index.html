@@ -32473,7 +32473,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             });
         })();
 
-        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null, tevelloUser:null, viewingBonus:false, submittedRounds:{}, coinsAwarded:false, coinsEarned:0, gachaRolls:0 };
+        var qs = { sessionId:null, playerId:null, playerName:'', playerEmoji:0, playerLevel:'', localBlob:null, isBusy:false, pendingStatus:null, tevelloUser:null, viewingBonus:false, submittedRounds:{}, coinsAwarded:false, coinsEarned:0, gachaRolls:0, awardBreakdown:[], gachaUsedToday:false, gachaDayChecked:false };
 
         // Level display helpers
         function qsGetLevelColor(lv){ return lv==='absolute_beginner'?'#ff69b4':lv==='beginner'?'#8bb4d6':'#c4a0e8'; }
@@ -33137,8 +33137,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var abWords=set.absoluteBeginnerWords||[];
                 sentences=abWords.map(function(w){return{korean:w,english:''};});
                 if(sentences.length===0) sentences=[set.sentences[0]]; // fallback
-                // Store words authoritatively here — don't rely on DOM reading later
+                // Store words authoritatively here, reset live grading state
                 qsAbWords=abWords.slice();
+                qsAbResetState();
             } else {
                 sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
             }
@@ -33172,6 +33173,560 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='</div></div>';
             area.innerHTML=h;
             qsFadeIn(area);
+        }
+
+        // ── MAIN ROUND RECORDING ─────────────────────────────────
+        // Abs beginner: chunked real-time GPT grading, one word at a time, left-to-right
+        // Other levels: hold-to-record → confirm/redo → submit
+
+        var qsRecorder=null;
+        var qsHoldStream=null;
+        var qsHoldChunks=[];
+        var qsHoldMime='';
+        var qsHoldActive=false;
+
+        // Abs beginner live-grading state
+        var qsAbWords=[];           // set in qsShowRound from session data
+        var qsAbCurrentIdx=0;       // which word we are currently waiting on
+        var qsAbGrading=false;      // semaphore: true while a GPT call is in flight
+        var qsAbFailedOnce={};      // word index → true if the student failed it at least once
+        var qsAbConfirmed={};       // word index → true when greened
+
+        // Called from qsShowRound when rendering abs beginner tiles
+        // (qsAbWords is assigned there directly too — this resets the live state)
+        function qsAbResetState(){
+            qsAbCurrentIdx=0;
+            qsAbGrading=false;
+            qsAbFailedOnce={};
+            qsAbConfirmed={};
+        }
+
+        // Called every 1000ms while abs beginner is recording
+        // Only asks GPT about qsAbWords[qsAbCurrentIdx] — never jumps ahead
+        async function qsAbCheckChunk(chunks, mime){
+            if(qsAbGrading) return;                          // previous call still running
+            if(qsAbCurrentIdx >= qsAbWords.length) return;  // all words already confirmed
+            var targetWord = qsAbWords[qsAbCurrentIdx];
+            if(!targetWord) return;
+            qsAbGrading = true;
+            try {
+                var blob = new Blob(chunks, {type: mime||'audio/webm'});
+                var wav = await convertBlobToWav(blob);
+                var prompt = 'The student is supposed to say the Korean word: "' + targetWord + '". ' +
+                    'Listen to the audio. Did they say this word clearly enough to be understood? ' +
+                    'Be lenient — if it sounds like the word, answer yes. ' +
+                    'Reply with ONLY one word: yes or no.';
+                var resp = await fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        messages:[{role:'user', content:[
+                            {type:'text', text:prompt},
+                            {type:'input_audio', input_audio:{data:wav.base64, format:'wav'}}
+                        ]}],
+                        model:'gpt-4o-audio-preview',
+                        max_tokens:5,
+                        temperature:0.1
+                    })
+                });
+                var data = await resp.json();
+                var rt = '';
+                if(data.data && typeof data.data==='string') rt=data.data;
+                else if(data.choices && data.choices[0]){var m2=data.choices[0].message||data.choices[0];rt=m2.content||(m2.audio&&m2.audio.transcript)||'';}
+                else rt=JSON.stringify(data);
+                rt = rt.trim().toLowerCase().replace(/[^a-z]/g,'');
+                console.log('[AB] word="'+targetWord+'" idx='+qsAbCurrentIdx+' GPT='+rt);
+                var heard = (rt.indexOf('yes')>=0);
+                if(heard){
+                    // Green this tile
+                    qsAbConfirmed[qsAbCurrentIdx]=true;
+                    var el=document.getElementById('qsAbWord-'+qsAbCurrentIdx);
+                    var msgEl=document.getElementById('qsAbWordMsg-'+qsAbCurrentIdx);
+                    if(el){el.style.borderColor='#39ff14';el.style.background='rgba(57,255,20,0.12)';}
+                    if(msgEl){msgEl.textContent='✓';msgEl.style.color='#39ff14';}
+                    qsAbCurrentIdx++;
+                } else {
+                    // Mark as failed at least once (affects first-attempt score)
+                    qsAbFailedOnce[qsAbCurrentIdx]=true;
+                    // Show "keep going..." on current tile
+                    var msgEl2=document.getElementById('qsAbWordMsg-'+qsAbCurrentIdx);
+                    if(msgEl2 && msgEl2.textContent!=='try again!'){msgEl2.textContent='keep going...';msgEl2.style.color='#aaa';}
+                }
+            } catch(e){ console.warn('[AB] chunk check error:',e); }
+            qsAbGrading=false;
+        }
+
+        function qsHoldStart(e){
+            e.preventDefault();
+            if(qsHoldActive) return;
+            var btn=document.getElementById('qsRecBtn');
+            qsHoldActive=true;
+            qsHoldChunks=[];
+            qs.isBusy=true;
+
+            // Abs beginner: reset live grading state, reset tile visuals
+            if(qs.playerLevel==='absolute_beginner'){
+                qsAbResetState();
+                for(var ri=0;ri<qsAbWords.length;ri++){
+                    var el=document.getElementById('qsAbWord-'+ri);
+                    if(el){el.style.borderColor='#ff69b4';el.style.background='rgba(255,105,180,0.12)';}
+                    var msgEl=document.getElementById('qsAbWordMsg-'+ri);
+                    if(msgEl){msgEl.textContent='';msgEl.style.color='';}
+                }
+                console.log('[AB] Starting with words:', qsAbWords);
+            }
+
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                if(!qsHoldActive){stream.getTracks().forEach(function(t){t.stop();});return;}
+                qsHoldStream=stream;
+                var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                    else if(MediaRecorder.isTypeSupported('audio/mp4'))mime='audio/mp4';
+                    else if(MediaRecorder.isTypeSupported('audio/aac'))mime='audio/aac';
+                }
+                qsHoldMime=mime;
+                var recOpts=mime?{mimeType:mime}:{};
+                // Abs beginner uses 1000ms timeslice for live chunk grading
+                var isAb=(qs.playerLevel==='absolute_beginner');
+                qsRecorder=new MediaRecorder(stream,recOpts);
+                qsRecorder.ondataavailable=function(ev){
+                    if(ev.data&&ev.data.size>0){
+                        qsHoldChunks.push(ev.data);
+                        if(isAb && qsAbWords.length>0 && qsAbCurrentIdx<qsAbWords.length){
+                            qsAbCheckChunk(qsHoldChunks.slice(), mime);
+                        }
+                    }
+                };
+                qsRecorder.onstop=function(){
+                    if(qsHoldStream){qsHoldStream.getTracks().forEach(function(t){t.stop();});qsHoldStream=null;}
+                    var blobType=qsHoldMime||'audio/webm';
+                    qs.localBlob=new Blob(qsHoldChunks,{type:blobType});
+                    qs.localMime=blobType;
+                    qs.recordDuration=(Date.now()-(qs.recordStartTime||Date.now()))/1000;
+                    qsHoldActive=false;
+                    if(isAb){
+                        // Skip confirm — go straight to finalise
+                        if(btn){btn.style.display='none';}
+                        var statusEl=document.getElementById('qsRecStatus');
+                        if(statusEl)statusEl.textContent='⏳ Scoring...';
+                        qsAbFinalise(blobType);
+                    } else {
+                        if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';btn.style.animation='none';}
+                        var statusEl=document.getElementById('qsRecStatus');
+                        var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
+                        confirmHtml+='<button onclick="qsConfirmSubmit()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
+                        confirmHtml+='<button onclick="qsTrashRecording()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                        confirmHtml+='</div>';
+                        statusEl.innerHTML=confirmHtml;
+                    }
+                };
+                qs.recordStartTime=Date.now();
+                if(isAb) qsRecorder.start(1000); else qsRecorder.start();
+                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#ff0000';btn.style.color='#fff';btn.style.background='rgba(239,68,68,0.35)';btn.style.animation='qsPulse 1s infinite';}
+                document.getElementById('qsRecStatus').textContent='Recording...';
+            }).catch(function(err){
+                alert('Microphone access denied: '+err.message);
+                qsHoldActive=false;qs.isBusy=false;
+            });
+        }
+
+        function qsHoldEnd(e){
+            if(!qsHoldActive) return;
+            if(qsRecorder&&qsRecorder.state==='recording'){
+                qsRecorder.stop();
+            } else {
+                qsHoldActive=false;
+            }
+        }
+
+        function qsConfirmSubmit(){
+            var statusEl=document.getElementById('qsRecStatus');
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            qsSubmitRecording(qs.localMime||'audio/webm');
+        }
+
+        function qsTrashRecording(){
+            qs.localBlob=null;qs.localMime=null;
+            qs.isBusy=false;
+            var btn=document.getElementById('qsRecBtn');
+            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';}
+            document.getElementById('qsRecStatus').textContent='';
+        }
+
+        function qsGetCurrentRound(){
+            // Read current round from visible data-round attribute
+            var area=document.getElementById('qsGameArea');
+            if(!area) return 0;
+            var el=area.querySelector('[data-round]');
+            return el?parseInt(el.dataset.round)||0:0;
+        }
+
+        // ── ABS BEGINNER FINALISE ─────────────────────────────────
+        // Called after recording stops. Waits for any in-flight GPT check,
+        // marks remaining unconfirmed words red, scores, saves to Firestore.
+        async function qsAbFinalise(blobType){
+            var statusEl=document.getElementById('qsRecStatus');
+
+            // Wait up to 15s for any in-flight GPT chunk check to finish
+            var waited=0;
+            while(qsAbGrading && waited<15000){
+                await new Promise(function(r){setTimeout(r,200);});
+                waited+=200;
+            }
+
+            // Do one final GPT pass for any words still unconfirmed
+            if(qsAbCurrentIdx<qsAbWords.length){
+                qsAbGrading=false; // force allow
+                await qsAbCheckChunk(qsHoldChunks.slice(), qsHoldMime);
+                waited=0;
+                while(qsAbGrading && waited<10000){
+                    await new Promise(function(r){setTimeout(r,200);});
+                    waited+=200;
+                }
+            }
+
+            // Mark all still-unconfirmed words red
+            qsAbWords.forEach(function(w,i){
+                if(!qsAbConfirmed[i]){
+                    var el=document.getElementById('qsAbWord-'+i);
+                    var msgEl=document.getElementById('qsAbWordMsg-'+i);
+                    if(el){el.style.borderColor='#ff4444';el.style.background='rgba(255,68,68,0.12)';}
+                    if(msgEl){msgEl.textContent='try again!';msgEl.style.color='#ff4444';}
+                }
+            });
+
+            // Score = % of words correct on FIRST attempt (never failed before turning green)
+            var abTotal=qsAbWords.length||1;
+            var abCorrect=0;
+            qsAbWords.forEach(function(w,i){
+                if(qsAbConfirmed[i] && !qsAbFailedOnce[i]) abCorrect++;
+            });
+            var abScore=Math.round((abCorrect/abTotal)*100);
+            var abPoints=Math.round(abScore/10);
+            var missedWords=qsAbWords.filter(function(w,i){return !qsAbConfirmed[i]||qsAbFailedOnce[i];});
+            var abFeedback='Words correct first try: '+abCorrect+'/'+abTotal+(missedWords.length>0?' • Needs work: '+missedWords.join(', '):'');
+
+            // Upload + save to Firestore
+            try{
+                var ext=blobType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/'+qs.playerId+'_round'+qsGetCurrentRound()+'.'+ext;
+                var ref=firebase.storage().ref().child(path);
+                await ref.put(qs.localBlob,{contentType:blobType});
+                var audioUrl=await ref.getDownloadURL();
+
+                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
+                var gameData=sessionDoc.exists?sessionDoc.data():{};
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId, playerName:qs.playerName,
+                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel, round:gameData.currentRound||qsGetCurrentRound(),
+                    audioUrl:audioUrl, transcript:qsAbWords.join(' '),
+                    score:abPoints, gradeScore:abScore, feedback:abFeedback,
+                    expectedKorean:qsAbWords.join(' '),
+                    phonemeErrors:[], azureFlaggedWords:[],
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                    status:'graded'
+                });
+
+                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
+                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+abPoints});
+
+                qs.submittedRounds[gameData.currentRound||qsGetCurrentRound()]=true;
+            }catch(uploadErr){console.error('AB upload error:',uploadErr);}
+
+            qs.isBusy=false;
+            var scoreColor=abScore>=80?'#00ff88':abScore>=50?'#FFD700':'#ff4444';
+            if(statusEl) statusEl.innerHTML=
+                '<div style="margin-top:10px;text-align:center;">'
+                +'<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+abScore+'%</div>'
+                +'<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin:4px 0 10px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+abPoints+' POINTS</div>'
+                +'<button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button>'
+                +'</div>';
+            qsFlushPending();
+        }
+
+        // ── MAIN ROUND SUBMIT (beginner/advanced) ─────────────────
+        async function qsSubmitRecording(blobType){
+            var statusEl=document.getElementById('qsRecStatus');
+            try{
+                if(statusEl)statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Uploading...</div>';
+                var ext=blobType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/'+qs.playerId+'_round'+qsGetCurrentRound()+'.'+ext;
+                var storRef=firebase.storage().ref().child(path);
+                await storRef.put(qs.localBlob,{contentType:blobType});
+                var audioUrl=await storRef.getDownloadURL();
+
+                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
+                var gameData=sessionDoc.exists?sessionDoc.data():{};
+                var set=gameData.sets?gameData.sets[gameData.currentRound]:null;
+                var sentences=(set&&set.sentences)||[];
+                var expectedSentences=(qs.playerLevel==='beginner')?[sentences[0]]:sentences;
+                var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' / ');
+
+                // Write pending submission
+                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId, playerName:qs.playerName,
+                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel, round:gameData.currentRound,
+                    audioUrl:audioUrl, transcript:'', score:0, gradeScore:0, feedback:'',
+                    expectedKorean:expectedKorean,
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                    status:'grading'
+                });
+
+                if(statusEl)statusEl.innerHTML='<div style="font-size:11px;color:#888;">🔍 Grading...</div>';
+
+                // Convert to WAV
+                var wav=await convertBlobToWav(qs.localBlob);
+                var wavBase64=wav.base64;
+                var wavBuf=wav.buffer;
+
+                // ========== G2PK then AZURE + STT in parallel ==========
+                var phonetic=expectedKorean;
+                var phonemeResult=null;
+                var azureResult=null;
+
+                try{
+                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:expectedKorean})
+                    });
+                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)phonetic=g2pData.pronunciation;}
+                }catch(e){}
+
+                var azurePromise=fetch(AZURE_PRON_URL+'/assess',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
+                }).then(function(r){return r.ok?r.json():null;}).then(function(d){
+                    if(d&&typeof d.pronunciation==='number'&&!d.error)return d; return null;
+                }).catch(function(){return null;});
+
+                var phFormData=new FormData();
+                phFormData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
+                phFormData.append('phonetic_hangul',phonetic);
+                phFormData.append('original_text',expectedKorean);
+                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFormData})
+                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var parallel=await Promise.all([azurePromise,sttPromise]);
+                azureResult=parallel[0];
+                phonemeResult=parallel[1];
+
+                // Build phoneme info for GPT
+                var phonemeInfo='';
+                if(azureResult){
+                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT:\n';
+                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100\n';
+                    if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
+                    if(azureResult.words&&azureResult.words.length>0){
+                        var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
+                        if(errW.length>0) phonemeInfo+='- FLAGGED: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+')';}).join(', ')+'\n';
+                        else phonemeInfo+='- All words correct per Azure.\n';
+                    }
+                }
+                if(phonemeResult){
+                    phonemeInfo+='\n\nGOOGLE STT:\n';
+                    if(phonemeResult.transcript) phonemeInfo+='- Heard: "'+phonemeResult.transcript+'"\n';
+                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                        phonemeResult.errors.forEach(function(err){
+                            if(err.type==='substitution')phonemeInfo+='  • Expected '+err.expected+' heard '+err.actual+'\n';
+                            else if(err.type==='deletion')phonemeInfo+='  • Missing: '+err.expected+'\n';
+                            else if(err.type==='insertion')phonemeInfo+='  • Extra: '+err.actual+'\n';
+                        });
+                    }
+                }
+
+                var consonantRules='CONSONANT RULES:\n'+
+                    '- ㄱ,ㄷ,ㅂ,ㅅ,ㅈ: aspirated — big puff of air\n'+
+                    '- ㅊ,ㅋ,ㅌ,ㅍ: less air than aspirated\n'+
+                    '- ㄲ,ㄸ,ㅃ,ㅆ,ㅉ: tensed — no air, engage throat\n'+
+                    '- ㄴ sounds like ND (as in "aND I")\n'+
+                    '- ㅁ sounds like MB (as in "siMBa")\n'+
+                    '- ㄹ: tap tongue on roof of mouth (double ㄹ = English L)\n'+
+                    'NEVER use the word "soft" or "hard". Describe errors in terms of air and throat.\n';
+
+                var gptPrompt='You are a Korean pronunciation coach. The student recorded themselves saying:\n"'+expectedKorean+'"\n(phonetic: "'+phonetic+'")\n'+phonemeInfo+'\n'+consonantRules+'\nGive a score 0-100 and brief feedback (2-3 sentences max). Focus only on real errors. If score >= 80 just give encouragement.\nReply ONLY as JSON: {"score":85,"transcript":"what you heard","feedback":"your feedback"}';
+
+                var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        messages:[{role:'user',content:[
+                            {type:'text',text:gptPrompt},
+                            {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
+                        ]}],
+                        model:'gpt-4o-audio-preview',max_tokens:400,temperature:0.1
+                    })
+                });
+                var gptData=await gptResp.json();
+                var gptRaw='';
+                if(gptData.data&&typeof gptData.data==='string')gptRaw=gptData.data;
+                else if(gptData.choices&&gptData.choices[0]){var gm=gptData.choices[0].message||gptData.choices[0];gptRaw=gm.content||(gm.audio&&gm.audio.transcript)||'';}
+                else gptRaw=JSON.stringify(gptData);
+                gptRaw=gptRaw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+                var gptMatch=gptRaw.match(/\{[\s\S]*\}/);
+                var grade={score:0,transcript:'',feedback:''};
+                try{grade=JSON.parse(gptMatch?gptMatch[0]:gptRaw);}catch(e){}
+                var gptScore=typeof grade.score==='number'?grade.score:0;
+
+                // Hybrid scoring: STT 25% / GPT 75% (GPT-only if STT unavailable)
+                var finalScore=gptScore;
+                var sttWB=0,gptWB=1,azureAllClear=false;
+                if(phonemeResult&&phonemeResult.transcript&&phonemeResult.transcript.trim()&&typeof phonemeResult.score==='number'){
+                    var azFlagged=azureResult?(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}):null;
+                    azureAllClear=azureResult&&azFlagged&&azFlagged.length===0;
+                    sttWB=azureAllClear?0.1:0.25; gptWB=azureAllClear?0.9:0.75;
+                    finalScore=Math.round(phonemeResult.score*sttWB+gptScore*gptWB);
+                }
+                var points=Math.round(finalScore/10);
+
+                // Collect phoneme errors
+                var phonemeErrorSummary=[];
+                if(phonemeResult&&phonemeResult.errors){
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution')phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion')phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion')phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                    });
+                }
+                if(phonemeErrorSummary.length===0&&grade.feedback&&finalScore<95){
+                    phonemeErrorSummary=extractGptErrors(grade.feedback,expectedKorean,phonetic);
+                }
+                var azureFlaggedWords=[];
+                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')azureFlaggedWords.push(w.word);});}
+
+                await pendingRef.update({
+                    transcript:grade.transcript||'',score:points,gradeScore:finalScore,
+                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,
+                    azureFlaggedWords:azureFlaggedWords,status:'graded'
+                });
+
+                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
+                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
+
+                qs.submittedRounds[gameData.currentRound]=true;
+                qs.isBusy=false;
+
+                // Show result
+                var scoreColor2=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
+                var rh='<div style="background:rgba(0,0,0,0.5);border:2px solid '+scoreColor2+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor2+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+finalScore+'%</div>';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin-top:4px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+points+' POINTS</div>';
+                rh+='</div>';
+                if(grade.feedback){
+                    rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
+                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
+                }
+                if(statusEl)statusEl.innerHTML=rh+'<div style="text-align:center;margin-top:10px;"><button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button></div>';
+
+                qsFlushPending();
+            }catch(err){
+                console.error('Submit error:',err);
+                if(statusEl)statusEl.innerHTML='<div style="color:#ff4444;font-size:11px;">❌ Error: '+escapeHtml(err.message)+'</div>';
+                qs.isBusy=false;
+                qsFlushPending();
+            }
+        }
+
+        // ── BONUS ROUND RECORDING ─────────────────────────────────
+        var qsBonusRecorder=null;
+        var qsBonusHoldStream=null;
+        var qsBonusHoldChunks=[];
+        var qsBonusHoldMime='';
+        var qsBonusHoldActive=false;
+
+        function qsStartBonus(){
+            var area=document.getElementById('qsGameArea');
+            if(!area||!qs.sessionId) return;
+            db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
+                if(!doc.exists)return;
+                var d=doc.data();
+                var set=d.sets?d.sets[d.currentRound]:null;
+                if(!set)return;
+                var bonusKorean='';
+                if(qs.playerLevel==='absolute_beginner'&&set.absoluteBeginnerBonus){
+                    bonusKorean=set.absoluteBeginnerBonus;
+                } else if(set.sentences&&set.sentences.length>0){
+                    var randIdx=Math.floor(Math.random()*set.sentences.length);
+                    bonusKorean=set.sentences[randIdx].korean;
+                }
+                if(!bonusKorean)return;
+                qs.bonusKorean=bonusKorean;
+                qs.bonusRound=d.currentRound;
+                qs.isBusy=true;
+
+                var h='<div style="margin-top:16px;">';
+                h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;text-align:center;margin-bottom:14px;">';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin-bottom:10px;">⭐ BONUS ROUND</div>';
+                h+='<div style="font-size:26px;color:#fff;font-weight:700;margin-bottom:4px;">'+escapeHtml(bonusKorean)+'</div>';
+                h+='</div>';
+                h+='<div style="text-align:center;">';
+                h+='<button id="qsBonusRecBtn" onpointerdown="qsBonusHoldStart(event)" onpointerup="qsBonusHoldEnd(event)" onpointercancel="qsBonusHoldEnd(event)" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">🎤 HOLD TO RECORD</button>';
+                h+='<div id="qsBonusStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
+                h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
+                h+='</div></div>';
+                area.innerHTML=h;
+                qsFadeIn(area);
+            }).catch(function(e){console.error('Bonus start error:',e);qs.isBusy=false;});
+        }
+
+        function qsBonusHoldStart(e){
+            e.preventDefault();
+            if(qsBonusHoldActive) return;
+            var btn=document.getElementById('qsBonusRecBtn');
+            qsBonusHoldActive=true;
+            qsBonusHoldChunks=[];
+            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                if(!qsBonusHoldActive){stream.getTracks().forEach(function(t){t.stop();});return;}
+                qsBonusHoldStream=stream;
+                var mime='';
+                if(typeof MediaRecorder.isTypeSupported==='function'){
+                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                    else if(MediaRecorder.isTypeSupported('audio/mp4'))mime='audio/mp4';
+                }
+                qsBonusHoldMime=mime;
+                qsBonusRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+                qsBonusRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size>0)qsBonusHoldChunks.push(ev.data);};
+                qsBonusRecorder.onstop=function(){
+                    if(qsBonusHoldStream){qsBonusHoldStream.getTracks().forEach(function(t){t.stop();});qsBonusHoldStream=null;}
+                    qs.bonusBlob=new Blob(qsBonusHoldChunks,{type:qsBonusHoldMime||'audio/webm'});
+                    qs.bonusMime=qsBonusHoldMime||'audio/webm';
+                    qsBonusHoldActive=false;
+                    if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
+                    var statusEl=document.getElementById('qsBonusStatus');
+                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
+                    confirmHtml+='<button onclick="qsBonusConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
+                    confirmHtml+='<button onclick="qsBonusTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                    confirmHtml+='</div>';
+                    statusEl.innerHTML=confirmHtml;
+                };
+                qsBonusRecorder.start();
+                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#ff8800';btn.style.color='#fff';btn.style.background='rgba(255,215,0,0.35)';}
+                document.getElementById('qsBonusStatus').textContent='Recording...';
+            }).catch(function(err){alert('Mic error: '+err.message);qsBonusHoldActive=false;qs.isBusy=false;});
+        }
+
+        function qsBonusHoldEnd(e){
+            if(!qsBonusHoldActive) return;
+            if(qsBonusRecorder&&qsBonusRecorder.state==='recording') qsBonusRecorder.stop();
+            else qsBonusHoldActive=false;
+        }
+
+        function qsBonusConfirm(){
+            var statusEl=document.getElementById('qsBonusStatus');
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            qsBonusSubmit(qs.bonusBlob,qs.bonusMime);
+        }
+
+        function qsBonusTrash(){
+            qs.bonusBlob=null;qs.bonusMime=null;
+            var btn=document.getElementById('qsBonusRecBtn');
+            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
+            document.getElementById('qsBonusStatus').textContent='';
         }
 
         // ── STUDENT DRILL ──
@@ -33397,1315 +33952,6 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var wb=wav.buffer;
 
                 // ========== G2PK then AZURE + STT in parallel ==========
-                var drillPhonetic=drillText;
-                var phonemeResult=null;
-                var azureResult=null;
-
-                // G2PK first (drill text is short, fast)
-                try{
-                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({text:drillText})
-                    });
-                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)drillPhonetic=g2pData.pronunciation;}
-                }catch(e){}
-
-                // Azure + STT in parallel
-                var azurePromise=fetch(AZURE_PRON_URL+'/assess',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({referenceText:drillText,audioBase64:wavBase64})
-                }).then(function(r){return r.ok?r.json():null;}).then(function(d){
-                    if(d&&typeof d.pronunciation==='number'&&!d.error) return d;
-                    return null;
-                }).catch(function(){return null;});
-
-                var phFormData=new FormData();
-                phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                phFormData.append('phonetic_hangul',drillPhonetic);
-                phFormData.append('original_text',drillText);
-                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([azurePromise,sttPromise]);
-                azureResult=parallel[0];
-                if(parallel[1]) phonemeResult=parallel[1];
-
-                // Call GPT for score + feedback
-                var gptFeedback='';
-                var gptScore=0;
-                try{
-                    var pronInfo='';
-                    if(drillPhonetic && drillPhonetic!==drillText){
-                        pronInfo='\nSTANDARD PRONUNCIATION: "'+drillPhonetic+'"\n';
-                    }
-                    var phonemeInfo='';
-                    if(azureResult){
-                        phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT (word-level error detection):\n';
-                        phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100, Completeness: '+(azureResult.completeness||'N/A')+'/100\n';
-                        if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
-                        if(azureResult.words && azureResult.words.length>0){
-                            var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                            if(errW.length>0){
-                                phonemeInfo+='- FLAGGED WORDS: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
-                            }else{
-                                phonemeInfo+='- All words recognized correctly by Azure.\n';
-                            }
-                        }
-                    }
-                    if(phonemeResult){
-                        phonemeInfo+='\n\nGOOGLE SPEECH-TO-TEXT ANALYSIS:\n';
-                        if(phonemeResult.transcript) phonemeInfo+='- Google heard: "'+phonemeResult.transcript+'"\n';
-                        if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                            phonemeInfo+='- Character-level errors (comparing recognized text vs expected):\n';
-                            phonemeResult.errors.forEach(function(err){
-                                if(err.type==='substitution')phonemeInfo+='  • Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                                else if(err.type==='deletion')phonemeInfo+='  • Missing sound '+ph(err.expected)+'\n';
-                                else if(err.type==='insertion')phonemeInfo+='  • Extra sound '+ph(err.actual)+' inserted\n';
-                            });
-                        }else{
-                            phonemeInfo+='- No character-level errors detected.\n';
-                        }
-                    }
-                    if(azureResult||phonemeResult){
-                        phonemeInfo+='\nINSTRUCTIONS: Use Azure to identify WHICH words have errors. Use Google STT and your own hearing to explain WHY those words are wrong. If Azure flags no errors, trust that. Do not invent errors.\n';
-                        phonemeInfo+='\nWHEN YOUR TRANSCRIPT MATCHES THE EXPECTED TEXT (no errors you heard yourself) BUT AZURE FLAGGED WORDS:\n';
-                        phonemeInfo+='You must still give feedback on Azure-flagged words. Since you heard no errors yourself, you are guessing what Azure detected. Only suggest errors from this specific list of common confusions — do NOT invent other errors:\n';
-                        phonemeInfo+='CONSONANT CONFUSIONS (always possible):\n';
-                        phonemeInfo+='- ㅅ vs ㅆ (tensed ㅅ — student may have used plain ㅅ instead of ㅆ or vice versa)\n';
-                        phonemeInfo+='- ㅂ vs ㅍ (student may not be breathy enough for ㅍ, or too breathy for ㅂ)\n';
-                        phonemeInfo+='- ㄷ vs ㅌ (student may not be breathy enough for ㅌ, or too breathy for ㄷ)\n';
-                        phonemeInfo+='- ㄱ vs ㅋ (student may not be breathy enough for ㅋ, or too breathy for ㄱ)\n';
-                        phonemeInfo+='- ㅈ vs ㅊ (student may not be breathy enough for ㅊ, or too buzzy for ㅈ)\n';
-                        phonemeInfo+='- ㄴ vs English N: students pronounce ㄴ like English N. Tell them: say it like ND — as in \'aND I\'. NEVER say ㄴ sounded like ㄹ.\n';
-                        phonemeInfo+='- ㅁ vs English M: students pronounce ㅁ like English M. Tell them: say it like MB — as in \'siMBa\'. NEVER say ㅁ sounded like another Korean consonant.\n';
-                        phonemeInfo+='- ㄹ vs English R: students pronounce ㄹ like English R. Tell them to tap or curl their tongue. NEVER say ㄹ sounded like ㄴ. EXCEPTION: when ㄹ+ㄹ appear across syllables (e.g. 들려, 몰라, 달려) → it should sound like English L, held on the roof of the mouth — NOT a tap.\n';
-                        phonemeInfo+='TENSED CONSONANT CONFUSIONS (only suggest these if the PHONETIC form of the word actually contains the tensed consonant — consonant assimilation may turn a plain consonant into a tensed one):\n';
-                        phonemeInfo+='- ㄸ vs ㄷ: student used too much air (ㄷ sounds breathy) — tell them to stop the air, engage the throat\n';
-                        phonemeInfo+='- ㅉ vs ㅈ: student used too much air (ㅈ sounds breathy) — tell them to cut the air, tighten the throat\n';
-                        phonemeInfo+='- ㅃ vs ㅂ: student used too much air (ㅂ sounds breathy) — tell them to hold the air back, engage the throat\n';
-                        phonemeInfo+='- ㄲ vs ㄱ: student used too much air (ㄱ sounds breathy) — tell them to stop the air, engage the throat\n';
-                        phonemeInfo+='NEVER use the word soft or hard to describe any consonant error. Tensed consonants (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) are sharp and harsh — if wrong, the student used too much air. Aspirated consonants (ㄱ,ㄷ,ㅂ,ㅅ,ㅈ) need a big puff of air — if wrong, the student sounded too tense, not breathy enough. Regular/harsh consonants (ㅊ,ㅋ,ㅌ,ㅍ) need less air than aspirated — if wrong, the student was too breathy. Always describe errors in terms of air and throat.\n';
-                        phonemeInfo+='VOWELS: Do NOT comment on vowel errors when guessing — students generally get vowels correct.\n';
-                        phonemeInfo+='IMPORTANT: Look at the actual consonants in each Azure-flagged word and pick the MOST LIKELY confusion from the list above. If none of the confusions from the list clearly apply, just say: focus on reading each letter carefully for that word. Do not mention Azure or automated systems.\n';
-                        phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                        phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds.\n';
-                        phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy.\n';
-                        phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use less air than aspirated, harder and sharper.\n';
-                        phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                        phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                        phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                        phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                        phonemeInfo+='\nWHEN YOUR TRANSCRIPT DIFFERS FROM EXPECTED (you heard real errors):\n';
-                        phonemeInfo+='IMPORTANT: Your transcript is a clue, not gospel. Reason backwards from the EXPECTED word to figure out what likely went wrong. Do NOT just say "you said X instead of Y".\n';
-                        phonemeInfo+='Example: expected 달, you heard 탕 → ㄷ said too hard (→ sounded like ㅌ), ㄹ said like English R (→ sounded like ㅇ/ㅏ ending). Feedback: "ㄷ — let more air out, make it breathy" + "ㄹ at the end — curl your tongue toward the roof of your mouth"\n';
-                        phonemeInfo+='Use the same confusion list as above (ㅅ/ㅆ, ㅂ/ㅍ, ㄷ/ㅌ, ㄱ/ㅋ, ㅈ/ㅊ always possible; tensed pairs only if in expected word; ㄴ/ㅁ/ㄹ English habits). VOWELS: do not comment on vowels.\n';
-                        phonemeInfo+='If nothing from the list fits → just say: focus on reading each letter carefully. Do not mention Azure or automated systems.\n';
-                        phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                        phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds.\n';
-                        phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy.\n';
-                        phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use less air than aspirated, harder and sharper.\n';
-                        phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                        phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                        phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                        phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                        if(drillPhonetic && drillPhonetic!==drillText) phonemeInfo+='NOTE: Written "'+drillText+'" and phonetic "'+drillPhonetic+'" are the SAME pronunciation. Do NOT flag differences between them as errors.\n';
-                    }
-                    var gptPrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to say:\nWRITTEN FORM: "'+drillText+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\n- If you hear SILENCE, background noise, or no speech → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or non-Korean → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you heard\n- If audio is too short or garbled → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe phonetic form shows how the word is ACTUALLY pronounced after Korean sound rules (assimilation, linking, tensification, etc.). Use the PHONETIC form — not the written form — to judge whether the student said the word correctly. For example, if written form is 웃지 but phonetic form is 웃찌, then sounding like 웃찌 is CORRECT and must NOT be flagged.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe errors above are HINTS — they may contain false positives. Verify each against what you actually hear. Discard anything that sounds correct. Synthesize both sources: your hearing + the hints.\n\nRULES:\n- ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n- Do NOT invent errors. Only mention what you can genuinely hear.\n- CRITICAL: Always judge consonants using the PHONETIC form, not the written form. Example: 웃지 is written with plain ㅈ but its phonetic form is 웃찌 (ㅉ) — so ㅉ is CORRECT for that word and must NOT be flagged.\n- Never say a sound is tense (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) unless the phonetic form of that word actually contains that tensed consonant.\n- If a consonant is plain in the phonetic form, do NOT say it sounded tense.\n- If a flagged error is hard to hear, explain the pronunciation rule instead (e.g. silent ㅎ, batchim linking, consonant assimilation).\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH. Korean words/letters are OK but sentences must be English.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•), max 2-4. If no real errors, say so positively.\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n\nSCORING RUBRIC — grade based on what you hear. Be generous — these are language learners, not native speakers:\n- 0-10: No Korean speech detected\n- 10-40: Very difficult to understand — many serious errors throughout\n- 40-60: Understandable but with several noticeable errors\n- 60-75: Mostly correct — one or two clear errors\n- 75-85: Good — one minor error or slightly unnatural\n- 85-95: Very accurate — sounds natural, minor imperfections only\n- 95-100: Perfect or near-perfect\nPer-error penalties: plain/aspirated confusion -5 to -8; tense/plain confusion -5 to -8; wrong vowel -3 to -5; missed assimilation -3 to -5; minor rhythm -1 to -2. Err on the side of generosity. Use the FULL range.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH","transcript":"what you ACTUALLY heard"}';
-                    var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gptPrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:300,temperature:0.1})
-                    });
-                    var gptData=await gptResp.json();
-                    var gptText='';
-                    if(gptData.data&&typeof gptData.data==='string')gptText=gptData.data;
-                    else if(gptData.choices&&gptData.choices[0]){var m=gptData.choices[0].message||gptData.choices[0];gptText=m.content?(typeof m.content==='string'?m.content:JSON.stringify(m.content)):(m.audio?m.audio.transcript:'');}
-                    gptText=gptText.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
-                    try{
-                        var parsed=JSON.parse(gptText);
-                        gptScore=typeof parsed.score==='number'?parsed.score:0;
-                        
-                        gptFeedback=parsed.feedback||'';
-                    }catch(pe){gptFeedback=gptText;}
-                }catch(e){ }
-
-                // Score: 25% STT + 75% GPT
-                var finalScore=0;
-                if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    finalScore=Math.round(phonemeResult.score*0.25 + gptScore*0.75);
-                }else{
-                    finalScore=Math.max(0,gptScore); // Fallback to GPT-only if phoneme service fails
-                }
-                console.group('%c🎙 DRILL GRADING — '+drillText, 'color:#9b59b6;font-weight:bold;font-size:13px');
-                console.log('Expected text:    ', drillText);
-                console.log('Phonetic form:    ', drillPhonetic!==drillText ? drillPhonetic : '(same as written)');
-                console.log('--- Azure ---');
-                if(azureResult){
-                    console.log('  Accuracy:       ', azureResult.accuracy, '/ 100');
-                    console.log('  Fluency:        ', azureResult.fluency, '/ 100');
-                    console.log('  Completeness:   ', azureResult.completeness, '/ 100');
-                    console.log('  Azure heard:    ', azureResult.transcript||'(none)');
-                    var aw=(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';});
-                    console.log('  Flagged words:  ', aw.length ? aw : '(none — all clear)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- Google STT ---');
-                if(phonemeResult){
-                    console.log('  STT score:      ', phonemeResult.score, '/ 100');
-                    console.log('  STT heard:      ', phonemeResult.transcript||'(none)');
-                    console.log('  STT errors:     ', phonemeResult.errors&&phonemeResult.errors.length ? phonemeResult.errors : '(none)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- GPT ---');
-                console.log('  GPT score:      ', gptScore, '/ 100');
-                console.log('  GPT feedback:   ', gptFeedback||'(none)');
-                console.log('--- FINAL (25% STT + 75% GPT) ---');
-                if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    console.log('  Formula:        ', phonemeResult.score+' × 0.25 + '+gptScore+' × 0.75 = '+finalScore);
-                } else {
-                    console.log('  Formula:         GPT-only (STT unavailable) = '+finalScore);
-                }
-                console.log('%c  FINAL SCORE:    '+finalScore+' / 100', 'color:#fbbf24;font-weight:bold;font-size:14px');
-                console.groupEnd();
-                var feedback=gptFeedback||'';
-                // Build phoneme error feedback if GPT gave nothing
-                if(!feedback && phonemeResult && phonemeResult.errors && phonemeResult.errors.length>0){
-                    feedback=phonemeResult.errors.map(function(err){
-                        if(err.type==='substitution') return '• Expected '+ph(err.expected)+' but heard '+ph(err.actual);
-                        if(err.type==='deletion') return '• Missing sound '+ph(err.expected);
-                        if(err.type==='insertion') return '• Extra sound '+ph(err.actual);
-                        return '';
-                    }).filter(Boolean).join(' ');
-                }
-                if(!feedback) feedback=(finalScore>=80?'Good pronunciation!':'Keep practicing!');
-
-                // Collect phoneme error summary for stats
-                var phonemeErrorSummary=[];
-                if(phonemeResult&&phonemeResult.errors){
-                    phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
-                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
-                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
-                    });
-                }
-                // GPT fallback: if phoneme errors all filtered out but GPT found issues, extract from feedback
-                if(phonemeErrorSummary.length===0 && feedback && finalScore<95){
-                    phonemeErrorSummary=extractGptErrors(feedback, drillText, drillPhonetic);
-                }
-
-                // Update Firestore
-                var drillAzureWords=[];
-                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')drillAzureWords.push(w.word);});}
-                await subRef.update({score:finalScore,feedback:feedback,phonemeErrors:phonemeErrorSummary,azureFlaggedWords:drillAzureWords,gradeScore:finalScore,status:'graded'});
-
-                // Show feedback only — no score shown to student for drills
-                resultEl.innerHTML='<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(155,89,182,0.4);border-radius:12px;padding:16px;margin-top:8px;">'+
-                    '<div style="font-size:12px;color:#ccc;text-align:left;margin-top:4px;">'+escapeHtml(feedback).replace(/•/g,'<br>•')+'</div></div>';
-                statusEl.textContent='';
-                qs.isBusy=false;qsFlushPending();
-                // Re-enable record button for retry
-                var btn=document.getElementById('qsDrillRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
-
-            }catch(e){
-                console.error('Drill submit error:',e);
-                statusEl.textContent='❌ Error: '+e.message;
-                qs.isBusy=false;qsFlushPending();
-                var btn=document.getElementById('qsDrillRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 START RECORDING';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';}
-            }
-        }
-
-        var qsRecorder=null;
-        var qsHoldStream=null;
-        var qsHoldChunks=[];
-        var qsHoldMime='';
-        var qsHoldActive=false;
-
-        // Abs beginner: track which word indices are already confirmed green
-        var qsAbConfirmed={};
-        // Abs beginner: first-attempt results {index: true/false}
-        var qsAbFirstAttempt={};
-        // Abs beginner: semaphore to avoid overlapping GPT calls
-        var qsAbGrading=false;
-        // Abs beginner: words for current round
-        var qsAbWords=[];
-
-        // Fire a GPT check against the accumulated audio so far.
-        // Only asks about words not yet confirmed.
-        async function qsAbCheckChunk(allChunks, mime){
-            if(qsAbGrading) return; // previous call still running, skip
-            var pending=qsAbWords.filter(function(w,i){return !qsAbConfirmed[i];});
-            if(pending.length===0) return; // all done
-            qsAbGrading=true;
-            try{
-                var blob=new Blob(allChunks,{type:mime||'audio/webm'});
-                var wav=await convertBlobToWav(blob);
-                var wordList=pending.map(function(w,j){
-                    // keep original index in the label so we can map back
-                    var origIdx=qsAbWords.indexOf(w);
-                    return origIdx+':'+w;
-                }).join('\n');
-                var prompt='You are listening to a student speaking Korean. They are supposed to say these specific Korean words (format is "index:word"):\n'+wordList+'\n\nFor each word, decide if the student has ALREADY SAID it clearly enough in the audio so far.\nBe lenient — if it sounds recognizable, mark correct.\nReply ONLY with a JSON array, one entry per word, in the same order:\n[{"idx":0,"word":"밥","heard":true}, ...]\nNo other text.';
-                var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({
-                        messages:[{role:'user',content:[
-                            {type:'text',text:prompt},
-                            {type:'input_audio',input_audio:{data:wav.base64,format:'wav'}}
-                        ]}],
-                        model:'gpt-4o-audio-preview',
-                        max_tokens:300,
-                        temperature:0.1
-                    })
-                });
-                var data=await resp.json();
-                var rt='';
-                // Robust proxy response parsing
-                if(data.data&&typeof data.data==='string') rt=data.data;
-                else if(data.data&&typeof data.data==='object') rt=JSON.stringify(data.data);
-                else if(data.text) rt=data.text;
-                else if(data.result) rt=data.result;
-                else if(data.response) rt=data.response;
-                else if(data.choices&&data.choices[0]){
-                    var m2=data.choices[0].message||data.choices[0];
-                    rt=m2.content||(m2.audio&&m2.audio.transcript)||'';
-                }
-                else rt=JSON.stringify(data);
-                rt=rt.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-                console.log('[AB] GPT raw response:', rt.slice(0,200));
-                var match=rt.match(/\[[\s\S]*\]/);
-                var results=[];
-                try{results=JSON.parse(match?match[0]:rt);}catch(e){
-                    console.warn('[AB] JSON parse failed:', e, 'raw:', rt.slice(0,100));
-                }
-                console.log('[AB] Parsed results:', results);
-                results.forEach(function(r){
-                    var idx=typeof r.idx==='number'?r.idx:qsAbWords.indexOf(r.word);
-                    if(idx<0||idx>=qsAbWords.length) return;
-                    if(qsAbConfirmed[idx]) return; // already green, skip
-                    if(r.heard){
-                        qsAbConfirmed[idx]=true;
-                        // Record first-attempt result if not yet set
-                        if(qsAbFirstAttempt[idx]===undefined) qsAbFirstAttempt[idx]=true;
-                        // Light up green immediately
-                        var el=document.getElementById('qsAbWord-'+idx);
-                        var msgEl=document.getElementById('qsAbWordMsg-'+idx);
-                        if(el){el.style.borderColor='#39ff14';el.style.background='rgba(57,255,20,0.12)';}
-                        if(msgEl){msgEl.textContent='✓';msgEl.style.color='#39ff14';}
-                    }
-                });
-            }catch(e){console.warn('[AB] AbCheck error:',e);}
-            qsAbGrading=false;
-        }
-
-        function qsHoldStart(e){
-            e.preventDefault();
-            if(qsHoldActive) return;
-            var btn=document.getElementById('qsRecBtn');
-            qsHoldActive=true;
-            qsHoldChunks=[];
-            qs.isBusy=true;
-
-            // If abs beginner, reset live-grading state (words already stored in qsAbWords)
-            if(qs.playerLevel==='absolute_beginner'){
-                qsAbConfirmed={};
-                qsAbFirstAttempt={};
-                qsAbGrading=false;
-                // Reset tile visuals
-                for(var ri2=0;ri2<qsAbWords.length;ri2++){
-                    var el2=document.getElementById('qsAbWord-'+ri2);
-                    if(el2){el2.style.borderColor='#ff69b4';el2.style.background='rgba(255,105,180,0.12)';}
-                    var msgEl2=document.getElementById('qsAbWordMsg-'+ri2);
-                    if(msgEl2){msgEl2.textContent='';msgEl2.style.color='';}
-                }
-                console.log('[AB] Starting round with words:', qsAbWords);
-            }
-
-            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-                if(!qsHoldActive){stream.getTracks().forEach(function(t){t.stop();});return;}
-                qsHoldStream=stream;
-                var mime='';
-                if(typeof MediaRecorder.isTypeSupported==='function'){
-                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
-                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
-                    else if(MediaRecorder.isTypeSupported('audio/mp4'))mime='audio/mp4';
-                    else if(MediaRecorder.isTypeSupported('audio/aac'))mime='audio/aac';
-                }
-                qsHoldMime=mime;
-                var recOpts=mime?{mimeType:mime}:{};
-                qsRecorder=new MediaRecorder(stream,recOpts);
-                qsRecorder.ondataavailable=function(ev){
-                    if(ev.data&&ev.data.size>0){
-                        qsHoldChunks.push(ev.data);
-                        // For abs beginner: fire a live GPT check on the accumulated audio so far
-                        if(qs.playerLevel==='absolute_beginner' && qsAbWords.length>0){
-                            var chunksCopy=qsHoldChunks.slice();
-                            qsAbCheckChunk(chunksCopy, mime);
-                        }
-                    }
-                };
-                qsRecorder.onstop=function(){
-                    if(qsHoldStream){qsHoldStream.getTracks().forEach(function(t){t.stop();});qsHoldStream=null;}
-                    var blobType=qsHoldMime||'audio/webm';
-                    qs.localBlob=new Blob(qsHoldChunks,{type:blobType});
-                    qs.localMime=blobType;
-                    qs.recordDuration=(Date.now()-(qs.recordStartTime||Date.now()))/1000;
-                    qsHoldActive=false;
-                    if(qs.playerLevel==='absolute_beginner'){
-                        if(btn){btn.style.display='none';}
-                        // Do a final GPT pass for any words not yet confirmed, then score
-                        qsAbFinalise(blobType);
-                    } else {
-                        if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';btn.style.animation='none';}
-                        var statusEl=document.getElementById('qsRecStatus');
-                        var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
-                        confirmHtml+='<button onclick="qsConfirmSubmit()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
-                        confirmHtml+='<button onclick="qsTrashRecording()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
-                        confirmHtml+='</div>';
-                        statusEl.innerHTML=confirmHtml;
-                    }
-                };
-                // timeslice=1000 fires ondataavailable every 1s while recording
-                var timeslice=(qs.playerLevel==='absolute_beginner')?1000:undefined;
-                if(timeslice) qsRecorder.start(timeslice); else qsRecorder.start();
-                qs.recordStartTime=Date.now();
-                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#ff0000';btn.style.color='#fff';btn.style.background='rgba(239,68,68,0.35)';btn.style.animation='qsPulse 1s infinite';}
-                var st=document.getElementById('qsRecStatus');
-                if(st) st.textContent='Recording...';
-            }).catch(function(err){
-                alert('Microphone access denied: '+err.message);
-                qsHoldActive=false;qs.isBusy=false;
-            });
-        }
-
-        function qsHoldEnd(e){
-            if(!qsHoldActive) return;
-            if(qsRecorder&&qsRecorder.state==='recording'){
-                qsRecorder.stop();
-            } else {
-                qsHoldActive=false;
-            }
-        }
-
-        // Called after recording stops for abs beginner.
-        // Waits for any in-flight GPT call, does one final pass on unconfirmed words, then scores.
-        async function qsAbFinalise(blobType){
-            var statusEl=document.getElementById('qsRecStatus');
-            if(statusEl) statusEl.textContent='⏳ Finalising...';
-
-            // Wait for any in-flight chunk check to finish (up to 15s)
-            var waited=0;
-            while(qsAbGrading && waited<15000){
-                await new Promise(function(r){setTimeout(r,200);});
-                waited+=200;
-            }
-
-            // Final pass: check any words still unconfirmed
-            var stillPending=qsAbWords.filter(function(w,i){return !qsAbConfirmed[i];});
-            if(stillPending.length>0){
-                qsAbGrading=false; // force allow
-                await qsAbCheckChunk(qsHoldChunks.slice(), qsHoldMime);
-                // Wait for that final check
-                waited=0;
-                while(qsAbGrading && waited<15000){
-                    await new Promise(function(r){setTimeout(r,200);});
-                    waited+=200;
-                }
-            }
-
-            // Mark any still-unconfirmed words as wrong (first attempt = false)
-            qsAbWords.forEach(function(w,i){
-                if(!qsAbConfirmed[i]){
-                    if(qsAbFirstAttempt[i]===undefined) qsAbFirstAttempt[i]=false;
-                    var el=document.getElementById('qsAbWord-'+i);
-                    var msgEl=document.getElementById('qsAbWordMsg-'+i);
-                    if(el){el.style.borderColor='#ff4444';el.style.background='rgba(255,68,68,0.12)';}
-                    if(msgEl){msgEl.textContent='try again!';msgEl.style.color='#ff4444';}
-                }
-            });
-
-            // Score = % correct first attempt
-            var abTotal=qsAbWords.length||1;
-            var abCorrect=0;
-            qsAbWords.forEach(function(w,i){if(qsAbFirstAttempt[i]===true)abCorrect++;});
-            var abScore=Math.round((abCorrect/abTotal)*100);
-            var abPoints=Math.round(abScore/10);
-            var missedWords=qsAbWords.filter(function(w,i){return qsAbFirstAttempt[i]!==true;});
-            var abFeedback='Words correct: '+abCorrect+'/'+abTotal+(missedWords.length>0?' • Needs work: '+missedWords.join(', '):'');
-
-            // Upload to Firebase Storage + write Firestore
-            try{
-                var ext=blobType.includes('mp4')?'mp4':'webm';
-                var path='quiz_game_audio/'+qs.sessionId+'/'+qs.playerId+'_round'+qsGetCurrentRound()+'.'+ext;
-                var ref=firebase.storage().ref().child(path);
-                await ref.put(qs.localBlob,{contentType:blobType});
-                var audioUrl=await ref.getDownloadURL();
-
-                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
-                var gameData=sessionDoc.data();
-                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
-                    playerId:qs.playerId, playerName:qs.playerName,
-                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel, round:gameData.currentRound,
-                    audioUrl:audioUrl, transcript:qsAbWords.join(' '),
-                    score:abPoints, gradeScore:abScore, feedback:abFeedback,
-                    expectedKorean:qsAbWords.join(' '),
-                    phonemeErrors:[], azureFlaggedWords:[],
-                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
-                    submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
-                    status:'graded'
-                });
-
-                // Update player total score
-                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
-                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
-                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+abPoints});
-            }catch(uploadErr){console.error('AB upload error:',uploadErr);}
-
-            qs.submittedRounds[gameData?gameData.currentRound:0]=true;
-            qs.isBusy=false;
-
-            // Show score summary below the word tiles
-            var scoreColor=abScore>=80?'#00ff88':abScore>=50?'#FFD700':'#ff4444';
-            if(statusEl) statusEl.innerHTML=
-                '<div style="margin-top:10px;text-align:center;">'
-                +'<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+abScore+'%</div>'
-                +'<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin:4px 0 10px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+abPoints+' POINTS</div>'
-                +'<button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button>'
-                +'</div>';
-
-            qsFlushPending();
-        }
-
-        function qsConfirmSubmit(){
-            var statusEl=document.getElementById('qsRecStatus');
-            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
-            qsSubmitRecording(qs.localMime);
-        }
-
-        function qsTrashRecording(){
-            qs.localBlob=null;qs.localMime=null;
-            qs.isBusy=false;
-            var btn=document.getElementById('qsRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';btn.style.animation='none';}
-            document.getElementById('qsRecStatus').textContent='';
-        }
-
-
-        // ── PHONEME ERROR FILTER ──────────────────────────────────────────────
-        // Cross-checks STT jamo-level errors against Azure word-level flags.
-        // Only runs for regular rounds (qsSubmitRecording).
-        //
-        // Decision tree:
-        //   azureResult missing/no words array → return sttErrors unchanged (fallback)
-        //   Azure flagged zero words (all 'None') → return [] and set azureAllClear=true
-        //   Azure flagged some words → keep only STT errors whose jamo maps to a flagged word
-        //
-        // Returns {errors: [...], azureAllClear: bool}
-        //   azureAllClear=true means caller should also skip extractGptErrors.
-        function filterPhonemeErrors(sttErrors, azureResult, expectedKorean) {
-            // No Azure data — can't filter, return as-is
-            if (!azureResult || !azureResult.words || !azureResult.words.length) {
-                return { errors: sttErrors, azureAllClear: false };
-            }
-
-            var flaggedWords = azureResult.words.filter(function(w) {
-                return w.error_type && w.error_type !== 'None';
-            });
-
-            // Azure cleared everything — discard all STT errors
-            if (flaggedWords.length === 0) {
-                return { errors: [], azureAllClear: true };
-            }
-
-            // Build set of flagged word strings (lowercased, trimmed) for lookup
-            var flaggedSet = {};
-            flaggedWords.forEach(function(w) {
-                if (w.word) flaggedSet[w.word.trim().toLowerCase()] = true;
-            });
-
-            // Decompose a Korean syllable block into its constituent jamo.
-            // Returns array of jamo characters (초성, 중성, 받침 if present).
-            // Only processes syllable blocks in range AC00–D7A3.
-            // Non-syllable characters (standalone jamo, punctuation) are returned as-is.
-            var CHOSUNG  = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-            var JUNGSUNG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
-            var JONGSUNG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-
-            function decomposeWord(word) {
-                var jamo = [];
-                for (var i = 0; i < word.length; i++) {
-                    var cp = word.charCodeAt(i);
-                    if (cp >= 0xAC00 && cp <= 0xD7A3) {
-                        var offset = cp - 0xAC00;
-                        var jong = offset % 28;
-                        var jung = Math.floor(offset / 28) % 21;
-                        var cho  = Math.floor(offset / 28 / 21);
-                        jamo.push(CHOSUNG[cho]);
-                        jamo.push(JUNGSUNG[jung]);
-                        if (jong > 0) jamo.push(JONGSUNG[jong]);
-                    } else {
-                        // standalone jamo or other character — include directly
-                        jamo.push(word[i]);
-                    }
-                }
-                return jamo;
-            }
-
-            // Build map: jamo character → array of space-separated words that contain it.
-            // We use the original expectedKorean text (not phonetic form) to match Azure's words.
-            var words = expectedKorean.split(/\s+/).filter(Boolean);
-            // jamoToWords[jamo] = {wordStr: true, ...}
-            var jamoToWords = {};
-            words.forEach(function(word) {
-                var clean = word.replace(/[^\uAC00-\uD7A3\u3131-\u314E\u314F-\u3163]/g, '');
-                var jamo = decomposeWord(clean);
-                jamo.forEach(function(j) {
-                    if (!jamoToWords[j]) jamoToWords[j] = {};
-                    jamoToWords[j][word.toLowerCase()] = true;
-                });
-            });
-
-            // Filter: keep STT error only if its expected jamo maps to an Azure-flagged word.
-            // Conservative rule: if the jamo appears in ANY flagged word, keep it.
-            // If the jamo can't be mapped to any word (not found in decomposition), keep it.
-            var filtered = [];
-            sttErrors.forEach(function(err) {
-                var jamoChar = err.expected || err.actual || '';
-                if (!jamoChar) return; // skip empty
-
-                var wordSet = jamoToWords[jamoChar];
-                if (!wordSet) {
-                    // Jamo not found in any word's decomposition — can't map, keep it
-                    filtered.push(err);
-                    return;
-                }
-
-                // Check if any word containing this jamo is Azure-flagged
-                var inFlaggedWord = Object.keys(wordSet).some(function(w) {
-                    return flaggedSet[w] || flaggedSet[w.replace(/[^\uAC00-\uD7A3a-z0-9]/gi, '')];
-                });
-
-                if (inFlaggedWord) filtered.push(err);
-                // else: Azure cleared every word this jamo appears in — discard
-            });
-
-            return { errors: filtered, azureAllClear: false };
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
-        // Normalize Korean text for STT comparison:
-        // strips spaces/punctuation and maps liaison equivalences to canonical forms
-        function qsNormalizeKorean(str){
-            var s=(str||'').replace(/[\s.,!?。、·]/g,'');
-            var liaisons=[
-                ['구이','귀'],['주이','쥐'],['우이','위'],['으이','의'],
-                ['의','에'],['위','우이'],['귀','구이'],
-                ['니오','뇨'],['디어','뎌'],['리에','례'],
-                ['루아','롸'],['루이','뢰'],['부에','봬'],
-                ['시어','셔'],['쑤에','쐐'],['이에','얘'],
-                ['우에','왜'],['우에','웨']
-            ];
-            liaisons.forEach(function(pair){
-                s=s.replace(new RegExp(pair[0],'g'),pair[1]);
-            });
-            return s;
-        }
-
-        async function qsSubmitRecording(mimeType) {
-            var statusEl=document.getElementById('qsRecStatus');
-            try {
-                statusEl.textContent='⏳ Uploading audio...';
-                // 1. Upload to Firebase Storage
-                var ext=mimeType.includes('mp4')?'mp4':'webm';
-                var path='quiz_game_audio/'+qs.sessionId+'/'+qs.playerId+'_round'+qsGetCurrentRound()+'.'+ext;
-                var ref=firebase.storage().ref().child(path);
-                await ref.put(qs.localBlob,{contentType:mimeType});
-                var audioUrl=await ref.getDownloadURL();
-
-                // 2. Write pending submission immediately so teacher sees it
-                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
-                var gameData=sessionDoc.data();
-                var set=gameData.sets[gameData.currentRound];
-                var expectedSentences;
-                if(qs.playerLevel==='absolute_beginner'){
-                    var abWords=set.absoluteBeginnerWords||[];
-                    expectedSentences=abWords.length>0?abWords.map(function(w){return{korean:w,english:''};}):([set.sentences[0]]);
-                } else {
-                    expectedSentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
-                }
-                var expectedKorean=expectedSentences.map(function(s){return s.korean;}).join(' ');
-
-                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
-                    playerId:qs.playerId, playerName:qs.playerName, emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel, round:gameData.currentRound,
-                    audioUrl:audioUrl, transcript:'', score:0, gradeScore:0, feedback:'',
-                    expectedKorean:expectedKorean, submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
-                    status:'grading'
-                });
-
-                statusEl.textContent='⏳ Transcribing & grading...';
-
-                // Convert audio blob to WAV for gpt-4o-audio-preview (only accepts wav/mp3)
-                var wav=await convertBlobToWav(qs.localBlob);
-                var wavBase64=wav.base64;
-                var wavBuf=wav.buffer; // save buffer ref immediately to survive async gaps
-
-                // ========== SPEECH RECOGNITION ANALYSIS ==========
-                // Use pre-calculated G2PK phonetics from session
-                var phoneticMap=gameData.phoneticMap||{};
-                var expectedPronunciation=phoneticMap[expectedKorean]||expectedKorean;
-                // For multi-word (absolute beginner), build phonetic from individual words
-                if(!phoneticMap[expectedKorean] && expectedSentences.length>1){
-                    expectedPronunciation=expectedSentences.map(function(s){return phoneticMap[s.korean]||s.korean;}).join(' ');
-                }
-
-                statusEl.textContent='🔍 Analyzing pronunciation...';
-
-                // ========== PARALLEL: Azure + Google STT ==========
-                var azureResult=null;
-                var phonemeResult=null;
-
-                // Azure Pronunciation Assessment (send both forms for testing)
-                var azurePromise=fetch(AZURE_PRON_URL+'/assess',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
-                }).then(function(r){return r.ok?r.json():null;}).then(function(d){
-                    if(d&&typeof d.pronunciation==='number'&&!d.error) return d;
-                    if(d&&d.error&&d.accuracy===0) return null;
-                    return d;
-                }).catch(function(){return null;});
-
-                // Google STT (speech proxy)
-                var sttFormData=new FormData();
-                sttFormData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
-                sttFormData.append('phonetic_hangul',expectedPronunciation);
-                sttFormData.append('original_text',expectedKorean);
-                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:sttFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([azurePromise,sttPromise]);
-                azureResult=parallel[0];
-                var sttRaw=parallel[1];
-
-                // Retry STT once after 30s if empty (cold start recovery)
-                console.log('  STT raw response:', sttRaw);
-                if(!sttRaw || !sttRaw.transcript || !sttRaw.transcript.trim()){
-                    console.warn('⚠️ STT empty — retrying in 30s...');
-                    await new Promise(function(res){setTimeout(res,30000);});
-                    var retryFormData=new FormData();
-                    retryFormData.append('audio',new Blob([new Uint8Array(wavBuf)],{type:'audio/wav'}),'audio.wav');
-                    retryFormData.append('phonetic_hangul',expectedPronunciation);
-                    retryFormData.append('original_text',expectedKorean);
-                    var sttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:retryFormData})
-                        .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-                    console.log('  STT retry raw response:', sttRetry);
-                    if(sttRetry && sttRetry.transcript && sttRetry.transcript.trim()){
-                        console.log('\u2705 STT retry succeeded:', sttRetry.transcript);
-                        sttRaw=sttRetry;
-                    } else {
-                        console.warn('\u274c STT retry also empty — falling back to GPT-only');
-                    }
-                }
-
-                if(sttRaw) phonemeResult=sttRaw;
-
-                var pronInfo='';
-                if(expectedPronunciation && expectedPronunciation!==expectedKorean){
-                    pronInfo='\nSTANDARD PRONUNCIATION: "'+expectedPronunciation+'"\n(This shows how the text should sound when spoken correctly per standard Korean pronunciation rules.)\n';
-                }
-
-                // ========== GPT GRADING (with phoneme data if available) ==========
-                statusEl.textContent='📝 Generating feedback...';
-
-                // If phoneme analysis succeeded, include its data in the GPT prompt for better feedback
-                var phonemeInfo='';
-                // Azure word-level flags (which words are mispronounced)
-                if(azureResult){
-                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT (word-level error detection):\n';
-                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100, Completeness: '+azureResult.completeness+'/100\n';
-                    if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
-                    if(azureResult.words && azureResult.words.length>0){
-                        var errorWords=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                        if(errorWords.length>0){
-                            phonemeInfo+='- FLAGGED WORDS: '+errorWords.map(function(w){return '"'+w.word+'" ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
-                        }else{
-                            phonemeInfo+='- All words recognized correctly by Azure.\n';
-                        }
-                    }
-                }
-                // Google STT transcript + jamo comparison
-                if(phonemeResult){
-                    phonemeInfo+='\n\nGOOGLE SPEECH-TO-TEXT ANALYSIS:\n';
-                    if(phonemeResult.transcript){
-                        phonemeInfo+='- Google heard: "'+phonemeResult.transcript+'"\n';
-                    }
-                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                        phonemeInfo+='- Character-level errors (comparing recognized text vs expected):\n';
-                        phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')phonemeInfo+='  • Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                            else if(err.type==='deletion')phonemeInfo+='  • Missing sound '+ph(err.expected)+'\n';
-                            else if(err.type==='insertion')phonemeInfo+='  • Extra sound '+ph(err.actual)+' inserted\n';
-                        });
-                    }else{
-                        phonemeInfo+='- No character-level errors detected.\n';
-                    }
-                }
-                if(azureResult||phonemeResult){
-                    phonemeInfo+='\nINSTRUCTIONS: Use Azure to identify WHICH words have errors. Use Google STT and your own hearing to explain WHY those words are wrong. If Azure flags no errors, trust that. Do not invent errors.\n';
-                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT MATCHES THE EXPECTED TEXT (no errors you heard yourself) BUT AZURE FLAGGED WORDS:\n';
-                    phonemeInfo+='You must still give feedback on Azure-flagged words. Since you heard no errors yourself, you are guessing what Azure detected. Only suggest errors from this specific list of common confusions — do NOT invent other errors:\n';
-                    phonemeInfo+='CONSONANT CONFUSIONS (always possible):\n';
-                    phonemeInfo+='- ㅅ vs ㅆ (tensed ㅅ — student may have used plain ㅅ instead of ㅆ or vice versa)\n';
-                    phonemeInfo+='- ㅂ vs ㅍ (student may not be breathy enough for ㅍ, or too breathy for ㅂ)\n';
-                    phonemeInfo+='- ㄷ vs ㅌ (student may not be breathy enough for ㅌ, or too breathy for ㄷ)\n';
-                    phonemeInfo+='- ㄱ vs ㅋ (student may not be breathy enough for ㅋ, or too breathy for ㄱ)\n';
-                    phonemeInfo+='- ㅈ vs ㅊ (student may not be breathy enough for ㅊ, or too buzzy for ㅈ)\n';
-                    phonemeInfo+='- ㄴ vs English N: students pronounce ㄴ like English N. Tell them: say it like ND — as in \'aND I\'. NEVER say ㄴ sounded like ㄹ.\n';
-                    phonemeInfo+='- ㅁ vs English M: students pronounce ㅁ like English M. Tell them: say it like MB — as in \'siMBa\'. NEVER say ㅁ sounded like another Korean consonant.\n';
-                    phonemeInfo+='- ㄹ vs English R: students pronounce ㄹ like English R. Tell them to tap or curl their tongue. NEVER say ㄹ sounded like ㄴ. EXCEPTION: when ㄹ+ㄹ appear across syllables (e.g. 들려, 몰라, 달려) → it should sound like English L, held on the roof of the mouth — NOT a tap.\n';
-                    phonemeInfo+='TENSED CONSONANT CONFUSIONS (only suggest these if the PHONETIC form of the word actually contains the tensed consonant — consonant assimilation may turn a plain consonant into a tensed one):\n';
-                    phonemeInfo+='- ㄸ vs ㄷ: student used too much air (ㄷ sounds breathy) — tell them to stop the air, engage the throat\n';
-                    phonemeInfo+='- ㅉ vs ㅈ: student used too much air (ㅈ sounds breathy) — tell them to cut the air, tighten the throat\n';
-                    phonemeInfo+='- ㅃ vs ㅂ: student used too much air (ㅂ sounds breathy) — tell them to hold the air back, engage the throat\n';
-                    phonemeInfo+='- ㄲ vs ㄱ: student used too much air (ㄱ sounds breathy) — tell them to stop the air, engage the throat\n';
-                    phonemeInfo+='NEVER use the word soft or hard to describe any consonant error. Tensed consonants (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) are sharp and harsh — if wrong, the student used too much air. Aspirated consonants (ㄱ,ㄷ,ㅂ,ㅅ,ㅈ) need a big puff of air — if wrong, the student sounded too tense, not breathy enough. Regular/harsh consonants (ㅊ,ㅋ,ㅌ,ㅍ) need less air than aspirated — if wrong, the student was too breathy. Always describe errors in terms of air and throat.\n';
-                    phonemeInfo+='VOWELS: Do NOT comment on vowel errors when guessing — students generally get vowels correct.\n';
-                    phonemeInfo+='IMPORTANT: Look at the actual consonants in each Azure-flagged word and pick the MOST LIKELY confusion from the list above. If none of the confusions from the list clearly apply, just say: focus on reading each letter carefully for that word. Do not mention Azure or automated systems.\n';
-                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                    phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
-                    phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
-                    phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for ㅊ, ㅋ, ㅌ, ㅍ. If student is too breathy: use less air, make it sharper and harder.\n';
-                    phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                    phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                    phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                    phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT DIFFERS FROM EXPECTED (you heard real errors):\n';
-                    phonemeInfo+='IMPORTANT: Your transcript is a clue, not gospel. Reason backwards from the EXPECTED word to figure out what likely went wrong. Do NOT just say "you said X instead of Y".\n';
-                    phonemeInfo+='Example: expected 달, you heard 탕 → ㄷ said too hard (→ sounded like ㅌ), ㄹ said like English R (→ sounded like ㅇ/ㅏ ending). Feedback: "ㄷ — let more air out, make it breathy" + "ㄹ at the end — curl your tongue toward the roof of your mouth"\n';
-                    phonemeInfo+='Use the same confusion list as above (ㅅ/ㅆ, ㅂ/ㅍ, ㄷ/ㅌ, ㄱ/ㅋ, ㅈ/ㅊ always possible; tensed pairs only if in expected word; ㄴ/ㅁ/ㄹ English habits). VOWELS: do not comment on vowels.\n';
-                    phonemeInfo+='If nothing from the list fits → just say: focus on reading each letter carefully. Do not mention Azure or automated systems.\n';
-                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                    phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
-                    phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
-                    phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for ㅊ, ㅋ, ㅌ, ㅍ. If student is too breathy: use less air, make it sharper and harder.\n';
-                    phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                    phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                    phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                    phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                    if(expectedPronunciation && expectedPronunciation!==expectedKorean){
-                        phonemeInfo+='NOTE: Azure received the written form "'+expectedKorean+'". The phonetic form "'+expectedPronunciation+'" is the SAME pronunciation. Do NOT flag differences between written and phonetic forms as errors (e.g. 않았어요 and 아나써요 are identical).\n';
-                    }
-                }
-
-                var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to read:\nWRITTEN FORM: "'+expectedKorean+'"'+pronInfo+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\n- If you hear SILENCE, background noise, or no speech → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or non-Korean → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you heard\n- If audio is too short or garbled → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe phonetic form shows how the word is ACTUALLY pronounced after Korean sound rules (assimilation, linking, tensification, etc.). Use the PHONETIC form — not the written form — to judge whether the student said the word correctly. For example, if written form is 웃지 but phonetic form is 웃찌, then sounding like 웃찌 is CORRECT and must NOT be flagged.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe errors above are HINTS — they may contain false positives. Verify each against what you actually hear. Discard anything that sounds correct. Synthesize both sources: your hearing + the hints.\n\nRULES:\n- ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n- Do NOT invent errors. Only mention what you can genuinely hear.\n- CRITICAL: Always judge consonants using the PHONETIC form, not the written form. Example: 웃지 is written with plain ㅈ but its phonetic form is 웃찌 (ㅉ) — so ㅉ is CORRECT for that word and must NOT be flagged.\n- Never say a sound is tense (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) unless the phonetic form of that word actually contains that tensed consonant.\n- If a consonant is plain in the phonetic form, do NOT say it sounded tense.\n- If a flagged error is hard to hear, explain the pronunciation rule instead (e.g. silent ㅎ, batchim linking, consonant assimilation).\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH. Korean words/letters are OK but sentences must be English.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•), max 2-4. If no real errors, say so positively.\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n\nSCORING RUBRIC — grade based on what you hear. Be generous — these are language learners, not native speakers:\n- 0-10: No Korean speech detected\n- 10-40: Very difficult to understand — many serious errors throughout\n- 40-60: Understandable but with several noticeable errors\n- 60-75: Mostly correct — one or two clear errors\n- 75-85: Good — one minor error or slightly unnatural\n- 85-95: Very accurate — sounds natural, minor imperfections only\n- 95-100: Perfect or near-perfect\nPer-error penalties: plain/aspirated confusion -5 to -8; tense/plain confusion -5 to -8; wrong vowel -3 to -5; missed assimilation -3 to -5; minor rhythm -1 to -2. Err on the side of generosity. Use the FULL range.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH","transcript":"what you ACTUALLY heard"}';
-
-                var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({
-                        messages:[{
-                            role:'user',
-                            content:[
-                                {type:'text',text:gradePrompt},
-                                {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
-                            ]
-                        }],
-                        model:'gpt-4o-audio-preview',
-                        max_tokens:800,
-                        temperature:0.1
-                    })
-                });
-                var aiData=await aiResp.json();
-
-                // Parse GPT response
-                var rt='';
-                if(aiData.data && typeof aiData.data==='string') rt=aiData.data;
-                else if(aiData.data && typeof aiData.data==='object') rt=JSON.stringify(aiData.data);
-                else if(aiData.choices && aiData.choices[0]){
-                    var msg=aiData.choices[0].message||aiData.choices[0];
-                    // Prefer content (structured JSON) over audio.transcript (spoken text)
-                    if(msg.content) rt=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
-                    else if(msg.audio && msg.audio.transcript) rt=msg.audio.transcript;
-                }
-                else rt=JSON.stringify(aiData);
-                if(typeof rt!=='string')rt=JSON.stringify(rt);
-
-                rt=rt.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-                var grade={score:0,feedback:'Grading failed.',transcript:''};
-                var transcript='';
-                try{
-                    var parsed=JSON.parse(rt);
-                    grade=parsed;
-                    transcript=parsed.transcript||'';
-                }catch(e){
-                    var m=rt.match(/\{[\s\S]*\}/);
-                    if(m)try{grade=JSON.parse(m[0]);transcript=grade.transcript||'';}catch(e2){}
-                    if(!transcript){
-                        var sm=rt.match(/"score"\s*:\s*(\d+)/);
-                        var fm=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        var tm=rt.match(/"transcript"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        if(sm)grade.score=parseInt(sm[1]);
-                        if(fm)grade.feedback=fm[1];
-                        if(tm){grade.transcript=tm[1];transcript=tm[1];}
-                    }
-                }
-
-                // ========== STT SCORE: always recalculate from transcript ==========
-                // The proxy's internal score is unreliable — it doesn't handle:
-                //   - Liaison (연음): 궀이 and 궀이 are the same sound
-                //   - Space differences: STT may merge/split syllables
-                //   - Azure-cleared words it still penalizes
-                // So we ALWAYS recompute the STT score ourselves from the transcript.
-                if(phonemeResult && phonemeResult.transcript){
-                    var normSttHeard=qsNormalizeKorean(phonemeResult.transcript);
-                    var expectedWords=expectedKorean.split(/\s+/).filter(Boolean);
-                    var azureFlaggedMap={};
-                    if(azureResult && azureResult.words){
-                        azureResult.words.forEach(function(w){
-                            if(w.word) azureFlaggedMap[w.word.trim()]=w.error_type&&w.error_type!=='None';
-                        });
-                    }
-                    var totalWords=expectedWords.length;
-                    var correctWords=0;
-                    expectedWords.forEach(function(word){
-                        // If Azure explicitly cleared this word, count it correct
-                        var azureCleared=azureFlaggedMap.hasOwnProperty(word)&&!azureFlaggedMap[word];
-                        if(azureCleared){ correctWords++; return; }
-                        // Otherwise check if liaison-normalized STT transcript contains the word
-                        if(normSttHeard.indexOf(qsNormalizeKorean(word))>=0){ correctWords++; }
-                    });
-                    var recalcScore=totalWords>0?Math.round((correctWords/totalWords)*100):0;
-                    console.log('  STT score (recalc): '+phonemeResult.score+' → '+recalcScore+' ('+correctWords+'/'+totalWords+' words matched)');
-                    phonemeResult.score=recalcScore;
-                }
-
-                // ========== HYBRID SCORING: Azure-aware weighting ==========
-                // STT unavailable (no transcript) → GPT 100%
-                // Azure all clear → STT 10% / GPT 90%
-                // Otherwise → STT 25% / GPT 75%
-                var gptScore=typeof grade.score==='number'?grade.score:0;
-                var sttAvailable=phonemeResult && phonemeResult.transcript && phonemeResult.transcript.trim();
-                if(sttAvailable && typeof phonemeResult.score==='number'){
-                    var phonemeScore=phonemeResult.score;
-                    var azureFlagged=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
-                    var azureAllClear=azureResult && azureFlagged && azureFlagged.length===0;
-                    var sttW=azureAllClear ? 0.1 : 0.25;
-                    var gptW=azureAllClear ? 0.9 : 0.75;
-                    var hybridScore=Math.round(phonemeScore*sttW + gptScore*gptW);
-                    grade.score=hybridScore;
-                }else{
-                    // STT unavailable — GPT only
-                    grade.score=gptScore;
-                    var sttW=0; var gptW=1; var azureAllClear=false;
-                }
-                console.group('%c🎤 REGULAR ROUND GRADING — '+expectedKorean, 'color:#41c0ff;font-weight:bold;font-size:13px');
-                console.log('Expected (written):  ', expectedKorean);
-                console.log('Expected (phonetic): ', expectedPronunciation!==expectedKorean ? expectedPronunciation : '(same as written)');
-                console.log('Player level:        ', qs.playerLevel);
-                console.log('--- Azure ---');
-                if(azureResult){
-                    console.log('  Accuracy:        ', azureResult.accuracy, '/ 100');
-                    console.log('  Fluency:         ', azureResult.fluency, '/ 100');
-                    console.log('  Completeness:    ', azureResult.completeness, '/ 100');
-                    console.log('  Azure heard:     ', azureResult.transcript||'(none)');
-                    var aw=(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';});
-                    console.log('  Flagged words:   ', aw.length ? aw : '(none — all clear)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- Google STT ---');
-                if(phonemeResult){
-                    console.log('  STT score:       ', phonemeResult.score, '/ 100');
-                    console.log('  STT heard:       ', phonemeResult.transcript||'(none)');
-                    console.log('  STT errors (raw):', phonemeResult.errors&&phonemeResult.errors.length ? phonemeResult.errors : '(none)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- GPT ---');
-                console.log('  GPT raw score:   ', gptScore, '/ 100');
-                console.log('  GPT transcript:  ', grade.transcript||'(none)');
-                console.log('  GPT feedback:    ', grade.feedback||'(none)');
-                console.log('--- HYBRID SCORE (STT '+Math.round(sttW*100)+'% + GPT '+Math.round(gptW*100)+'%'+(azureAllClear?' — Azure all clear)':')') +' ---');
-                if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    console.log('  Formula:         ', phonemeResult.score+' × '+sttW+' + '+gptScore+' × '+gptW+' = '+grade.score);
-                } else {
-                    console.log('  Formula:          GPT-only (STT unavailable) = '+grade.score);
-                }
-                console.log('%c  PRE-SAFETY SCORE: '+grade.score+' / 100', 'color:#fbbf24;font-weight:bold');
-                console.groupEnd();
-
-                // Safety check: detect no speech / echoed transcript
-                var finalTranscriptCheck=grade.transcript||transcript||'';
-                if(!finalTranscriptCheck.trim()){
-                    // Empty transcript = no speech detected
-                    grade.score=0;
-                    grade.feedback=grade.feedback||'No speech detected. Please try again.';
-                }else{
-                    // Check if GPT just echoed the expected text or phonetic form
-                    var cleanT=finalTranscriptCheck.replace(/[\s.,!?。、]/g,'');
-                    var cleanE=expectedKorean.replace(/[\s.,!?。、]/g,'');
-                    var cleanP=(expectedPronunciation||'').replace(/[\s.,!?。、]/g,'');
-                    if(cleanT===cleanE||cleanT===cleanP){
-                        // Transcript is identical to expected — GPT likely hallucinated
-                        // Only flag if phoneme service also had issues or was unavailable
-                        if(!phonemeResult||phonemeResult.score>95){
-                        }
-                    }
-                    // Check for English words (more than 2 english words = probably wrong language)
-                    var engWords=finalTranscriptCheck.match(/[a-zA-Z]{3,}/g);
-                    if(engWords&&engWords.length>2){
-                        grade.score=0;
-                        grade.feedback='Non-Korean speech detected. Please read the Korean text.';
-                    }
-                }
-
-                // 4. Speed penalty: beginner + recording over 60s → -5% (silent)
-                var finalScore = typeof grade.score === 'number' ? grade.score : 0;
-                var speedPenalty=0;
-                if((qs.playerLevel==='beginner'||qs.playerLevel==='absolute_beginner') && qs.recordDuration && qs.recordDuration>60){
-                    speedPenalty=5;
-                    finalScore=Math.max(0,finalScore-5);
-                }
-                var finalFeedback = grade.feedback || '';
-                var finalTranscript = grade.transcript || transcript || '';
-                var points = Math.round(finalScore / 10);
-                console.group('%c🏁 REGULAR ROUND FINAL — '+expectedKorean, 'color:#00ff88;font-weight:bold;font-size:13px');
-                console.log('  Post-safety score:  ', grade.score, '/ 100');
-                if(speedPenalty) console.log('  Speed penalty:      -'+speedPenalty+' (recording >60s)');
-                console.log('%c  FINAL SCORE:        '+finalScore+' / 100  →  +'+points+' pts', 'color:#00ff88;font-weight:bold;font-size:14px');
-                console.log('  Transcript heard:   ', finalTranscript||'(none)');
-                console.log('  Feedback:           ', finalFeedback||'(none)');
-                console.groupEnd();
-
-                // Collect phoneme error summary for stats.
-                // Filtered through Azure word-level flags via filterPhonemeErrors():
-                //   - azureAllClear=true  → Azure said all words correct; discard all STT errors
-                //                           and skip extractGptErrors (would re-introduce false positives)
-                //   - azureAllClear=false → Azure had flagged words or was unavailable;
-                //                           only keep STT errors whose jamo maps to a flagged word
-                var rawSttErrors=[];
-                if(phonemeResult&&phonemeResult.errors){
-                    phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution') rawSttErrors.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
-                        else if(err.type==='deletion') rawSttErrors.push({expected:err.expected||'',actual:'',type:'deletion'});
-                        else if(err.type==='insertion') rawSttErrors.push({expected:'',actual:err.actual||'',type:'insertion'});
-                    });
-                }
-                var filterResult=filterPhonemeErrors(rawSttErrors, azureResult, expectedKorean);
-                var phonemeErrorSummary=filterResult.errors;
-                // GPT fallback: only run if Azure did NOT clear everything
-                if(phonemeErrorSummary.length===0 && !filterResult.azureAllClear && finalFeedback && finalScore<95){
-                    phonemeErrorSummary=extractGptErrors(finalFeedback, expectedKorean, expectedPronunciation);
-                }
-
-                var regAzureWords=[];
-                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')regAzureWords.push(w.word);});}
-                await pendingRef.update({
-                    transcript:finalTranscript,
-                    score:points, gradeScore:finalScore, feedback:finalFeedback,
-                    phonemeErrors:phonemeErrorSummary,
-                    azureFlaggedWords:regAzureWords,
-                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
-                    status:'graded'
-                });
-
-                // 5. Update player total score
-                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
-                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
-                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
-
-                // 6. Show feedback popup
-                qs.submittedRounds[gameData.currentRound]=true;
-                qsShowFeedback({score:finalScore,feedback:finalFeedback,transcript:finalTranscript},points,audioUrl,expectedSentences);
-
-            } catch(err){
-                console.error('Submit error:',err);
-                statusEl.textContent='❌ Error: '+err.message;
-                qs.isBusy=false;
-                qsFlushPending();
-                var btn=document.getElementById('qsRecBtn');
-                if(btn){btn.disabled=false;btn.innerHTML='🎤 TRY AGAIN';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.animation='none';}
-            }
-        }
-
-        function qsGetCurrentRound() {
-            // Read from Firestore cache or DOM
-            var el=document.querySelector('[data-round]');
-            return el?parseInt(el.dataset.round):0;
-        }
-
-        function qsShowFeedback(grade,points,audioUrl,expectedSentences) {
-            window.scrollTo(0,0);
-            var area=document.getElementById('qsGameArea');
-            var lc=qsGetLevelColor(qs.playerLevel);
-            var scoreColor=grade.score>=80?'#00ff88':grade.score>=50?'#FFD700':'#ff4444';
-            var h='<div style="margin-top:16px;background:rgba(0,0,0,0.6);border:3px solid '+lc+';border-radius:16px;padding:24px;text-align:center;">';
-            h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:28px;color:'+scoreColor+';margin-bottom:4px;">'+grade.score+'%</div>';
-            h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;margin-bottom:16px;">+'+points+' POINTS</div>';
-            // Feedback
-            if(grade.feedback){
-                h+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-bottom:16px;text-align:left;">';
-                h+='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Feedback</div>';
-                h+='<div style="font-size:14px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
-            }
-            // What you said vs expected
-            if(grade.transcript){
-                h+='<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left;">';
-                h+='<div style="font-size:10px;color:#888;margin-bottom:4px;">YOU SAID:</div>';
-                h+='<div style="font-size:13px;color:#a855f7;margin-bottom:8px;">'+escapeHtml(grade.transcript)+'</div>';
-                h+='<div style="font-size:10px;color:#888;margin-bottom:4px;">EXPECTED:</div>';
-                h+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedSentences.map(function(s){return s.korean;}).join(' '))+'</div></div>';
-            }
-            // Audio buttons
-            h+='<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">';
-            var koreanForTTS=expectedSentences.map(function(s){return s.korean;}).join(' ');
-            h+='<button onclick="qsPlayTeacher(\''+koreanForTTS.replace(/'/g,"\\'")+'\')" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🔊 Teacher Example</button>';
-            h+='<button onclick="qsPlayMine()" style="background:rgba(168,85,247,0.15);border:2px solid #a855f7;color:#a855f7;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🎧 My Recording</button></div>';
-            // Close
-            h+='<button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button>';
-            h+='</div>';
-            area.innerHTML=h;
-            qsFadeIn(area);
-        }
-
-        var qsTTSAudio=null;
-        function qsPlayTeacher(text) {
-            if(qsTTSAudio){qsTTSAudio.pause();qsTTSAudio=null;}
-            fetch('https://tts-proxy-386010826708.us-central1.run.app',{
-                method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})
-            }).then(function(r){return r.blob();}).then(function(blob){
-                qsTTSAudio=new Audio(URL.createObjectURL(blob));qsTTSAudio.play();
-            }).catch(function(e){console.error('TTS error:',e);alert('Could not play teacher audio.');});
-        }
-        function qsPlayMine() {
-            if(!qs.localBlob){alert('No recording found.');return;}
-            var a=new Audio(URL.createObjectURL(qs.localBlob));a.play();
-        }
-
-        // ── BONUS ROUND ──
-        var qsBonusRecorder=null;
-        async function qsStartBonus(){
-            qs.isBusy=true;
-            var area=document.getElementById('qsGameArea');
-            area.innerHTML='<div style="margin-top:20px;text-align:center;"><div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">⭐ GENERATING BONUS...</div><div style="font-size:11px;color:#888;margin-top:8px;">Preparing a bonus sentence for you!</div></div>';
-            try{
-                // Get current round sentences
-                var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
-                var gameData=sessionDoc.data();
-                if(gameData.status!=='playing'){ qsShowWaiting();return;}
-                var set=gameData.sets[gameData.currentRound];
-                if(!set){console.error('Bonus: no set found for round',gameData.currentRound);qsShowWaiting();return;}
-                var sentences;
-                if(qs.playerLevel==='absolute_beginner'){
-                    var abWords=set.absoluteBeginnerWords||[];
-                    sentences=abWords.length>0?abWords.map(function(w){return{korean:w,english:''};}):([set.sentences[0]]);
-                } else {
-                    sentences=(qs.playerLevel==='beginner')?[set.sentences[0]]:set.sentences;
-                }
-                var originalKorean=sentences.map(function(s){return s.korean;}).join('\n');
-                var originalEnglish=sentences.map(function(s){return s.english||'';}).filter(Boolean).join('\n');
-
-                // Call GPT to generate bonus sentence
-                var prompt;
-                if(qs.playerLevel==='absolute_beginner'){
-                    // Check for preloaded bonus first
-                    var preloadedBonus=set.absoluteBeginnerBonus||null;
-                    var studentGoal=(qs.tevelloUser&&qs.tevelloUser.goal)||'';
-                    if(preloadedBonus && preloadedBonus.korean && !studentGoal){
-                        // Use preloaded bonus (no goal set, so generic is fine)
-                        var bonus=preloadedBonus;
-                        qs.bonusKorean=bonus.korean;
-                        qs.bonusRound=gameData.currentRound;
-                        qsShowBonusUI(area,bonus,gameData.currentRound);
-                        return;
-                    }
-                    // Goal is set or no preload — generate custom bonus via AI
-                    prompt='You are a Korean language teaching assistant for absolute beginners who barely know Korean.\n';
-                    prompt+='The student just practiced these syllable blocks: '+originalKorean.replace(/\n/g,', ')+'\n';
-                    if(studentGoal){
-                        prompt+='The student\'s 3-month Korean learning goal is: "'+studentGoal.replace(/"/g,'\\"')+'".\n';
-                        prompt+='Generate ONE very short, simple Korean clause (2-3 words maximum) that relates to their goal. The clause should be relevant to what they want to achieve, but simple enough for an absolute beginner to read.\n';
-                    } else {
-                        prompt+='Generate ONE very short, simple Korean clause (2-3 words maximum) that an absolute beginner could attempt to read.\n';
-                    }
-                    prompt+='Use only common, basic vocabulary with simple syllable structure (1-3 syllable words only).\n';
-                    prompt+='Examples of appropriate difficulty: "밥 먹어요", "물 주세요", "집에 가요", "고양이 봐요", "한국어 공부해요"\n';
-                    prompt+='Try to incorporate one of the syllable blocks the student practiced if possible.\n';
-                    prompt+='Reply ONLY with JSON: {"korean":"THE SHORT CLAUSE","english":"ENGLISH TRANSLATION","changed":"bonus"}';
-                } else {
-                    prompt='You are a Korean language teaching assistant.\n';
-                    prompt+='Original Korean sentence(s):\n'+originalKorean+'\n';
-                    if(originalEnglish)prompt+='English translation(s):\n'+originalEnglish+'\n';
-                    prompt+='Create a NEW version of this sentence by changing exactly ONE noun to a different noun that still makes sense in context. Keep the grammar, verb endings, and sentence structure identical.\n';
-                    prompt+='Examples:\n- "나는 학교에 갔어요" → "나는 병원에 갔어요" (학교→병원)\n- "고양이가 물을 마셔요" → "고양이가 우유를 마셔요" (물→우유)\n\n';
-                    prompt+='Reply ONLY with JSON: {"korean":"THE NEW KOREAN SENTENCE","english":"ENGLISH TRANSLATION","changed":"ORIGINAL_NOUN → NEW_NOUN"}';
-                }
-
-                var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({messages:[{role:'user',content:prompt}],model:'gpt-4o',max_tokens:300,temperature:0.8})
-                });
-                var data=await resp.json();
-                var text='';
-                // Match the robust parsing used in grading
-                if(data.data&&typeof data.data==='string')text=data.data;
-                else if(data.data&&typeof data.data==='object'){
-                    // Proxy might return parsed object directly
-                    if(data.data.korean){
-                        // Already parsed — use directly
-                        var bonus=data.data;
-                        qs.bonusKorean=bonus.korean;
-                        qs.bonusRound=gameData.currentRound;
-                        qsShowBonusUI(area,bonus,gameData.currentRound);
-                        return;
-                    }
-                    text=JSON.stringify(data.data);
-                }
-                else if(data.choices&&data.choices[0]){
-                    var msg=data.choices[0].message||data.choices[0];
-                    if(msg.content)text=typeof msg.content==='string'?msg.content:JSON.stringify(msg.content);
-                }
-                else text=JSON.stringify(data);
-                text=text.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
-                // Sometimes the response has extra text before/after JSON
-                var jsonMatch=text.match(/\{[\s\S]*"korean"[\s\S]*\}/);
-                if(jsonMatch)text=jsonMatch[0];
-                if(!text){throw new Error('Empty GPT response for bonus');}
-                var bonus=JSON.parse(text);
-                if(!bonus.korean){throw new Error('No korean field in bonus response: '+text);}
-
-                // Store for submission
-                qs.bonusKorean=bonus.korean;
-                qs.bonusRound=gameData.currentRound;
-                qsShowBonusUI(area,bonus,gameData.currentRound);
-
-            }catch(e){
-                console.error('Bonus generation error:',e);
-                qs.isBusy=false;
-                qsFlushPending();
-                if(!qs.pendingStatus){
-                    qsShowWaiting();
-                }
-            }
-        }
-
-        function qsShowBonusUI(area,bonus,roundNum){
-                window.scrollTo(0,0);
-                var h='<div data-bonus="'+roundNum+'" style="margin-top:16px;">';
-                h+='<div style="text-align:center;margin-bottom:10px;">';
-                h+='<span style="font-family:\'Press Start 2P\';font-size:10px;background:linear-gradient(135deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;">⭐ BONUS SENTENCE ⭐</span>';
-                h+='<div style="font-size:10px;color:#888;margin-top:4px;">Earn extra points!</div></div>';
-                h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;box-shadow:0 0 25px rgba(255,215,0,0.15);margin-bottom:16px;text-align:center;">';
-                h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(bonus.korean)+'</div>';
-                if(bonus.english)h+='<div style="font-size:11px;color:#888;margin-top:6px;">'+escapeHtml(bonus.english)+'</div>';
-                if(bonus.changed)h+='<div style="font-size:10px;color:#FFA500;margin-top:6px;">Changed: '+escapeHtml(bonus.changed)+'</div>';
-                h+='</div>';
-                h+='<div style="text-align:center;">';
-                h+='<button id="qsBonusRecBtn" onpointerdown="qsBonusHoldStart(event)" onpointerup="qsBonusHoldEnd(event)" onpointercancel="qsBonusHoldEnd(event)" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #8B6914,2px -2px 0 #8B6914,-2px 2px 0 #8B6914,2px 2px 0 #8B6914,0 -2px 0 #8B6914,0 2px 0 #8B6914,-2px 0 0 #8B6914,2px 0 0 #8B6914;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">🎤 HOLD TO RECORD</button>';
-                h+='<div id="qsBonusStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
-                h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
-                h+='</div></div>';
-                area.innerHTML=h;
-            qsFadeIn(area);
-        }
-
-        var qsBonusHoldStream=null;
-        var qsBonusHoldChunks=[];
-        var qsBonusHoldMime='';
-        var qsBonusHoldActive=false;
-
-        function qsBonusHoldStart(e){
-            e.preventDefault();
-            if(qsBonusHoldActive) return;
-            var btn=document.getElementById('qsBonusRecBtn');
-            qsBonusHoldActive=true;
-            qsBonusHoldChunks=[];
-            qs.isBusy=true;
-            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-                if(!qsBonusHoldActive){stream.getTracks().forEach(function(t){t.stop();});return;}
-                qsBonusHoldStream=stream;
-                var mime='';
-                if(typeof MediaRecorder.isTypeSupported==='function'){
-                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
-                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
-                }
-                qsBonusHoldMime=mime;
-                qsBonusRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
-                qsBonusRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size>0)qsBonusHoldChunks.push(ev.data);};
-                qsBonusRecorder.onstop=function(){
-                    if(qsBonusHoldStream){qsBonusHoldStream.getTracks().forEach(function(t){t.stop();});qsBonusHoldStream=null;}
-                    var blob=new Blob(qsBonusHoldChunks,{type:qsBonusHoldMime||'audio/webm'});
-                    qs.bonusBlob=blob;
-                    qs.bonusMime=qsBonusHoldMime||'audio/webm';
-                    if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
-                    var statusEl=document.getElementById('qsBonusStatus');
-                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
-                    confirmHtml+='<button onclick="qsBonusConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
-                    confirmHtml+='<button onclick="qsBonusTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:12px 24px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
-                    confirmHtml+='</div>';
-                    statusEl.innerHTML=confirmHtml;
-                    qsBonusHoldActive=false;
-                };
-                qsBonusRecorder.start();
-                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#e87777';btn.style.color='#fff';btn.style.background='rgba(255,215,0,0.35)';}
-                document.getElementById('qsBonusStatus').textContent='Recording...';
-            }).catch(function(err){alert('Mic error: '+err.message);qsBonusHoldActive=false;qs.isBusy=false;});
-        }
-
-        function qsBonusHoldEnd(e){
-            if(!qsBonusHoldActive) return;
-            if(qsBonusRecorder&&qsBonusRecorder.state==='recording'){
-                qsBonusRecorder.stop();
-            } else {
-                qsBonusHoldActive=false;
-            }
-        }
-
-        function qsBonusConfirm(){
-            var statusEl=document.getElementById('qsBonusStatus');
-            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
-            qsBonusSubmit(qs.bonusBlob,qs.bonusMime);
-        }
-
-        function qsBonusTrash(){
-            qs.bonusBlob=null;qs.bonusMime=null;
-            // If round already ended while reviewing, flush to leaderboard
-            if(qs.pendingStatus){
-                qs.isBusy=false;
-                qsFlushPending();
-                return;
-            }
-            qs.isBusy=false;
-            var btn=document.getElementById('qsBonusRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
-            document.getElementById('qsBonusStatus').textContent='';
-        }
-
-        async function qsBonusSubmit(blob,mimeType){
-            var statusEl=document.getElementById('qsBonusStatus');
-            var resultEl=document.getElementById('qsBonusResult');
-            try{
-                statusEl.textContent='⏳ Uploading...';
-                // Upload audio
-                var ext=mimeType.includes('mp4')?'mp4':'webm';
-                var path='quiz_game_audio/'+qs.sessionId+'/bonus_'+qs.playerId+'_round'+qs.bonusRound+'.'+ext;
-                var storRef=firebase.storage().ref().child(path);
-                await storRef.put(blob,{contentType:mimeType});
-                var audioUrl=await storRef.getDownloadURL();
-
-                var expectedKorean=qs.bonusKorean;
-
-                // Write pending submission (marked as bonus)
-                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
-                    playerId:qs.playerId,playerName:qs.playerName,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel,round:qs.bonusRound,isBonus:true,
-                    audioUrl:audioUrl,transcript:'',score:0,gradeScore:0,feedback:'',
-                    expectedKorean:expectedKorean,submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
-                    status:'grading'
-                });
-
-                statusEl.textContent='⏳ Transcribing & grading...';
-
-                // Convert to WAV
-                var wav=await convertBlobToWav(blob);
-                var wavBase64=wav.base64;
-                var wb=wav.buffer;
-
-                // ========== G2PK then AZURE + STT in parallel ==========
                 var phonetic=expectedKorean;
                 var phonemeResult=null;
                 var azureResult=null;
@@ -34867,26 +34113,10 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }
                 }
 
-                // Hybrid: Azure-aware weighting (10% STT / 90% GPT if Azure all clear, else 50/50)
-                // Always recompute STT score from transcript (proxy score is unreliable)
-                if(phonemeResult && phonemeResult.transcript){
-                    var bNormSttHeard=qsNormalizeKorean(phonemeResult.transcript);
-                    var bExpectedWords=expectedKorean.split(/\s+/).filter(Boolean);
-                    var bAzureFlaggedMap={};
-                    if(azureResult && azureResult.words){
-                        azureResult.words.forEach(function(w){
-                            if(w.word) bAzureFlaggedMap[w.word.trim()]=w.error_type&&w.error_type!=='None';
-                        });
-                    }
-                    var bCorrect=0;
-                    bExpectedWords.forEach(function(word){
-                        var cleared=bAzureFlaggedMap.hasOwnProperty(word)&&!bAzureFlaggedMap[word];
-                        if(cleared){ bCorrect++; return; }
-                        if(bNormSttHeard.indexOf(qsNormalizeKorean(word))>=0){ bCorrect++; }
-                    });
-                    var bRecalc=bExpectedWords.length>0?Math.round((bCorrect/bExpectedWords.length)*100):0;
-                    console.log('  STT score (recalc bonus): '+phonemeResult.score+' → '+bRecalc+' ('+bCorrect+'/'+bExpectedWords.length+' words)');
-                    phonemeResult.score=bRecalc;
+                // Use the proxy's score directly — it already does accurate comparison
+                // (recalculating from word-split was breaking single-word bonus phrases)
+                if(phonemeResult){
+                    console.log('  STT score (proxy, bonus): '+phonemeResult.score+' transcript: "'+phonemeResult.transcript+'"');
                 }
                 var gptScore=typeof grade.score==='number'?grade.score:0;
                 var sttAvailableB=phonemeResult && phonemeResult.transcript && phonemeResult.transcript.trim();
@@ -35102,64 +34332,153 @@ Return ONLY this JSON (no markdown, no code blocks):
         var qsMistakePracticeStream=null;
         var qsMistakePracticeActive=false;
 
-        async function qsShowMistakes(){
+        // Called with optional sessionId override (for dropdown selection)
+        async function qsShowMistakes(overrideSessionId){
             var area=document.getElementById('qsGameArea');
             if(!area||!qs.sessionId) return;
+            var viewingSessionId=overrideSessionId||qs.sessionId;
             area.innerHTML='<div style="padding:20px;text-align:center;color:#888;font-size:13px;">⏳ Loading...</div>';
 
             try{
-                // Fetch session doc for leaderboard placement
+                // Fetch session doc for leaderboard placement (use current session for coins/placement)
                 var sessionDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
                 var sessionData=sessionDoc.exists?sessionDoc.data():{};
                 var myBoard=sessionData[qsGetLeaderboardKey(qs.playerLevel)]||[];
                 var myPlacement=-1;
                 for(var pi=0;pi<myBoard.length;pi++){if(myBoard[pi].name===qs.playerName){myPlacement=pi;break;}}
 
-                // Award coins + gacha rolls (only once per session)
+                // Build session list for dropdown (logged-in users only)
+                var sessionOptions=[];
+                if(qs.tevelloUser){
+                    try{
+                        var histSnap=await db.collection(TEVELLO_GAME_HISTORY)
+                            .where('tevelloId','==',qs.tevelloUser.id).get();
+                        var histDocs=[];
+                        histSnap.forEach(function(d){histDocs.push(Object.assign({docId:d.id},d.data()));});
+                        // Sort newest first locally
+                        histDocs.sort(function(a,b){
+                            var ta=a.createdAt?a.createdAt.toMillis?a.createdAt.toMillis():0:0;
+                            var tb=b.createdAt?b.createdAt.toMillis?b.createdAt.toMillis():0:0;
+                            return tb-ta;
+                        });
+                        // Deduplicate by sessionId (keep newest entry per session)
+                        var seen={};
+                        histDocs.forEach(function(h){
+                            if(h.sessionId&&!seen[h.sessionId]){
+                                seen[h.sessionId]=true;
+                                sessionOptions.push({sessionId:h.sessionId,date:h.date||'Unknown date',level:h.level||''});
+                            }
+                        });
+                        // Always ensure current session is in the list
+                        if(!seen[qs.sessionId]){
+                            sessionOptions.unshift({sessionId:qs.sessionId,date:'Today (current)',level:qs.playerLevel});
+                        }
+                    }catch(histErr){console.warn('History fetch error:',histErr);}
+                }
+
+                // ── COIN + ROLL AWARD (once per session, Firestore-verified) ──
+                // Get today's date in EST for gacha gate
+                var _nowEst=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+                var _epParts=_nowEst.split('/');
+                var _todayEst=_epParts[2]+'-'+_epParts[0]+'-'+_epParts[1]; // YYYY-MM-DD
+
                 var coinsToAward=0;
                 var rollsToAward=0;
                 var awardBreakdown=[];
+                var gachaUsedToday=false; // will be set after Firestore read
+
                 if(!qs.coinsAwarded){
-                    // Coins
+                    // Build what should be awarded for this placement
                     coinsToAward+=10;
                     awardBreakdown.push({label:'Participation',coins:10,rolls:1});
                     rollsToAward+=1;
                     if(myPlacement===0){
-                        coinsToAward+=30;rollsToAward+=2; // total 3 rolls for 1st
+                        coinsToAward+=30;rollsToAward+=2;
                         awardBreakdown.push({label:'1st Place \uD83E\uDD47',coins:30,rolls:2});
                     } else if(myPlacement===1){
-                        coinsToAward+=25;rollsToAward+=1; // total 2 rolls for 2nd
+                        coinsToAward+=25;rollsToAward+=1;
                         awardBreakdown.push({label:'2nd Place \uD83E\uDD48',coins:25,rolls:1});
                     } else if(myPlacement===2){
-                        coinsToAward+=20;rollsToAward+=1; // total 2 rolls for 3rd
+                        coinsToAward+=20;rollsToAward+=1;
                         awardBreakdown.push({label:'3rd Place \uD83E\uDD49',coins:20,rolls:1});
                     }
-                    qs.coinsAwarded=true;
-                    qs.coinsEarned=coinsToAward;
-                    qs.gachaRolls=rollsToAward;
-                    // Save to tevello_accounts if logged in
+
                     if(qs.tevelloUser){
                         try{
                             var acctRef=db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id);
-                            await acctRef.update({
-                                coins: firebase.firestore.FieldValue.increment(coinsToAward),
-                                gachaRolls: firebase.firestore.FieldValue.increment(rollsToAward)
-                            });
                             var acctSnap=await acctRef.get();
                             var acctData=acctSnap.exists?acctSnap.data():{};
-                            qs.tevelloUser.coins=acctData.coins||coinsToAward;
-                            qs.tevelloUser.gachaRolls=acctData.gachaRolls||rollsToAward;
-                        }catch(coinErr){console.warn('Award save error:',coinErr);}
+
+                            // Check if coins were already awarded for this session
+                            var awardedSessions=acctData.coinsAwardedSessions||[];
+                            var alreadyAwarded=(awardedSessions.indexOf(qs.sessionId)>=0);
+
+                            // Check gacha gate
+                            gachaUsedToday=(acctData.gachaLastUsedDate===_todayEst);
+
+                            if(!alreadyAwarded){
+                                // First time — increment and mark session
+                                await acctRef.update({
+                                    coins: firebase.firestore.FieldValue.increment(coinsToAward),
+                                    gachaRolls: firebase.firestore.FieldValue.increment(rollsToAward),
+                                    coinsAwardedSessions: firebase.firestore.FieldValue.arrayUnion(qs.sessionId)
+                                });
+                                // Re-read for display totals
+                                var acctSnap2=await acctRef.get();
+                                var acctData2=acctSnap2.exists?acctSnap2.data():{};
+                                qs.tevelloUser.coins=typeof acctData2.coins==='number'?acctData2.coins:coinsToAward;
+                                qs.tevelloUser.gachaRolls=typeof acctData2.gachaRolls==='number'?acctData2.gachaRolls:rollsToAward;
+                            } else {
+                                // Already awarded this session — just show stored totals
+                                qs.tevelloUser.coins=typeof acctData.coins==='number'?acctData.coins:0;
+                                qs.tevelloUser.gachaRolls=typeof acctData.gachaRolls==='number'?acctData.gachaRolls:0;
+                                coinsToAward=0; // don't double-display in breakdown
+                                rollsToAward=0;
+                                // Still show the breakdown for what they earned originally
+                                // (awardBreakdown built above is kept for display)
+                            }
+                        }catch(coinErr){
+                            console.warn('Award save error:',coinErr);
+                            // If Firestore fails, fall back to in-memory flag
+                        }
+                    }
+
+                    qs.coinsAwarded=true;
+                    qs.coinsEarned=coinsToAward;
+                    qs.gachaRolls=rollsToAward;
+                    qs.awardBreakdown=awardBreakdown.slice();
+                    qs.gachaUsedToday=gachaUsedToday;
+                } else {
+                    // Already awarded this session (in-memory flag) — just check gacha gate from Firestore
+                    gachaUsedToday=qs.gachaUsedToday||false;
+                    if(qs.tevelloUser && !qs.gachaDayChecked){
+                        try{
+                            var acctSnap3=await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).get();
+                            if(acctSnap3.exists){
+                                gachaUsedToday=(acctSnap3.data().gachaLastUsedDate===_todayEst);
+                                qs.gachaUsedToday=gachaUsedToday;
+                                qs.gachaDayChecked=true;
+                            }
+                        }catch(e){}
                     }
                 }
 
-                var snap=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB)
-                    .where('playerId','==',qs.playerId).where('status','==','graded').get();
+                // Fetch submissions from the selected session
+                // Use tevelloId if available (more reliable across sessions), else playerId
+                var subQuery=db.collection(QUIZ_GAME_COLLECTION).doc(viewingSessionId).collection(QUIZ_SUBS_SUB)
+                    .where('status','==','graded');
+                if(qs.tevelloUser){
+                    subQuery=subQuery.where('tevelloId','==',qs.tevelloUser.id);
+                } else {
+                    subQuery=subQuery.where('playerId','==',qs.playerId);
+                }
+                var snap=await subQuery.get();
                 var subs=[];
                 snap.forEach(function(doc){subs.push(Object.assign({id:doc.id},doc.data()));});
                 subs.sort(function(a,b){return (a.round||0)-(b.round||0)||(a.isBonus?1:-1);});
 
                 var mistakes=subs.filter(function(s){return typeof s.gradeScore==='number' && s.gradeScore<80;});
+                var isCurrentSession=(viewingSessionId===qs.sessionId);
                 var lc=qsGetLevelColor(qs.playerLevel);
                 var h='<div style="margin-top:16px;">';
                 // Back button
@@ -35167,7 +34486,22 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<button onclick="qsShowFinished(document.getElementById(\'qsGameArea\'),null)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:8px 18px;border-radius:8px;font-family:\'Press Start 2P\';font-size:8px;cursor:pointer;">&#x2190; BACK</button>';
                 h+='</div>';
 
-                // ── COINS + GACHA ROLLS AWARD BANNER ──
+                // ── SESSION DROPDOWN (logged-in users with history) ──
+                if(sessionOptions.length>1){
+                    h+='<div style="margin-bottom:16px;">';
+                    h+='<label style="font-family:\'Press Start 2P\';font-size:8px;color:#888;display:block;margin-bottom:6px;">&#x1F4C5; SELECT SESSION</label>';
+                    h+='<select onchange="qsShowMistakes(this.value)" style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:10px 12px;border-radius:8px;font-size:13px;cursor:pointer;-webkit-appearance:none;appearance:none;">';
+                    sessionOptions.forEach(function(opt){
+                        var label=opt.date+(opt.level?' ('+qsGetLevelLabel(opt.level)+')':'');
+                        var selected=(opt.sessionId===viewingSessionId)?'selected':'';
+                        h+='<option value="'+escapeHtml(opt.sessionId)+'" '+selected+'>'+escapeHtml(label)+'</option>';
+                    });
+                    h+='</select>';
+                    h+='</div>';
+                }
+
+                // ── COINS + GACHA ROLLS AWARD BANNER (current session only) ──
+                if(isCurrentSession){
                 h+='<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(155,89,182,0.08));border:2px solid #FFD700;border-radius:14px;padding:18px 16px;margin-bottom:18px;text-align:center;">';
                 h+='<div style="font-size:28px;margin-bottom:6px;">\uD83C\uDF9F\uFE0F</div>';
                 h+='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:12px;">REWARDS EARNED</div>';
@@ -35177,8 +34511,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<span style="font-size:9px;color:#888;text-align:center;min-width:52px;">\uD83E\uDE99 Coins</span>';
                 h+='<span style="font-size:9px;color:#888;text-align:center;min-width:52px;">\uD83C\uDFB0 Rolls</span>';
                 h+='</div>';
-                // Breakdown rows
-                awardBreakdown.forEach(function(row){
+                // Breakdown rows — use saved breakdown on revisit
+                var renderBreakdown=awardBreakdown.length>0?awardBreakdown:qs.awardBreakdown;
+                renderBreakdown.forEach(function(row){
                     h+='<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 12px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:8px;">';
                     h+='<span style="font-size:12px;color:#ddd;text-align:left;">'+escapeHtml(row.label)+'</span>';
                     h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;text-align:center;min-width:52px;">+'+row.coins+'</span>';
@@ -35199,11 +34534,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                 } else {
                     h+='<div style="font-size:11px;color:#888;margin-top:8px;">Log in to save your coins &amp; rolls permanently!</div>';
                 }
-                // Gacha button
+                // Gacha button — gated: once per calendar day (EST)
                 h+='<div style="margin-top:14px;">';
-                h+='<button onclick="qsLaunchGacha('+qs.gachaRolls+')" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f,0 -2px 0 #2e0a4f,0 2px 0 #2e0a4f,-2px 0 0 #2e0a4f,2px 0 0 #2e0a4f;padding:14px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:0 0 18px rgba(155,89,182,0.5),rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">\uD83C\uDFB0 UNLEASH YOUR GACHA ('+qs.gachaRolls+'x)</button>';
+                if(gachaUsedToday){
+                    h+='<div style="background:rgba(155,89,182,0.08);border:2px solid rgba(155,89,182,0.3);border-radius:10px;padding:12px 16px;text-align:center;">';
+                    h+='<div style="font-size:18px;margin-bottom:4px;">\uD83C\uDFB0</div>';
+                    h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#c4a0e8;margin-bottom:4px;">GACHA USED TODAY</div>';
+                    h+='<div style="font-size:11px;color:#888;">Come back tomorrow for more rolls!</div>';
+                    h+='</div>';
+                } else {
+                    h+='<button onclick="qsLaunchGacha('+qs.gachaRolls+')" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f,0 -2px 0 #2e0a4f,0 2px 0 #2e0a4f,-2px 0 0 #2e0a4f,2px 0 0 #2e0a4f;padding:14px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:0 0 18px rgba(155,89,182,0.5),rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">\uD83C\uDFB0 UNLEASH YOUR GACHA ('+qs.gachaRolls+'x)</button>';
+                }
                 h+='</div>';
                 h+='</div>';
+                } // end isCurrentSession
 
                 // ── REVIEW MISTAKES HEADER ──
                 h+='<div style="text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:11px;color:#e67e22;margin-bottom:6px;">&#x1F4DD; REVIEW MISTAKES</div>';
@@ -35865,11 +35209,19 @@ Return ONLY this JSON (no markdown, no code blocks):
                         });
                     });
                     // arrayUnion each item (Firestore limit: batch of items)
+                    // Get today in EST for the daily gate
+                    var _gNow=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+                    var _gParts=_gNow.split('/');
+                    var _gToday=_gParts[2]+'-'+_gParts[0]+'-'+_gParts[1];
                     await acctRef.update({
                         gachaCollection:firebase.firestore.FieldValue.arrayUnion.apply(
                             firebase.firestore.FieldValue, toAdd
-                        )
+                        ),
+                        gachaLastUsedDate: _gToday
                     });
+                    // Update in-memory state so the button grays out immediately
+                    qs.gachaUsedToday=true;
+                    qs.gachaDayChecked=true;
                     console.log('Saved '+characters.length+' gacha result(s) to Firestore');
                 } else {
                     try{
@@ -35943,8 +35295,8 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
-<div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; justify-content:center; align-items:center; padding:20px;">
-    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+<div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:20px; box-sizing:border-box;">
+    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
         <!-- Header -->
         <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
