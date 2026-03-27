@@ -33515,40 +33515,81 @@ Return ONLY this JSON (no markdown, no code blocks):
                 azureResult=parallel[0];
                 phonemeResult=parallel[1];
 
-                // Build phoneme info for GPT
+                // Build phoneme info for GPT — full detail matching bonus/drill grading
                 var phonemeInfo='';
                 if(azureResult){
-                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT:\n';
-                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100\n';
+                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT (word-level error detection):\n';
+                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100, Completeness: '+(azureResult.completeness||'N/A')+'/100\n';
                     if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
                     if(azureResult.words&&azureResult.words.length>0){
                         var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                        if(errW.length>0) phonemeInfo+='- FLAGGED: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+')';}).join(', ')+'\n';
-                        else phonemeInfo+='- All words correct per Azure.\n';
+                        if(errW.length>0){
+                            phonemeInfo+='- FLAGGED WORDS: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
+                        }else{
+                            phonemeInfo+='- All words recognized correctly by Azure.\n';
+                        }
                     }
                 }
                 if(phonemeResult){
-                    phonemeInfo+='\n\nGOOGLE STT:\n';
-                    if(phonemeResult.transcript) phonemeInfo+='- Heard: "'+phonemeResult.transcript+'"\n';
+                    phonemeInfo+='\n\nGOOGLE SPEECH-TO-TEXT ANALYSIS:\n';
+                    if(phonemeResult.transcript) phonemeInfo+='- Google heard: "'+phonemeResult.transcript+'"\n';
                     if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                        phonemeInfo+='- Character-level errors (comparing recognized text vs expected):\n';
                         phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')phonemeInfo+='  • Expected '+err.expected+' heard '+err.actual+'\n';
-                            else if(err.type==='deletion')phonemeInfo+='  • Missing: '+err.expected+'\n';
-                            else if(err.type==='insertion')phonemeInfo+='  • Extra: '+err.actual+'\n';
+                            if(err.type==='substitution')phonemeInfo+='  \u2022 Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
+                            else if(err.type==='deletion')phonemeInfo+='  \u2022 Missing sound '+ph(err.expected)+'\n';
+                            else if(err.type==='insertion')phonemeInfo+='  \u2022 Extra sound '+ph(err.actual)+' inserted\n';
                         });
+                    }else{
+                        phonemeInfo+='- No character-level errors detected.\n';
                     }
                 }
+                if(azureResult||phonemeResult){
+                    phonemeInfo+='\nINSTRUCTIONS: Use Azure to identify WHICH words have errors. Use Google STT and your own hearing to explain WHY those words are wrong. If Azure flags no errors, trust that. Do not invent errors.\n';
+                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT MATCHES THE EXPECTED TEXT (no errors you heard yourself) BUT AZURE FLAGGED WORDS:\n';
+                    phonemeInfo+='You must still give feedback on Azure-flagged words. Since you heard no errors yourself, you are guessing what Azure detected. Only suggest errors from this specific list of common confusions \u2014 do NOT invent other errors:\n';
+                    phonemeInfo+='CONSONANT CONFUSIONS (always possible):\n';
+                    phonemeInfo+='- \u3145 vs \u3146 (tensed \u3145 \u2014 student may have used plain \u3145 instead of \u3146 or vice versa)\n';
+                    phonemeInfo+='- \u3142 vs \u314d (student may not be breathy enough for \u314d, or too breathy for \u3142)\n';
+                    phonemeInfo+='- \u3137 vs \u314c (student may not be breathy enough for \u314c, or too breathy for \u3137)\n';
+                    phonemeInfo+='- \u3131 vs \u314b (student may not be breathy enough for \u314b, or too breathy for \u3131)\n';
+                    phonemeInfo+='- \u3148 vs \u314a (student may not be breathy enough for \u314a, or too buzzy for \u3148)\n';
+                    phonemeInfo+='- \u3134 vs English N: students pronounce \u3134 like English N. Tell them: say it like ND \u2014 as in \'aND I\'. NEVER say \u3134 sounded like \u3139.\n';
+                    phonemeInfo+='- \u3141 vs English M: students pronounce \u3141 like English M. Tell them: say it like MB \u2014 as in \'siMBa\'. NEVER say \u3141 sounded like another Korean consonant.\n';
+                    phonemeInfo+='- \u3139 vs English R: students pronounce \u3139 like English R. Tell them to tap or curl their tongue. NEVER say \u3139 sounded like \u3134. EXCEPTION: when \u3139+\u3139 appear across syllables (e.g. \ub4e4\ub824, \ubab0\ub77c, \ub2ec\ub824) \u2192 it should sound like English L, held on the roof of the mouth \u2014 NOT a tap.\n';
+                    phonemeInfo+='TENSED CONSONANT CONFUSIONS (only suggest these if the PHONETIC form of the word actually contains the tensed consonant \u2014 consonant assimilation may turn a plain consonant into a tensed one):\n';
+                    phonemeInfo+='- \u3138 vs \u3137: student used too much air (\u3137 sounds breathy) \u2014 tell them to stop the air, engage the throat\n';
+                    phonemeInfo+='- \u3149 vs \u3148: student used too much air (\u3148 sounds breathy) \u2014 tell them to cut the air, tighten the throat\n';
+                    phonemeInfo+='- \u3143 vs \u3142: student used too much air (\u3142 sounds breathy) \u2014 tell them to hold the air back, engage the throat\n';
+                    phonemeInfo+='- \u3132 vs \u3131: student used too much air (\u3131 sounds breathy) \u2014 tell them to stop the air, engage the throat\n';
+                    phonemeInfo+='NEVER use the word soft or hard to describe any consonant error. Tensed consonants (\u3132,\u3138,\u3143,\u3146,\u3149) are sharp and harsh \u2014 if wrong, the student used too much air. Aspirated consonants (\u3131,\u3137,\u3142,\u3145,\u3148) need a big puff of air \u2014 if wrong, the student sounded too tense, not breathy enough. Regular/harsh consonants (\u314a,\u314b,\u314c,\u314d) need less air than aspirated \u2014 if wrong, the student was too breathy. Always describe errors in terms of air and throat.\n';
+                    phonemeInfo+='VOWELS: Do NOT comment on vowel errors when guessing \u2014 students generally get vowels correct.\n';
+                    phonemeInfo+='IMPORTANT: Look at the actual consonants in each Azure-flagged word and pick the MOST LIKELY confusion from the list above. If none of the confusions from the list clearly apply, just say: focus on reading each letter carefully for that word. Do not mention Azure or automated systems.\n';
+                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
+                    phonemeInfo+='- TENSED consonants: \u3132, \u3138, \u3143, \u3146, \u3149 \u2014 no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
+                    phonemeInfo+='- ASPIRATED consonants: \u3131, \u3137, \u3142, \u3145, \u3148 \u2014 use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
+                    phonemeInfo+='- REGULAR/HARSH consonants: \u314a, \u314b, \u314c, \u314d \u2014 use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for \u314a, \u314b, \u314c, \u314d. If student is too breathy: use less air, make it sharper and harder.\n';
+                    phonemeInfo+='- \u3134 misheard at start of word \u2192 pronounce it: ND like "aND I" (stress the ND)\n';
+                    phonemeInfo+='- \u3141 misheard at start of word \u2192 pronounce it: MB like "siMBa" (stress the MB)\n';
+                    phonemeInfo+='- \u3139 misheard in middle of word \u2192 student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth \u2014 one quick tap, do not roll it. (EXCEPTION: double-\u3139 like in \ub4e4\ub824, \ubab0\ub77c, \uc54c\ub824 \u2192 pronounce like English L, not a tap)\n';
+                    phonemeInfo+='- \u3139 misheard at end of word \u2192 student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: \u3139+\u3139 (double \u3139 across syllables, e.g. \ub4e4\ub824, \ub2ec\ub824, \ubab0\ub77c) \u2192 pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
+                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT DIFFERS FROM EXPECTED (you heard real errors):\n';
+                    phonemeInfo+='IMPORTANT: Your transcript is a clue, not gospel. Reason backwards from the EXPECTED word to figure out what likely went wrong. Do NOT just say "you said X instead of Y".\n';
+                    phonemeInfo+='Example: expected \ub2ec, you heard \ud0d5 \u2192 \u3137 said too hard (\u2192 sounded like \u314c), \u3139 said like English R (\u2192 sounded like \u3147/\u3161 ending). Feedback: "\u3137 \u2014 let more air out, make it breathy" + "\u3139 at the end \u2014 curl your tongue toward the roof of your mouth"\n';
+                    phonemeInfo+='Use the same confusion list as above (\u3145/\u3146, \u3142/\u314d, \u3137/\u314c, \u3131/\u314b, \u3148/\u314a always possible; tensed pairs only if in expected word; \u3134/\u3141/\u3139 English habits). VOWELS: do not comment on vowels.\n';
+                    phonemeInfo+='If nothing from the list fits \u2192 just say: focus on reading each letter carefully. Do not mention Azure or automated systems.\n';
+                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
+                    phonemeInfo+='- TENSED consonants: \u3132, \u3138, \u3143, \u3146, \u3149 \u2014 no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
+                    phonemeInfo+='- ASPIRATED consonants: \u3131, \u3137, \u3142, \u3145, \u3148 \u2014 use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
+                    phonemeInfo+='- REGULAR/HARSH consonants: \u314a, \u314b, \u314c, \u314d \u2014 use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for \u314a, \u314b, \u314c, \u314d. If student is too breathy: use less air, make it sharper and harder.\n';
+                    phonemeInfo+='- \u3134 misheard at start of word \u2192 pronounce it: ND like "aND I" (stress the ND)\n';
+                    phonemeInfo+='- \u3141 misheard at start of word \u2192 pronounce it: MB like "siMBa" (stress the MB)\n';
+                    phonemeInfo+='- \u3139 misheard in middle of word \u2192 student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth \u2014 one quick tap, do not roll it. (EXCEPTION: double-\u3139 like in \ub4e4\ub824, \ubab0\ub77c, \uc54c\ub824 \u2192 pronounce like English L, not a tap)\n';
+                    phonemeInfo+='- \u3139 misheard at end of word \u2192 student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: \u3139+\u3139 (double \u3139 across syllables, e.g. \ub4e4\ub824, \ub2ec\ub824, \ubab0\ub77c) \u2192 pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
+                    if(phonetic&&phonetic!==expectedKorean) phonemeInfo+='NOTE: Written "'+expectedKorean+'" and phonetic "'+phonetic+'" are the SAME pronunciation. Do NOT flag differences between them as errors.\n';
+                }
 
-                var consonantRules='CONSONANT RULES:\n'+
-                    '- ㄱ,ㄷ,ㅂ,ㅅ,ㅈ: aspirated — big puff of air\n'+
-                    '- ㅊ,ㅋ,ㅌ,ㅍ: less air than aspirated\n'+
-                    '- ㄲ,ㄸ,ㅃ,ㅆ,ㅉ: tensed — no air, engage throat\n'+
-                    '- ㄴ sounds like ND (as in "aND I")\n'+
-                    '- ㅁ sounds like MB (as in "siMBa")\n'+
-                    '- ㄹ: tap tongue on roof of mouth (double ㄹ = English L)\n'+
-                    'NEVER use the word "soft" or "hard". Describe errors in terms of air and throat.\n';
-
-                var gptPrompt='You are a Korean pronunciation coach. The student recorded themselves saying:\n"'+expectedKorean+'"\n(phonetic: "'+phonetic+'")\n'+phonemeInfo+'\n'+consonantRules+'\nGive a score 0-100 and brief feedback (2-3 sentences max). Focus only on real errors. If score >= 80 just give encouragement.\nReply ONLY as JSON: {"score":85,"transcript":"what you heard","feedback":"your feedback"}';
+                var gptPrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to say:\nWRITTEN FORM: "'+expectedKorean+'"'+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL \u2014 DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\n- If you hear SILENCE, background noise, or no speech \u2192 score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or non-Korean \u2192 score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you heard\n- If audio is too short or garbled \u2192 score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT \u2014 THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe phonetic form shows how the word is ACTUALLY pronounced after Korean sound rules (assimilation, linking, tensification, etc.). Use the PHONETIC form \u2014 not the written form \u2014 to judge whether the student said the word correctly. For example, if written form is \uc6c3\uc9c0 but phonetic form is \uc6c3\uc2f8, then sounding like \uc6c3\uc2f8 is CORRECT and must NOT be flagged.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe errors above are HINTS \u2014 they may contain false positives. Verify each against what you actually hear. Discard anything that sounds correct. Synthesize both sources: your hearing + the hints.\n\nRULES:\n- \u3154 and \u3150 ARE IDENTICAL in modern Korean. NEVER flag this.\n- Do NOT invent errors. Only mention what you can genuinely hear.\n- CRITICAL: Always judge consonants using the PHONETIC form, not the written form. Example: \uc6c3\uc9c0 is written with plain \u3148 but its phonetic form is \uc6c3\uc2f8 (\u3149) \u2014 so \u3149 is CORRECT for that word and must NOT be flagged.\n- Never say a sound is tense (\u3132,\u3138,\u3143,\u3146,\u3149) unless the phonetic form of that word actually contains that tensed consonant.\n- If a consonant is plain in the phonetic form, do NOT say it sounded tense.\n- If a flagged error is hard to hear, explain the pronunciation rule instead (e.g. silent \u3147, batchim linking, consonant assimilation).\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH. Korean words/letters are OK but sentences must be English.\n- Short, informal, helpful \u2014 like a friendly tutor\n- Use bullet points (\u2022), max 2-4. If no real errors, say so positively.\n- ALWAYS use Hangul letters (\u3131,\u314b,\u3132 etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n\nSCORING RUBRIC \u2014 grade based on what you hear. Be generous \u2014 these are language learners, not native speakers:\n- 0-10: No Korean speech detected\n- 10-40: Very difficult to understand \u2014 many serious errors throughout\n- 40-60: Understandable but with several noticeable errors\n- 60-75: Mostly correct \u2014 one or two clear errors\n- 75-85: Good \u2014 one minor error or slightly unnatural\n- 85-95: Very accurate \u2014 sounds natural, minor imperfections only\n- 95-100: Perfect or near-perfect\nPer-error penalties: plain/aspirated confusion -5 to -8; tense/plain confusion -5 to -8; wrong vowel -3 to -5; missed assimilation -3 to -5; minor rhythm -1 to -2. Err on the side of generosity. Use the FULL range.\n\nProvide a transcript of EXACTLY what you heard \u2014 do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH","transcript":"what you ACTUALLY heard"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -33750,7 +33791,6 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(d.drillText)+'</div></div>';
             h+='<div style="text-align:center;">';
             h+='<button id="qsDrillRecBtn" onpointerdown="qsDrillHoldStart(event)" onpointerup="qsDrillHoldEnd(event)" onpointercancel="qsDrillHoldEnd(event)" data-drilltext="'+escapeHtml(d.drillText||'')+'" data-drillid="'+(d.drillId||'')+'" style="background:rgba(155,89,182,0.15);border:3px solid #9b59b6;color:#9b59b6;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">🎤 HOLD TO RECORD</button>';
-            h+='🎤 START RECORDING</button>';
             h+='<div id="qsDrillStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
             h+='<div id="qsDrillResult" style="margin-top:12px;"></div>';
             h+='</div></div>';
@@ -33924,27 +33964,31 @@ Return ONLY this JSON (no markdown, no code blocks):
             return {base64:btoa(binary), buffer:wb};
         }
 
-        async function qsDrillSubmit(blob,mimeType,drillText,drillId){
-            var statusEl=document.getElementById('qsDrillStatus');
-            var resultEl=document.getElementById('qsDrillResult');
+        async function qsBonusSubmit(blob,mimeType){
+            var statusEl=document.getElementById('qsBonusStatus');
+            var resultEl=document.getElementById('qsBonusResult');
+            var expectedKorean=qs.bonusKorean||'';
             try{
-                statusEl.textContent='⏳ Uploading...';
-                // Upload audio
+                statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Uploading...</div>';
                 var ext=mimeType.includes('mp4')?'mp4':'webm';
-                var path='quiz_game_audio/'+qs.sessionId+'/drill_'+qs.playerId+'_'+drillId+'.'+ext;
+                var path='quiz_game_audio/'+qs.sessionId+'/bonus_'+qs.playerId+'_'+(qs.bonusRound||0)+'_'+Date.now()+'.'+ext;
                 var ref=firebase.storage().ref().child(path);
                 await ref.put(blob,{contentType:mimeType});
                 var audioUrl=await ref.getDownloadURL();
 
                 // Write pending submission
-                var subRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection('drill_submissions').add({
-                    playerId:qs.playerId,playerName:qs.playerName,emoji:(typeof qs.playerEmoji==="number"&&typeof emojis!=="undefined"?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel,drillId:drillId,drillText:drillText,
-                    audioUrl:audioUrl,score:0,feedback:'',status:'grading',
-                    submittedAt:firebase.firestore.FieldValue.serverTimestamp()
+                var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
+                    playerId:qs.playerId,playerName:qs.playerName,
+                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel,round:qs.bonusRound,
+                    audioUrl:audioUrl,transcript:'',score:0,gradeScore:0,feedback:'',
+                    expectedKorean:expectedKorean,isBonus:true,
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
+                    status:'grading'
                 });
 
-                statusEl.textContent='🔍 Analyzing pronunciation...';
+                statusEl.innerHTML='<div style="font-size:11px;color:#888;">🔍 Grading...</div>';
 
                 // Convert to WAV
                 var wav=await convertBlobToWav(blob);
@@ -34241,6 +34285,161 @@ Return ONLY this JSON (no markdown, no code blocks):
             qs.viewingBonus=false;
             qsFlushPending();
         }
+
+        async function qsDrillSubmit(blob,mimeType,drillText,drillId){
+            var statusEl=document.getElementById('qsDrillStatus');
+            var resultEl=document.getElementById('qsDrillResult');
+            var expectedKorean=drillText||'';
+            try{
+                statusEl.textContent='⏳ Uploading...';
+                var ext=mimeType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/drill_'+qs.playerId+'_'+drillId+'.'+ext;
+                var ref=firebase.storage().ref().child(path);
+                await ref.put(blob,{contentType:mimeType});
+                var audioUrl=await ref.getDownloadURL();
+
+                var subRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection('drill_submissions').add({
+                    playerId:qs.playerId,playerName:qs.playerName,
+                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel,drillId:drillId,drillText:drillText,
+                    audioUrl:audioUrl,score:0,feedback:'',status:'grading',
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                statusEl.textContent='🔍 Analyzing pronunciation...';
+                var wav=await convertBlobToWav(blob);
+                var wavBase64=wav.base64;
+                var wb=wav.buffer;
+
+                var phonetic=expectedKorean;
+                var phonemeResult=null;
+                var azureResult=null;
+
+                try{
+                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
+                        method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({text:expectedKorean})
+                    });
+                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)phonetic=g2pData.pronunciation;}
+                }catch(e){}
+
+                var azurePromise=fetch(AZURE_PRON_URL+'/assess',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
+                }).then(function(r){return r.ok?r.json():null;}).then(function(d){
+                    if(d&&typeof d.pronunciation==='number'&&!d.error) return d; return null;
+                }).catch(function(){return null;});
+
+                var phFd=new FormData();
+                phFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                phFd.append('phonetic_hangul',phonetic);
+                phFd.append('original_text',expectedKorean);
+                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFd})
+                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+
+                var parallel=await Promise.all([azurePromise,sttPromise]);
+                azureResult=parallel[0];
+                phonemeResult=parallel[1];
+
+                var phonemeInfo='';
+                if(azureResult){
+                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT:\n';
+                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100\n';
+                    if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
+                    if(azureResult.words&&azureResult.words.length>0){
+                        var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
+                        if(errW.length>0) phonemeInfo+='- FLAGGED: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+')';}).join(', ')+'\n';
+                        else phonemeInfo+='- All words correct per Azure.\n';
+                    }
+                }
+                if(phonemeResult){
+                    phonemeInfo+='\n\nGOOGLE STT:\n';
+                    if(phonemeResult.transcript) phonemeInfo+='- Heard: "'+phonemeResult.transcript+'"\n';
+                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
+                        phonemeResult.errors.forEach(function(err){
+                            if(err.type==='substitution')phonemeInfo+='  \u2022 Expected '+err.expected+' heard '+err.actual+'\n';
+                            else if(err.type==='deletion')phonemeInfo+='  \u2022 Missing: '+err.expected+'\n';
+                            else if(err.type==='insertion')phonemeInfo+='  \u2022 Extra: '+err.actual+'\n';
+                        });
+                    }
+                }
+
+                var consonantRules='CONSONANT RULES:\n- \u3131,\u3137,\u3142,\u3145,\u3148: aspirated \u2014 big puff of air\n- \u314a,\u314b,\u314c,\u314d: less air than aspirated\n- \u3132,\u3138,\u3143,\u3146,\u3149: tensed \u2014 no air, engage throat\n- \u3134 sounds like ND (as in "aND I")\n- \u3141 sounds like MB (as in "siMBa")\n- \u3139: tap tongue on roof of mouth (double \u3139 = English L)\nNEVER use the word "soft" or "hard". Describe errors in terms of air and throat.\n';
+
+                var gptPrompt='You are a Korean pronunciation coach. The student recorded themselves saying:\n'+'"'+expectedKorean+'"\n'+'(phonetic: "'+phonetic+'")\n'+phonemeInfo+'\n'+consonantRules+'\nGive a score 0-100 and brief feedback (2-3 sentences max). Focus only on real errors. If score >= 80 just give encouragement.\nReply ONLY as JSON: {"score":85,"transcript":"what you heard","feedback":"your feedback"}';
+
+                var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        messages:[{role:'user',content:[
+                            {type:'text',text:gptPrompt},
+                            {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
+                        ]}],
+                        model:'gpt-4o-audio-preview',max_tokens:400,temperature:0.1
+                    })
+                });
+                var gptData=await gptResp.json();
+                var gptRaw='';
+                if(gptData.data&&typeof gptData.data==='string')gptRaw=gptData.data;
+                else if(gptData.choices&&gptData.choices[0]){var gm=gptData.choices[0].message||gptData.choices[0];gptRaw=gm.content||(gm.audio&&gm.audio.transcript)||'';}
+                else gptRaw=JSON.stringify(gptData);
+                gptRaw=gptRaw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+                var gptMatch=gptRaw.match(/\{[\s\S]*\}/);
+                var grade={score:0,transcript:'',feedback:''};
+                try{grade=JSON.parse(gptMatch?gptMatch[0]:gptRaw);}catch(e){}
+                var gptScore=typeof grade.score==='number'?grade.score:0;
+
+                var finalScore=gptScore;
+                var sttWB=0,gptWB=1,azureAllClear=false;
+                if(phonemeResult&&phonemeResult.transcript&&phonemeResult.transcript.trim()&&typeof phonemeResult.score==='number'){
+                    var azFlagged=azureResult?(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}):null;
+                    azureAllClear=azureResult&&azFlagged&&azFlagged.length===0;
+                    sttWB=azureAllClear?0.1:0.25; gptWB=azureAllClear?0.9:0.75;
+                    finalScore=Math.round(phonemeResult.score*sttWB+gptScore*gptWB);
+                }
+                var points=Math.round(finalScore/10);
+
+                var phonemeErrorSummary=[];
+                if(phonemeResult&&phonemeResult.errors){
+                    phonemeResult.errors.forEach(function(err){
+                        if(err.type==='substitution')phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
+                        else if(err.type==='deletion')phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
+                        else if(err.type==='insertion')phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
+                    });
+                }
+                if(phonemeErrorSummary.length===0&&grade.feedback&&finalScore<95){
+                    phonemeErrorSummary=extractGptErrors(grade.feedback,expectedKorean,phonetic);
+                }
+                var azureFlaggedWords=[];
+                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')azureFlaggedWords.push(w.word);});}
+
+                await subRef.update({
+                    transcript:grade.transcript||'',score:finalScore,gradeScore:finalScore,
+                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,
+                    azureFlaggedWords:azureFlaggedWords,status:'graded'
+                });
+
+                qs.isBusy=false;
+                var scoreColor=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
+                var rh='<div style="background:rgba(0,0,0,0.5);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';">'+finalScore+'%</div>';
+                rh+='</div>';
+                if(grade.feedback){
+                    rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
+                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
+                }
+                if(resultEl)resultEl.innerHTML=rh;
+                statusEl.textContent='';
+                var drillBtn=document.getElementById('qsDrillRecBtn');
+                if(drillBtn)drillBtn.style.display='none';
+            }catch(e){
+                console.error('Drill submit error:',e);
+                statusEl.textContent='❌ Error: '+e.message;
+                qs.isBusy=false;
+            }
+        }
+
 
         function qsFlushPending(){
             if(qs.pendingStatus && !qs.isBusy){
