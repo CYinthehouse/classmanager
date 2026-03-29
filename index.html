@@ -9593,6 +9593,12 @@
                     btn.style.borderColor = '#39ff14';
                 }
 
+                // Parse whichever response has leaderboard data (novice = index 0)
+                return responses[0].json().catch(function(){ return {}; });
+            })
+            .then(function(data) {
+                showTRLeaderboard(data);
+
                 setTimeout(function() {
                     if (btn) {
                         btn.disabled = false;
@@ -32489,15 +32495,21 @@ Return ONLY this JSON (no markdown, no code blocks):
         async function qsTevSaveGameSummary(){
             if(!qs.tevelloUser||!qs.sessionId)return;
             try{
-                // Fetch all this user's graded submissions from the session
-                var allSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).where('playerId','==',qs.playerId).where('status','==','graded').get();
+                // Bug fix: dedup — skip if already saved for this session
+                var existingSnap=await db.collection(TEVELLO_GAME_HISTORY)
+                    .where('tevelloId','==',qs.tevelloUser.id)
+                    .where('sessionId','==',qs.sessionId).limit(1).get();
+                if(!existingSnap.empty)return; // already saved, don't duplicate
+
+                // Bug fix: use tevelloId (reliable across rejoins) not playerId
+                var allSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB)
+                    .where('tevelloId','==',qs.tevelloUser.id).where('status','==','graded').get();
                 var scores=[];
                 var wordFreqMap={};
                 allSubs.forEach(function(doc){
                     var d=doc.data();
                     if(typeof d.gradeScore==='number'){
                         scores.push(d.gradeScore);
-                        // Use Azure-flagged full words, deduplicated per submission
                         if(d.azureFlaggedWords&&d.azureFlaggedWords.length>0){
                             var seen={};
                             d.azureFlaggedWords.forEach(function(w){
@@ -32508,14 +32520,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 });
                 if(scores.length===0)return;
                 var avg=Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
-                // Sort by frequency, take top 3
                 var topErrors=Object.keys(wordFreqMap).sort(function(a,b){return wordFreqMap[b]-wordFreqMap[a];}).slice(0,3).map(function(k){return{error:k,count:wordFreqMap[k]};});
 
-                // Get current date info
                 var now=new Date();
                 var estStr=now.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
                 var parts=estStr.split('/');
-                var dateStr=parts[2]+'-'+parts[0]+'-'+parts[1]; // YYYY-MM-DD
+                var dateStr=parts[2]+'-'+parts[0]+'-'+parts[1];
 
                 await db.collection(TEVELLO_GAME_HISTORY).add({
                     tevelloId:qs.tevelloUser.id,
@@ -32566,48 +32576,50 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(games.length===0){
                     h+='<div style="text-align:center;padding:30px;"><div style="font-size:13px;color:#888;">No game history yet. Play some rounds to see your stats!</div></div>';
                 } else {
-                    // Group games by week (Mon-Sun)
-                    var weeks={};
+                    // Group games by month (YYYY-MM)
+                    var months={};
                     games.forEach(function(g){
-                        var d=new Date(g.date+'T12:00:00');
-                        // Get Monday of that week
-                        var day=d.getDay();
-                        var diff=d.getDate()-day+(day===0?-6:1);
-                        var monday=new Date(d);
-                        monday.setDate(diff);
-                        var weekKey=monday.toISOString().slice(0,10);
-                        if(!weeks[weekKey])weeks[weekKey]={games:[],monday:monday};
-                        weeks[weekKey].games.push(g);
+                        var mk=(g.date||'').slice(0,7); // YYYY-MM
+                        if(!mk) return;
+                        if(!months[mk])months[mk]={games:[]};
+                        months[mk].games.push(g);
                     });
-
-                    var weekKeys=Object.keys(weeks).sort();
+                    var monthKeys=Object.keys(months).sort();
                     var chartData=[];
+                    var MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-                    // 1. WEEKLY AVERAGES TABLE
+                    // 0. ALL-TIME AVERAGE
+                    var allAvgScores=[];
+                    games.forEach(function(g){if(typeof g.avgScore==='number')allAvgScores.push(g.avgScore);});
+                    var allTimeAvg=allAvgScores.length?Math.round(allAvgScores.reduce(function(a,b){return a+b;},0)/allAvgScores.length):0;
+                    var atColor=allTimeAvg>=80?'#00ff88':allTimeAvg>=50?'#FFD700':'#ff4444';
+                    h+='<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">';
+                    h+='<div><div style="'+psFont+';font-size:8px;color:#888;margin-bottom:4px;">ALL-TIME AVERAGE</div>';
+                    h+='<div style="font-size:11px;color:#aaa;">'+allAvgScores.length+' game'+(allAvgScores.length!==1?'s':'')+' total</div></div>';
+                    h+='<div style="'+psFont+';font-size:22px;color:'+atColor+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;">'+allTimeAvg+'%</div>';
+                    h+='</div>';
+
+                    // 1. MONTHLY AVERAGES TABLE
                     h+='<div style="margin-bottom:24px;">';
-                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">📈 WEEKLY AVERAGES</div>';
-
-                    weekKeys.forEach(function(wk,wi){
-                        var w=weeks[wk];
-                        var mon=w.monday;
-                        var sun=new Date(mon);sun.setDate(mon.getDate()+6);
-                        var dateLabel=(mon.getMonth()+1)+'/'+mon.getDate();
+                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">📈 MONTHLY AVERAGES</div>';
+                    monthKeys.forEach(function(mk,mi){
+                        var m=months[mk];
+                        var parts=mk.split('-');
+                        var monthLabel=MONTH_NAMES[parseInt(parts[1],10)-1]+' '+parts[0];
                         var allScores=[];
-                        w.games.forEach(function(g){allScores.push(g.avgScore);});
-                        var weekAvg=Math.round(allScores.reduce(function(a,b){return a+b;},0)/allScores.length);
-                        var sc=weekAvg>=80?'#00ff88':weekAvg>=50?'#FFD700':'#ff4444';
-                        chartData.push({week:wi+1,label:dateLabel,avg:weekAvg});
-
+                        m.games.forEach(function(g){if(typeof g.avgScore==='number')allScores.push(g.avgScore);});
+                        var monthAvg=allScores.length?Math.round(allScores.reduce(function(a,b){return a+b;},0)/allScores.length):0;
+                        var sc=monthAvg>=80?'#00ff88':monthAvg>=50?'#FFD700':'#ff4444';
+                        chartData.push({idx:mi+1,label:monthLabel.slice(0,3),avg:monthAvg});
                         h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;margin-bottom:6px;border-left:3px solid '+sc+';">';
-                        h+='<div><span style="color:#ccc;font-size:13px;font-weight:600;">'+dateLabel+'</span>';
-                        h+='<span style="color:#888;font-size:11px;margin-left:8px;">Week '+(wi+1)+'</span>';
-                        h+='<span style="color:#666;font-size:10px;margin-left:8px;">('+w.games.length+' game'+(w.games.length>1?'s':'')+')</span></div>';
-                        h+='<div style="'+psFont+';font-size:12px;color:'+sc+';">'+weekAvg+'%</div>';
+                        h+='<div><span style="color:#ccc;font-size:13px;font-weight:600;">'+monthLabel+'</span>';
+                        h+='<span style="color:#666;font-size:10px;margin-left:8px;">('+m.games.length+' game'+(m.games.length>1?'s':'')+')</span></div>';
+                        h+='<div style="'+psFont+';font-size:12px;color:'+sc+';">'+monthAvg+'%</div>';
                         h+='</div>';
                     });
                     h+='</div>';
 
-                    // 2. MINI CHART (CSS bar chart)
+                    // 2. MINI CHART (CSS bar chart — monthly)
                     if(chartData.length>1){
                         h+='<div style="margin-bottom:24px;">';
                         h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">📉 PROGRESS</div>';
@@ -32618,31 +32630,29 @@ Return ONLY this JSON (no markdown, no code blocks):
                             h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">';
                             h+='<div style="font-size:9px;color:#ccc;'+psFont+';">'+cd.avg+'</div>';
                             h+='<div style="width:100%;height:'+pct+'%;max-height:100px;background:linear-gradient(180deg,'+bc+','+bc+'44);border-radius:4px 4px 0 0;min-height:4px;"></div>';
-                            h+='<div style="font-size:8px;color:#888;">W'+cd.week+'</div>';
+                            h+='<div style="font-size:8px;color:#888;">'+cd.label+'</div>';
                             h+='</div>';
                         });
                         h+='</div></div>';
                     }
 
-                    // 3. TOP STRUGGLES PER WEEK
+                    // 3. TOP STRUGGLES PER MONTH
                     h+='<div>';
-                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">🔤 TOP STRUGGLES BY WEEK</div>';
-                    weekKeys.forEach(function(wk,wi){
-                        var w=weeks[wk];
-                        var mon=w.monday;
-                        var dateLabel=(mon.getMonth()+1)+'/'+mon.getDate();
-                        // Aggregate all errors for this week
-                        var weekErrors={};
-                        w.games.forEach(function(g){
+                    h+='<div style="'+psFont+';font-size:9px;color:#FFD700;'+ts+';margin-bottom:12px;">🔤 TOP STRUGGLES BY MONTH</div>';
+                    monthKeys.forEach(function(mk){
+                        var m=months[mk];
+                        var parts=mk.split('-');
+                        var monthLabel=MONTH_NAMES[parseInt(parts[1],10)-1]+' '+parts[0];
+                        var monthErrors={};
+                        m.games.forEach(function(g){
                             if(g.topErrors){
-                                g.topErrors.forEach(function(e){weekErrors[e.error]=(weekErrors[e.error]||0)+e.count;});
+                                g.topErrors.forEach(function(e){monthErrors[e.error]=(monthErrors[e.error]||0)+e.count;});
                             }
                         });
-                        var sorted=Object.keys(weekErrors).sort(function(a,b){return weekErrors[b]-weekErrors[a];}).slice(0,3);
-
+                        var sorted=Object.keys(monthErrors).sort(function(a,b){return monthErrors[b]-monthErrors[a];}).slice(0,3);
                         h+='<div style="padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:6px;">';
                         h+='<div style="display:flex;justify-content:space-between;margin-bottom:4px;">';
-                        h+='<span style="color:#ccc;font-size:12px;font-weight:600;">'+dateLabel+' — Week '+(wi+1)+'</span></div>';
+                        h+='<span style="color:#ccc;font-size:12px;font-weight:600;">'+monthLabel+'</span></div>';
                         if(sorted.length===0){
                             h+='<div style="font-size:11px;color:#39ff14;">✨ No errors recorded!</div>';
                         } else {
@@ -34575,92 +34585,23 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }catch(histErr){console.warn('History fetch error:',histErr);}
                 }
 
-                // ── COIN + ROLL AWARD (once per session, Firestore-verified) ──
-                // Get today's date in EST for gacha gate
+                // ── COIN AWARD: handled by qsAwardCoins() called from qsShowFinished ──
+                // Just read the gacha gate for display here
                 var _nowEst=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
                 var _epParts=_nowEst.split('/');
-                var _todayEst=_epParts[2]+'-'+_epParts[0]+'-'+_epParts[1]; // YYYY-MM-DD
-
-                var coinsToAward=0;
-                var rollsToAward=0;
-                var awardBreakdown=[];
-                var gachaUsedToday=false; // will be set after Firestore read
-
-                if(!qs.coinsAwarded){
-                    // Build what should be awarded for this placement
-                    coinsToAward+=10;
-                    awardBreakdown.push({label:'Participation',coins:10,rolls:1});
-                    rollsToAward+=1;
-                    if(myPlacement===0){
-                        coinsToAward+=30;rollsToAward+=2;
-                        awardBreakdown.push({label:'1st Place \uD83E\uDD47',coins:30,rolls:2});
-                    } else if(myPlacement===1){
-                        coinsToAward+=25;rollsToAward+=1;
-                        awardBreakdown.push({label:'2nd Place \uD83E\uDD48',coins:25,rolls:1});
-                    } else if(myPlacement===2){
-                        coinsToAward+=20;rollsToAward+=1;
-                        awardBreakdown.push({label:'3rd Place \uD83E\uDD49',coins:20,rolls:1});
-                    }
-
-                    if(qs.tevelloUser){
-                        try{
-                            var acctRef=db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id);
-                            var acctSnap=await acctRef.get();
-                            var acctData=acctSnap.exists?acctSnap.data():{};
-
-                            // Check if coins were already awarded for this session
-                            var awardedSessions=acctData.coinsAwardedSessions||[];
-                            var alreadyAwarded=(awardedSessions.indexOf(qs.sessionId)>=0);
-
-                            // Check gacha gate
-                            gachaUsedToday=(acctData.gachaLastUsedDate===_todayEst);
-
-                            if(!alreadyAwarded){
-                                // First time — increment and mark session
-                                await acctRef.update({
-                                    coins: firebase.firestore.FieldValue.increment(coinsToAward),
-                                    gachaRolls: firebase.firestore.FieldValue.increment(rollsToAward),
-                                    coinsAwardedSessions: firebase.firestore.FieldValue.arrayUnion(qs.sessionId)
-                                });
-                                // Re-read for display totals
-                                var acctSnap2=await acctRef.get();
-                                var acctData2=acctSnap2.exists?acctSnap2.data():{};
-                                qs.tevelloUser.coins=typeof acctData2.coins==='number'?acctData2.coins:coinsToAward;
-                                qs.tevelloUser.gachaRolls=typeof acctData2.gachaRolls==='number'?acctData2.gachaRolls:rollsToAward;
-                            } else {
-                                // Already awarded this session — just show stored totals
-                                qs.tevelloUser.coins=typeof acctData.coins==='number'?acctData.coins:0;
-                                qs.tevelloUser.gachaRolls=typeof acctData.gachaRolls==='number'?acctData.gachaRolls:0;
-                                coinsToAward=0; // don't double-display in breakdown
-                                rollsToAward=0;
-                                // Still show the breakdown for what they earned originally
-                                // (awardBreakdown built above is kept for display)
-                            }
-                        }catch(coinErr){
-                            console.warn('Award save error:',coinErr);
-                            // If Firestore fails, fall back to in-memory flag
+                var _todayEst=_epParts[2]+'-'+_epParts[0]+'-'+_epParts[1];
+                var gachaUsedToday=qs.gachaUsedToday||false;
+                if(qs.tevelloUser&&!qs.gachaDayChecked){
+                    try{
+                        var acctSnap3=await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).get();
+                        if(acctSnap3.exists){
+                            gachaUsedToday=(acctSnap3.data().gachaLastUsedDate===_todayEst);
+                            qs.gachaUsedToday=gachaUsedToday;
+                            qs.gachaDayChecked=true;
                         }
-                    }
-
-                    qs.coinsAwarded=true;
-                    qs.coinsEarned=coinsToAward;
-                    qs.gachaRolls=rollsToAward;
-                    qs.awardBreakdown=awardBreakdown.slice();
-                    qs.gachaUsedToday=gachaUsedToday;
-                } else {
-                    // Already awarded this session (in-memory flag) — just check gacha gate from Firestore
-                    gachaUsedToday=qs.gachaUsedToday||false;
-                    if(qs.tevelloUser && !qs.gachaDayChecked){
-                        try{
-                            var acctSnap3=await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).get();
-                            if(acctSnap3.exists){
-                                gachaUsedToday=(acctSnap3.data().gachaLastUsedDate===_todayEst);
-                                qs.gachaUsedToday=gachaUsedToday;
-                                qs.gachaDayChecked=true;
-                            }
-                        }catch(e){}
-                    }
+                    }catch(e){}
                 }
+                var awardBreakdown=qs.awardBreakdown||[];
 
                 // Fetch submissions from the selected session
                 // Use tevelloId if available (more reliable across sessions), else playerId
@@ -34704,36 +34645,31 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(155,89,182,0.08));border:2px solid #FFD700;border-radius:14px;padding:18px 16px;margin-bottom:18px;text-align:center;">';
                 h+='<div style="font-size:28px;margin-bottom:6px;">\uD83C\uDF9F\uFE0F</div>';
                 h+='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:12px;">REWARDS EARNED</div>';
-                // Column headers
-                h+='<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:4px 12px;margin-bottom:4px;">';
-                h+='<span style="font-size:9px;color:#888;text-align:left;"></span>';
-                h+='<span style="font-size:9px;color:#888;text-align:center;min-width:52px;">\uD83E\uDE99 Coins</span>';
-                h+='<span style="font-size:9px;color:#888;text-align:center;min-width:52px;">\uD83C\uDFB0 Rolls</span>';
-                h+='</div>';
-                // Breakdown rows — use saved breakdown on revisit
+                // Breakdown rows — coins only, no rolls column
                 var renderBreakdown=awardBreakdown.length>0?awardBreakdown:qs.awardBreakdown;
                 renderBreakdown.forEach(function(row){
-                    h+='<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 12px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:8px;">';
-                    h+='<span style="font-size:12px;color:#ddd;text-align:left;">'+escapeHtml(row.label)+'</span>';
-                    h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;text-align:center;min-width:52px;">+'+row.coins+'</span>';
-                    h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#c4a0e8;text-align:center;min-width:52px;">+'+row.rolls+'</span>';
+                    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:8px;">';
+                    h+='<span style="font-size:12px;color:#ddd;">'+escapeHtml(row.label)+'</span>';
+                    h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;">+'+row.coins+' \uD83E\uDE99</span>';
                     h+='</div>';
                 });
                 // Totals row
-                h+='<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;border-top:1px solid rgba(255,215,0,0.3);margin-top:8px;padding:8px 12px 0;">';
-                h+='<span style="font-family:\'Press Start 2P\';font-size:8px;color:#ccc;text-align:left;">TOTAL</span>';
-                h+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;min-width:52px;">+'+qs.coinsEarned+'</span>';
-                h+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:#c4a0e8;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;min-width:52px;">'+qs.gachaRolls+'x</span>';
+                h+='<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,215,0,0.3);margin-top:8px;padding:8px 12px 0;">';
+                h+='<span style="font-family:\'Press Start 2P\';font-size:8px;color:#ccc;">EARNED THIS GAME</span>';
+                h+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+qs.coinsEarned+' \uD83E\uDE99</span>';
                 h+='</div>';
-                // Running totals / login nudge
+                // Running total / login nudge
                 if(qs.tevelloUser){
                     var tc=typeof qs.tevelloUser.coins==='number'?qs.tevelloUser.coins:'?';
-                    var tr=typeof qs.tevelloUser.gachaRolls==='number'?qs.tevelloUser.gachaRolls:'?';
-                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Total: <span style="color:#FFD700;font-weight:700;">'+tc+' \uD83E\uDE99</span> &nbsp;|&nbsp; <span style="color:#c4a0e8;font-weight:700;">'+tr+' rolls</span></div>';
+                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Total coins: <span style="color:#FFD700;font-weight:700;">'+tc+' \uD83E\uDE99</span></div>';
                 } else {
-                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Log in to save your coins &amp; rolls permanently!</div>';
+                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Log in to save your coins permanently!</div>';
                 }
                 // Gacha button — gated: once per calendar day (EST)
+                // Use stored total rolls (from Firestore) not just session-earned rolls
+                var gachaRollsAvailable=qs.tevelloUser?
+                    (typeof qs.tevelloUser.gachaRolls==='number'?qs.tevelloUser.gachaRolls:qs.gachaRolls):
+                    qs.gachaRolls;
                 h+='<div style="margin-top:14px;">';
                 if(gachaUsedToday){
                     h+='<div style="background:rgba(155,89,182,0.08);border:2px solid rgba(155,89,182,0.3);border-radius:10px;padding:12px 16px;text-align:center;">';
@@ -34741,8 +34677,14 @@ Return ONLY this JSON (no markdown, no code blocks):
                     h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#c4a0e8;margin-bottom:4px;">GACHA USED TODAY</div>';
                     h+='<div style="font-size:11px;color:#888;">Come back tomorrow for more rolls!</div>';
                     h+='</div>';
+                } else if(gachaRollsAvailable<=0){
+                    h+='<div style="background:rgba(155,89,182,0.08);border:2px solid rgba(155,89,182,0.3);border-radius:10px;padding:12px 16px;text-align:center;">';
+                    h+='<div style="font-size:18px;margin-bottom:4px;">\uD83C\uDFB0</div>';
+                    h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#c4a0e8;margin-bottom:4px;">NO ROLLS LEFT</div>';
+                    h+='<div style="font-size:11px;color:#888;">Earn rolls by playing more games!</div>';
+                    h+='</div>';
                 } else {
-                    h+='<button onclick="qsLaunchGacha('+qs.gachaRolls+')" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f,0 -2px 0 #2e0a4f,0 2px 0 #2e0a4f,-2px 0 0 #2e0a4f,2px 0 0 #2e0a4f;padding:14px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:0 0 18px rgba(155,89,182,0.5),rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">\uD83C\uDFB0 UNLEASH YOUR GACHA ('+qs.gachaRolls+'x)</button>';
+                    h+='<button onclick="qsLaunchGacha('+gachaRollsAvailable+')" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f,0 -2px 0 #2e0a4f,0 2px 0 #2e0a4f,-2px 0 0 #2e0a4f,2px 0 0 #2e0a4f;padding:14px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:0 0 18px rgba(155,89,182,0.5),rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">\uD83C\uDFB0 UNLEASH YOUR GACHA ('+gachaRollsAvailable+'x)</button>';
                 }
                 h+='</div>';
                 h+='</div>';
@@ -34858,21 +34800,76 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(btn){btn.innerHTML='&#x1F3A4; HOLD TO PRACTICE';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';}
                     if(statusEl) statusEl.innerHTML='<span style="color:#888;">⏳ Grading...</span>';
                     try{
-                        // Convert + grade with GPT
+                        // Convert blob to WAV
                         var wav=await convertBlobToWav(blob);
-                        var gradePrompt='You are a Korean pronunciation grading assistant.\nThe student was supposed to say: "'+expectedKorean+'"\nListen and grade their pronunciation.\nReply ONLY with JSON: {"score":NUMBER_0_TO_100,"feedback":"short English feedback"}\nBe lenient. 80+ = nearly perfect.';
+                        var wavBase64=wav.base64;
+                        var wb=wav.buffer;
+
+                        // G2PK phonetic form
+                        var pracPhonetic=expectedKorean;
+                        try{
+                            var pracG2p=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:expectedKorean})});
+                            if(pracG2p.ok){var pracG2d=await pracG2p.json();if(pracG2d.pronunciation)pracPhonetic=pracG2d.pronunciation;}
+                        }catch(e2){}
+
+                        // Azure + STT parallel
+                        var pracAzureResult=null,pracPhonemeResult=null;
+                        var pracAzProm=fetch(AZURE_PRON_URL+'/assess',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})})
+                            .then(function(r){return r.ok?r.json():null;}).then(function(d){return(d&&typeof d.pronunciation==='number'&&!d.error)?d:null;}).catch(function(){return null;});
+                        var pracFd=new FormData();
+                        pracFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                        pracFd.append('phonetic_hangul',pracPhonetic);
+                        pracFd.append('original_text',expectedKorean);
+                        var pracSttProm=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:pracFd}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+                        var pracPar=await Promise.all([pracAzProm,pracSttProm]);
+                        pracAzureResult=pracPar[0];pracPhonemeResult=pracPar[1];
+
+                        // Build phonemeInfo for GPT
+                        var pracPhonemeInfo='';
+                        if(pracAzureResult){
+                            pracPhonemeInfo+='\n\nAZURE ASSESSMENT:\n- Accuracy: '+pracAzureResult.accuracy+'/100, Fluency: '+pracAzureResult.fluency+'/100\n';
+                            if(pracAzureResult.transcript)pracPhonemeInfo+='- Azure heard: "'+pracAzureResult.transcript+'"\n';
+                            if(pracAzureResult.words&&pracAzureResult.words.length){
+                                var pracErrW=pracAzureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
+                                pracPhonemeInfo+=pracErrW.length?'- FLAGGED: '+pracErrW.map(function(w){return'"'+w.word+'" ('+w.error_type+')';}).join(', ')+'\n':'- All words correct per Azure.\n';
+                            }
+                        }
+                        if(pracPhonemeResult){
+                            pracPhonemeInfo+='\n\nGOOGLE STT:\n';
+                            if(pracPhonemeResult.transcript)pracPhonemeInfo+='- Google heard: "'+pracPhonemeResult.transcript+'"\n';
+                            if(pracPhonemeResult.errors&&pracPhonemeResult.errors.length){
+                                pracPhonemeResult.errors.forEach(function(err){
+                                    if(err.type==='substitution')pracPhonemeInfo+='  \u2022 Expected '+ph(err.expected)+' heard '+ph(err.actual)+'\n';
+                                    else if(err.type==='deletion')pracPhonemeInfo+='  \u2022 Missing: '+ph(err.expected)+'\n';
+                                    else if(err.type==='insertion')pracPhonemeInfo+='  \u2022 Extra: '+ph(err.actual)+'\n';
+                                });
+                            }
+                        }
+
+                        // GPT grading
+                        var gradePrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using the automated analysis and what you hear.\n\nExpected: "'+expectedKorean+'" (phonetic: "'+pracPhonetic+'")'+pracPhonemeInfo+'\n\nCRITICAL: Detect silence/non-Korean first (score 0). Use phonetic form to judge correctness. Do NOT invent errors. \u3154/\u3150 are identical — never flag. Feedback in English only, max 2-3 bullets using Hangul letters not romanization.\n\nSCORING: 0-10 no speech, 10-40 very hard to understand, 40-60 understandable with errors, 60-75 mostly correct, 75-85 good, 85-95 very accurate, 95-100 perfect.\n\nReply ONLY with JSON: {"score":NUMBER_0_TO_100,"feedback":"bulleted English feedback","transcript":"what you heard"}';
                         var aiResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                             method:'POST',headers:{'Content-Type':'application/json'},
-                            body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gradePrompt},{type:'input_audio',input_audio:{data:wav.base64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:200,temperature:0.1})
+                            body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gradePrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:300,temperature:0.1})
                         });
                         var aiData=await aiResp.json();
                         var rt='';
                         if(aiData.data&&typeof aiData.data==='string')rt=aiData.data;
                         else if(aiData.choices&&aiData.choices[0]){var m2=aiData.choices[0].message||aiData.choices[0];rt=m2.content||(m2.audio&&m2.audio.transcript)||'';}
                         rt=rt.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-                        var grade={score:0,feedback:''};
+                        var grade={score:0,feedback:'',transcript:''};
                         try{var jm=rt.match(/\{[\s\S]*\}/);if(jm)grade=JSON.parse(jm[0]);}catch(pe){}
-                        var sc2=typeof grade.score==='number'?grade.score:0;
+
+                        // Hybrid score: 25% STT / 75% GPT (same as main round)
+                        var gptScore2=typeof grade.score==='number'?grade.score:0;
+                        var finalScore2=gptScore2;
+                        if(pracPhonemeResult&&pracPhonemeResult.transcript&&pracPhonemeResult.transcript.trim()&&typeof pracPhonemeResult.score==='number'){
+                            var azFlagged2=pracAzureResult?(pracAzureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}):null;
+                            var azAllClear2=pracAzureResult&&azFlagged2&&azFlagged2.length===0;
+                            var sttW2=azAllClear2?0.1:0.25,gptW2=azAllClear2?0.9:0.75;
+                            finalScore2=Math.round(pracPhonemeResult.score*sttW2+gptScore2*gptW2);
+                        }
+                        var sc2=finalScore2;
                         var scColor2=sc2>=80?'#00ff88':sc2>=50?'#FFD700':'#ff4444';
                         var improved=sc2>origScore;
                         var statusHtml='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px;">';
@@ -34995,42 +34992,389 @@ Return ONLY this JSON (no markdown, no code blocks):
           "captain_corea|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/6zav3gtnldn6fh8uy04pv/yellow-liger.png?rlkey=nmltqthtpt987ijx6cpxpqv7j&dl=1",
           "captain_corea|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/90glxtp33bqjsvu4kxfn0/yellow-shark.png?rlkey=2y5loyqyjxm6w07wysggjl5s0&dl=1",
           "captain_corea|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/evyvlg73yvp55yrkawoic/yellow-wizard.png?rlkey=zwfmijmcmrhw57v0t2yvm2p7s&dl=1",
-          "fox|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/vkme5a84s9ju5jd6illx6/blue-fox-bella-shoulder.png?rlkey=pp4d6xd0j9zc15r2l54n04e3c&dl=1","fox|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/1ef96utqv83flh1hp0q8d/blue-fox-calvin.png?rlkey=9en4lbckjtg2j1p9dh88l1u5u&dl=1","fox|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/u0m33l9qdoltbs58dk9xk/blue-fox-calvin-slipper.png?rlkey=d9do79yfe69myzx2r17z40olz&dl=1","fox|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/0q37gz19a30cpqyprzm40/blue-fox-cat-paw.png?rlkey=2ceee4wu52iqjj4csxcs3y65x&dl=1","fox|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/fxis16r8wqq5c2ggsfqzf/blue-fox-dog-slipper.png?rlkey=ims73nryr30ju2j03867cjmum&dl=1","fox|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/ynw3cdafw91dhemk1wi61/blue-fox-fan.png?rlkey=vdnza5ra5eljth764dlvm76by&dl=1","fox|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/iwfln7lxzsabz41sy7jm1/blue-fox-frog.png?rlkey=ncj0cq7g2wqb941wmsplho7rq&dl=1","fox|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/pzoubff1tyjec18zx2l60/blue-fox-kigurumi.png?rlkey=86m9p24omg393a888f9alvy27&dl=1","fox|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/4cnw996bgrr4vjh87m3jc/blue-fox-korean.png?rlkey=g12341iw8vz4bhahkurrg1px3&dl=1","fox|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/u0ftcwcxe15v9hgjnw9z0/blue-fox-liger.png?rlkey=d2tpokbrbvzks6d0gaqjpel7v&dl=1","fox|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/44n37v3trhcixx4e92c0h/blue-fox-shark.png?rlkey=c9ltc922x11cam9d54hcnnbjo&dl=1","fox|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/34i1fn6j7bn42ntdhxyyu/blue-fox-wizard.png?rlkey=ell6p6lk5hchg3xvilz2bk3fz&dl=1","fox|green|bella":"https://dl.dropboxusercontent.com/scl/fi/8y6e7uxozd8avq5ygdotd/green-fox-bella-shoulde.png?rlkey=9fmkjoiw3q68usy54nwurqy30&dl=1","fox|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/pa0k60di47vfbm3f1kg2c/green-fox-calvin.png?rlkey=npgxrlmmg5xzeszc47au4aoko&dl=1","fox|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/icbl98y767ke4b7vedhwz/green-fox-calvin-slipper.png?rlkey=6v5bgfekcvp03lnpgo3odkm9&dl=1","fox|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/h09iyyeq50lxi0zp8qrm8/green-fox-paw.png?rlkey=9hko5buhphdao7nl4ipiw8d4x&dl=1","fox|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9suiwj880sgcg6tvyzv4h/green-fox-dog.png?rlkey=kbca8ze8h7h79evli5o3d3nj&dl=1","fox|green|fan":"https://dl.dropboxusercontent.com/scl/fi/889hb280o2zvx5rb929sd/green-fox-fan.png?rlkey=fcxefh16qe92rn9ty2r6iq3io&dl=1","fox|green|frog":"https://dl.dropboxusercontent.com/scl/fi/fn48cnla8udai2u8fw22j/green-fox-frog.png?rlkey=o2n7pcvajww1g8i64m7xaz1u5&dl=1","fox|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/agy707wg7xq3ffvfmp4ah/green-fox-kigu.png?rlkey=42d116ggoa97ujh2b1n2wf8iu&dl=1","fox|green|korean":"https://dl.dropboxusercontent.com/scl/fi/g5tcpdas2ei95ovdaolj9/green-fox-korean.png?rlkey=z9g32xcixpgs2binbaitzmo8m&dl=1","fox|green|liger":"https://dl.dropboxusercontent.com/scl/fi/gvqank2p481ccat44hz5c/green-fox-liger.png?rlkey=7baguhngf4q5qy7qrn2hu1gl0&dl=1","fox|green|shark":"https://dl.dropboxusercontent.com/scl/fi/6n2ycmn0mg4johm79zn4u/green-fox-shark.png?rlkey=ikqo46prjabggovr816wihwcw&dl=1","fox|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/dqu28wrrv0f2qj8mdu0cu/green-fox-wizard.png?rlkey=az2w9he39piznl2hy37fbbaa0&dl=1","fox|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/ll250apztih962dmtuk7v/pink-fox-bella-shoulder.png?rlkey=05scyulst8jo7eswe6tu5bimj&dl=1","fox|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/8bm1jjogpwdeshrudq5dw/pink-calvin-fox.png?rlkey=xmk3o9qar8fuuqvw3p0arjpjp&dl=1","fox|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/9l61oioqrztwb1zrnyear/pink-fox-calvin-slippers.png?rlkey=zdlcdmuo1fwgrfhrzkk4ice2p&dl=1","fox|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/96aeeg07mt7uepyhb6ywa/pink-fox-paw.png?rlkey=9y5m4rr4qyhld1gzlncezuje3&dl=1","fox|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9410xtexhv6pq8pgmpsyp/pink-fox-dog.png?rlkey=iwkrs4c0f3gnko74suz2b27s4&dl=1","fox|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/l2l1v46grvi7tzz9dybxe/pink-fox-fan.png?rlkey=ns78282mo6swa7y4m3d3ppwqv&dl=1","fox|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/av6udwmstd2a2ltji963u/pink-fox-frog.png?rlkey=vsf2t1s4f5is01egkma4ktv4y&dl=1","fox|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/sg3hkuya9kwqe7tm6g8rn/pink-fox-kigu.png?rlkey=iz46xfp2sfk41894vdk0egqx7&dl=1","fox|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/gc92tmt731v7fppnqeha4/pink-fox-korea.png?rlkey=avmxcvsglurgbjx284pz5y93i&dl=1","fox|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/uo4sarfqbypsaq5cp7kyo/pink-fox-liger.png?rlkey=thor0ua5h55r2xsjpb3iwvwup&dl=1","fox|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/6u3v1j8jpqcz6mx4gxvvs/pink-fox-shark.png?rlkey=1fhdrpe5545s7tfto3770gz7d&dl=1","fox|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/c5oobps88gxwvqyj8xr58/pink-fox-wizard.png?rlkey=osxcdks4rtg9t3agn90stgtet&dl=1","fox|red|bella":"https://dl.dropboxusercontent.com/scl/fi/m8sns5gqjd4dfgei7wb33/red-fox-bella-shoulder.png?rlkey=vbfxn6mk51u9vdd5v6wqt2era&dl=1","fox|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/h685lfsk1jhzedxskbl16/red-fox-calvin.png?rlkey=s9608swd924a6gqwee2u4shat&dl=1","fox|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/kqpdcrczxpjcyxv3abug6/red-fox-calvin-slipper.png?rlkey=6x5zjn7rr2lbi7gbjg9q9zagn&dl=1","fox|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/psyk1a3unnhsmfxerx8e5/red-fox-paws.png?rlkey=0tl83v4lcx4vs37w1dfghbzld&dl=1","fox|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/ibufk4iyrqr583vldjny0/red-fox-dog.png?rlkey=hgcd44okp2fl7mjlziycztriw&dl=1","fox|red|fan":"https://dl.dropboxusercontent.com/scl/fi/mb2kno3kog4mr5et3fpt0/red-fox-fan.png?rlkey=20bfjpixlyh61f7bsl2j2b9ka&dl=1","fox|red|frog":"https://dl.dropboxusercontent.com/scl/fi/5mwq84om1rk1gagafnb39/red-fox-frog.png?rlkey=853lwo36hcez5gyl3m0xldk4h&dl=1","fox|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/winced2inecdxn775a5y2/red-fox-kigu.png?rlkey=aiz2vkh1or3nu79bm22ovakop&dl=1","fox|red|korean":"https://dl.dropboxusercontent.com/scl/fi/cnzm3bu4eew1iftrfniyn/red-fox-korean.png?rlkey=3msugen3pk85n3i955xmcxazz&dl=1","fox|red|liger":"https://dl.dropboxusercontent.com/scl/fi/aiw34fl72f2mn2pqcxk4d/red-fox-liger.png?rlkey=dl4hhdcrjzd0ghj2pjb7aqa19&dl=1","fox|red|shark":"https://dl.dropboxusercontent.com/scl/fi/eelj47ipadd0z82qb2xnn/red-fox-shark.png?rlkey=fs58fpl7xsssyyik7qgzt3g32&dl=1","fox|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/42w8hc1ix9ds1vl4g368f/red-fox-wizard.png?rlkey=froa5nn0yhypanu88v86vve16&dl=1","fox|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/k3klg9dk6u3f196qe0lx6/silver-fox-bella.png?rlkey=g1t7f2q71wil4zt8ny5t7govl&dl=1","fox|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/18sn6cnj34rpsqyelvzvj/silver-calvin-fox.png?rlkey=182gn0jmz8genxfnz9oq90fdr&dl=1","fox|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/3sne4rp29uuiv24y34bp0/silver-fox-calvin-slippers.png?rlkey=1kytdj22fmv2a4smlpahmnt7e&dl=1","fox|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/6hc4od80dkmtji4vlym6w/silver-fox-paws.png?rlkey=0ofv3xgy5oze2j35d73i1yywf&dl=1","fox|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/igmqa6sevhxggvy9f5f2c/silver-fox-dog.png?rlkey=vpsxy9qitjo9m017jg8tyj9n9&dl=1","fox|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/tm34nmkl95dgtbaal0hvl/silver-fox-fan.png?rlkey=43wh819zi022n2lu1dbvd9cjo&dl=1","fox|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/0650tue1oy1orofecfxq1/silver-fox-frog.png?rlkey=ww0sgddjb8xvmrxiu04h0xjxn&dl=1","fox|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/bdepqqh45jkf2f89nxk1x/silver-fox-kigu.png?rlkey=84u7og5ry03tzig4abps7hry4&dl=1","fox|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/6utsd3s688p5j2jf1iz0l/silver-fox-korea.png?rlkey=23abphlyi0ryhu93skdskfgrz&dl=1","fox|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/2q0sl2sjrdj8ero7ufodd/silver-fox-liger.png?rlkey=3m20p5ypy6ibl6konfk6ek8fc&dl=1","fox|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/2vnxeo47sx5ldauew8g15/silver-fox-shark.png?rlkey=gy5pz9sdxw8167o155cbmkgyo&dl=1","fox|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/k6fhinqtwwfkwpawx0quy/silver-fox-wizard.png?rlkey=ogt39m3e6zpnu1lzka8j0gggx&dl=1","fox|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/xoordtl4k30680xqq9w1z/yellow-fox-bella-shoulder.png?rlkey=rxrldmc4k1vl23jctfq9hvoym&dl=1","fox|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/evj30hjjv76ruvd7dh9o3/yellow-fox-calvin.png?rlkey=ga4482rtk66ljrffb114kkyi3&dl=1","fox|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/ssyr88nm6m6fqfbnpfuzc/yellow-fox-calvin-slipper.png?rlkey=ys0a6pb4h58yuq709sd2uxdyw&dl=1","fox|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5yd0rsn6pxylquujauznz/yellow-fox-paw.png?rlkey=hj5s2itxomqcz5l3jsqb7bjav&dl=1","fox|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/vaxxn0mft0lynnozimofp/yellow-fox-dog.png?rlkey=p2r0wdjg8pz8ueiwhemj7h2fd&dl=1","fox|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/o0aysy6esrjoonwkkr6pk/yellow-fox-fan.png?rlkey=rspgvxgrnhz2lhd6frkpcmkqr&dl=1","fox|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/b7wnlksv7ox0vcuchfr19/yellow-fox-frog.png?rlkey=htv7hkauau0yqfph0tyqkec0z&dl=1","fox|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/crkw2zp0at80pkqwf8nw0/yellow-fox-kigu.png?rlkey=38gscj8wtp6060anupkfrb0o7&dl=1","fox|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/7ct5a49q7lvorzui5pzha/yellow-fox-korean.png?rlkey=bk4zmwksvt6797g09bcbqhyvx&dl=1","fox|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/bbkni2wxxr0u7qcn68597/yellow-fox-liger.png?rlkey=tyvkc7jk3r96xvhv008wedj20&dl=1","fox|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/7iz4x0akg7s5vlsiuo1s0/yellow-fox-shark.png?rlkey=3g762hu8igxo5h5knxh3obbki&dl=1","fox|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/jk7ln84qhy6vmqv3wq04n/yellow-fox-wizard.png?rlkey=49e92gjfq2f7np669elkyuw8u&dl=1",
-          "pola_cola|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/vkjxt7ea9ykc3aqmopkgi/blue-calvin-bear.png?rlkey=qgfv7qn5prmwdoc2zgxmk7qvw&dl=1","pola_cola|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/xyphdl8xm8kk6w48om1zo/blue-calvin-slippers.png?rlkey=4geyitrhhjzbm69ynsjj5p20b&dl=1","pola_cola|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/vvyt5nak3v7crejfgn4l6/blue-bear-paws.png?rlkey=7f2buts7ja5wr36wzyrkf2rvo&dl=1","pola_cola|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/meibmnvngn50ff8yodcuo/blue-dog.png?rlkey=m4bdxrucko3sxsmr40mwsd9ks&dl=1","pola_cola|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/xrx1xeusth6dia5tiscrg/blue-bear-fan.png?rlkey=1m3ruw7wwcbf6jjdg2iz4ng3d&dl=1","pola_cola|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/mbkahut8adm0uqa9tzt06/blue-frog-bear.png?rlkey=ixzvdkljk5tr05vfpjnm8yf8b&dl=1","pola_cola|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/uemit00ojanc9y37zajzt/blue-bear-kigu.png?rlkey=xt238leibdffrtvuly18hcnm4&dl=1","pola_cola|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/stnj9vzv9eqn69h9x3jzx/blue-bear-korean.png?rlkey=jm63flm7iw2v27n5o8l18gfjm&dl=1","pola_cola|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/1yckoo8hqt3sspzx58d4o/blue-liger-bear.png?rlkey=39sosykvi194bfbkwzvlqb2v4&dl=1","pola_cola|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/5i56ihouxsppw90b4bqn8/blue-shark-bear.png?rlkey=twss5k1w9dqz85hetatryysn0&dl=1","pola_cola|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/u2sgjo8jfcaadep0fsc3z/blue-wizard-bear.png?rlkey=n0dl9bllyym3g3l2gv2fdzce4&dl=1","pola_cola|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/ar26u0ayv5482xpiep44n/green-calvin-bear.png?rlkey=7hu6e4lt2bt84253bd53yj62g&dl=1","pola_cola|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/bhgci07f67wgdsuw4j9h3/green-slippers.png?rlkey=krnsi257b94iwf6e5qing44hr&dl=1","pola_cola|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/62wvo1jyknk3x21twbbyb/green-cat.png?rlkey=d9wku0tf26six7xpcaac54l06&dl=1","pola_cola|green|fan":"https://dl.dropboxusercontent.com/scl/fi/naxry80k0zcsfyl7sfiv0/green-bear-fan.png?rlkey=alz3d333bn67rru4yt8ks3sm3&dl=1","pola_cola|green|frog":"https://dl.dropboxusercontent.com/scl/fi/d6x1ly02lrqdqv8bd1ed3/green-frog-bear.png?rlkey=ax375eq34dsuvo12i3kt9tthi&dl=1","pola_cola|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/y6nhcurkn9asum0hoegqk/green-bear-kigu.png?rlkey=6ip28i27tetgcpkvm68c187ka&dl=1","pola_cola|green|korean":"https://dl.dropboxusercontent.com/scl/fi/nx4cygcw6fkly600dttrq/green-bear-korean.png?rlkey=3cfjtfnqpcuuhfhgd6cbmawai&dl=1","pola_cola|green|liger":"https://dl.dropboxusercontent.com/scl/fi/cdntjq5217chhy4q9az5j/green-liger-bear.png?rlkey=49noctbu5rv7lgpie7do95o3p&dl=1","pola_cola|green|shark":"https://dl.dropboxusercontent.com/scl/fi/vo4clpri5i1we20w09dwd/green-shark-bear.png?rlkey=0nj7y9rzbhn5k8o8jg0j58i3k&dl=1","pola_cola|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/rtygevhoj6nofk4lubl82/green-wizard-bear.png?rlkey=17lm872665oebnae342fpuzay&dl=1","pola_cola|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/angybecon0bt1v2jgzzaj/pink-calvin-bear.png?rlkey=mgwcba3m3wot5mo1s9dobdykc&dl=1","pola_cola|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/50rhxgdfxbdlojiywwhhn/pink-bear-calvin-slippers.png?rlkey=gib0i77ywo769ya7be9ube649&dl=1","pola_cola|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/b61iin9w9n43ab6l9poz2/pink-bear-paws.png?rlkey=gwubisqntklgwwsbnoy2ck5v2&dl=1","pola_cola|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/npvoj1syc1xpbrdv17y88/pink-dog.png?rlkey=ezy0iispuukec1cv6kbo2ak38&dl=1","pola_cola|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/lu6tmead277ebvmg2w9h6/pink-bear-fan.png?rlkey=x756u5vtpq8wd0orte07e7d24&dl=1","pola_cola|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/jtt8s9mnxtjma60sjfyv4/pink-frog-bear.png?rlkey=9r1l99xldu6yk1ec1irgvom3c&dl=1","pola_cola|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/009u3zlk5ann6jemrae0m/pink-bear-kigu.png?rlkey=cvo5bdv387u7ed4t39bighpc0&dl=1","pola_cola|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/1uzcsvxhz4tocakpz3ulz/pink-bear-korean.png?rlkey=eqw3cs4aq0yokvmg3uqtwv6hn&dl=1","pola_cola|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/9gbvvsbfhy8ngot23twuk/pink-bear-liger.png?rlkey=rhdrb9v18p3mmasja76s5h0n5&dl=1","pola_cola|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/fi66ttisdu69tt72k2rpi/pink-shark-bear.png?rlkey=5vjm6bgf3nzro76u67i5wwygy&dl=1","pola_cola|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/s9t8r9gwdm06xwzhmckjq/pink-wizard-bear.png?rlkey=8oa3x3ti9xlf8xeut54sailtb&dl=1","pola_cola|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/okrlcatoadcoeydozq3kc/red-calvin-bear.png?rlkey=tf6gcxq3o355dfmv0vkmu57hy&dl=1","pola_cola|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/nfbeqdyx2qatgbepguyxg/red-slipper.png?rlkey=crl47c3ehifuznrop0m1z0nuk&dl=1","pola_cola|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/b7wn70tlx1nhjofrpjxo5/red-bear-paws.png?rlkey=8enhzgdgzp8oe5ih0syf9xmqc&dl=1","pola_cola|red|fan":"https://dl.dropboxusercontent.com/scl/fi/25k5ffz7ttpnq4x7n7plm/red-bear-fan.png?rlkey=c7ytciza9l3bjzn9ea8z4aybn&dl=1","pola_cola|red|frog":"https://dl.dropboxusercontent.com/scl/fi/mre1771r54kwhh3vb6vla/red-frog-bear.png?rlkey=aenh85xyjo17v5nt6pylz65zq&dl=1","pola_cola|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/r1bln6jtnileae7lyv3q8/red-bear-kigu.png?rlkey=m8qlzu25uh0gdc60zfd64qw24&dl=1","pola_cola|red|korean":"https://dl.dropboxusercontent.com/scl/fi/bmeuij3ni5f2fw9e1j93h/red-bear-korean.png?rlkey=ci2o9dcwyakd3d82e1oao1p7q&dl=1","pola_cola|red|liger":"https://dl.dropboxusercontent.com/scl/fi/z5ngjoj0086u8hrbw8zm1/red-liger-bear.png?rlkey=t0fduedxtsnsi89oz58sczz2t&dl=1","pola_cola|red|shark":"https://dl.dropboxusercontent.com/scl/fi/myjmindm92e5d8owmbk0n/red-shark-bear.png?rlkey=tgpss7vaa5ue1gx64ai7zkext&dl=1","pola_cola|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/u78ghg7pfbdvb7xxpcszb/red-wizard-bear.png?rlkey=xljmh8nytbxlqj8fklllacodn&dl=1","pola_cola|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/bssxx04cv10wzjbk6wm0c/silver-calvin-bear.png?rlkey=m4xz921jsdyh65gny4y8cwueu&dl=1","pola_cola|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/vipy30w8zojzv6l82m615/silver-calvin-slippers.png?rlkey=uk3l9adtfqmlx265gyjr78dl3&dl=1","pola_cola|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/hams81vrgo2qbtawevabc/chrome-bear-paws.png?rlkey=u9gj42y56cxyrvht61trxkde8&dl=1","pola_cola|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9dhii4uzjkz4c3v2vip3h/chrome-dog-slippers.png?rlkey=9sfhltgk6kjjpocl8k5nk4nqk&dl=1","pola_cola|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/c6fij2f0ht7gwrlv13g3o/silver-bear-fan.png?rlkey=0wt7th53kphsfzz3n99k6buke&dl=1","pola_cola|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/pevjzuazguogq090bs4ll/silver-bear-image-frog.png?rlkey=ubs6nvkn4lcnc08p0xqj4haa0&dl=1","pola_cola|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/o96ug7wrywy7ktj7lfa35/silver-kigurumi-bear.png?rlkey=00l97hrev33jvf0p2y5e3a8v2&dl=1","pola_cola|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/fn7tt994kkj2u0ut035un/silver-bear-korean.png?rlkey=m4auhs77n1xhpmbphcqvar1fq&dl=1","pola_cola|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/6ziznkk9f5s71ia4g45iw/silver-liger-bear.png?rlkey=huvavlvzl43xtp812cfqzmleb&dl=1","pola_cola|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/gat8bics5m1fwimikr0cz/silver-shark-bear.png?rlkey=ccy5428em4g2lt1t1mddh0vxt&dl=1","pola_cola|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/l2j2fncmd8cwr5z9cc04t/chrome-wizard-bear.png?rlkey=hkcl20s7htpx1w2l57xw4wv27&dl=1","pola_cola|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/l4vgktwdj4cy0dg19zvoq/yellow-calvin-bear-2.png?rlkey=jz29b13ytedwp5wcn3w81eguu&dl=1","pola_cola|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/ep1u9pud76w00tbxnmfqj/yellow-slipper.png?rlkey=6cfabazm3qnoaxvt3ld7vf2hh&dl=1","pola_cola|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/r4bgwxcek5o48rbtkk9d6/yellow-cat.png?rlkey=vlreucg49zwq2lq7h226y5l4h&dl=1","pola_cola|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/tumkjrg3tq2rbuhpjt9v5/yellow-bear-fan.png?rlkey=ebnrbec2yccgnuand3mq1w2yc&dl=1","pola_cola|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/w99n6wi17nrzatu8l7n94/yellow-bearfrog.png?rlkey=t59k8nbspsbzyr64kwywk0koe&dl=1","pola_cola|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/92p45c9bv2cpwys2cd7w9/yellow-bear-kigu.png?rlkey=ls24kmeeb0frra5dbmh4g2yv8&dl=1","pola_cola|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/9q2drz0c19g4jek1nn515/yellow-bear-korean.png?rlkey=n9lm2gt34hyb348ztfrev19s9&dl=1","pola_cola|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/ozpyf5npfydytxkaz9noq/yellow-liger-bear.png?rlkey=rem5mofeun5rjdh4rsvua739t&dl=1","pola_cola|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/vwk19p6abjlzkspbvlfzg/yellow-shark-bear.png?rlkey=4y384487aubb27dp9j06hxfow&dl=1","pola_cola|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/gthyl0h6q0p9uxy8p7vmq/yellow-wizard-bear.png?rlkey=z4777mo6tqutcyngfqg95wiyd&dl=1",
-          "sloth|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/cqzin77ralmiazn13sa68/blue-sloth-bella-shoulder.png?rlkey=ums7tx1yxjlmqii845x9033t1&dl=1","sloth|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/m84d2e9lwuvw5miftk4wu/blue-calvin-slith.png?rlkey=humpzwbeyjeolfm9fnih04nnq&dl=1","sloth|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/fz7prshdfu8izeer3ftjw/blue-slipper-sloth.png?rlkey=03cvtuq1r7r8m2d9ig8mx4efm&dl=1","sloth|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/9cs23tl3c7zme3grpztl6/blue-cat-paw-sloth.png?rlkey=bzcdahpgjl63luch7hpkxkpxr&dl=1","sloth|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/p4vqf8bubystyidtoocpf/blue-dog-sloth.png?rlkey=h0neskxrcwtg9v6w5whddjd7v&dl=1","sloth|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/eqyr2g7mobdfmh8e6boy6/blue-sloth-fan.png?rlkey=rpl3yq5c3s7feuhaz0abhgese&dl=1","sloth|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/e1yo0dtpfi8hzsb4nbhj2/blue-sloth-frog.png?rlkey=ms4osq95ub74n803m933frakw&dl=1","sloth|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/phdu0cf7kt66uslmfmn1b/blue-kigu-sloth.png?rlkey=2glpbdmodjjoqk1037bw8z2hp&dl=1","sloth|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/xeu6sohkvay9zk2qlh5lt/blue-korean-sloth.png?rlkey=navphc4wnt0mqf9gnzgbyu0a5&dl=1","sloth|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/gp8w1t4v5cy519sx82eyb/blue-sloth-liger.png?rlkey=xl2vjntiyw38ouxzljsrzoran&dl=1","sloth|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/dx5oxireqr5u3g13ipejl/blue-sloth-shark.png?rlkey=z2mfopw11aasxdg70mpafilnv&dl=1","sloth|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/g41jpl0c97opjq2y3mtqj/blue-sloth-wizard.png?rlkey=n2l26cye6feun4sgk4lmcwtvq&dl=1","sloth|green|bella":"https://dl.dropboxusercontent.com/scl/fi/n4wgpnc3jd767lr01bpvc/green-sloth-bella.png?rlkey=0jroy9dtxhfn8vj4ibg9wovrr&dl=1","sloth|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/h14pinz5jg6z1uivy3y8c/green-sloth-calvin.png?rlkey=oqfvdy7smwbayyx06dywlnqeh&dl=1","sloth|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/hwkuccl2ci4mrlc3e8rov/green-sloth-slippers.png?rlkey=728zpsrvquw9qyte1rekuu3t6&dl=1","sloth|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5mv9e2gj7l88lqvlc0fqv/green-sloth-paws.png?rlkey=qbz5ualkizenfhspwm4u9s2v1&dl=1","sloth|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/e50lisd7z0owpr2rnrohx/green-sloth-dog.png?rlkey=579bi3p478czshx0d14u82pr2&dl=1","sloth|green|fan":"https://dl.dropboxusercontent.com/scl/fi/tlr4iurr34f5sktlt3w8q/green-sloth-fan.png?rlkey=o7rdp3g80d6urd5u5v6qgnedj&dl=1","sloth|green|frog":"https://dl.dropboxusercontent.com/scl/fi/murxzx40xucfny48rwc1u/green-sloth-frog.png?rlkey=zde6v56zw6doarpelntrwvtv0&dl=1","sloth|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/xpq7sv5w0lawwffn3kfxx/green-sloth-kigurumi.png?rlkey=5jroaf4vpb4wbjqhyoultw76j&dl=1","sloth|green|korean":"https://dl.dropboxusercontent.com/scl/fi/6afwe0dz671wd3qmxofry/green-korean-sloth.png?rlkey=0ykfrws4rpbn9oknis37vuq9b&dl=1","sloth|green|liger":"https://dl.dropboxusercontent.com/scl/fi/pnbcozba0ctc3z2dske1o/green-sloth-liger.png?rlkey=b23un8ydkdedkglji34kt0y6u&dl=1","sloth|green|shark":"https://dl.dropboxusercontent.com/scl/fi/sz0o8bu8rdal3ewgkr387/green-shark-sloth.png?rlkey=6suxihsz1fju334jbb3g0cog2&dl=1","sloth|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/5s9n24w68m7b0spzhx4zf/wizard-green-sloth.png?rlkey=wu4m84nchf380jb3r5nml2qne&dl=1","sloth|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/a882umx91phupy6g16ju3/pink-calvin-sloth.png?rlkey=wknco76mryzug9vhhoo1yztn9&dl=1","sloth|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/12vbaodnrs7ukvxn43ir0/pink-sloth-slippers.png?rlkey=gxdc7r1ncjz1jxbvcex4ep4il&dl=1","sloth|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/rr2q3ejtv57lu7oyi7u72/pink-cat-sloth.png?rlkey=4hd1fmtxpkq3gkd8y8gqsa2c9&dl=1","sloth|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/hzkyrioettabsunwlfdi1/pink-dog-slippers.png?rlkey=n6j399nqviheyzid8gn8ld2h5&dl=1","sloth|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/kqv9yy6ud3a7cy9ld13wq/pink-sloth-fan.png?rlkey=d8w16qlwckjipkkg0buhnucz9&dl=1","sloth|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/uiif9vohkkyvesiusjjmm/pink-sloth-frog.png?rlkey=dlw6qqlsvwz409i5dfocahqrg&dl=1","sloth|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/dpxvrcaeju2modoaeqapf/pink-kigurumi.png?rlkey=5lmto283v7wmjxybcmcx8iugy&dl=1","sloth|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/85dbvoe1udujmrsgozvtp/pink-korean-sloth.png?rlkey=v5chscu8l1o1tyoxweqwt2nnm&dl=1","sloth|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/owx112ixlpj9c8xi8zyk7/pink-liger-sloth.png?rlkey=f5pw8gojlydq480dz1pwezb37&dl=1","sloth|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/f81rp1aaydu99zr87gdo5/pink-sloth-shark.png?rlkey=hrp5520kt4xvgsh7jjf16ff32&dl=1","sloth|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/g7h56a3gswr1d0tou98pp/pink-wizard-sloth.png?rlkey=6udorwgk2bgw57zv34wz4ko38&dl=1","sloth|red|bella":"https://dl.dropboxusercontent.com/scl/fi/9nvwzznlfue7tpc718z9a/red-sloth-bella-image.png?rlkey=iyu6zcb5u6tlxiwm17crpdlgj&dl=1","sloth|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/54ihpjq9cwh72pevec5cr/red-sloth-calvin.png?rlkey=y8x5n8sbxu1isaje2e4o69f0n&dl=1","sloth|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/i0r9h3e7bzynl0crpwvfn/red-sloth-slippers.png?rlkey=3affzhhta1q4c27aob5dut661&dl=1","sloth|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/jyhtyjbmpg01q90n6r56p/red-sloth-cat-paw.png?rlkey=b0bxi3a07t65gche5c9bdh30i&dl=1","sloth|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/6z562ssz0ea5nn7weuxt1/red-sloth-dog-slipper.png?rlkey=wwg3hibl3rk1gt6i3c4rewicn&dl=1","sloth|red|fan":"https://dl.dropboxusercontent.com/scl/fi/ay6gnc6orx7gqufy1xp35/red-sloth-fan.png?rlkey=hb10nopatdmzv3xvrpkslrvlv&dl=1","sloth|red|frog":"https://dl.dropboxusercontent.com/scl/fi/67pu6aqs22i90rovoh7xo/red-frog-sloth.png?rlkey=oec5oglop0pcqk5mn4v16foso&dl=1","sloth|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/0yvcx97207x6bn62dpdxo/red-sloth-kigu.png?rlkey=0w9aiwmupiqe8pei79s5re7i1&dl=1","sloth|red|korean":"https://dl.dropboxusercontent.com/scl/fi/mvjz91ugmvcgkyhvjjaqm/red-korean-sloth.png?rlkey=0igulh4b8u3jsjmns8zdvpnxp&dl=1","sloth|red|liger":"https://dl.dropboxusercontent.com/scl/fi/pgprmv2jd74jafvj8ycgy/red-sloth-liger.png?rlkey=7ew4xgna6aok8v1jj8dqg6mz8&dl=1","sloth|red|shark":"https://dl.dropboxusercontent.com/scl/fi/0we7amd8bmrqak6kpysdc/red-shark-sloth.png?rlkey=3im3s9603w5q2o6088c8phl4u&dl=1","sloth|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/srf4z994hxsj9rxlpeojq/red-wizard-sloth.png?rlkey=b93cbw0i5n4wek0uruyq6oa71&dl=1","sloth|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/9gwk00fd41c65iavihw96/silver-bella-shoulder.png?rlkey=wkjnkse6lp4w668jreyfwx8p7&dl=1","sloth|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/1onabiic1iq45xjyvk0qu/silver-calvin-sloth.png?rlkey=agqu42ubgnw5uuhrhad5o7par&dl=1","sloth|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/li309jxj3tll7zskn3s4p/chrome-sloth-calvin-slippers.png?rlkey=zc30u6l3hvc0hp3r7dejui3v2&dl=1","sloth|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/j1s9hmefl3s1fp6bbo9s7/chrome-sloth-paws.png?rlkey=uosz4oo3colh7w76g35wxbii2&dl=1","sloth|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/krpxbch1py5g6n2uhy4h0/chrome-sloth-dog.png?rlkey=j6so9ky6rsitudrcj81gj5brb&dl=1","sloth|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/cfnxtdxhyz2xk1qxl0qvs/silver-sloth-fan.png?rlkey=lkta7t7hobmiqtyszhd0vall8&dl=1","sloth|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/q4oyoacl6bwuj86lb66to/silver-frog-sloth.png?rlkey=xo153yqm2cmeilii6qtw49jli&dl=1","sloth|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/o35iu0dbrjgfz8iegvaw7/silver-cat-kigurumi.png?rlkey=iiey8kwwj4xu8jwxfltqwa5yp&dl=1","sloth|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/ph6zcxjstvbkonvgkpj0i/silver-korean-sloth.png?rlkey=a1b5xx2bo1v1ck4evfwwdvas7&dl=1","sloth|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/65lr714ui4wzmnsh6s4ia/silver-sloth-liger.png?rlkey=fvhfcwb7kfxpgxfu7342ic&dl=1","sloth|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/qzy548973xaylj9gm3t54/silver-shark-sloth.png?rlkey=pdy1mq4jnasvzifb1h5dj5570&dl=1","sloth|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/nkhhcqlr0wt03rixj2tu9/silver-wizard-sloth.png?rlkey=g37gv3wtilfzhgyjz384iw4zw&dl=1","sloth|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/6l4o3vk9uaxo1qu3r2u6c/yellow-bella-shoulder.png?rlkey=ytnrs9uguqaysakuhbfzxpio5&dl=1","sloth|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/ilofa89928o88htscokre/yellow-calvin-sloth.png?rlkey=oemoo48pmv16samhp2n6svzvc&dl=1","sloth|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/us676zwcrc0w3om1txaj9/yellow-sloth-slippers.png?rlkey=jbo72ubbvai8enw83awll911h&dl=1","sloth|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/dt6jy15h7osowh76hnin8/yellow-sloth-paws.png?rlkey=1ujwm3pl4w6ikvzs00pqktehp&dl=1","sloth|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/go14e6bdxjx59thyv7qon/yellow-sloth-dog.png?rlkey=5kmha9a7h91qu7t32cxr89x9y&dl=1","sloth|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/1wn1vo3mirnrh8qvje4ju/yellow-sloth-fan.png?rlkey=e3tijhtv6d109wqe67h5qtdo6&dl=1","sloth|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/41d3t7h7j0csn12ixcb7u/yellow-sloth-frog.png?rlkey=pfjjbbr2f6dwbt4rk67igup17&dl=1","sloth|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/fjkmekdf86c1bfnwfzpst/yellow-sloth-kigurumi.png?rlkey=mqrc0p5h0q8ad28wg54thqmte&dl=1","sloth|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/85a96uzbmbtl4i6mn5073/yellow-korean-sloth.png?rlkey=exwyl2sxi7ctetkogxol6okpk&dl=1","sloth|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/wb2bv1p4nx85ys8l9milx/yellow-sloth-liger.png?rlkey=hmpj82koxeov35yciutkahrxt&dl=1","sloth|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/gpd6g19orgx5u18wmvnj7/yellow-shark-hat.png?rlkey=99wmq72ikjj83t0n9macjjzqf&dl=1","sloth|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/tjjxduekybh36cwvk0kly/yellow-sloth-wizard.png?rlkey=ftmuqmtn58ohoni2o1xoh7g25&dl=1",
-          "turtle|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/qy98zvro2c9ztu6jugvif/blue-turtle-bella-shoulder.png?rlkey=oun4j138ky9by0f4h8t44onph&dl=1","turtle|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/iiqwo9spb3ig1223u0j88/blue-turtle-calvin.png?rlkey=p4olok7gfl97otm04buospseq&dl=1","turtle|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/r7bw27tyaz4phq0bocniv/blue-turtle-calvin-slipper.png?rlkey=129y3k7hvjk3ss6030v5lyd20&dl=1","turtle|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5d0gsx2jr31pllh9qn71y/blue-turtle-cat.png?rlkey=o78cns9qmk8tr4n0cesl60ltq&dl=1","turtle|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/io6h41dem49ru3in5s9e8/blue-turtle-dog-slipper.png?rlkey=tn6pi1ehkv5ysr8w8li2qb8jt&dl=1","turtle|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/o7gcw5diuqn6vqyoj1g3h/turtle-fan-blue-final.png?rlkey=8kwvefbtj3k8dwlus725fy47o&dl=1","turtle|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/zldiyhqt8cktsjxur3nlh/blue-turtle-frog.png?rlkey=wf6aqoz4aay3omvi6id3d2bac&dl=1","turtle|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/dpm4xf0jxacpnoq083wnw/blue-turtle-kigu.png?rlkey=9i7jsehuvx1rv39ihlf49ztb4&dl=1","turtle|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/mzsf4nhu6kajy9mpgm6gq/blue-turtle-korean.png?rlkey=yzw3rggfz1kau5nlel9lifslj&dl=1","turtle|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/9rm48c61celri385dfu9a/blue-turtle-liger.png?rlkey=otn8c76u2j3j47hiytew6n8wb&dl=1","turtle|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/kf38pvmp9ovym32sht271/blue-turtle-shark.png?rlkey=8zio1kg0yzr2q8kyd642dbqsk&dl=1","turtle|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/ly6kdv71a0w4z6j9x9457/blue-turtle-wizard.png?rlkey=65vx7vgwmhlk00f10ax5f5uvj&dl=1","turtle|green|bella":"https://dl.dropboxusercontent.com/scl/fi/6uhzh8snyb8jn9qid2eg7/green-turtle-bella.png?rlkey=lovwqaxops3s21ob232plby5l&dl=1","turtle|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/w1114srywrgwzrhdo6hnn/green-turtle-calvin.png?rlkey=ewc7yjg9wkk1im7lkolf9vfzk&dl=1","turtle|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/giyi1v954176pjwunza5f/green-turtle-calvin-slipper.png?rlkey=5wqfw9979byk8anznwtf6r1h8&dl=1","turtle|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/28zedado68btccfawjcne/green-turtle-cat-paw.png?rlkey=0ou9dn445r4m4u1ix75iqc2q4&dl=1","turtle|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/ylw99k8wf4r3qqjgb2g2f/green-turtle-dog-slipper.png?rlkey=iqn9lw3dnloyx2rpk156huuze&dl=1","turtle|green|fan":"https://dl.dropboxusercontent.com/scl/fi/1k9dyvw8gae5op93hskef/green-turtle-fan.png?rlkey=ki3fq2zxb8xqlo52przix7w6q&dl=1","turtle|green|frog":"https://dl.dropboxusercontent.com/scl/fi/mnhnalkqsnsgl23i6ilsh/green-turtle-frog.png?rlkey=ns2qad1uu1x4gcep69x2rpqvb&dl=1","turtle|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/tfm4z7wco9jcidepltdr8/green-turtle-kigu.png?rlkey=vhjpmeafkt8r89pm5b2ar0ujx&dl=1","turtle|green|korean":"https://dl.dropboxusercontent.com/scl/fi/wz9egzjf5nhf2hajx0tmg/green-turtle-korean.png?rlkey=2hppjh44qqznlq0yiwg1413wn&dl=1","turtle|green|liger":"https://dl.dropboxusercontent.com/scl/fi/vbrxs681w44oca1avv7gj/green-turtle-liger.png?rlkey=m47iattbgaexvu3rmj1jfl7pv&dl=1","turtle|green|shark":"https://dl.dropboxusercontent.com/scl/fi/l672z6in3dil3gxc761iy/green-turtle-shark.png?rlkey=kjreo9a4g1j57gr0qiqgvop7l&dl=1","turtle|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/xyl6aqu50g61tvkmr7hj0/green-turtle-wizard.png?rlkey=8aqy3uxsvt50zkwcez2u9t8ie&dl=1","turtle|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/3a4ibeijegiax5nv705pk/pink-turtle-bella.png?rlkey=wjke79qcj9blo2qq5kydxdioj&dl=1","turtle|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/jy4cs14igelabh37kuokd/pink-turtle-calvin.png?rlkey=9nk5de53jjc3e3wj3o1o4j6ie&dl=1","turtle|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/62ex17glsh3ydvkripnii/pink-turtle-kigu.png?rlkey=c8npw5ryhkd2wn4o1g28gowdw&dl=1","turtle|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/kf04zh5kzywixjiil881r/pink-turtle-korean.png?rlkey=n6y9fvz65tl6qv1uwycm61639&dl=1","turtle|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/11hoxg32vu6drn7jkv8cj/pink-turtle-liger.png?rlkey=i1j0r70a41fx22ih0ecoeu0un&dl=1","turtle|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/dj4fafvyvnhwkurcg4ch6/pink-turtle-shark.png?rlkey=9ie2g8wuz46qed8zkaiuu2408&dl=1","turtle|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/2oqanoc1m3if1a8b2rezj/pink-turtle-wizrd.png?rlkey=lgyf7o9ahsnaqdo2qer2p96oz&dl=1","turtle|red|bella":"https://dl.dropboxusercontent.com/scl/fi/ahb6n836wc7gzuxyidzgt/red-turtle-bella.png?rlkey=bhxfmlcm2rjyc5o2vg7nkdx0i&dl=1","turtle|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/wecqknydt7162f1e6i1nb/red-turtle-calvin.png?rlkey=ys7zvrl4e3a6hv7chr6hwhc6i&dl=1","turtle|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/d83czl1ilwa2w7m2gcr1m/red-turtle-calvin-slipper.png?rlkey=p03hd8x1ubbsz9i1aabdz28dm&dl=1","turtle|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/sdptjwxgs5cocceb7johx/red-turtle-cat-paw.png?rlkey=hx0kfz3e5ogkc0i9okl5gbkmn&dl=1","turtle|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/dw4b6hh6y2jw7emuq13p3/red-turtle-dog.png?rlkey=l4rjxpzym6ssfioitxp327wed&dl=1","turtle|red|fan":"https://dl.dropboxusercontent.com/scl/fi/rqrucm98t91dbfbmoqosy/red-turtle-fan.png?rlkey=5hjg07fpuix7voka0gjv04kph&dl=1","turtle|red|frog":"https://dl.dropboxusercontent.com/scl/fi/2q1pormjipp3gos9l8une/red-turtle-frog.png?rlkey=nob8z2h8gvj1f10f3kf4aewdw&dl=1","turtle|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/sxi3rxtms4w21o4pt3jk3/red-turtle-kigu.png?rlkey=cas5nzvbffj59frgd8b7ea8gh&dl=1","turtle|red|korean":"https://dl.dropboxusercontent.com/scl/fi/bsyecpjbm7vs6np5ni6v5/red-turtle-korean.png?rlkey=swhe1h0uflno2v6quh6k64yuk&dl=1","turtle|red|liger":"https://dl.dropboxusercontent.com/scl/fi/zj92iongeo1on26h77al4/red-turtle-liger.png?rlkey=p5zq32nrrcdbfpsxan545ordo&dl=1","turtle|red|shark":"https://dl.dropboxusercontent.com/scl/fi/awl3l7sdbwgiq7zek535r/red-turtle-shark.png?rlkey=zv8bbze06xwbqf0hnqzaj8krj&dl=1","turtle|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/5p7z6trifpuhqs4ek6isx/red-turtle-wizard.png?rlkey=nlplpu5zfjrl6lirvah5l226n&dl=1","turtle|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/2pchlsaccnbln3uzbikbj/silver-turtle-bella.png?rlkey=c7vykt7jblcpyl1jggq38pnzk&dl=1","turtle|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/ksap2whm2zjzn7v0ehdtg/silver-turtle-calvin.png?rlkey=ohejnxwieiujpjzi427ab9w7h&dl=1","turtle|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/v2ucs9pokwsc1lwvfk2fe/silver-turtle-calvin-slipper.png?rlkey=8i8dv23vtod1le6hd6ssmazx4&dl=1","turtle|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/uf6q8708cu64rhdaavix5/silver-turtle-cat-paw.png?rlkey=v7a0cm5lf2ly6t1dm60d0hlkb&dl=1","turtle|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/rxyf751ezu0ajwo5tlsvh/silver-turtle-dog-slippre.png?rlkey=aqjb3qluapholdn4qp71sfyd3&dl=1","turtle|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/mev8jqtqie41211sdjp2h/silver-turtle-fan.png?rlkey=036s8b8ytev4d65ti58w4bs8d&dl=1","turtle|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/2j2qgwmbtp17n6ru35osf/silver-turtle-frog.png?rlkey=dsnp0kvhoo09cbtthgr15z6l0&dl=1","turtle|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/st7ay64297wytfov1slsk/silver-turtle-kigu.png?rlkey=c4q4841j6ithgv4pidjtjzpq2&dl=1","turtle|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/c4rikyeik63ma2gmz9iuw/silver-turtle-korean.png?rlkey=8e8tde43r9kt9xaupwqq899ob&dl=1","turtle|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/s58qip2pncwfcnvw5vt0x/silver-turtle-liger.png?rlkey=cwoqax5xz3efyuvm5fk7nwwe5&dl=1","turtle|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/cdto2h6h2ckoj2c4pccnz/silver-turtle-shark.png?rlkey=ky61erp30t4bih76hso5r3sa1&dl=1","turtle|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/zt55zi7iorj8egfa96926/silver-turtle-wizard.png?rlkey=vhnlekw4s6lxuomu3o1hlqeeq&dl=1","turtle|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/k09yqyjo6a4wxctw3kpmn/yellow-turtle-bella.png?rlkey=b4qe28r1cz897he763bflw13k&dl=1","turtle|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/uvahrhvvy6bdfxqpx6ael/yellow-turtle-calvin.png?rlkey=95ifsqbqubwlqyprc7dnt9eif&dl=1","turtle|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/d2heoyj7ddk349yt3hx73/yellow-turtle-calvin-slipper.png?rlkey=9za0dk3bhzcv4n5kzorxv6zop&dl=1","turtle|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/ehatxc96zkf68btq167mj/yellow-turtle-calico-paw.png?rlkey=h9f2ht3z3jm0go9sy1ju8ihrm&dl=1","turtle|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/udwfddm0wnpe1im6zki51/yellow-turtle-dog-slipper.png?rlkey=ogy5hf91bhj96v7qcdlcp4zp5&dl=1","turtle|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/v7hxyjc5090z5y1h50zbh/yellow-turtle-fan.png?rlkey=23xgxp7hurbjwjmevo2tx33b4&dl=1","turtle|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/54yw16cz5a5ky6tj4k3ef/yellow-turtle-frog.png?rlkey=z9g6a5aja9r50hbhpp3sm15p9&dl=1","turtle|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/8s4p0jptrnn2i0rilm36y/yellow-turtle-kigu.png?rlkey=rmxts27f3xie5d5ve23zkreb5&dl=1","turtle|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/5vcytcrnpsms7mgg9ql6m/yellow-turtle-korean.png?rlkey=pyek48fx6z78eeshm2g4twxlj&dl=1","turtle|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/fvkzxmiw79ro76p2ren0u/yellow-turtle-liger.png?rlkey=7n797x610roempmr8d9hca91r&dl=1","turtle|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/mz3w87kmn7hz87w2ogpxh/yellow-turtle-shark.png?rlkey=vegbo7v5okopzvq1bw5oenf9x&dl=1","turtle|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/cxwhdbzh9387ersbwpey1/yellow-turtle-wizard.png?rlkey=q66v8yeb4bdon9e78zbhr8d49&dl=1",
-          "wombat|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/am9t3m552onazqtjox8ct/wombat-bella-base.png?rlkey=tyrx5e19mjhe5gj3i4pkl8c9j&dl=1","wombat|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/eqbu85rily5n1ey9fu01t/wombat-calvin-blue.png.png?rlkey=fr6nvbsnxry19cqvumfzkhbfq&dl=1","wombat|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/c3x7kc1tuzl3llsy9xlbh/blue-wombat-calvin-slippers.png?rlkey=2bk78zkad1jpvfyq7sh9kw90d&dl=1","wombat|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/xr72eowofhgsss6wivdy9/blue-wombat-cat-paw.png?rlkey=4kg80kcnm50nphaw9q7b49hmp&dl=1","wombat|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/az5wt86v9gg3jidt4srip/blue-wombat-dog-slippers.png?rlkey=2ii36z48nsfv306ss8k6p2p5z&dl=1","wombat|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/hwd1ims21qz2hfufasa9e/blue-wombat-fan.png?rlkey=sk9q8xxrybbc5em7iski2pn9a&dl=1","wombat|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/a3pj7wbgc1lfla20fftqb/wombat-frog-blue.png?rlkey=wmqxtconur2ebjoqzmus8s2w9&dl=1","wombat|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/okykeqabp7qqyjtqgruw4/wombat-kigurumi-blue.png.png?rlkey=040zrd1i5ft2budxbx5w4f3l9&dl=1","wombat|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/cuit6zh3n9znw5o4kly4t/wombat-korean-blue.png.png?rlkey=r8n25huhsk692i2z6xro2c7zb&dl=1","wombat|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/aijb4vksn35c6nsa3nj19/wombat-liger-blue.png.png?rlkey=x85eufyo7txsf1ptpa58ac85h&dl=1","wombat|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/1f4vcihf8cqzabqj79a0y/wombat-shark-blue.png?rlkey=01i7edfjb2rjbssp0zorndidk&dl=1","wombat|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/t2penpyv4uxhmzgcydahf/wombat-wizard-blue.png.png?rlkey=htyswrd97ciwih30lh1k4xypi&dl=1","wombat|green|bella":"https://dl.dropboxusercontent.com/scl/fi/70dkvc18j6d7eanzhvtgo/green-wombat-bella-shoulder.png?rlkey=9am7vkyxg87iiw6hudpa18bq9&dl=1","wombat|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/rlp8x173vim05pgrik595/green-wombat-calvin.png?rlkey=llky7a9u3em95m3bq2vr6qir4&dl=1","wombat|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/u21mvxipk52fmjc7q3i2o/green-wombat-calvin-slipper.png?rlkey=glub0lfp8j9sdxpfb0dx1p44m&dl=1","wombat|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/ws1bm9iskfbjwpt06wl29/green-wombat-paw.png?rlkey=kto365gp9qqso5m2lxiy48jxt&dl=1","wombat|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/55abayyl07jedcocheh9s/green-wombat-dog.png?rlkey=6mb6bdgx2iub2dbsbicffuuu4&dl=1","wombat|green|fan":"https://dl.dropboxusercontent.com/scl/fi/0ffz9ponjocyhf8jwtbcl/green-wombat-fan.png?rlkey=9sd5lgnmvdqq1chwiphmihhi1&dl=1","wombat|green|frog":"https://dl.dropboxusercontent.com/scl/fi/pp3ugi0weh0z5evd2hppu/green-wombat-frog.png?rlkey=7mv7qd1yv48tjlxugx8qa9er3&dl=1","wombat|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/s5hw6e6xnkgsqe4ms49s8/green-wombat-kigu.png?rlkey=xyd5dgcc7yvzp2zqlrodzm6z2&dl=1","wombat|green|korean":"https://dl.dropboxusercontent.com/scl/fi/s5vghv4c7ndo07wu2w7w0/green-wombat-korean.png?rlkey=6ruts6wq8gvy4xsjboh56aip1&dl=1","wombat|green|liger":"https://dl.dropboxusercontent.com/scl/fi/5waxgkmj22tiktrqit36z/green-wombat-liger.png?rlkey=iijjdndkwur17tmvlhgp4znnh&dl=1","wombat|green|shark":"https://dl.dropboxusercontent.com/scl/fi/7vota7s8q6nqar63npnur/green-wombat-shark.png?rlkey=vvobtxu0aymtmn953s68d3z5z&dl=1","wombat|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/eesr6i7raqs7e2ughirzb/green-wombat-wizard.png?rlkey=bzngcxmhknuljs9hhyxgbnhuw&dl=1","wombat|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/2vehi51pdyujtm3g4ub2g/pink-wombat-bella-shoulder.png?rlkey=3squrmsblhhgfrozueyo73flv&dl=1","wombat|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/5m0n7ofz7bnrmhxh472vg/pink-wombat-calvin.png?rlkey=lmlccc2q21b7cpjtiu3cvxv1u&dl=1","wombat|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/6h33z2q2dsym6n4y51uru/pink-wombat-calvin-slipper.png?rlkey=pb6h65fqukr7vkrunbqapjt01&dl=1","wombat|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/2ueqxdg4rkcxfx0jmgiaw/pink-wombat-paw.png?rlkey=jckz44etn8ikenljdrngjlq1k&dl=1","wombat|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/pwzd9cxxi0w8q6l2y7w71/pink-wombat-dog.png?rlkey=uplgneyoz10eox3tsrssui33i&dl=1","wombat|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/31ibyadojm1d1i5uycd4j/pink-wombat-fan.png?rlkey=urno2zhhfbw9hgnappqajumd6&dl=1","wombat|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/sao5j6t4qgeysbimbumty/pink-wombat-frog.png?rlkey=pc64pob7i1ep063hdjmx0ie8s&dl=1","wombat|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/0w18jlpeqnq3sqchyla2l/pink-wombat-kigu.png?rlkey=o9zkkgftqkmxxs8cu8vfsy8zt&dl=1","wombat|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/edy062ba1tfhujeoq7hw3/pink-wombat-korean.png?rlkey=ed6acg4zjuhkwwrmjrx884auq&dl=1","wombat|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/iez42ybrxjmfzoyip0705/pink-liger-wombat.png?rlkey=dpirf5o3ahj8c3ur4j2lmpndq&dl=1","wombat|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/wfc4bxvckle1rrv83aye5/pink-wombat-shark.png?rlkey=hjtwdcxuy1uxw512f3v7lj7zx&dl=1","wombat|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/w99m6xr944xeddbvfk5to/pink-wombat-wizard.png?rlkey=25tsqnnluwxoq0b0gftf8emve&dl=1","wombat|red|bella":"https://dl.dropboxusercontent.com/scl/fi/3uewa7835bpnbomy0eg4s/red-wombat-bella-shoulder.png?rlkey=gpma4pwjd15ugx38a9k2e3u2s&dl=1","wombat|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/127jpi7n5pdbvckt3rerr/red-wombat-calvin.png?rlkey=i6yi7u04gu3gu9lgllxyrenaa&dl=1","wombat|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/jvumamr6tq5kgx568e00o/red-wombat-slipper-calvin.png?rlkey=6kdbu99j9x3xchnim3eri8crm&dl=1","wombat|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/sza119pbum016ss0jwhxs/red-wombat-paw.png?rlkey=y1atrc1j6q72h19e3iump6u6s&dl=1","wombat|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/nfe85t32hdppbefzupi72/red-wombat-dog.png?rlkey=8lqi9im7mqfhz78bzlxnkcci0&dl=1","wombat|red|fan":"https://dl.dropboxusercontent.com/scl/fi/zvhfwf3032wpde3glsd36/red-wombat-fan.png?rlkey=g7npv4eqwjlk5avi5hkz1lfvf&dl=1","wombat|red|frog":"https://dl.dropboxusercontent.com/scl/fi/doqgukf2onk1v5mmz87ix/red-wombat-frog.png?rlkey=tgksqz2aoieapsqmoobsmi3p8&dl=1","wombat|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/h5medzzpbgu9e4xoqks69/red-wombat-kigu.png?rlkey=326hmlz6mfrmzgn4epo0aqqlu&dl=1","wombat|red|korean":"https://dl.dropboxusercontent.com/scl/fi/6jfub1lbrb1w6dqnrke7r/red-wombat-korean.png?rlkey=tway56jf4cpr0w74ev5gpacfk&dl=1","wombat|red|liger":"https://dl.dropboxusercontent.com/scl/fi/ankxuqno9dsjan5ju5agf/red-wombat-liger.png?rlkey=oe7a7zmcbshp0pmozhd8ap5dj&dl=1","wombat|red|shark":"https://dl.dropboxusercontent.com/scl/fi/8rrntmg8dfbo0izu8vuf7/red-wombat-shark.png?rlkey=g8dmjvoyk03s434576ykfhyhh&dl=1","wombat|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/9aktt45tglnu4na4ekifi/red-wombat-wizard.png?rlkey=s6i1br1s78eyzekstthr2kk83&dl=1","wombat|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/7740uo820ba417bggrgo8/silver-wombat-bae.png?rlkey=gegsxkhzutmm5ryux280jvnwy&dl=1","wombat|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/1m91jtgy16c9i9qlfb4w8/silver-wombat-calvin.png?rlkey=xw96g7nkkxk2hud5401x554z2&dl=1","wombat|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/rt2ggs0ef8i3vxzowon24/silver-wombat-calvin-slipper.png?rlkey=1sf3qo4cvoqgfkfnfwwns0b61&dl=1","wombat|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/gmtp2ta644za7tb873e2y/silver-wombat-paw.png?rlkey=e3zwnj95cykhsrugu4favvy02&dl=1","wombat|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/7fz7puyw8esgegf6030u6/silver-wombat-dog.png?rlkey=wqmmtm50bsosa0ewr3brw322u&dl=1","wombat|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/i48w1rhmtn1kctr8e1oj5/silver-wombat-fan.png?rlkey=gn6ggxgneoitllrwx0479kh0d&dl=1","wombat|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/acgmll5lvtrb2yz6rnd1b/silver-wombat-frog.png?rlkey=ulvaaxfwcp254ky2qscy42asr&dl=1","wombat|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/8vva0d28wfc2zuuv10ovz/silver-wombat-kigu.png?rlkey=2lzfrx5gwmf08pupywq5028fg&dl=1","wombat|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/6ce7kr5mwtgywp8h0wnn4/silver-wombat-korean.png?rlkey=tis6s37n3aeolotl29rzhi8r8&dl=1","wombat|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/izvzrx4o3rs9hqkpjxorh/silver-wombat-shark.png?rlkey=1eb2hxt7tbjxty40im2bjfz9e&dl=1","wombat|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/rd5w50s8o9f7nypbzlyli/silver-wombat-wizard.png?rlkey=dmrt0er6bglf3cm14vki9y3es&dl=1","wombat|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/qst4sf6709su32spptmic/yellow-wombat-bella.png?rlkey=6ggfqp1c0igsc2w87ghobswds&dl=1","wombat|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/habeyikhok1miivqpi8ju/yellow-wombat-calvin.png?rlkey=f8fhzh0q7f9hb924oty6e1vg8&dl=1","wombat|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/uhj76o71phucx7voou6nt/yellow-wombat-calvin-slipper.png?rlkey=en0bz4a0envtqh3wn6ltbwkbm&dl=1","wombat|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/unpug13im4dtp3gbrtc6c/yellow-wombat-paw.png?rlkey=gnn2fnnva1kvcgg4ij15nh7vk&dl=1","wombat|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/l4onrlfkasjdj4hhv65kg/yellow-wombat-dog.png?rlkey=rsszftofn7uopyxu8svpjqmje&dl=1","wombat|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/m4axxz6lc6vggmflilslh/yellow-wombat-fan.png?rlkey=bhhf5p7tn4oh8pmnychxzkrqr&dl=1","wombat|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/ascc4fjo6wsnynu0r5ies/yellow-wombat-frog.png?rlkey=jufeljf7lzu5x7d1s3r4lcz9v&dl=1","wombat|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/lnbjq2i6mpjoekxwqynvp/yellow-wombat-kigu.png?rlkey=nbyyggfe62oy7hgh3h598rrg9&dl=1","wombat|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/sv8tgwhyo970yblhq7k96/yellow-wombat-korean.png?rlkey=697i72gdfl54sm7a4ni3yv4x0&dl=1","wombat|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/xs0txbsmc1gcgm1tdx8yn/yellow-wombat-liger.png?rlkey=bwen2n5mn9ns9dxa0m9whd8e1&dl=1","wombat|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/6ccjgc4v1ajn68wgmni4r/yellow-wombat-shark.png?rlkey=z23w1k5329t1ae9wjq8osaelt&dl=1","wombat|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/r4gor3p597f1c1fbo1v7x/yellow-wombat-wizard.png?rlkey=iealiax9lb6nw49v6r2czjo48&dl=1"
+          "fox|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/vkme5a84s9ju5jd6illx6/blue-fox-bella-shoulder.png?rlkey=pp4d6xd0j9zc15r2l54n04e3c&dl=1",
+          "fox|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/1ef96utqv83flh1hp0q8d/blue-fox-calvin.png?rlkey=9en4lbckjtg2j1p9dh88l1u5u&dl=1",
+          "fox|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/u0m33l9qdoltbs58dk9xk/blue-fox-calvin-slipper.png?rlkey=d9do79yfe69myzx2r17z40olz&dl=1",
+          "fox|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/0q37gz19a30cpqyprzm40/blue-fox-cat-paw.png?rlkey=2ceee4wu52iqjj4csxcs3y65x&dl=1",
+          "fox|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/fxis16r8wqq5c2ggsfqzf/blue-fox-dog-slipper.png?rlkey=ims73nryr30ju2j03867cjmum&dl=1",
+          "fox|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/ynw3cdafw91dhemk1wi61/blue-fox-fan.png?rlkey=vdnza5ra5eljth764dlvm76by&dl=1",
+          "fox|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/iwfln7lxzsabz41sy7jm1/blue-fox-frog.png?rlkey=ncj0cq7g2wqb941wmsplho7rq&dl=1",
+          "fox|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/pzoubff1tyjec18zx2l60/blue-fox-kigurumi.png?rlkey=86m9p24omg393a888f9alvy27&dl=1",
+          "fox|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/4cnw996bgrr4vjh87m3jc/blue-fox-korean.png?rlkey=g12341iw8vz4bhahkurrg1px3&dl=1",
+          "fox|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/u0ftcwcxe15v9hgjnw9z0/blue-fox-liger.png?rlkey=d2tpokbrbvzks6d0gaqjpel7v&dl=1",
+          "fox|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/44n37v3trhcixx4e92c0h/blue-fox-shark.png?rlkey=c9ltc922x11cam9d54hcnnbjo&dl=1",
+          "fox|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/34i1fn6j7bn42ntdhxyyu/blue-fox-wizard.png?rlkey=ell6p6lk5hchg3xvilz2bk3fz&dl=1",
+          "fox|green|bella":"https://dl.dropboxusercontent.com/scl/fi/8y6e7uxozd8avq5ygdotd/green-fox-bella-shoulde.png?rlkey=9fmkjoiw3q68usy54nwurqy30&dl=1",
+          "fox|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/pa0k60di47vfbm3f1kg2c/green-fox-calvin.png?rlkey=npgxrlmmg5xzeszc47au4aoko&dl=1",
+          "fox|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/icbl98y767ke4b7vedhwz/green-fox-calvin-slipper.png?rlkey=6fv5bgfekcvp03lnpgo3odkm9&dl=1",
+          "fox|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/h09iyyeq50lxi0zp8qrm8/green-fox-paw.png?rlkey=9hko5buhphdao7nl4ipiw8d4x&dl=1",
+          "fox|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9suiwj880sgcg6tvyzv4h/green-fox-dog.png?rlkey=gkbca8ze8h7h79evli5o3d3nj&dl=1",
+          "fox|green|fan":"https://dl.dropboxusercontent.com/scl/fi/889hb280o2zvx5rb929sd/green-fox-fan.png?rlkey=fcxefh16qe92rn9ty2r6iq3io&dl=1",
+          "fox|green|frog":"https://dl.dropboxusercontent.com/scl/fi/fn48cnla8udai2u8fw22j/green-fox-frog.png?rlkey=o2n7pcvajww1g8i64m7xaz1u5&dl=1",
+          "fox|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/agy707wg7xq3ffvfmp4ah/green-fox-kigu.png?rlkey=42d116ggoa97ujh2b1n2wf8iu&dl=1",
+          "fox|green|korean":"https://dl.dropboxusercontent.com/scl/fi/g5tcpdas2ei95ovdaolj9/green-fox-korean.png?rlkey=z9g32xcixpgs2binbaitzmo8m&dl=1",
+          "fox|green|liger":"https://dl.dropboxusercontent.com/scl/fi/gvqank2p481ccat44hz5c/green-fox-liger.png?rlkey=7baguhngf4q5qy7qrn2hu1gl0&dl=1",
+          "fox|green|shark":"https://dl.dropboxusercontent.com/scl/fi/6n2ycmn0mg4johm79zn4u/green-fox-shark.png?rlkey=ikqo46prjabggovr816wihwcw&dl=1",
+          "fox|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/dqu28wrrv0f2qj8mdu0cu/green-fox-wizard.png?rlkey=az2w9he39piznl2hy37fbbaa0&dl=1",
+          "fox|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/ll250apztih962dmtuk7v/pink-fox-bella-shoulder.png?rlkey=05scyulst8jo7eswe6tu5bimj&dl=1",
+          "fox|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/8bm1jjogpwdeshrudq5dw/pink-calvin-fox.png?rlkey=xmk3o9qar8fuuqvw3p0arjpjp&dl=1",
+          "fox|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/9l61oioqrztwb1zrnyear/pink-fox-calvin-slippers.png?rlkey=zdlcdmuo1fwgrfhrzkk4ice2p&dl=1",
+          "fox|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/96aeeg07mt7uepyhb6ywa/pink-fox-paw.png?rlkey=9y5m4rr4qyhld1gzlncezuje3&dl=1",
+          "fox|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9410xtexhv6pq8pgmpsyp/pink-fox-dog.png?rlkey=iwkrs4c0f3gnko74suz2b27s4&dl=1",
+          "fox|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/l2l1v46grvi7tzz9dybxe/pink-fox-fan.png?rlkey=ns78282mo6swa7y4m3d3ppwqv&dl=1",
+          "fox|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/av6udwmstd2a2ltji963u/pink-fox-frog.png?rlkey=vsf2t1s4f5is01egkma4ktv4y&dl=1",
+          "fox|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/sg3hkuya9kwqe7tm6g8rn/pink-fox-kigu.png?rlkey=iz46xfp2sfk41894vdk0egqx7&dl=1",
+          "fox|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/gc92tmt731v7fppnqeha4/pink-fox-korea.png?rlkey=avmxcvsglurgbjx284pz5y93i&dl=1",
+          "fox|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/uo4sarfqbypsaq5cp7kyo/pink-fox-liger.png?rlkey=thor0ua5h55r2xsjpb3iwvwup&dl=1",
+          "fox|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/6u3v1j8jpqcz6mx4gxvvs/pink-fox-shark.png?rlkey=1fhdrpe5545s7tfto3770gz7d&dl=1",
+          "fox|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/c5oobps88gxwvqyj8xr58/pink-fox-wizard.png?rlkey=osxcdks4rtg9t3agn90stgtet&dl=1",
+          "fox|red|bella":"https://dl.dropboxusercontent.com/scl/fi/m8sns5gqjd4dfgei7wb33/red-fox-bella-shoulder.png?rlkey=vbfxn6mk51u9vdd5v6wqt2era&dl=1",
+          "fox|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/h685lfsk1jhzedxskbl16/red-fox-calvin.png?rlkey=s9608swd924a6gqwee2u4shat&dl=1",
+          "fox|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/kqpdcrczxpjcyxv3abug6/red-fox-calvin-slipper.png?rlkey=6x5zjn7rr2lbi7gbjg9q9zagn&dl=1",
+          "fox|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/psyk1a3unnhsmfxerx8e5/red-fox-paws.png?rlkey=0tl83v4lcx4vs37w1dfghbzld&dl=1",
+          "fox|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/ibufk4iyrqr583vldjny0/red-fox-dog.png?rlkey=hgcd44okp2fl7mjlziycztriw&dl=1",
+          "fox|red|fan":"https://dl.dropboxusercontent.com/scl/fi/mb2kno3kog4mr5et3fpt0/red-fox-fan.png?rlkey=20bfjpixlyh61f7bsl2j2b9ka&dl=1",
+          "fox|red|frog":"https://dl.dropboxusercontent.com/scl/fi/5mwq84om1rk1gagafnb39/red-fox-frog.png?rlkey=853lwo36hcez5gyl3m0xldk4h&dl=1",
+          "fox|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/winced2inecdxn775a5y2/red-fox-kigu.png?rlkey=aiz2vkh1or3nu79bm22ovakop&dl=1",
+          "fox|red|korean":"https://dl.dropboxusercontent.com/scl/fi/cnzm3bu4eew1iftrfniyn/red-fox-korean.png?rlkey=3msugen3pk85n3i955xmcxazz&dl=1",
+          "fox|red|liger":"https://dl.dropboxusercontent.com/scl/fi/aiw34fl72f2mn2pqcxk4d/red-fox-liger.png?rlkey=dl4hhdcrjzd0ghj2pjb7aqa19&dl=1",
+          "fox|red|shark":"https://dl.dropboxusercontent.com/scl/fi/eelj47ipadd0z82qb2xnn/red-fox-shark.png?rlkey=fs58fpl7xsssyyik7qgzt3g32&dl=1",
+          "fox|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/42w8hc1ix9ds1vl4g368f/red-fox-wizard.png?rlkey=froa5nn0yhypanu88v86vve16&dl=1",
+          "fox|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/k3klg9dk6u3f196qe0lx6/silver-fox-bella.png?rlkey=g1t7f2q71wil4zt8ny5t7govl&dl=1",
+          "fox|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/18sn6cnj34rpsqyelvzvj/silver-calvin-fox.png?rlkey=182gn0jmz8genxfnz9oq90fdr&dl=1",
+          "fox|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/3sne4rp29uuiv24y34bp0/silver-fox-calvin-slippers.png?rlkey=1kytdj22fmv2a4smlpahmnt7e&dl=1",
+          "fox|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/6hc4od80dkmtji4vlym6w/silver-fox-paws.png?rlkey=0ofv3xgy5oze2j35d73i1yywf&dl=1",
+          "fox|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/igmqa6sevhxggvy9f5f2c/silver-fox-dog.png?rlkey=vpsxy9qitjo9m017jg8tyj9n9&dl=1",
+          "fox|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/tm34nmkl95dgtbaal0hvl/silver-fox-fan.png?rlkey=43wh819zi022n2lu1dbvd9cjo&dl=1",
+          "fox|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/0650tue1oy1orofecfxq1/silver-fox-frog.png?rlkey=ww0sgddjb8xvmrxiu04h0xjxn&dl=1",
+          "fox|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/bdepqqh45jkf2f89nxk1x/silver-fox-kigu.png?rlkey=84u7og5ry03tzig4abps7hry4&dl=1",
+          "fox|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/6utsd3s688p5j2jf1iz0l/silver-fox-korea.png?rlkey=23abphlyi0ryhu93skdskfgrz&dl=1",
+          "fox|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/2q0sl2sjrdj8ero7ufodd/silver-fox-liger.png?rlkey=3m20p5ypy6ibl6konfk6ek8fc&dl=1",
+          "fox|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/2vnxeo47sx5ldauew8g15/silver-fox-shark.png?rlkey=gy5pz9sdxw8167o155cbmkgyo&dl=1",
+          "fox|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/k6fhinqtwwfkwpawx0quy/silver-fox-wizard.png?rlkey=ogt39m3e6zpnu1lzka8j0gggx&dl=1",
+          "fox|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/xoordtl4k30680xqq9w1z/yellow-fox-bella-shoulder.png?rlkey=rxrldmc4k1vl23jctfq9hvoym&dl=1",
+          "fox|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/evj30hjjv76ruvd7dh9o3/yellow-fox-calvin.png?rlkey=ga4482rtk66ljrffb114kkyi3&dl=1",
+          "fox|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/ssyr88nm6m6fqfbnpfuzc/yellow-fox-calvin-slipper.png?rlkey=ys0a6pb4h58yuq709sd2uxdyw&dl=1",
+          "fox|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5yd0rsn6pxylquujauznz/yellow-fox-paw.png?rlkey=hj5s2itxomqcz5l3jsqb7bjav&dl=1",
+          "fox|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/vaxxn0mft0lynnozimofp/yellow-fox-dog.png?rlkey=p2r0wdjg8pz8ueiwhemj7h2fd&dl=1",
+          "fox|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/o0aysy6esrjoonwkkr6pk/yellow-fox-fan.png?rlkey=rspgvxgrnhz2lhd6frkpcmkqr&dl=1",
+          "fox|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/b7wnlksv7ox0vcuchfr19/yellow-fox-frog.png?rlkey=htv7hkauau0yqfph0tyqkec0z&dl=1",
+          "fox|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/crkw2zp0at80pkqwf8nw0/yellow-fox-kigu.png?rlkey=38gscj8wtp6060anupkfrb0o7&dl=1",
+          "fox|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/7ct5a49q7lvorzui5pzha/yellow-fox-korean.png?rlkey=bk4zmwksvt6797g09bcbqhyvx&dl=1",
+          "fox|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/bbkni2wxxr0u7qcn68597/yellow-fox-liger.png?rlkey=tyvkc7jk3r96xvhv008wedj20&dl=1",
+          "fox|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/7iz4x0akg7s5vlsiuo1s0/yellow-fox-shark.png?rlkey=3g762hu8igxo5h5knxh3obbki&dl=1",
+          "fox|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/jk7ln84qhy6vmqv3wq04n/yellow-fox-wizard.png?rlkey=49e92gjfq2f7np669elkyuw8u&dl=1",
+          "pola_cola|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/ykvwiusbg0c8chy44n5c9/blue-cat.png?rlkey=k2rlw50fgaie4lsv35cb9z6r6&dl=1",
+          "pola_cola|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/vkjxt7ea9ykc3aqmopkgi/blue-calvin-bear.png?rlkey=qgfv7qn5prmwdoc2zgxmk7qvw&dl=1",
+          "pola_cola|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/xyphdl8xm8kk6w48om1zo/blue-calvin-slippers.png?rlkey=4geyitrhhjzbm69ynsjj5p20b&dl=1",
+          "pola_cola|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/vvyt5nak3v7crejfgn4l6/blue-bear-paws.png?rlkey=7f2buts7ja5wr36wzyrkf2rvo&dl=1",
+          "pola_cola|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/meibmnvngn50ff8yodcuo/blue-dog.png?rlkey=m4bdxrucko3sxsmr40mwsd9ks&dl=1",
+          "pola_cola|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/xrx1xeusth6dia5tiscrg/blue-bear-fan.png?rlkey=1m3ruw7wwcbf6jjdg2iz4ng3d&dl=1",
+          "pola_cola|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/mbkahut8adm0uqa9tzt06/blue-frog-bear.png?rlkey=ixzvdkljk5tr05vfpjnm8yf8b&dl=1",
+          "pola_cola|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/uemit00ojanc9y37zajzt/blue-bear-kigu.png?rlkey=xt238leibdffrtvuly18hcnm4&dl=1",
+          "pola_cola|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/stnj9vzv9eqn69h9x3jzx/blue-bear-korean.png?rlkey=jm63flm7iw2v27n5o8l18gfjm&dl=1",
+          "pola_cola|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/1yckoo8hqt3sspzx58d4o/blue-liger-bear.png?rlkey=39sosykvi194bfbkwzvlqb2v4&dl=1",
+          "pola_cola|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/5i56ihouxsppw90b4bqn8/blue-shark-bear.png?rlkey=twss5k1w9dqz85hetatryysn0&dl=1",
+          "pola_cola|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/u2sgjo8jfcaadep0fsc3z/blue-wizard-bear.png?rlkey=n0dl9bllyym3g3l2gv2fdzce4&dl=1",
+          "pola_cola|green|bella":"https://dl.dropboxusercontent.com/scl/fi/62wvo1jyknk3x21twbbyb/green-cat.png?rlkey=d9wku0tf26six7xpcaac54l06&dl=1",
+          "pola_cola|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/ar26u0ayv5482xpiep44n/green-calvin-bear.png?rlkey=7hu6e4lt2bt84253bd53yj62g&dl=1",
+          "pola_cola|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/bhgci07f67wgdsuw4j9h3/green-slippers.png?rlkey=krnsi257b94iwf6e5qing44hr&dl=1",
+          "pola_cola|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/1n8d9xn2w48d3rxammlo4/green-bear-paws.png?rlkey=mr7745kpc2f63p9x3qa98z2f8&dl=1",
+          "pola_cola|green|fan":"https://dl.dropboxusercontent.com/scl/fi/naxry80k0zcsfyl7sfiv0/green-bear-fan.png?rlkey=alz3d333bn67rru4yt8ks3sm3&dl=1",
+          "pola_cola|green|frog":"https://dl.dropboxusercontent.com/scl/fi/d6x1ly02lrqdqv8bd1ed3/green-frog-bear.png?rlkey=ax375eq34dsuvo12i3kt9tthi&dl=1",
+          "pola_cola|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/y6nhcurkn9asum0hoegqk/green-bear-kigu.png?rlkey=6ip28i27tetgcpkvm68c187ka&dl=1",
+          "pola_cola|green|korean":"https://dl.dropboxusercontent.com/scl/fi/nx4cygcw6fkly600dttrq/green-bear-korean.png?rlkey=3cfjtfnqpcuuhfhgd6cbmawai&dl=1",
+          "pola_cola|green|liger":"https://dl.dropboxusercontent.com/scl/fi/cdntjq5217chhy4q9az5j/green-liger-bear.png?rlkey=49noctbu5rv7lgpie7do95o3p&dl=1",
+          "pola_cola|green|shark":"https://dl.dropboxusercontent.com/scl/fi/vo4clpri5i1we20w09dwd/green-shark-bear.png?rlkey=0nj7y9rzbhn5k8o8jg0j58i3k&dl=1",
+          "pola_cola|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/rtygevhoj6nofk4lubl82/green-wizard-bear.png?rlkey=17lm872665oebnae342fpuzay&dl=1",
+          "pola_cola|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/o64ks50xvzkk9w4zjuugu/pink-cat.png?rlkey=u6owbltk7srh7xv5xvahoecax&dl=1",
+          "pola_cola|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/angybecon0bt1v2jgzzaj/pink-calvin-bear.png?rlkey=mgwcba3m3wot5mo1s9dobdykc&dl=1",
+          "pola_cola|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/50rhxgdfxbdlojiywwhhn/pink-bear-calvin-slippers.png?rlkey=gib0i77ywo769ya7be9ube649&dl=1",
+          "pola_cola|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/b61iin9w9n43ab6l9poz2/pink-bear-paws.png?rlkey=gwubisqntklgwwsbnoy2ck5v2&dl=1",
+          "pola_cola|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/npvoj1syc1xpbrdv17y88/pink-dog.png?rlkey=ezy0iispuukec1cv6kbo2ak38&dl=1",
+          "pola_cola|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/lu6tmead277ebvmg2w9h6/pink-bear-fan.png?rlkey=x756u5vtpq8wd0orte07e7d24&dl=1",
+          "pola_cola|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/jtt8s9mnxtjma60sjfyv4/pink-frog-bear.png?rlkey=9r1l99xldu6yk1ec1irgvom3c&dl=1",
+          "pola_cola|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/009u3zlk5ann6jemrae0m/pink-bear-kigu.png?rlkey=cvo5bdv387u7ed4t39bighpc0&dl=1",
+          "pola_cola|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/1uzcsvxhz4tocakpz3ulz/pink-bear-korean.png?rlkey=eqw3cs4aq0yokvmg3uqtwv6hn&dl=1",
+          "pola_cola|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/9gbvvsbfhy8ngot23twuk/pink-bear-liger.png?rlkey=rhdrb9v18p3mmasja76s5h0n5&dl=1",
+          "pola_cola|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/fi66ttisdu69tt72k2rpi/pink-shark-bear.png?rlkey=5vjm6bgf3nzro76u67i5wwygy&dl=1",
+          "pola_cola|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/s9t8r9gwdm06xwzhmckjq/pink-wizard-bear.png?rlkey=8oa3x3ti9xlf8xeut54sailtb&dl=1",
+          "pola_cola|red|bella":"https://dl.dropboxusercontent.com/scl/fi/bej7j37x1f79w6fr4x63m/red-cat.png?rlkey=lrg3pd5mtak3wsiqmci8610n3&dl=1",
+          "pola_cola|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/okrlcatoadcoeydozq3kc/red-calvin-bear.png?rlkey=tf6gcxq3o355dfmv0vkmu57hy&dl=1",
+          "pola_cola|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/nfbeqdyx2qatgbepguyxg/red-slipper.png?rlkey=crl47c3ehifuznrop0m1z0nuk&dl=1",
+          "pola_cola|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/b7wn70tlx1nhjofrpjxo5/red-bear-paws.png?rlkey=8enhzgdgzp8oe5ih0syf9xmqc&dl=1",
+          "pola_cola|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/nfbeqdyx2qatgbepguyxg/red-slipper.png?rlkey=crl47c3ehifuznrop0m1z0nuk&dl=1",
+          "pola_cola|red|fan":"https://dl.dropboxusercontent.com/scl/fi/25k5ffz7ttpnq4x7n7plm/red-bear-fan.png?rlkey=c7ytciza9l3bjzn9ea8z4aybn&dl=1",
+          "pola_cola|red|frog":"https://dl.dropboxusercontent.com/scl/fi/mre1771r54kwhh3vb6vla/red-frog-bear.png?rlkey=aenh85xyjo17v5nt6pylz65zq&dl=1",
+          "pola_cola|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/r1bln6jtnileae7lyv3q8/red-bear-kigu.png?rlkey=m8qlzu25uh0gdc60zfd64qw24&dl=1",
+          "pola_cola|red|korean":"https://dl.dropboxusercontent.com/scl/fi/bmeuij3ni5f2fw9e1j93h/red-bear-korean.png?rlkey=ci2o9dcwyakd3d82e1oao1p7q&dl=1",
+          "pola_cola|red|liger":"https://dl.dropboxusercontent.com/scl/fi/z5ngjoj0086u8hrbw8zm1/red-liger-bear.png?rlkey=t0fduedxtsnsi89oz58sczz2t&dl=1",
+          "pola_cola|red|shark":"https://dl.dropboxusercontent.com/scl/fi/myjmindm92e5d8owmbk0n/red-shark-bear.png?rlkey=tgpss7vaa5ue1gx64ai7zkext&dl=1",
+          "pola_cola|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/u78ghg7pfbdvb7xxpcszb/red-wizard-bear.png?rlkey=xljmh8nytbxlqj8fklllacodn&dl=1",
+          "pola_cola|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/qnhhoxmv4g62478uqpxh5/silver-cat-bear.png?rlkey=jdpf8e6oa3kdckzggh5sajhx0&dl=1",
+          "pola_cola|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/bssxx04cv10wzjbk6wm0c/silver-calvin-bear.png?rlkey=m4xz921jsdyh65gny4y8cwueu&dl=1",
+          "pola_cola|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/vipy30w8zojzv6l82m615/silver-calvin-slippers.png?rlkey=uk3l9adtfqmlx265gyjr78dl3&dl=1",
+          "pola_cola|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/hams81vrgo2qbtawevabc/chrome-bear-paws.png?rlkey=u9gj42y56cxyrvht61trxkde8&dl=1",
+          "pola_cola|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/9dhii4uzjkz4c3v2vip3h/chrome-dog-slippers.png?rlkey=9sfhltgk6kjjpocl8k5nk4nqk&dl=1",
+          "pola_cola|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/c6fij2f0ht7gwrlv13g3o/silver-bear-fan.png?rlkey=0wt7th53kphsfzz3n99k6buke&dl=1",
+          "pola_cola|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/pevjzuazguogq090bs4ll/silver-bear-image-frog.png?rlkey=ubs6nvkn4lcnc08p0xqj4haa0&dl=1",
+          "pola_cola|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/o96ug7wrywy7ktj7lfa35/silver-kigurumi-bear.png?rlkey=00l97hrev33jvf0p2y5e3a8v2&dl=1",
+          "pola_cola|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/fn7tt994kkj2u0ut035un/silver-bear-korean.png?rlkey=m4auhs77n1xhpmbphcqvar1fq&dl=1",
+          "pola_cola|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/6ziznkk9f5s71ia4g45iw/silver-liger-bear.png?rlkey=huvavlvzl43xtp812cfqzmleb&dl=1",
+          "pola_cola|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/gat8bics5m1fwimikr0cz/silver-shark-bear.png?rlkey=ccy5428em4g2lt1t1mddh0vxt&dl=1",
+          "pola_cola|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/l2j2fncmd8cwr5z9cc04t/chrome-wizard-bear.png?rlkey=hkcl20s7htpx1w2l57xw4wv27&dl=1",
+          "pola_cola|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/r4bgwxcek5o48rbtkk9d6/yellow-cat.png?rlkey=vlreucg49zwq2lq7h226y5l4h&dl=1",
+          "pola_cola|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/l4vgktwdj4cy0dg19zvoq/yellow-calvin-bear-2.png?rlkey=jz29b13ytedwp5wcn3w81eguu&dl=1",
+          "pola_cola|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/ep1u9pud76w00tbxnmfqj/yellow-slipper.png?rlkey=6cfabazm3qnoaxvt3ld7vf2hh&dl=1",
+          "pola_cola|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/f1uon9hpqyx4as5afql2p/yellow-bear-paws.png?rlkey=xbful8duj2u98mymsq5ax3pzz&dl=1",
+          "pola_cola|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/ep1u9pud76w00tbxnmfqj/yellow-slipper.png?rlkey=6cfabazm3qnoaxvt3ld7vf2hh&dl=1",
+          "pola_cola|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/tumkjrg3tq2rbuhpjt9v5/yellow-bear-fan.png?rlkey=ebnrbec2yccgnuand3mq1w2yc&dl=1",
+          "pola_cola|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/w99n6wi17nrzatu8l7n94/yellow-bearfrog.png?rlkey=t59k8nbspsbzyr64kwywk0koe&dl=1",
+          "pola_cola|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/92p45c9bv2cpwys2cd7w9/yellow-bear-kigu.png?rlkey=ls24kmeeb0frra5dbmh4g2yv8&dl=1",
+          "pola_cola|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/9q2drz0c19g4jek1nn515/yellow-bear-korean.png?rlkey=n9lm2gt34hyb348ztfrev19s9&dl=1",
+          "pola_cola|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/ozpyf5npfydytxkaz9noq/yellow-liger-bear.png?rlkey=rem5mofeun5rjdh4rsvua739t&dl=1",
+          "pola_cola|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/vwk19p6abjlzkspbvlfzg/yellow-shark-bear.png?rlkey=4y384487aubb27dp9j06hxfow&dl=1",
+          "pola_cola|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/gthyl0h6q0p9uxy8p7vmq/yellow-wizard-bear.png?rlkey=z4777mo6tqutcyngfqg95wiyd&dl=1",
+          "sloth|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/cqzin77ralmiazn13sa68/blue-sloth-bella-shoulder.png?rlkey=ums7tx1yxjlmqii845x9033t1&dl=1",
+          "sloth|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/m84d2e9lwuvw5miftk4wu/blue-calvin-slith.png?rlkey=humpzwbeyjeolfm9fnih04nnq&dl=1",
+          "sloth|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/fz7prshdfu8izeer3ftjw/blue-slipper-sloth.png?rlkey=03cvtuq1r7r8m2d9ig8mx4efm&dl=1",
+          "sloth|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/9cs23tl3c7zme3grpztl6/blue-cat-paw-sloth.png?rlkey=bzcdahpgjl63luch7hpkxkpxr&dl=1",
+          "sloth|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/p4vqf8bubystyidtoocpf/blue-dog-sloth.png?rlkey=h0neskxrcwtg9v6w5whddjd7v&dl=1",
+          "sloth|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/eqyr2g7mobdfmh8e6boy6/blue-sloth-fan.png?rlkey=rpl3yq5c3s7feuhaz0abhgese&dl=1",
+          "sloth|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/e1yo0dtpfi8hzsb4nbhj2/blue-sloth-frog.png?rlkey=ms4osq95ub74n803m933frakw&dl=1",
+          "sloth|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/phdu0cf7kt66uslmfmn1b/blue-kigu-sloth.png?rlkey=2glpbdmodjjoqk1037bw8z2hp&dl=1",
+          "sloth|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/xeu6sohkvay9zk2qlh5lt/blue-korean-sloth.png?rlkey=navphc4wnt0mqf9gnzgbyu0a5&dl=1",
+          "sloth|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/gp8w1t4v5cy519sx82eyb/blue-sloth-liger.png?rlkey=xl2vjntiyw38ouxzljsrzoran&dl=1",
+          "sloth|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/dx5oxireqr5u3g13ipejl/blue-sloth-shark.png?rlkey=z2mfopw11aasxdg70mpafilnv&dl=1",
+          "sloth|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/g41jpl0c97opjq2y3mtqj/blue-sloth-wizard.png?rlkey=n2l26cye6feun4sgk4lmcwtvq&dl=1",
+          "sloth|green|bella":"https://dl.dropboxusercontent.com/scl/fi/n4wgpnc3jd767lr01bpvc/green-sloth-bella.png?rlkey=0jroy9dtxhfn8vj4ibg9wovrr&dl=1",
+          "sloth|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/h14pinz5jg6z1uivy3y8c/green-sloth-calvin.png?rlkey=oqfvdy7smwbayyx06dywlnqeh&dl=1",
+          "sloth|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/hwkuccl2ci4mrlc3e8rov/green-sloth-slippers.png?rlkey=728zpsrvquw9qyte1rekuu3t6&dl=1",
+          "sloth|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5mv9e2gj7l88lqvlc0fqv/green-sloth-paws.png?rlkey=qbz5ualkizenfhspwm4u9s2v1&dl=1",
+          "sloth|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/e50lisd7z0owpr2rnrohx/green-sloth-dog.png?rlkey=579bi3p478czshx0d14u82pr2&dl=1",
+          "sloth|green|fan":"https://dl.dropboxusercontent.com/scl/fi/tlr4iurr34f5sktlt3w8q/green-sloth-fan.png?rlkey=o7rdp3g80d6urd5u5v6qgnedj&dl=1",
+          "sloth|green|frog":"https://dl.dropboxusercontent.com/scl/fi/murxzx40xucfny48rwc1u/green-sloth-frog.png?rlkey=zde6v56zw6doarpelntrwvtv0&dl=1",
+          "sloth|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/xpq7sv5w0lawwffn3kfxx/green-sloth-kigurumi.png?rlkey=5jroaf4vpb4wbjqhyoultw76j&dl=1",
+          "sloth|green|korean":"https://dl.dropboxusercontent.com/scl/fi/6afwe0dz671wd3qmxofry/green-korean-sloth.png?rlkey=0ykfrws4rpbn9oknis37vuq9b&dl=1",
+          "sloth|green|liger":"https://dl.dropboxusercontent.com/scl/fi/pnbcozba0ctc3z2dske1o/green-sloth-liger.png?rlkey=b23un8ydkdedkglji34kt0y6u&dl=1",
+          "sloth|green|shark":"https://dl.dropboxusercontent.com/scl/fi/sz0o8bu8rdal3ewgkr387/green-shark-sloth.png?rlkey=6suxihsz1fju334jbb3g0cog2&dl=1",
+          "sloth|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/5s9n24w68m7b0spzhx4zf/wizard-green-sloth.png?rlkey=wu4m84nchf380jb3r5nml2qne&dl=1",
+          "sloth|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/a882umx91phupy6g16ju3/pink-calvin-sloth.png?rlkey=wknco76mryzug9vhhoo1yztn9&dl=1",
+          "sloth|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/12vbaodnrs7ukvxn43ir0/pink-sloth-slippers.png?rlkey=gxdc7r1ncjz1jxbvcex4ep4il&dl=1",
+          "sloth|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/rr2q3ejtv57lu7oyi7u72/pink-cat-sloth.png?rlkey=4hd1fmtxpkq3gkd8y8gqsa2c9&dl=1",
+          "sloth|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/hzkyrioettabsunwlfdi1/pink-dog-slippers.png?rlkey=n6j399nqviheyzid8gn8ld2h5&dl=1",
+          "sloth|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/kqv9yy6ud3a7cy9ld13wq/pink-sloth-fan.png?rlkey=d8w16qlwckjipkkg0buhnucz9&dl=1",
+          "sloth|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/uiif9vohkkyvesiusjjmm/pink-sloth-frog.png?rlkey=dlw6qqlsvwz409i5dfocahqrg&dl=1",
+          "sloth|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/dpxvrcaeju2modoaeqapf/pink-kigurumi.png?rlkey=5lmto283v7wmjxybcmcx8iugy&dl=1",
+          "sloth|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/85dbvoe1udujmrsgozvtp/pink-korean-sloth.png?rlkey=v5chscu8l1o1tyoxweqwt2nnm&dl=1",
+          "sloth|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/owx112ixlpj9c8xi8zyk7/pink-liger-sloth.png?rlkey=f5pw8gojlydq480dz1pwezb37&dl=1",
+          "sloth|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/f81rp1aaydu99zr87gdo5/pink-sloth-shark.png?rlkey=hrp5520kt4xvgsh7jjf16ff32&dl=1",
+          "sloth|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/g7h56a3gswr1d0tou98pp/pink-wizard-sloth.png?rlkey=6udorwmk2bgw57zv34wz4ko38&dl=1",
+          "sloth|red|bella":"https://dl.dropboxusercontent.com/scl/fi/9nvwzznlfue7tpc718z9a/red-sloth-bella-image.png?rlkey=iyu6zcb5u6tlxiwm17crpdlgj&dl=1",
+          "sloth|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/54ihpjq9cwh72pevec5cr/red-sloth-calvin.png?rlkey=y8x5n8sbxu1isaje2e4o69f0n&dl=1",
+          "sloth|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/i0r9h3e7bzynl0crpwvfn/red-sloth-slippers.png?rlkey=3affzhhta1q4c27aob5dut661&dl=1",
+          "sloth|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/jyhtyjbmpg01q90n6r56p/red-sloth-cat-paw.png?rlkey=b0bxi3a07t65gche5c9bdh30i&dl=1",
+          "sloth|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/6z562ssz0ea5nn7weuxt1/red-sloth-dog-slipper.png?rlkey=wwg3hibl3rk1gt6i3c4rewicn&dl=1",
+          "sloth|red|fan":"https://dl.dropboxusercontent.com/scl/fi/ay6gnc6orx7gqufy1xp35/red-sloth-fan.png?rlkey=hb10nopatdmzv3xvrpkslrvlv&dl=1",
+          "sloth|red|frog":"https://dl.dropboxusercontent.com/scl/fi/67pu6aqs22i90rovoh7xo/red-frog-sloth.png?rlkey=oec5oglop0pcqk5mn4v16foso&dl=1",
+          "sloth|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/0yvcx97207x6bn62dpdxo/red-sloth-kigu.png?rlkey=0w9aiwmupiqe8pei79s5re7i1&dl=1",
+          "sloth|red|korean":"https://dl.dropboxusercontent.com/scl/fi/mvjz91ugmvcgkyhvjjaqm/red-korean-sloth.png?rlkey=0igulh4b8u3jsjmny8zdvpnxp&dl=1",
+          "sloth|red|liger":"https://dl.dropboxusercontent.com/scl/fi/pgprmv2jd74jafvj8ycgy/red-sloth-liger.png?rlkey=7ew4xgna6aok8v1jj8dqg6mz8&dl=1",
+          "sloth|red|shark":"https://dl.dropboxusercontent.com/scl/fi/0we7amd8bmrqak6kpysdc/red-shark-sloth.png?rlkey=3im3s9603w5q2o6088c8phl4u&dl=1",
+          "sloth|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/srf4z994hxsj9rxlpeojq/red-wizard-sloth.png?rlkey=b93cbw0i5n4wek0uruyq6oa71&dl=1",
+          "sloth|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/9gwk00fd41c65iavihw96/silver-bella-shoulder.png?rlkey=wkjnkse6lp4w668jreyfwx8p7&dl=1",
+          "sloth|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/1onabiic1iq45xjyvk0qu/silver-calvin-sloth.png?rlkey=agqu42ubgnw5uuhrhad5o7par&dl=1",
+          "sloth|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/li309jxj3tll7zskn3s4p/chrome-sloth-calvin-slippers.png?rlkey=zc30u6l3hvc0hp3r7dejui3v2&dl=1",
+          "sloth|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/j1s9hmefl3s1fp6bbo9s7/chrome-sloth-paws.png?rlkey=uosz4oo3colh7w76g35wxbii2&dl=1",
+          "sloth|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/krpxbch1py5g6n2uhy4h0/chrome-sloth-dog.png?rlkey=j6so9ky6rsitudrcj81gj5brb&dl=1",
+          "sloth|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/cfnxtdxhyz2xk1qxl0qvs/silver-sloth-fan.png?rlkey=lkta7t7hobmiqtyszhd0vall8&dl=1",
+          "sloth|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/q4oyoacl6bwuj86lb66to/silver-frog-sloth.png?rlkey=xo153yqm2cmeilii6qtw49jli&dl=1",
+          "sloth|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/o35iu0dbrjgfz8iegvaw7/silver-cat-kigurumi.png?rlkey=iiey8kwwj4xu8jwxfltqwa5yp&dl=1",
+          "sloth|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/ph6zcxjstvbkonvgkpj0i/silver-korean-sloth.png?rlkey=a1b5xx2bo1v1ck4evfwwdvas7&dl=1",
+          "sloth|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/65lr714ui4wzmnsh6s4ia/silver-sloth-liger.png?rlkey=fvhfwb5cwb7kfxpgxfu7342ic&dl=1",
+          "sloth|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/qzy548973xaylj9gm3t54/silver-shark-sloth.png?rlkey=pdy1mq4jnasvzifb1h5dj5570&dl=1",
+          "sloth|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/nkhhcqlr0wt03rixj2tu9/silver-wizard-sloth.png?rlkey=g37gv3wtilfzhgyjz384iw4zw&dl=1",
+          "sloth|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/6l4o3vk9uaxo1qu3r2u6c/yellow-bella-shoulder.png?rlkey=ytnrs9uguqaysakuhbfzxpio5&dl=1",
+          "sloth|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/ilofa89928o88htscokre/yellow-calvin-sloth.png?rlkey=oemoo48pmv16samhp2n6svzvc&dl=1",
+          "sloth|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/us676zwcrc0w3om1txaj9/yellow-sloth-slippers.png?rlkey=jbo72ubbvai8enw83awll911h&dl=1",
+          "sloth|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/dt6jy15h7osowh76hnin8/yellow-sloth-paws.png?rlkey=1ujwm3pl4w6ikvzs00pqktehp&dl=1",
+          "sloth|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/go14e6bdxjx59thyv7qon/yellow-sloth-dog.png?rlkey=5kmha9a7h91qu7t32cxr89x9y&dl=1",
+          "sloth|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/1wn1vo3mirnrh8qvje4ju/yellow-sloth-fan.png?rlkey=e3tijhtv6d109wqe67h5qtdo6&dl=1",
+          "sloth|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/41d3t7h7j0csn12ixcb7u/yellow-sloth-frog.png?rlkey=pfjjbbr2f6dwbt4rk67igup17&dl=1",
+          "sloth|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/fjkmekdf86c1bfnwfzpst/yellow-sloth-kigurumi.png?rlkey=mqrc0p5h0q8ad28wg54thqmte&dl=1",
+          "sloth|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/85a96uzbmbtl4i6mn5073/yellow-korean-sloth.png?rlkey=exwyl2sxi7ctetkogxol6okpk&dl=1",
+          "sloth|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/wb2bv1p4nx85ys8l9milx/yellow-sloth-liger.png?rlkey=hmpj82koxeov35yciutkahrxt&dl=1",
+          "sloth|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/gpd6g19orgx5u18wmvnj7/yellow-shark-hat.png?rlkey=99wmq72ikjj83t0n9macjjzqf&dl=1",
+          "sloth|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/tjjxduekybh36cwvk0kly/yellow-sloth-wizard.png?rlkey=ftmuqmtn58ohoni2o1xoh7g25&dl=1",
+          "turtle|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/qy98zvro2c9ztu6jugvif/blue-turtle-bella-shoulder.png?rlkey=oun4j138ky9by0f4h8t44onph&dl=1",
+          "turtle|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/iiqwo9spb3ig1223u0j88/blue-turtle-calvin.png?rlkey=p4olok7gfl97otm04buospseq&dl=1",
+          "turtle|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/r7bw27tyaz4phq0bocniv/blue-turtle-calvin-slipper.png?rlkey=129y3k7hvjk3ss6030v5lyd20&dl=1",
+          "turtle|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/5d0gsx2jr31pllh9qn71y/blue-turtle-cat.png?rlkey=o78cns9qmk8tr4n0cesl60ltq&dl=1",
+          "turtle|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/io6h41dem49ru3in5s9e8/blue-turtle-dog-slipper.png?rlkey=tn6pi1ehkv5ysr8w8li2qb8jt&dl=1",
+          "turtle|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/o7gcw5diuqn6vqyoj1g3h/turtle-fan-blue-final.png?rlkey=8kwvefbtj3k8dwlus725fy47o&dl=1",
+          "turtle|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/zldiyhqt8cktsjxur3nlh/blue-turtle-frog.png?rlkey=wf6aqoz4aay3omvi6id3d2bac&dl=1",
+          "turtle|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/dpm4xf0jxacpnoq083wnw/blue-turtle-kigu.png?rlkey=9i7jsehuvx1rv39ihlf49ztb4&dl=1",
+          "turtle|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/mzsf4nhu6kajy9mpgm6gq/blue-turtle-korean.png?rlkey=yzw3rggfz1kau5nlel9lifslj&dl=1",
+          "turtle|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/9rm48c61celri385dfu9a/blue-turtle-liger.png?rlkey=otn8c76u2j3j47hiytew6n8wb&dl=1",
+          "turtle|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/kf38pvmp9ovym32sht271/blue-turtle-shark.png?rlkey=8zio1kg0yzr2q8kyd642dbqsk&dl=1",
+          "turtle|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/ly6kdv71a0w4z6j9x9457/blue-turtle-wizard.png?rlkey=65vx7vgwmhlk00f10ax5f5uvj&dl=1",
+          "turtle|green|bella":"https://dl.dropboxusercontent.com/scl/fi/6uhzh8snyb8jn9qid2eg7/green-turtle-bella.png?rlkey=lovwqaxops3s21ob232plby5l&dl=1",
+          "turtle|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/w1114srywrgwzrhdo6hnn/green-turtle-calvin.png?rlkey=ewc7yjg9wkk1im7lkolf9vfzk&dl=1",
+          "turtle|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/giyi1v954176pjwunza5f/green-turtle-calvin-slipper.png?rlkey=5wqfw9979byk8anznwtf6r1h8&dl=1",
+          "turtle|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/28zedado68btccfawjcne/green-turtle-cat-paw.png?rlkey=0ou9dn445r4m4u1ix75iqc2q4&dl=1",
+          "turtle|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/ylw99k8wf4r3qqjgb2g2f/green-turtle-dog-slipper.png?rlkey=iqn9lw3dnloyx2rpk156huuze&dl=1",
+          "turtle|green|fan":"https://dl.dropboxusercontent.com/scl/fi/1k9dyvw8gae5op93hskef/green-turtle-fan.png?rlkey=ki3fq2zxb8xqlo52przix7w6q&dl=1",
+          "turtle|green|frog":"https://dl.dropboxusercontent.com/scl/fi/mnhnalkqsnsgl23i6ilsh/green-turtle-frog.png?rlkey=ns2qad1uu1x4gcep69x2rpqvb&dl=1",
+          "turtle|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/tfm4z7wco9jcidepltdr8/green-turtle-kigu.png?rlkey=vhjpmeafkt8r89pm5b2ar0ujx&dl=1",
+          "turtle|green|korean":"https://dl.dropboxusercontent.com/scl/fi/wz9egzjf5nhf2hajx0tmg/green-turtle-korean.png?rlkey=2hppjh44qqznlq0yiwg1413wn&dl=1",
+          "turtle|green|liger":"https://dl.dropboxusercontent.com/scl/fi/vbrxs681w44oca1avv7gj/green-turtle-liger.png?rlkey=m47iattbgaexvu3rmj1jfl7pv&dl=1",
+          "turtle|green|shark":"https://dl.dropboxusercontent.com/scl/fi/l672z6in3dil3gxc761iy/green-turtle-shark.png?rlkey=kjreo9a4g1j57gr0qiqgvop7l&dl=1",
+          "turtle|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/xyl6aqu50g61tvkmr7hj0/green-turtle-wizard.png?rlkey=8aqy3uxsvt50zkwcez2u9t8ie&dl=1",
+          "turtle|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/3a4ibeijegiax5nv705pk/pink-turtle-bella.png?rlkey=wjke79qcj9blo2qq5kydxdioj&dl=1",
+          "turtle|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/jy4cs14igelabh37kuokd/pink-turtle-calvin.png?rlkey=9nk5de53jjc3e3wj3o1o4j6ie&dl=1",
+          "turtle|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/62ex17glsh3ydvkripnii/pink-turtle-kigu.png?rlkey=c8npw5ryhkd2wn4o1g28gowdw&dl=1",
+          "turtle|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/kf04zh5kzywixjiil881r/pink-turtle-korean.png?rlkey=n6y9fvz65tl6qv1uwycm61639&dl=1",
+          "turtle|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/11hoxg32vu6drn7jkv8cj/pink-turtle-liger.png?rlkey=i1j0r70a41fx22ih0ecoeu0un&dl=1",
+          "turtle|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/dj4fafvyvnhwkurcg4ch6/pink-turtle-shark.png?rlkey=9ie2g8wuz46qed8zkaiuu2408&dl=1",
+          "turtle|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/2oqanoc1m3if1a8b2rezj/pink-turtle-wizrd.png?rlkey=lgyf7o9ahsnaqdo2qer2p96oz&dl=1",
+          "turtle|red|bella":"https://dl.dropboxusercontent.com/scl/fi/ahb6n836wc7gzuxyidzgt/red-turtle-bella.png?rlkey=bhxfmlcm2rjyc5o2vg7nkdx0i&dl=1",
+          "turtle|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/wecqknydt7162f1e6i1nb/red-turtle-calvin.png?rlkey=ys7zvrl4e3a6hv7chr6hwhc6i&dl=1",
+          "turtle|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/d83czl1ilwa2w7m2gcr1m/red-turtle-calvin-slipper.png?rlkey=p03hd8x1ubbsz9i1aabdz28dm&dl=1",
+          "turtle|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/sdptjwxgs5cocceb7johx/red-turtle-cat-paw.png?rlkey=hx0kfz3e5ogkc0i9okl5gbkmn&dl=1",
+          "turtle|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/dw4b6hh6y2jw7emuq13p3/red-turtle-dog.png?rlkey=l4rjxpzym6ssfioitxp327wed&dl=1",
+          "turtle|red|fan":"https://dl.dropboxusercontent.com/scl/fi/rqrucm98t91dbfbmoqosy/red-turtle-fan.png?rlkey=5hjg07fpuix7voka0gjv04kph&dl=1",
+          "turtle|red|frog":"https://dl.dropboxusercontent.com/scl/fi/2q1pormjipp3gos9l8une/red-turtle-frog.png?rlkey=nob8z2h8gvj1f10f3kf4aewdw&dl=1",
+          "turtle|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/sxi3rxtms4w21o4pt3jk3/red-turtle-kigu.png?rlkey=cas5nzvbffj59frgd8b7ea8gh&dl=1",
+          "turtle|red|korean":"https://dl.dropboxusercontent.com/scl/fi/bsyecpjbm7vs6np5ni6v5/red-turtle-korean.png?rlkey=swhe1h0uflno2v6quh6k64yuk&dl=1",
+          "turtle|red|liger":"https://dl.dropboxusercontent.com/scl/fi/zj92iongeo1on26h77al4/red-turtle-liger.png?rlkey=p5zq32nrrcdbfpsxan545ordo&dl=1",
+          "turtle|red|shark":"https://dl.dropboxusercontent.com/scl/fi/awl3l7sdbwgiq7zek535r/red-turtle-shark.png?rlkey=zv8bbze06xwbqf0hnqzaj8krj&dl=1",
+          "turtle|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/5p7z6trifpuhqs4ek6isx/red-turtle-wizard.png?rlkey=nlplpu5zfjrl6lirvah5l226n&dl=1",
+          "turtle|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/2pchlsaccnbln3uzbikbj/silver-turtle-bella.png?rlkey=c7vykt7jblcpyl1jggq38pnzk&dl=1",
+          "turtle|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/ksap2whm2zjzn7v0ehdtg/silver-turtle-calvin.png?rlkey=ohejnxwieiujpjzi427ab9w7h&dl=1",
+          "turtle|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/v2ucs9pokwsc1lwvfk2fe/silver-turtle-calvin-slipper.png?rlkey=8i8dv23vtod1le6hd6ssmazx4&dl=1",
+          "turtle|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/uf6q8708cu64rhdaavix5/silver-turtle-cat-paw.png?rlkey=v7a0cm5lf2ly6t1dm60d0hlkb&dl=1",
+          "turtle|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/rxyf751ezu0ajwo5tlsvh/silver-turtle-dog-slippre.png?rlkey=aqjb3qluapholdn4qp71sfyd3&dl=1",
+          "turtle|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/mev8jqtqie41211sdjp2h/silver-turtle-fan.png?rlkey=036s8b8ytev4d65ti58w4bs8d&dl=1",
+          "turtle|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/2j2qgwmbtp17n6ru35osf/silver-turtle-frog.png?rlkey=dsnp0kvhoo09cbtthgr15z6l0&dl=1",
+          "turtle|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/st7ay64297wytfov1slsk/silver-turtle-kigu.png?rlkey=c4q4841j6ithgv4pidjtjzpq2&dl=1",
+          "turtle|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/c4rikyeik63ma2gmz9iuw/silver-turtle-korean.png?rlkey=8e8tde43r9kt9xaupwqq899ob&dl=1",
+          "turtle|silver|liger":"https://dl.dropboxusercontent.com/scl/fi/s58qip2pncwfcnvw5vt0x/silver-turtle-liger.png?rlkey=cwoqax5xz3efyuvm5fk7nwwe5&dl=1",
+          "turtle|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/cdto2h6h2ckoj2c4pccnz/silver-turtle-shark.png?rlkey=ky61erp30t4bih76hso5r3sa1&dl=1",
+          "turtle|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/zt55zi7iorj8egfa96926/silver-turtle-wizard.png?rlkey=vhnlekw4s6lxuomu3o1hlqeeq&dl=1",
+          "turtle|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/k09yqyjo6a4wxctw3kpmn/yellow-turtle-bella.png?rlkey=b4qe28r1cz897he763bflw13k&dl=1",
+          "turtle|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/uvahrhvvy6bdfxqpx6ael/yellow-turtle-calvin.png?rlkey=95ifsqbqubwlqyprc7dnt9eif&dl=1",
+          "turtle|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/d2heoyj7ddk349yt3hx73/yellow-turtle-calvin-slipper.png?rlkey=9za0dk3bhzcv4n5kzorxv6zop&dl=1",
+          "turtle|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/ehatxc96zkf68btq167mj/yellow-turtle-calico-paw.png?rlkey=h9f2ht3z3jm0go9sy1ju8ihrm&dl=1",
+          "turtle|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/udwfddm0wnpe1im6zki51/yellow-turtle-dog-slipper.png?rlkey=ogy5hf91bhj96v7qcdlcp4zp5&dl=1",
+          "turtle|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/v7hxyjc5090z5y1h50zbh/yellow-turtle-fan.png?rlkey=23xgxp7hurbjwjmevo2tx33b4&dl=1",
+          "turtle|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/54yw16cz5a5ky6tj4k3ef/yellow-turtle-frog.png?rlkey=z9g6a5aja9r50hbhpp3sm15p9&dl=1",
+          "turtle|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/8s4p0jptrnn2i0rilm36y/yellow-turtle-kigu.png?rlkey=rmxts27f3xie5d5ve23zkreb5&dl=1",
+          "turtle|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/5vcytcrnpsms7mgg9ql6m/yellow-turtle-korean.png?rlkey=pyek48fx6z78eeshm2g4twxlj&dl=1",
+          "turtle|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/fvkzxmiw79ro76p2ren0u/yellow-turtle-liger.png?rlkey=7n797x610roempmr8d9hca91r&dl=1",
+          "turtle|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/mz3w87kmn7hz87w2ogpxh/yellow-turtle-shark.png?rlkey=vegbo7v5okopzvq1bw5oenf9x&dl=1",
+          "turtle|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/cxwhdbzh9387ersbwpey1/yellow-turtle-wizard.png?rlkey=q66v8yeb4bdon9e78zbhr8d49&dl=1",
+          "wombat|blue|bella":"https://dl.dropboxusercontent.com/scl/fi/am9t3m552onazqtjox8ct/wombat-bella-base.png?rlkey=tyrx5e19mjhe5gj3i4pkl8c9j&dl=1",
+          "wombat|blue|calvin":"https://dl.dropboxusercontent.com/scl/fi/eqbu85rily5n1ey9fu01t/wombat-calvin-blue.png.png?rlkey=fr6nvbsnxry19cqvumfzkhbfq&dl=1",
+          "wombat|blue|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/c3x7kc1tuzl3llsy9xlbh/blue-wombat-calvin-slippers.png?rlkey=2bk78zkad1jpvfyq7sh9kw90d&dl=1",
+          "wombat|blue|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/xr72eowofhgsss6wivdy9/blue-wombat-cat-paw.png?rlkey=4kg80kcnm50nphaw9q7b49hmp&dl=1",
+          "wombat|blue|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/az5wt86v9gg3jidt4srip/blue-wombat-dog-slippers.png?rlkey=2ii36z48nsfv306ss8k6p2p5z&dl=1",
+          "wombat|blue|fan":"https://dl.dropboxusercontent.com/scl/fi/hwd1ims21qz2hfufasa9e/blue-wombat-fan.png?rlkey=sk9q8xxrybbc5em7iski2pn9a&dl=1",
+          "wombat|blue|frog":"https://dl.dropboxusercontent.com/scl/fi/a3pj7wbgc1lfla20fftqb/wombat-frog-blue.png?rlkey=wmqxtconur2ebjoqzmus8s2w9&dl=1",
+          "wombat|blue|kigu":"https://dl.dropboxusercontent.com/scl/fi/okykeqabp7qqyjtqgruw4/wombat-kigurumi-blue.png.png?rlkey=040zrd1i5ft2budxbx5w4f3l9&dl=1",
+          "wombat|blue|korean":"https://dl.dropboxusercontent.com/scl/fi/cuit6zh3n9znw5o4kly4t/wombat-korean-blue.png.png?rlkey=r8n25huhsk692i2z6xro2c7zb&dl=1",
+          "wombat|blue|liger":"https://dl.dropboxusercontent.com/scl/fi/aijb4vksn35c6nsa3nj19/wombat-liger-blue.png.png?rlkey=x85eufyo7txsf1ptpa58ac85h&dl=1",
+          "wombat|blue|shark":"https://dl.dropboxusercontent.com/scl/fi/1f4vcihf8cqzabqj79a0y/wombat-shark-blue.png?rlkey=01i7edfjb2rjbssp0zorndidk&dl=1",
+          "wombat|blue|wizard":"https://dl.dropboxusercontent.com/scl/fi/t2penpyv4uxhmzgcydahf/wombat-wizard-blue.png.png?rlkey=htyswrd97ciwih30lh1k4xypi&dl=1",
+          "wombat|green|bella":"https://dl.dropboxusercontent.com/scl/fi/70dkvc18j6d7eanzhvtgo/green-wombat-bella-shoulder.png?rlkey=9am7vkyxg87iiw6hudpa18bq9&dl=1",
+          "wombat|green|calvin":"https://dl.dropboxusercontent.com/scl/fi/rlp8x173vim05pgrik595/green-wombat-calvin.png?rlkey=llky7a9u3em95m3bq2vr6qir4&dl=1",
+          "wombat|green|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/u21mvxipk52fmjc7q3i2o/green-wombat-calvin-slipper.png?rlkey=glub0lfp8j9sdxpfb0dx1p44m&dl=1",
+          "wombat|green|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/ws1bm9iskfbjwpt06wl29/green-wombat-paw.png?rlkey=kto365gp9qqso5m2lxiy48jxt&dl=1",
+          "wombat|green|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/55abayyl07jedcocheh9s/green-wombat-dog.png?rlkey=6mb6bdgx2iub2dbsbicffuuu4&dl=1",
+          "wombat|green|fan":"https://dl.dropboxusercontent.com/scl/fi/0ffz9ponjocyhf8jwtbcl/green-wombat-fan.png?rlkey=9sd5lgnmvdqq1chwiphmihhi1&dl=1",
+          "wombat|green|frog":"https://dl.dropboxusercontent.com/scl/fi/pp3ugi0weh0z5evd2hppu/green-wombat-frog.png?rlkey=7mv7qd1yv48tjlxugx8qa9er3&dl=1",
+          "wombat|green|kigu":"https://dl.dropboxusercontent.com/scl/fi/s5hw6e6xnkgsqe4ms49s8/green-wombat-kigu.png?rlkey=xyd5dgcc7yvzp2zqlrodzm6z2&dl=1",
+          "wombat|green|korean":"https://dl.dropboxusercontent.com/scl/fi/s5vghv4c7ndo07wu2w7w0/green-wombat-korean.png?rlkey=6ruts6wq8gvy4xsjboh56aip1&dl=1",
+          "wombat|green|liger":"https://dl.dropboxusercontent.com/scl/fi/5waxgkmj22tiktrqit36z/green-wombat-liger.png?rlkey=iijjdndkwur17tmvlhgp4znnh&dl=1",
+          "wombat|green|shark":"https://dl.dropboxusercontent.com/scl/fi/7vota7s8q6nqar63npnur/green-wombat-shark.png?rlkey=vvobtxu0aymtmn953s68d3z5z&dl=1",
+          "wombat|green|wizard":"https://dl.dropboxusercontent.com/scl/fi/eesr6i7raqs7e2ughirzb/green-wombat-wizard.png?rlkey=bzngcxmhknuljs9hhyxgbnhuw&dl=1",
+          "wombat|pink|bella":"https://dl.dropboxusercontent.com/scl/fi/2vehi51pdyujtm3g4ub2g/pink-wombat-bella-shoulder.png?rlkey=3squrmsblhhgfrozueyo73flv&dl=1",
+          "wombat|pink|calvin":"https://dl.dropboxusercontent.com/scl/fi/5m0n7ofz7bnrmhxh472vg/pink-wombat-calvin.png?rlkey=lmlccc2q21b7cpjtiu3cvxv1u&dl=1",
+          "wombat|pink|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/6h33z2q2dsym6n4y51uru/pink-wombat-calvin-slipper.png?rlkey=pb6h65fqukr7vkrunbqapjt01&dl=1",
+          "wombat|pink|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/2ueqxdg4rkcxfx0jmgiaw/pink-wombat-paw.png?rlkey=jckz44etn8ikenljdrngjlq1k&dl=1",
+          "wombat|pink|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/pwzd9cxxi0w8q6l2y7w71/pink-wombat-dog.png?rlkey=uplgneyoz10eox3tsrssui33i&dl=1",
+          "wombat|pink|fan":"https://dl.dropboxusercontent.com/scl/fi/31ibyadojm1d1i5uycd4j/pink-wombat-fan.png?rlkey=urno2zhhfbw9hgnappqajumd6&dl=1",
+          "wombat|pink|frog":"https://dl.dropboxusercontent.com/scl/fi/sao5j6t4qgeysbimbumty/pink-wombat-frog.png?rlkey=pc64pob7i1ep063hdjmx0ie8s&dl=1",
+          "wombat|pink|kigu":"https://dl.dropboxusercontent.com/scl/fi/0w18jlpeqnq3sqchyla2l/pink-wombat-kigu.png?rlkey=o9zkkgftqkmxxs8cu8vfsy8zt&dl=1",
+          "wombat|pink|korean":"https://dl.dropboxusercontent.com/scl/fi/edy062ba1tfhujeoq7hw3/pink-wombat-korean.png?rlkey=ed6acg4zjuhkwwrmjrx884auq&dl=1",
+          "wombat|pink|liger":"https://dl.dropboxusercontent.com/scl/fi/iez42ybrxjmfzoyip0705/pink-liger-wombat.png?rlkey=dpirf5o3ahj8c3ur4j2lmpndq&dl=1",
+          "wombat|pink|shark":"https://dl.dropboxusercontent.com/scl/fi/wfc4bxvckle1rrv83aye5/pink-wombat-shark.png?rlkey=hjtwdcxuy1uxw512f3v7lj7zx&dl=1",
+          "wombat|pink|wizard":"https://dl.dropboxusercontent.com/scl/fi/w99m6xr944xeddbvfk5to/pink-wombat-wizard.png?rlkey=25tsqnnluwxoq0b0gftf8emve&dl=1",
+          "wombat|red|bella":"https://dl.dropboxusercontent.com/scl/fi/3uewa7835bpnbomy0eg4s/red-wombat-bella-shoulder.png?rlkey=gpma4pwjd15ugx38a9k2e3u2s&dl=1",
+          "wombat|red|calvin":"https://dl.dropboxusercontent.com/scl/fi/127jpi7n5pdbvckt3rerr/red-wombat-calvin.png?rlkey=i6yi7u04gu3gu9lgllxyrenaa&dl=1",
+          "wombat|red|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/jvumamr6tq5kgx568e00o/red-wombat-slipper-calvin.png?rlkey=6kdbu99j9x3xchnim3eri8crm&dl=1",
+          "wombat|red|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/sza119pbum016ss0jwhxs/red-wombat-paw.png?rlkey=y1atrc1j6q72h19e3iump6u6s&dl=1",
+          "wombat|red|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/nfe85t32hdppbefzupi72/red-wombat-dog.png?rlkey=8lqi9im7mqfhz78bzlxnkcci0&dl=1",
+          "wombat|red|fan":"https://dl.dropboxusercontent.com/scl/fi/zvhfwf3032wpde3glsd36/red-wombat-fan.png?rlkey=g7npv4eqwjlk5avi5hkz1lfvf&dl=1",
+          "wombat|red|frog":"https://dl.dropboxusercontent.com/scl/fi/doqgukf2onk1v5mmz87ix/red-wombat-frog.png?rlkey=tgksqz2aoieapsqmoobsmi3p8&dl=1",
+          "wombat|red|kigu":"https://dl.dropboxusercontent.com/scl/fi/h5medzzpbgu9e4xoqks69/red-wombat-kigu.png?rlkey=326hmlz6mfrmzgn4epo0aqqlu&dl=1",
+          "wombat|red|korean":"https://dl.dropboxusercontent.com/scl/fi/6jfub1lbrb1w6dqnrke7r/red-wombat-korean.png?rlkey=tway56jf4cpr0w74ev5gpacfk&dl=1",
+          "wombat|red|liger":"https://dl.dropboxusercontent.com/scl/fi/ankxuqno9dsjan5ju5agf/red-wombat-liger.png?rlkey=oe7a7zmcbshp0pmozhd8ap5dj&dl=1",
+          "wombat|red|shark":"https://dl.dropboxusercontent.com/scl/fi/8rrntmg8dfbo0izu8vuf7/red-wombat-shark.png?rlkey=g8dmjvoyk03s434576ykfhyhh&dl=1",
+          "wombat|red|wizard":"https://dl.dropboxusercontent.com/scl/fi/9aktt45tglnu4na4ekifi/red-wombat-wizard.png?rlkey=s6i1br1s78eyzekstthr2kk83&dl=1",
+          "wombat|silver|bella":"https://dl.dropboxusercontent.com/scl/fi/7740uo820ba417bggrgo8/silver-wombat-bae.png?rlkey=gegsxkhzutmm5ryux280jvnwy&dl=1",
+          "wombat|silver|calvin":"https://dl.dropboxusercontent.com/scl/fi/1m91jtgy16c9i9qlfb4w8/silver-wombat-calvin.png?rlkey=xw96g7nkkxk2hud5401x554z2&dl=1",
+          "wombat|silver|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/rt2ggs0ef8i3vxzowon24/silver-wombat-calvin-slipper.png?rlkey=1sf3qo4cvoqgfkfnfwwns0b61&dl=1",
+          "wombat|silver|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/gmtp2ta644za7tb873e2y/silver-wombat-paw.png?rlkey=e3zwnj95cykhsrugu4favvy02&dl=1",
+          "wombat|silver|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/7fz7puyw8esgegf6030u6/silver-wombat-dog.png?rlkey=wqmmtm50bsosa0ewr3brw322u&dl=1",
+          "wombat|silver|fan":"https://dl.dropboxusercontent.com/scl/fi/i48w1rhmtn1kctr8e1oj5/silver-wombat-fan.png?rlkey=gn6ggxgneoitllrwx0479kh0d&dl=1",
+          "wombat|silver|frog":"https://dl.dropboxusercontent.com/scl/fi/acgmll5lvtrb2yz6rnd1b/silver-wombat-frog.png?rlkey=ulvaaxfwcp254ky2qscy42asr&dl=1",
+          "wombat|silver|kigu":"https://dl.dropboxusercontent.com/scl/fi/8vva0d28wfc2zuuv10ovz/silver-wombat-kigu.png?rlkey=2lzfrx5gwmf08pupywq5028fg&dl=1",
+          "wombat|silver|korean":"https://dl.dropboxusercontent.com/scl/fi/6ce7kr5mwtgywp8h0wnn4/silver-wombat-korean.png?rlkey=tis6s37n3aeolotl29rzhi8r8&dl=1",
+          "wombat|silver|shark":"https://dl.dropboxusercontent.com/scl/fi/izvzrx4o3rs9hqkpjxorh/silver-wombat-shark.png?rlkey=1eb2hxt7tbjxty40im2bjfz9e&dl=1",
+          "wombat|silver|wizard":"https://dl.dropboxusercontent.com/scl/fi/rd5w50s8o9f7nypbzlyli/silver-wombat-wizard.png?rlkey=dmrt0er6bglf3cm14vki9y3es&dl=1",
+          "wombat|yellow|bella":"https://dl.dropboxusercontent.com/scl/fi/qst4sf6709su32spptmic/yellow-wombat-bella.png?rlkey=6ggfqp1c0igsc2w87ghobswds&dl=1",
+          "wombat|yellow|calvin":"https://dl.dropboxusercontent.com/scl/fi/habeyikhok1miivqpi8ju/yellow-wombat-calvin.png?rlkey=f8fhzh0q7f9hb924oty6e1vg8&dl=1",
+          "wombat|yellow|calvin_slipper":"https://dl.dropboxusercontent.com/scl/fi/uhj76o71phucx7voou6nt/yellow-wombat-calvin-slipper.png?rlkey=en0bz4a0envtqh3wn6ltbwkbm&dl=1",
+          "wombat|yellow|cat_paw":"https://dl.dropboxusercontent.com/scl/fi/unpug13im4dtp3gbrtc6c/yellow-wombat-paw.png?rlkey=gnn2fnnva1kvcgg4ij15nh7vk&dl=1",
+          "wombat|yellow|dog_slipper":"https://dl.dropboxusercontent.com/scl/fi/l4onrlfkasjdj4hhv65kg/yellow-wombat-dog.png?rlkey=rsszftofn7uopyxu8svpjqmje&dl=1",
+          "wombat|yellow|fan":"https://dl.dropboxusercontent.com/scl/fi/m4axxz6lc6vggmflilslh/yellow-wombat-fan.png?rlkey=bhhf5p7tn4oh8pmnychxzkrqr&dl=1",
+          "wombat|yellow|frog":"https://dl.dropboxusercontent.com/scl/fi/ascc4fjo6wsnynu0r5ies/yellow-wombat-frog.png?rlkey=jufeljf7lzu5x7d1s3r4lcz9v&dl=1",
+          "wombat|yellow|kigu":"https://dl.dropboxusercontent.com/scl/fi/lnbjq2i6mpjoekxwqynvp/yellow-wombat-kigu.png?rlkey=nbyyggfe62oy7hgh3h598rrg9&dl=1",
+          "wombat|yellow|korean":"https://dl.dropboxusercontent.com/scl/fi/sv8tgwhyo970yblhq7k96/yellow-wombat-korean.png?rlkey=697i72gdfl54sm7a4ni3yv4x0&dl=1",
+          "wombat|yellow|liger":"https://dl.dropboxusercontent.com/scl/fi/xs0txbsmc1gcgm1tdx8yn/yellow-wombat-liger.png?rlkey=bwen2n5mn9ns9dxa0m9whd8e1&dl=1",
+          "wombat|yellow|shark":"https://dl.dropboxusercontent.com/scl/fi/6ccjgc4v1ajn68wgmni4r/yellow-wombat-shark.png?rlkey=z23w1k5329t1ae9wjq8osaelt&dl=1",
+          "wombat|yellow|wizard":"https://dl.dropboxusercontent.com/scl/fi/r4gor3p597f1c1fbo1v7x/yellow-wombat-wizard.png?rlkey=iealiax9lb6nw49v6r2czjo48&dl=1"
         };
 
         var _GACHA_ANIMALS=[
-          {name:'Captain Corea',key:'captain_corea',weight:2},
-          {name:'Fennec Fox',key:'fox',weight:9},
-          {name:'Muscle Turtle',key:'turtle',weight:14},
-          {name:'Pola Cola',key:'pola_cola',weight:22},
-          {name:'Sloman',key:'sloth',weight:25},
-          {name:'Wombatman',key:'wombat',weight:28}
+          {name:'Captain Corea',key:'captain_corea',weight:5},
+          {name:'Fennec Fox',   key:'fox',           weight:9},
+          {name:'Muscle Turtle',key:'turtle',        weight:13},
+          {name:'Pola Cola',   key:'pola_cola',      weight:22},
+          {name:'Sloman',      key:'sloth',          weight:25},
+          {name:'Wombatman',   key:'wombat',         weight:26}
         ];
         var _GACHA_COLORS=[
-          {name:'Holo Chrome/Silver',key:'silver',weight:0.1,rarity:'holo',badge:'badge-holo'},
-          {name:'Metallic Pink',key:'pink',weight:4.9,rarity:'pink',badge:'badge-pink'},
-          {name:'Red',key:'red',weight:15,rarity:'red',badge:'badge-red'},
-          {name:'Yellow',key:'yellow',weight:18,rarity:'yellow',badge:'badge-yellow'},
-          {name:'Green',key:'green',weight:27,rarity:'green',badge:'badge-green'},
-          {name:'Blue',key:'blue',weight:35,rarity:'blue',badge:'badge-blue'}
+          {name:'Holo Chrome/Silver',key:'silver',weight:3,   rarity:'holo',  badge:'badge-holo'},
+          {name:'Metallic Pink',     key:'pink',  weight:5,   rarity:'pink',  badge:'badge-pink'},
+          {name:'Red',               key:'red',   weight:15,  rarity:'red',   badge:'badge-red'},
+          {name:'Yellow',            key:'yellow',weight:18,  rarity:'yellow',badge:'badge-yellow'},
+          {name:'Green',             key:'green', weight:27,  rarity:'green', badge:'badge-green'},
+          {name:'Blue',              key:'blue',  weight:32,  rarity:'blue',  badge:'badge-blue'}
         ];
         var _GACHA_ITEMS=[
-          {name:'Traditional Korean Warrior costume',key:'korean',weight:1,tier:3},
-          {name:'Mecha costume',key:'liger',weight:1,tier:3},
-          {name:'Calico cat kigurumi',key:'kigu',weight:2,tier:3},
-          {name:'Mr. Calvin costume',key:'calvin',weight:3,tier:3},
-          {name:'Mr. Croak Croak (frog) costume',key:'frog',weight:6,tier:2},
-          {name:'Mr. Shark (\uc0c1\uc5b4\uc528) costume',key:'shark',weight:6,tier:2},
-          {name:'Calico cat friend (Bella)',key:'bella',weight:9,tier:2},
-          {name:'Wizard costume',key:'wizard',weight:9,tier:2},
-          {name:'Cat paws',key:'cat_paw',weight:18,tier:1},
-          {name:'Dog slippers',key:'dog_slipper',weight:18,tier:1},
-          {name:'Mr. Calvin slippers',key:'calvin_slipper',weight:13.5,tier:1},
-          {name:'KoreanLearnin fan',key:'fan',weight:13.5,tier:1}
+          {name:'Traditional Korean Warrior costume',key:'korean',        weight:1,   tier:3},
+          {name:'Mecha costume',                     key:'liger',         weight:1,   tier:3},
+          {name:'Calico cat kigurumi',               key:'kigu',          weight:2,   tier:3},
+          {name:'Mr. Calvin costume',                key:'calvin',        weight:3,   tier:3},
+          {name:'Mr. Croak Croak (frog) costume',    key:'frog',          weight:6,   tier:2},
+          {name:'Mr. Shark (\uc0c1\uc5b4\uc528) costume', key:'shark',   weight:6,   tier:2},
+          {name:'Calico cat friend (Bella)',          key:'bella',         weight:9,   tier:2},
+          {name:'Wizard costume',                    key:'wizard',        weight:9,   tier:2},
+          {name:'Cat paws',                          key:'cat_paw',       weight:18,  tier:1},
+          {name:'Dog slippers',                      key:'dog_slipper',   weight:18,  tier:1},
+          {name:'Mr. Calvin slippers',               key:'calvin_slipper',weight:13.5,tier:1},
+          {name:'KoreanLearnin fan',                 key:'fan',           weight:13.5,tier:1}
         ];
 
         function _gachaWeightedRoll(table){
@@ -35108,8 +35452,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '._gfmsg.show{opacity:1;}',
                   '._grov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9999999;opacity:0;pointer-events:none;transition:opacity .4s;background:rgba(0,0,0,.82);}',
                   '._grov.show{opacity:1;pointer-events:all;}',
-                  '._grc{background:#0e0e0e;border-radius:20px;padding:24px 24px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transform:scale(.85);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:340px;width:92vw;}',
-                  '._grov.show ._grc{transform:scale(1);}',
+                                  '._grov.show ._grc{transform:scale(1);}',
                   '._grc[data-rarity="holo"]{border:2px solid #dde;box-shadow:0 0 50px rgba(200,200,255,.55),0 0 90px rgba(200,200,255,.18);}',
                   '._grc[data-rarity="pink"]{border:2px solid #d4537e;box-shadow:0 0 45px rgba(212,83,126,.5);}',
                   '._grc[data-rarity="red"]{border:2px solid #e24b4a;box-shadow:0 0 45px rgba(226,75,74,.45);}',
@@ -35138,6 +35481,35 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '@keyframes _gFly{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.3);opacity:0}}',
                   '._gctr{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:12px;color:#aaa;font-size:11px;letter-spacing:.1em;}',
                   '.tier-3{background:#1a0808;color:#e24b4a;border:1px solid #e24b4a55;}.tier-2{background:#081208;color:#639922;border:1px solid #63992255;}.tier-1{background:#08080e;color:#378add;border:1px solid #378add55;}',
+  '._grc{background:#0e0e0e;border-radius:20px;padding:24px 24px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transform:scale(.85);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:440px;width:94vw;}',
+  '._grrws{display:flex;flex-direction:column;gap:8px;width:100%;}',
+  '._grrw{display:flex;align-items:center;gap:8px;font-size:7px;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;border-radius:8px;background:#141414;border:1px solid #2a2a2a;}',
+  '._grrw ._grrl{flex:0 0 72px;color:#666;white-space:nowrap;border-right:1px solid #2a2a2a;padding-right:8px;}',
+  '._grrw ._grrn{flex:1;color:#fff;font-size:7px;line-height:1.4;word-break:break-word;}',
+  '._grrw ._grrt{font-size:6px;padding:3px 6px;border-radius:4px;white-space:nowrap;text-align:center;flex-shrink:0;}',
+  '._grrw ._grrp{color:#f5c842;font-size:7px;white-space:nowrap;text-align:right;flex-shrink:0;min-width:42px;}',
+  '._gcmb{font-size:8px;color:#aaa;letter-spacing:.08em;text-align:center;border-top:1px solid #222;padding-top:10px;width:100%;}',
+  '._gcmb span{color:#f5c842;}',
+  '._gsrb{background:#1a1a2e;border:1px solid #378add;color:#378add;font-family:"Press Start 2P",monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:6px 14px;border-radius:6px;cursor:pointer;transition:background .2s,color .2s;}',
+  '._gsrb:hover{background:#378add;color:#fff;}',
+  '._grarov{position:fixed;inset:0;z-index:10000000;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}',
+  '._grarov.show{opacity:1;pointer-events:all;}',
+  '._grarpop{background:#0e0e0e;border:1px solid #333;border-radius:16px;padding:24px;max-width:440px;width:94vw;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px;}',
+  '._grarpop h2{font-size:9px;color:#f5c842;letter-spacing:.15em;text-transform:uppercase;text-align:center;text-shadow:0 0 8px #f5c842;}',
+  '._grarsect{font-size:7px;color:#f5c842;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;}',
+  '._grartbl{width:100%;border-collapse:collapse;}',
+  '._grartbl th{font-size:6px;color:#888;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #222;text-align:left;}',
+  '._grartbl td{font-size:6px;color:#fff;padding:5px 8px;border-bottom:1px solid #1a1a1a;letter-spacing:.05em;}',
+  '._grartbl td.pct{color:#f5c842;text-align:right;}',
+  '._grartbl td.t3{color:#e24b4a;}._grartbl td.t2{color:#639922;}._grartbl td.t1{color:#378add;}',
+  '._grarcls{background:#1a0e00;border:1px solid #f5c842;color:#f5c842;font-family:"Press Start 2P",monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:6px 16px;border-radius:6px;cursor:pointer;align-self:center;}',
+  '._grarcls:hover{background:#f5c842;color:#000;}',
+  '._gorb{position:absolute;border-radius:50%;opacity:0;animation:_gOrbAnim var(--dur) ease-in-out var(--delay) infinite;}',
+  '@keyframes _gOrbAnim{0%{transform:translate(0,0) scale(0);opacity:0}15%{transform:translate(var(--x1),var(--y1)) scale(1.1);opacity:.95}55%{transform:translate(var(--x2),var(--y2)) scale(.9);opacity:.7}85%{transform:translate(var(--x3),var(--y3)) scale(1);opacity:.3}100%{transform:translate(var(--x3),var(--y3)) scale(0);opacity:0}}',
+  '._gss{position:absolute;inset:-2px;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.95) 50%,transparent 70%);background-size:250% 250%;clip-path:polygon(50% 0%,63% 37%,100% 50%,63% 63%,50% 100%,37% 63%,0% 50%,37% 37%);animation:_gStarShine 1s ease-in-out var(--shdl) infinite;pointer-events:none;}',
+  '@keyframes _gStarShine{0%{background-position:150% 150%;opacity:0}40%{opacity:0}50%{background-position:0% 0%;opacity:1}60%{opacity:0}100%{background-position:-150% -150%;opacity:0}}',
+  '._gholosc{position:absolute;inset:0;border-radius:12px;pointer-events:none;opacity:0;background:linear-gradient(115deg,transparent 0%,rgba(255,100,200,0) 30%,rgba(150,220,255,.3) 42%,rgba(255,255,255,.5) 50%,rgba(180,255,150,.3) 58%,rgba(255,180,100,0) 70%,transparent 100%);background-size:300% 300%;mix-blend-mode:screen;animation:_gHoloScan 5s ease-in-out infinite;}',
+  '@keyframes _gHoloScan{0%{background-position:150% 150%;opacity:0}5%{opacity:1}14%{background-position:-50% -50%;opacity:0}100%{background-position:-50% -50%;opacity:0}}',
                 ].join('');
                 document.head.appendChild(st);
             }
@@ -35154,12 +35526,26 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '<div class="_grb" id="_grb"></div>',
                   '<div class="_griw" id="_griw"><div class="_gholoS"></div><div class="_gspov" id="_gspov"></div></div>',
                   '<div style="font-size:16px;font-weight:bold;color:#fff;letter-spacing:.04em;text-align:center" id="_gran"></div>',
-                  '<div style="font-size:11px;color:#fff;letter-spacing:.1em;text-transform:uppercase" id="_grcr"></div>',
-                  '<div style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:10px;text-align:center" id="_grib"></div>',
-                  '<div style="font-size:10px;color:#aaa;letter-spacing:.1em" id="_grcp"></div>',
+                  '<div class="_grrws" id="_grrws"></div>',
+                  '<div class="_gcmb" id="_grcp"></div>',
+                  '<button class="_gsrb" id="_gsrb">❖ See All Rarities</button>',
                   '<div class="_gctr" id="_grollctr"></div>',
                   '<button id="_grclose" style="background:none;border:1px solid #888;color:#fff;font-family:\'Courier New\',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:7px 22px;border-radius:6px;cursor:pointer;">&#x2715; &nbsp; Close</button>',
                 '</div>',
+              '<div class="_grarov" id="_grarov">',
+                '<div class="_grarpop">',
+                  '<h2>❖ Rarity Tables ❖</h2>',
+                  '<div class="_grarsect">Character</div>',
+                  '<table class="_grartbl"><tr><th>Name</th><th class="pct">Chance</th></tr><tr><td>Wombatman</td><td class="pct">26%</td></tr><tr><td>Sloman</td><td class="pct">25%</td></tr><tr><td>Pola Cola</td><td class="pct">22%</td></tr><tr><td>Muscle Turtle</td><td class="pct">13%</td></tr><tr><td>Fennec Fox</td><td class="pct">9%</td></tr><tr><td>Captain Corea</td><td class="pct">5%</td></tr></table>',
+                  '<div class="_grarsect">Color</div>',
+                  '<table class="_grartbl"><tr><th>Color</th><th class="pct">Chance</th></tr><tr><td>Blue</td><td class="pct">32%</td></tr><tr><td>Green</td><td class="pct">27%</td></tr><tr><td>Yellow</td><td class="pct">18%</td></tr><tr><td>Red</td><td class="pct">15%</td></tr><tr><td>Metallic Pink</td><td class="pct">5%</td></tr><tr><td>Holo Chrome</td><td class="pct">3%</td></tr></table>',
+                  '<div class="_grarsect">Item / Costume</div>',
+                  '<table class="_grartbl"><tr><th>Item</th><th>Tier</th><th class="pct">Chance</th></tr><tr><td>Cat paws</td><td class="t1">★ Common</td><td class="pct">18%</td></tr><tr><td>Dog slippers</td><td class="t1">★ Common</td><td class="pct">18%</td></tr><tr><td>Mr. Calvin slippers</td><td class="t1">★ Common</td><td class="pct">13.5%</td></tr><tr><td>KoreanLearnin fan</td><td class="t1">★ Common</td><td class="pct">13.5%</td></tr><tr><td>Wizard costume</td><td class="t2">★★ Rare</td><td class="pct">9%</td></tr><tr><td>Calico cat (Bella)</td><td class="t2">★★ Rare</td><td class="pct">9%</td></tr><tr><td>Mr. Croak Croak</td><td class="t2">★★ Rare</td><td class="pct">6%</td></tr><tr><td>Mr. Shark (상어씨)</td><td class="t2">★★ Rare</td><td class="pct">6%</td></tr><tr><td>Mr. Calvin costume</td><td class="t3">★★★ Legendary</td><td class="pct">3%</td></tr><tr><td>Calico cat kigurumi</td><td class="t3">★★★ Legendary</td><td class="pct">2%</td></tr><tr><td>Mecha costume</td><td class="t3">★★★ Legendary</td><td class="pct">1%</td></tr><tr><td>Korean Warrior</td><td class="t3">★★★ Legendary</td><td class="pct">1%</td></tr></table>',
+                  '<div class="_grarsect">Bonus</div>',
+                  '<table class="_grartbl"><tr><th>Effect</th><th class="pct">Chance</th></tr><tr><td style="color:#f5c842">❖ Glitter</td><td class="pct">1%</td></tr></table>',
+                  '<button class="_grarcls" id="_grarcls">✕ Close</button>',
+                '</div>',
+              '</div>',
               '</div>',
               '<div class="_ggrip" id="_ggrip"><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div></div>',
               '<div style="position:relative;display:flex;flex-direction:column;align-items:center;z-index:1;">',
@@ -35251,34 +35637,67 @@ Return ONLY this JSON (no markdown, no code blocks):
               gSpawnParticles();
             }
 
-            // Sparkles for glitter cards
-            function gMakeShimmerStar(size,delay){
-              var half=size/2,thin=size*0.12;
-              var pts=half+',0 '+(half+thin)+','+(half-thin)+' '+size+','+half+' '+(half+thin)+','+(half+thin)+' '+half+','+size+' '+(half-thin)+','+(half+thin)+' 0,'+half+' '+(half-thin)+','+(half-thin);
-              var id='_gs'+Math.random().toString(36).slice(2,7);
-              return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" xmlns="http://www.w3.org/2000/svg"><defs><filter id="'+id+'"><feGaussianBlur stdDeviation="0.8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="sh'+id+'" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="white" stop-opacity="0.3"/><stop offset="45%" stop-color="white" stop-opacity="0.3"/><stop offset="50%" stop-color="white" stop-opacity="1"><animate attributeName="stop-opacity" values="0.3;0.3;1;0.3;0.3" dur="1s" begin="'+delay+'s" repeatCount="indefinite"/></stop><stop offset="55%" stop-color="white" stop-opacity="0.3"/><stop offset="100%" stop-color="white" stop-opacity="0.3"/><animateTransform attributeName="gradientTransform" type="translate" values="-1 -1; -1 -1; 0 0; 1 1; 1 1" dur="1s" begin="'+delay+'s" repeatCount="indefinite"/></linearGradient></defs><polygon points="'+pts+'" fill="url(#sh'+id+')" filter="url(#'+id+')"/></svg>';
+            // Sparkles for glitter cards — rich multi-layer system
+            var _GSTAR_COLORS=[
+              ['#aaddff','#4499ff'],['#ffaae8','#ff44aa'],['#aaffcc','#44ffaa'],
+              ['#ffffaa','#ffdd33'],['#ddaaff','#aa44ff'],['#ffddaa','#ff9933']
+            ];
+            var _GORB_COLORS=[
+              ['#cceeff','#2288ff'],['#ffccee','#ff2288'],['#ccffee','#22ff88'],
+              ['#fffacc','#ffcc22'],['#eeccff','#8822ff'],['#ffeacc','#ff8822']
+            ];
+            function gMakeStar(size,color){
+              var h=size/2,t=size*0.13;
+              var pts=h+',0 '+(h+t)+','+(h-t)+' '+size+','+h+' '+(h+t)+','+(h+t)+' '+h+','+size+' '+(h-t)+','+(h+t)+' 0,'+h+' '+(h-t)+','+(h-t);
+              return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" xmlns="http://www.w3.org/2000/svg"><polygon points="'+pts+'" fill="'+color+'"/></svg>';
             }
             function gCreateSparkles(){
               var overlay=gGetEl('_gspov');if(!overlay)return;
-              overlay.innerHTML='<div class="_ggsc"></div>';
+              // Rainbow holo scan
+              overlay.innerHTML='<div class="_ggsc"></div><div class="_gholosc"></div>';
+              // 18 stars with clip-path shimmer
               for(var i=0;i<18;i++){
                 var s=document.createElement('div');s.className='_gsp';
-                s.style.left=(5+Math.random()*88)+'%';s.style.top=(5+Math.random()*88)+'%';
-                s.style.setProperty('--dur',(0.6+Math.random()*1.2).toFixed(2)+'s');
-                s.style.setProperty('--delay',(Math.random()*2).toFixed(2)+'s');
-                var sz=8+Math.random()*14,dl=(Math.random()*2).toFixed(2);
-                s.innerHTML=gMakeShimmerStar(sz,dl);
+                var sz=10+Math.random()*14;
+                s.style.width=sz+'px';s.style.height=sz+'px';
+                s.style.left=(4+Math.random()*88)+'%';s.style.top=(4+Math.random()*88)+'%';
+                s.style.setProperty('--dur',(0.7+Math.random()*1.3).toFixed(2)+'s');
+                s.style.setProperty('--delay',(Math.random()*2.5).toFixed(2)+'s');
+                var sc=_GSTAR_COLORS[Math.floor(Math.random()*_GSTAR_COLORS.length)];
+                s.style.filter='drop-shadow(0 0 3px white) drop-shadow(0 0 7px '+sc[1]+')';
+                s.innerHTML=gMakeStar(sz,sc[0]);
+                var shine=document.createElement('div');shine.className='_gss';
+                shine.style.setProperty('--shdl',(Math.random()*2).toFixed(2)+'s');
+                s.appendChild(shine);
                 overlay.appendChild(s);
               }
-              for(var j=0;j<25;j++){
+              // 14 glowing orbs
+              for(var j=0;j<14;j++){
+                var o=document.createElement('div');o.className='_gorb';
+                var os=4+Math.random()*4;
+                o.style.width=os+'px';o.style.height=os+'px';
+                o.style.left=(4+Math.random()*88)+'%';o.style.top=(4+Math.random()*88)+'%';
+                o.style.setProperty('--dur',(1.0+Math.random()*1.8).toFixed(2)+'s');
+                o.style.setProperty('--delay',(Math.random()*2.5).toFixed(2)+'s');
+                var oc=_GORB_COLORS[Math.floor(Math.random()*_GORB_COLORS.length)];
+                o.style.background='radial-gradient(circle at 35% 30%,white 0%,'+oc[0]+' 35%,'+oc[1]+' 70%,transparent 100%)';
+                o.style.boxShadow='0 0 6px 2px '+oc[0]+',0 0 16px 5px '+oc[1]+',0 0 30px 8px rgba(255,255,255,.1)';
+                var d=function(){return ((Math.random()-.5)*22).toFixed(1)+'px';};
+                o.style.setProperty('--x1',d());o.style.setProperty('--y1',d());
+                o.style.setProperty('--x2',d());o.style.setProperty('--y2',d());
+                o.style.setProperty('--x3',d());o.style.setProperty('--y3',d());
+                overlay.appendChild(o);
+              }
+              // 20 tiny drifting dots
+              for(var k=0;k<20;k++){
                 var gp=document.createElement('div');gp.className='_gglp';
                 gp.style.left=(Math.random()*95)+'%';gp.style.top=(Math.random()*95)+'%';
-                gp.style.setProperty('--dur',(1.2+Math.random()*1.8).toFixed(2)+'s');
+                gp.style.setProperty('--dur',(1.0+Math.random()*2.0).toFixed(2)+'s');
                 gp.style.setProperty('--delay',(Math.random()*2.5).toFixed(2)+'s');
-                var rx=(Math.random()-.5)*30,ry=(Math.random()-.5)*30;
-                gp.style.setProperty('--dx1',rx*0.3+'px');gp.style.setProperty('--dy1',ry*0.3+'px');
-                gp.style.setProperty('--dx2',rx*0.7+'px');gp.style.setProperty('--dy2',ry*0.7+'px');
-                gp.style.setProperty('--dx3',rx+'px');gp.style.setProperty('--dy3',ry+'px');
+                var rx=(Math.random()-.5)*28,ry=(Math.random()-.5)*28;
+                gp.style.setProperty('--dx1',(rx*0.3).toFixed(1)+'px');gp.style.setProperty('--dy1',(ry*0.3).toFixed(1)+'px');
+                gp.style.setProperty('--dx2',(rx*0.7).toFixed(1)+'px');gp.style.setProperty('--dy2',(ry*0.7).toFixed(1)+'px');
+                gp.style.setProperty('--dx3',rx.toFixed(1)+'px');gp.style.setProperty('--dy3',ry.toFixed(1)+'px');
                 overlay.appendChild(gp);
               }
             }
@@ -35306,24 +35725,48 @@ Return ONLY this JSON (no markdown, no code blocks):
                 else{var ph=document.createElement('div');ph.innerHTML=gPlaceholderHTML(roll.animal.name);wrap.insertBefore(ph.firstChild,wrap.firstChild);}
               }
               var an=gGetEl('_gran');if(an)an.textContent=roll.animal.name;
-              var cr=gGetEl('_grcr');if(cr)cr.innerHTML='Color &nbsp;<span style="color:#f5c842">'+roll.color.name+'</span>';
-              var ib=gGetEl('_grib');
-              if(ib){
-                var tC={3:'tier-3',2:'tier-2',1:'tier-1'};
-                var tL={3:'\u2605\u2605\u2605 Legendary',2:'\u2605\u2605 Rare',1:'\u2605 Common'};
-                ib.className=tC[roll.item.tier];
-                ib.textContent=tL[roll.item.tier]+' \u2014 '+roll.item.name;
+
+              // Three individual rarity rows
+              var tA=_GACHA_ANIMALS.reduce(function(s,e){return s+e.weight;},0);
+              var tC=_GACHA_COLORS.reduce(function(s,e){return s+e.weight;},0);
+              var tI=_GACHA_ITEMS.reduce(function(s,e){return s+e.weight;},0);
+              var pA=(roll.animal.weight/tA*100).toFixed(1)+'%';
+              var pC=(roll.color.weight/tC*100).toFixed(1)+'%';
+              var pI=(roll.item.weight/tI*100).toFixed(1)+'%';
+              var aW=roll.animal.weight/tA*100;
+              var cW=roll.color.weight/tC*100;
+              var aLabel=aW<=5?'\u2605\u2605\u2605 Legendary':aW<=10?'\u2605\u2605 Rare':'\u2605 Common';
+              var aClass=aW<=5?'tier-3':aW<=10?'tier-2':'tier-1';
+              var cLabel=cW<=3?'\u2605\u2605\u2605 Legendary':cW<=5?'\u2605\u2605 Rare':'\u2605 Common';
+              var cClass=cW<=3?'tier-3':cW<=5?'tier-2':'tier-1';
+              var tL={3:'\u2605\u2605\u2605 Legendary',2:'\u2605\u2605 Rare',1:'\u2605 Common'};
+              var tC2={3:'tier-3',2:'tier-2',1:'tier-1'};
+              var rows=gGetEl('_grrws');
+              if(rows){
+                rows.innerHTML=
+                  '<div class="_grrw"><span class="_grrl">Character</span><span class="_grrn">'+roll.animal.name+'</span><span class="_grrt '+aClass+'">'+aLabel+'</span><span class="_grrp">'+pA+'</span></div>'+
+                  '<div class="_grrw"><span class="_grrl">Color</span><span class="_grrn">'+roll.color.name+'</span><span class="_grrt '+cClass+'">'+cLabel+'</span><span class="_grrp">'+pC+'</span></div>'+
+                  '<div class="_grrw"><span class="_grrl">Item</span><span class="_grrn">'+roll.item.name+'</span><span class="_grrt '+tC2[roll.item.tier]+'">'+tL[roll.item.tier]+'</span><span class="_grrp">'+pI+'</span></div>';
               }
+
               var cp=gGetEl('_grcp');
               if(cp){
-                cp.textContent='Pull chance: '+_gachaFmtPct(roll.pct);
-                if(roll.glitter)cp.innerHTML='Pull chance: '+_gachaFmtPct(roll.pct)+' &nbsp;<span style="color:#f5c842">\u2756 GLITTER \u2756</span>';
+                cp.innerHTML='Combined pull chance: <span>'+_gachaFmtPct(roll.pct)+'</span>';
+                if(roll.glitter)cp.innerHTML='Pull chance: '+_gachaFmtPct(roll.pct)+' &nbsp;<span>\u2756 GLITTER \u2756</span>';
               }
               var ctr=gGetEl('_grollctr');
               if(ctr)ctr.innerHTML='<span style="color:#888">Roll</span> <span style="color:#f5c842;font-size:13px;">'+(currentRoll+1)+'</span> <span style="color:#888">of</span> <span style="color:#f5c842;font-size:13px;">'+rolls+'</span>';
 
               var rovEl=gGetEl('_grov');if(rovEl)rovEl.classList.add('show');
               gApplyGlitter(roll.glitter);
+
+              // See All Rarities button + popup
+              var srb=gGetEl('_gsrb');
+              if(srb){srb.onclick=function(e){e.stopPropagation();var ar=gGetEl('_grarov');if(ar)ar.classList.add('show');};}
+              var arcls=gGetEl('_grarcls');
+              if(arcls){arcls.onclick=function(e){e.stopPropagation();var ar=gGetEl('_grarov');if(ar)ar.classList.remove('show');};}
+              var ararov=gGetEl('_grarov');
+              if(ararov){ararov.onclick=function(e){if(e.target===ararov)ararov.classList.remove('show');};}
             }
 
             function gResetForNextRoll(){
@@ -35416,11 +35859,15 @@ Return ONLY this JSON (no markdown, no code blocks):
                         gachaCollection:firebase.firestore.FieldValue.arrayUnion.apply(
                             firebase.firestore.FieldValue, toAdd
                         ),
-                        gachaLastUsedDate: _gToday
+                        gachaLastUsedDate: _gToday,
+                        gachaRolls: firebase.firestore.FieldValue.increment(-characters.length)
                     });
                     // Update in-memory state so the button grays out immediately
                     qs.gachaUsedToday=true;
                     qs.gachaDayChecked=true;
+                    if(qs.tevelloUser&&typeof qs.tevelloUser.gachaRolls==='number'){
+                        qs.tevelloUser.gachaRolls=Math.max(0,qs.tevelloUser.gachaRolls-characters.length);
+                    }
                     console.log('Saved '+characters.length+' gacha result(s) to Firestore');
                 } else {
                     try{
@@ -35436,10 +35883,173 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
         // ── END MISTAKES REVIEW ──────────────────────────────────
 
+        // ── GACHA COLLECTION VIEWER ──────────────────────────────
+        async function qsShowCollection(){
+            if(!qs.tevelloUser) return;
+            // Create overlay
+            var ov=document.getElementById('_qsCollectionOverlay');
+            if(ov) ov.remove();
+            ov=document.createElement('div');
+            ov.id='_qsCollectionOverlay';
+            ov.style.cssText='position:fixed;inset:0;z-index:10003;background:rgba(0,0,0,0.95);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;box-sizing:border-box;';
+            ov.innerHTML='<div style="max-width:900px;margin:0 auto;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div style="font-family:\'Press Start 2P\';font-size:13px;color:#c4a0e8;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">&#x1F3B4; MY COLLECTION</div><button onclick="document.getElementById(\'_qsCollectionOverlay\').remove()" style="background:rgba(255,119,119,0.1);border:1px solid rgba(255,119,119,0.3);color:#ff7777;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">&#x2715;</button></div><div id="_qsColGrid" style="text-align:center;padding:40px 0;color:#888;font-size:13px;">&#x23F3; Loading collection...</div></div>';
+            document.body.appendChild(ov);
+
+            try{
+                var acctSnap=await db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).get();
+                if(!acctSnap.exists){document.getElementById('_qsColGrid').innerHTML='<div style="color:#888;font-size:12px;">No collection yet. Play a game and open your gacha!</div>';return;}
+                var acctData=acctSnap.data();
+                var col=acctData.gachaCollection||[];
+                var coins=acctData.coins||0;
+                var rolls=acctData.gachaRolls||0;
+
+                if(col.length===0){
+                    document.getElementById('_qsColGrid').innerHTML='<div style="padding:40px 0;"><div style="font-size:40px;margin-bottom:12px;">&#x1F95A;</div><div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;">No cards yet!</div><div style="font-size:12px;color:#666;margin-top:8px;">Earn gacha rolls by playing the quiz game.</div></div>';
+                    return;
+                }
+
+                // Sort newest first
+                var sorted=col.slice().sort(function(a,b){
+                    return new Date(b.wonAt||0)-new Date(a.wonAt||0);
+                });
+
+                var rarityBorder={
+                    holo:'border:2px solid #dde;box-shadow:0 0 18px rgba(200,200,255,.5);',
+                    pink:'border:2px solid #d4537e;box-shadow:0 0 14px rgba(212,83,126,.4);',
+                    red:'border:2px solid #e24b4a;box-shadow:0 0 14px rgba(226,75,74,.4);',
+                    yellow:'border:2px solid #f5c842;box-shadow:0 0 14px rgba(245,200,66,.4);',
+                    green:'border:2px solid #639922;box-shadow:0 0 10px rgba(99,153,34,.35);',
+                    blue:'border:2px solid #378add;box-shadow:0 0 10px rgba(55,138,221,.35);'
+                };
+                var tierLabel={3:'\u2605\u2605\u2605',2:'\u2605\u2605',1:'\u2605'};
+                var tierColor={3:'#e24b4a',2:'#639922',1:'#378add'};
+
+                var h='';
+                // Stats bar
+                h+='<div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;">';
+                h+='<div style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:10px 18px;text-align:center;">';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#888;margin-bottom:4px;">CARDS</div>';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;">'+sorted.length+'</div></div>';
+                h+='<div style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:10px 18px;text-align:center;">';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#888;margin-bottom:4px;">COINS</div>';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:16px;color:#FFD700;">'+coins+'</div></div>';
+                h+='<div style="background:rgba(155,89,182,0.08);border:1px solid rgba(155,89,182,0.25);border-radius:10px;padding:10px 18px;text-align:center;">';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#888;margin-bottom:4px;">ROLLS LEFT</div>';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:16px;color:#c4a0e8;">'+rolls+'</div></div>';
+                h+='</div>';
+
+                // Card grid
+                h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;">';
+                sorted.forEach(function(card){
+                    var border=rarityBorder[card.rarity]||rarityBorder.blue;
+                    var dateStr='';
+                    if(card.wonAt){
+                        try{var d=new Date(card.wonAt);dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){}
+                    }
+                    h+='<div style="background:#0e0e0e;border-radius:12px;'+border+'padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;">';
+                    // Glitter badge
+                    if(card.glitter) h+='<div style="position:absolute;top:6px;right:6px;font-size:9px;color:#f5c842;text-shadow:0 0 6px #f5c842;">\u2756</div>';
+                    // Image
+                    if(card.imageUrl){
+                        h+='<div style="width:100%;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:1;">';
+                        h+='<img src="'+escapeHtml(card.imageUrl)+'" style="width:100%;height:100%;object-fit:contain;display:block;clip-path:inset(10px 0 25px 0);margin-bottom:-25px;margin-top:-10px;" loading="lazy">';
+                        h+='</div>';
+                    } else {
+                        h+='<div style="width:100%;aspect-ratio:1;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;"><span style="font-size:30px;">&#x1F95A;</span></div>';
+                    }
+                    // Animal name
+                    h+='<div style="font-size:9px;font-weight:700;color:#fff;text-align:center;line-height:1.3;">'+escapeHtml(card.animal||'')+'</div>';
+                    // Color badge
+                    h+='<div style="font-size:7px;letter-spacing:.06em;text-transform:uppercase;color:#ccc;">'+escapeHtml(card.color||'')+'</div>';
+                    // Item tier + name
+                    h+='<div style="font-size:6px;color:'+tierColor[card.tier||1]+';text-align:center;line-height:1.4;">'+tierLabel[card.tier||1]+' '+escapeHtml(card.item||'')+'</div>';
+                    // Date
+                    if(dateStr) h+='<div style="font-size:7px;color:#555;margin-top:2px;">'+dateStr+'</div>';
+                    h+='</div>';
+                });
+                h+='</div>';
+
+                document.getElementById('_qsColGrid').innerHTML=h;
+            }catch(err){
+                console.error('Collection load error:',err);
+                var g=document.getElementById('_qsColGrid');
+                if(g) g.innerHTML='<div style="color:#ff4444;font-size:12px;">Error loading collection.</div>';
+            }
+        }
+
+        // ── COIN + ROLL AWARD (called once from qsShowFinished) ──────────
+        async function qsAwardCoins(){
+            if(qs.coinsAwarded) return; // already done this session
+            if(!qs.sessionId) return;
+
+            // Determine placement from session leaderboard
+            var myPlacement=-1;
+            try{
+                var sDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get();
+                if(sDoc.exists){
+                    var sData=sDoc.data();
+                    var myBoard=sData[qsGetLeaderboardKey(qs.playerLevel)]||[];
+                    for(var pi=0;pi<myBoard.length;pi++){if(myBoard[pi].name===qs.playerName){myPlacement=pi;break;}}
+                }
+            }catch(e){console.warn('qsAwardCoins: leaderboard fetch error',e);}
+
+            // Build award totals
+            var coinsToAward=10; // participation
+            var rollsToAward=1;
+            var awardBreakdown=[{label:'Participation',coins:10,rolls:1}];
+            if(myPlacement===0){
+                coinsToAward+=30;rollsToAward+=2;
+                awardBreakdown.push({label:'1st Place \uD83E\uDD47',coins:30,rolls:2});
+            } else if(myPlacement===1){
+                coinsToAward+=25;rollsToAward+=1;
+                awardBreakdown.push({label:'2nd Place \uD83E\uDD48',coins:25,rolls:1});
+            } else if(myPlacement===2){
+                coinsToAward+=20;rollsToAward+=1;
+                awardBreakdown.push({label:'3rd Place \uD83E\uDD49',coins:20,rolls:1});
+            }
+
+            // Store locally first so display always works
+            qs.coinsEarned=coinsToAward;
+            qs.gachaRolls=rollsToAward;
+            qs.awardBreakdown=awardBreakdown.slice();
+            qs.coinsAwarded=true;
+
+            // Write to Firestore (once per session, deduped by coinsAwardedSessions)
+            if(qs.tevelloUser){
+                try{
+                    var acctRef=db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id);
+                    var acctSnap=await acctRef.get();
+                    var acctData=acctSnap.exists?acctSnap.data():{};
+                    var awardedSessions=acctData.coinsAwardedSessions||[];
+                    var alreadyAwarded=(awardedSessions.indexOf(qs.sessionId)>=0);
+                    if(!alreadyAwarded){
+                        await acctRef.update({
+                            coins: firebase.firestore.FieldValue.increment(coinsToAward),
+                            gachaRolls: firebase.firestore.FieldValue.increment(rollsToAward),
+                            coinsAwardedSessions: firebase.firestore.FieldValue.arrayUnion(qs.sessionId)
+                        });
+                        var acctSnap2=await acctRef.get();
+                        var acctData2=acctSnap2.exists?acctSnap2.data():{};
+                        qs.tevelloUser.coins=typeof acctData2.coins==='number'?acctData2.coins:coinsToAward;
+                        qs.tevelloUser.gachaRolls=typeof acctData2.gachaRolls==='number'?acctData2.gachaRolls:rollsToAward;
+                    } else {
+                        // Already saved from a prior session visit — load stored totals
+                        qs.tevelloUser.coins=typeof acctData.coins==='number'?acctData.coins:0;
+                        qs.tevelloUser.gachaRolls=typeof acctData.gachaRolls==='number'?acctData.gachaRolls:0;
+                    }
+                }catch(coinErr){console.warn('qsAwardCoins Firestore error:',coinErr);}
+            }
+        }
+
         function qsShowFinished(area,status) {
             window.scrollTo(0,0);
             if(status){status.textContent='\u{1F3C1} GAME OVER';status.style.color='#00ff88';}
-            qsTevSaveGameSummary();
+            // Run sequentially: save game summary first, then award coins
+            // (qsAwardCoins reads the leaderboard which may not be final yet — small delay helps)
+            qsTevSaveGameSummary()
+                .catch(function(e){console.error('qsTevSaveGameSummary error:',e);});
+            qsAwardCoins()
+                .catch(function(e){console.error('qsAwardCoins error:',e);});
             if(qs.sessionId){
                 db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).get().then(function(doc){
                     if(!doc.exists)return;
@@ -35468,7 +36078,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                         }
                         h+='</div>';
                     });
-                    // Disclaimer
+                    // Coins earned badge
+                    if(qs.coinsEarned>0){
+                        h+='<div style="background:linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,140,0,0.07));border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">';
+                        h+='<div style="font-size:11px;color:#ccc;">Coins earned this game</div>';
+                        h+='<div style="font-family:\'Press Start 2P\';font-size:13px;color:#FFD700;text-shadow:-1px -1px 0 #000024,1px -1px 0 #000024,-1px 1px 0 #000024,1px 1px 0 #000024;">+'+qs.coinsEarned+' \uD83E\uDE99</div>';
+                        h+='</div>';
+                    }
                     h+='<div style="background:rgba(255,215,0,0.07);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#ccc;line-height:1.7;text-align:left;">';
                     h+='<span style="color:#FFD700;font-weight:700;">Note:</span> A score of 80% or above is considered nearly perfect. Small differences at that level are usually minor aspiration, tensification, or intonation — not pronunciation errors.';
                     h+='</div>';
@@ -35478,6 +36094,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                         h+='<button id="qsStatsBtn" onclick="qsTevShowStats()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86,0 -2px 0 #005a86,0 2px 0 #005a86,-2px 0 0 #005a86,2px 0 0 #005a86;padding:12px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">&#x1F4CA; MY STATS</button>';
                     }
                     h+='<button onclick="qsShowMistakes()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #7a2300,2px -2px 0 #7a2300,-2px 2px 0 #7a2300,2px 2px 0 #7a2300,0 -2px 0 #7a2300,0 2px 0 #7a2300,-2px 0 0 #7a2300,2px 0 0 #7a2300;padding:12px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">&#x1F4DD; REVIEW MISTAKES</button>';
+                    if(qs.tevelloUser){
+                        h+='<button onclick="qsShowCollection()" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f,0 -2px 0 #2e0a4f,0 2px 0 #2e0a4f,-2px 0 0 #2e0a4f,2px 0 0 #2e0a4f;padding:12px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:0 0 14px rgba(155,89,182,0.4),rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">&#x1F3B4; MY COLLECTION</button>';
+                    }
                     h+='</div>';
                     h+='</div>';
                     area.innerHTML=h;
