@@ -3467,27 +3467,6 @@
                 </div>
             </div>
             
-            <!-- Date Selection (for scheduling) -->
-            <div id="slotDateSelection" style="display: none; margin: 15px 0; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
-                <h4 style="color: #39ff14; margin-bottom: 10px;">📅 Schedule Next Session</h4>
-                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Select a start date (3-week buffer included):</p>
-                <div id="slotDateOptions" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-                
-                <div id="prescheduleForm" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #39ff14;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 11px;">Class Type *</label>
-                            <select id="prescheduleClassType" data-level-select style="font-size: 12px;"></select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 11px;">Teacher *</label>
-                            <select id="prescheduleTeacher" style="font-size: 12px;"></select>
-                        </div>
-                    </div>
-                    <button class="btn btn-success" onclick="confirmPreschedule()" style="width: 100%;">✓ Pre-schedule This Slot</button>
-                </div>
-            </div>
-            
             <!-- Pre-scheduled Info (for X slots) -->
             <div id="slotPrescheduleInfo" style="display: none; margin: 15px 0; padding: 15px; background: rgba(255,152,0,0.1); border: 2px solid #ff9800; border-radius: 8px;">
                 <h4 style="color: #ff9800; margin-bottom: 10px;">⏳ Pre-scheduled</h4>
@@ -4824,6 +4803,7 @@
             loadProposals();
             initSalesChat(); // Initialize sales chat system
             setupPrescheduledSlotsListener(); // Setup real-time listener for prescheduled slots
+            backfillAbsenceReasonNotes(); // One-time sync: copy existing absence reasons → attendance_notes
             
             // Hide delete buttons and reset button for support role
             if (currentUser.role === 'support') {
@@ -18562,10 +18542,6 @@ Return ONLY valid JSON (single object, not array):
                 // Render active classes first, then prescheduled
                 let html = '';
                 
-                // Cache for switchAttendanceWeek
-                window._teacherAttendanceData = allAttendanceData;
-                window._teacherActiveClasses = activeClasses;
-
                 // Active classes section
                 if (activeClasses.length > 0) {
                     html += activeClasses.map(c => renderClassCard(c)).join('');
@@ -18701,38 +18677,6 @@ Return ONLY valid JSON (single object, not array):
                     
                     // Determine which week to show attendance for
                     const attendanceWeek = currentWeek > 0 && currentWeek <= 6 ? currentWeek : 1;
-
-                    // Build attendance week switcher tabs
-                    function buildAttendanceRows(forWeek) {
-                        return students.map(s => `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name || 'Unknown'}</span>
-                                <div style="display: flex; gap: 5px;">
-                                    <button class="attendance-btn present ${getAttendanceStatusForClass(c.id, s.id, forWeek) === 'present' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'present', ${forWeek})">P</button>
-                                    <button class="attendance-btn late ${getAttendanceStatusForClass(c.id, s.id, forWeek) === 'late' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'late', ${forWeek})">L</button>
-                                    <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, forWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', ${forWeek})">A</button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-
-                    function buildWeekSwitcher(activeW) {
-                        const maxW = Math.min(currentWeek <= 0 ? 1 : currentWeek, 6);
-                        let tabs = '';
-                        for (let w = 1; w <= 6; w++) {
-                            const isPast = w < currentWeek;
-                            const isCur = w === currentWeek;
-                            const isSelected = w === activeW;
-                            const isLocked = w > currentWeek;
-                            const bg = isSelected ? '#ffff00' : (isPast ? 'rgba(255,255,255,0.1)' : (isCur ? 'rgba(255,255,0,0.15)' : 'rgba(255,255,255,0.04)'));
-                            const color = isSelected ? '#000' : (isLocked ? '#444' : '#ccc');
-                            const cursor = isLocked ? 'default' : 'pointer';
-                            const clickFn = isLocked ? '' : `switchAttendanceWeek('${c.id}', ${w})`;
-                            tabs += `<div onclick="${clickFn}" style="flex:1;text-align:center;padding:5px 2px;border-radius:4px;background:${bg};color:${color};font-size:10px;font-weight:${isSelected?'bold':'normal'};cursor:${cursor};border:1px solid ${isSelected?'#ffff00':'rgba(255,255,255,0.1)'};">W${w}</div>`;
-                        }
-                        return `<div style="display:flex;gap:4px;margin-bottom:8px;">${tabs}</div>`;
-                    }
-                    
                     return `
                         <div class="class-card" style="${isUpcoming || startsToday ? 'border: 2px solid #ff9800;' : ''}">
                             <div class="class-header">
@@ -18752,12 +18696,18 @@ Return ONLY valid JSON (single object, not array):
                             <p style="font-size: 10px; color: #888; text-align: center; margin: 5px 0;">👆 Click any week to view materials</p>
                             
                             ${currentWeek >= 1 && currentWeek <= 6 ? `
-                                <div id="att-section-${c.id}">
-                                    <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
-                                    ${buildWeekSwitcher(attendanceWeek)}
-                                    <div id="att-rows-${c.id}" style="display: grid; gap: 10px;">
-                                        ${buildAttendanceRows(attendanceWeek)}
-                                    </div>
+                                <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
+                                <div style="display: grid; gap: 10px;">
+                                    ${students.map(s => `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                            <span style="cursor: pointer; text-decoration: underline; color: #00ffff;" onclick="openStudentAnalyticsMenu('${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', '${(s.email || '').replace(/'/g, "\\'")}')">${s.name || 'Unknown'}</span>
+                                            <div style="display: flex; gap: 5px;">
+                                                <button class="attendance-btn present ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'present' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
+                                                <button class="attendance-btn late ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'late' ? 'active' : ''}" onclick="markAttendanceWithWeek('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
+                                                <button class="attendance-btn absent ${getAttendanceStatusForClass(c.id, s.id, attendanceWeek) === 'absent' ? 'active' : ''}" onclick="handleAbsentClickWithWeek('${c.id}', '${s.id}', '${(s.name || 'Unknown').replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
                                 </div>
                             ` : currentWeek > 6 ? `
                                 <div style="text-align: center; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
@@ -18845,68 +18795,6 @@ Return ONLY valid JSON (single object, not array):
         }
 
         // Switch the visible attendance week on a teacher class card without reloading
-        function switchAttendanceWeek(classId, week) {
-            const section = document.getElementById('att-section-' + classId);
-            const rowsDiv = document.getElementById('att-rows-' + classId);
-            if (!section || !rowsDiv) return;
-
-            const cls = (window._teacherActiveClasses || []).find(c => c.id === classId);
-            if (!cls) return;
-
-            const attData = (window._teacherAttendanceData || {})[classId] || {};
-            const students = cls.students || [];
-
-            // Rebuild the heading
-            const heading = section.querySelector('h4');
-            if (heading) heading.textContent = 'Attendance - Week ' + week;
-
-            // Rebuild switcher tabs
-            const currentWeek = (function() {
-                if (!cls.startDate) return 1;
-                const todayStr = toESTDateStr(new Date());
-                const startStr = cls.startDate;
-                if (todayStr < startStr) return 0;
-                const [sy, sm, sd] = startStr.split('-').map(Number);
-                const [ty, tm, td] = todayStr.split('-').map(Number);
-                const daysSinceStart = Math.floor((Date.UTC(ty,tm-1,td) - Date.UTC(sy,sm-1,sd)) / (1000*60*60*24));
-                return Math.min(Math.floor(daysSinceStart / 7) + 1, 7);
-            })();
-
-            const switcherDiv = section.querySelector('div[style*="display:flex;gap:4px"]');
-            if (switcherDiv) {
-                let tabs = '';
-                for (let w = 1; w <= 6; w++) {
-                    const isSelected = w === week;
-                    const isLocked = w > currentWeek;
-                    const isPast = w < currentWeek;
-                    const isCur = w === currentWeek;
-                    const bg = isSelected ? '#ffff00' : (isPast ? 'rgba(255,255,255,0.1)' : (isCur ? 'rgba(255,255,0,0.15)' : 'rgba(255,255,255,0.04)'));
-                    const color = isSelected ? '#000' : (isLocked ? '#444' : '#ccc');
-                    const cursor = isLocked ? 'default' : 'pointer';
-                    const clickFn = isLocked ? '' : `switchAttendanceWeek('${classId}', ${w})`;
-                    tabs += `<div onclick="${clickFn}" style="flex:1;text-align:center;padding:5px 2px;border-radius:4px;background:${bg};color:${color};font-size:10px;font-weight:${isSelected?'bold':'normal'};cursor:${cursor};border:1px solid ${isSelected?'#ffff00':'rgba(255,255,255,0.1)'};">W${w}</div>`;
-                }
-                switcherDiv.innerHTML = tabs;
-            }
-
-            // Rebuild attendance rows
-            rowsDiv.innerHTML = students.map(s => {
-                const name = s.name || 'Unknown';
-                const safeName = name.replace(/'/g, "\\'");
-                const safeEmail = (s.email || '').replace(/'/g, "\\'");
-                const status = attData[s.id + '_' + week] || '';
-                return `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:5px;">
-                        <span style="cursor:pointer;text-decoration:underline;color:#00ffff;" onclick="openStudentAnalyticsMenu('${s.id}','${safeName}','${safeEmail}')">${name}</span>
-                        <div style="display:flex;gap:5px;">
-                            <button class="attendance-btn present ${status==='present'?'active':''}" onclick="markAttendanceWithWeek('${classId}','${s.id}','present',${week})">P</button>
-                            <button class="attendance-btn late ${status==='late'?'active':''}" onclick="markAttendanceWithWeek('${classId}','${s.id}','late',${week})">L</button>
-                            <button class="attendance-btn absent ${status==='absent'?'active':''}" onclick="handleAbsentClickWithWeek('${classId}','${s.id}','${safeName}',${week})">A</button>
-                        </div>
-                    </div>`;
-            }).join('');
-        }
-        
         // Admin attendance functions
         async function markAttendanceAsAdmin(classId, studentId, status, week) {
             const key = `${classId}_${studentId}_${week}`;
@@ -21549,23 +21437,39 @@ Return ONLY valid JSON (single object, not array):
                     <p style="font-size: 10px; color: #888; text-align: center; margin: 5px 0;">👆 Click any week to view materials</p>
                     
                     ${currentWeek >= 1 && currentWeek <= 6 ? `
-                        <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
-                        <div style="display: grid; gap: 10px;">
-                            ${(c.students || []).map(s => {
-                                const studentName = s.name || 'Unknown';
-                                const studentEmail = s.email || '';
-                                const status = getAttendanceStatus(c.id, s.id, attendanceWeek);
-                                return `
-                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                        <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
-                                        <div style="display: flex; gap: 5px;">
-                                            <button class="attendance-btn present ${status === 'present' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
-                                            <button class="attendance-btn late ${status === 'late' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
-                                            <button class="attendance-btn absent ${status === 'absent' ? 'active' : ''}" onclick="handleAbsentClickAsAdmin('${c.id}', '${s.id}', '${studentName.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                        <div id="adm-att-section-${c.id}">
+                            <h4 style="color: #ffff00; font-size: 13px; margin: 10px 0;">Attendance - Week ${attendanceWeek}</h4>
+                            <div style="display:flex;gap:4px;margin-bottom:8px;">
+                                ${(function(){
+                                    let tabs='';
+                                    for(let w=1;w<=6;w++){
+                                        const isSel=w===attendanceWeek,isLocked=w>currentWeek,isPast=w<currentWeek,isCur=w===currentWeek;
+                                        const bg=isSel?'#ffff00':(isPast?'rgba(255,255,255,0.1)':(isCur?'rgba(255,255,0,0.15)':'rgba(255,255,255,0.04)'));
+                                        const col=isSel?'#000':(isLocked?'#444':'#ccc');
+                                        const cur=isLocked?'default':'pointer';
+                                        const fn=isLocked?'':('switchAdminAttWeek(\''+c.id+'\','+w+')');
+                                        tabs+='<div onclick="'+fn+'" style="flex:1;text-align:center;padding:5px 2px;border-radius:4px;background:'+bg+';color:'+col+';font-size:10px;font-weight:'+(isSel?'bold':'normal')+';cursor:'+cur+';border:1px solid '+(isSel?'#ffff00':'rgba(255,255,255,0.1)')+';">W'+w+'</div>';
+                                    }
+                                    return tabs;
+                                })()}
+                            </div>
+                            <div id="adm-att-rows-${c.id}" style="display: grid; gap: 10px;">
+                                ${(c.students || []).map(s => {
+                                    const studentName = s.name || 'Unknown';
+                                    const studentEmail = s.email || '';
+                                    const status = getAttendanceStatus(c.id, s.id, attendanceWeek);
+                                    return `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
+                                            <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
+                                            <div style="display: flex; gap: 5px;">
+                                                <button class="attendance-btn present ${status === 'present' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
+                                                <button class="attendance-btn late ${status === 'late' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
+                                                <button class="attendance-btn absent ${status === 'absent' ? 'active' : ''}" onclick="handleAbsentClickAsAdmin('${c.id}', '${s.id}', '${studentName.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
+                                            </div>
                                         </div>
-                                    </div>
-                                `;
-                            }).join('')}
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
                     ` : currentWeek > 6 ? `
                         <div style="text-align: center; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
@@ -21603,6 +21507,54 @@ Return ONLY valid JSON (single object, not array):
         }
         
         // ==================== MOVE STUDENT ====================
+
+        // Switch attendance week in the admin teacher view without full re-render
+        function switchAdminAttWeek(classId, week) {
+            const section = document.getElementById('adm-att-section-' + classId);
+            const rowsDiv = document.getElementById('adm-att-rows-' + classId);
+            if (!section || !rowsDiv) return;
+
+            const attData = (window.adminTeacherAttendanceData || {})[classId] || {};
+            const cls = (adminViewingTeacherClasses || []).find(c => c.id === classId);
+            if (!cls) return;
+            const students = cls.students || [];
+
+            const currentWeek = getClassCurrentWeek(cls);
+
+            // Update heading
+            const h4 = section.querySelector('h4');
+            if (h4) h4.textContent = 'Attendance - Week ' + week;
+
+            // Rebuild tabs
+            const tabRow = section.querySelector('div[style*="display:flex;gap:4px"]');
+            if (tabRow) {
+                tabRow.innerHTML = Array.from({length:6},(_,i)=>i+1).map(w => {
+                    const isSel=w===week, isLocked=w>currentWeek, isPast=w<currentWeek, isCur=w===currentWeek;
+                    const bg=isSel?'#ffff00':(isPast?'rgba(255,255,255,0.1)':(isCur?'rgba(255,255,0,0.15)':'rgba(255,255,255,0.04)'));
+                    const col=isSel?'#000':(isLocked?'#444':'#ccc');
+                    const cur=isLocked?'default':'pointer';
+                    const fn=isLocked?'':('switchAdminAttWeek(\''+classId+'\','+w+')');
+                    return '<div onclick="'+fn+'" style="flex:1;text-align:center;padding:5px 2px;border-radius:4px;background:'+bg+';color:'+col+';font-size:10px;font-weight:'+(isSel?'bold':'normal')+';cursor:'+cur+';border:1px solid '+(isSel?'#ffff00':'rgba(255,255,255,0.1)')+' ;">W'+w+'</div>';
+                }).join('');
+            }
+
+            // Rebuild rows
+            rowsDiv.innerHTML = students.map(s => {
+                const name = s.name || 'Unknown';
+                const email = s.email || '';
+                const safeName = name.replace(/'/g, "\\'");
+                const safeEmail = email.replace(/'/g, "\\'");
+                const status = attData[s.id + '_' + week] || '';
+                return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:5px;">' +
+                    '<span style="cursor:pointer;text-decoration:underline;color:#00ffff;font-size:12px;" onclick="openStudentAnalyticsMenu(\''+s.id+'\',\''+safeName+'\',\''+safeEmail+'\')">' + name + '</span>' +
+                    '<div style="display:flex;gap:5px;">' +
+                        '<button class="attendance-btn present '+(status==='present'?'active':'')+'" onclick="markAttendanceAsAdmin(\''+classId+'\',\''+s.id+'\',\'present\','+week+')">P</button>' +
+                        '<button class="attendance-btn late '+(status==='late'?'active':'')+'" onclick="markAttendanceAsAdmin(\''+classId+'\',\''+s.id+'\',\'late\','+week+')">L</button>' +
+                        '<button class="attendance-btn absent '+(status==='absent'?'active':'')+'" onclick="handleAbsentClickAsAdmin(\''+classId+'\',\''+s.id+'\',\''+safeName+'\','+week+')">A</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
         
         let selectedMoveClassId = null;
         
@@ -25200,6 +25152,56 @@ ${daySpecific}
         // Use existing TIME_SLOTS and DAYS variables from schedule
         
         // Standalone function to sync 2+ Absent tags — fetches its own absence data
+        // Backfill: copy existing absence reasons from scheduler_attendance → attendance_notes
+        // Runs once per admin login session. Safe to re-run — deduplicates by checking existing notes first.
+        async function backfillAbsenceReasonNotes() {
+            try {
+                // Get all absence records that have a reason
+                const absSnap = await db.collection('scheduler_attendance')
+                    .where('status', '==', 'absent')
+                    .get();
+                const withReason = absSnap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter(d => d.reason && d.reason.trim());
+
+                if (!withReason.length) return;
+
+                // Get existing attendance notes to avoid duplicates
+                const existingSnap = await db.collection('attendance_notes').get();
+                // Build a set of "classId|studentId|week" keys that already have an absence-reason note
+                const existingKeys = new Set();
+                existingSnap.docs.forEach(d => {
+                    const nd = d.data();
+                    if (nd.note && nd.note.startsWith('📋 Absence reason:')) {
+                        existingKeys.add(`${nd.classId}|${nd.studentId}|${nd.week}`);
+                    }
+                });
+
+                // Write missing ones in a batch
+                const batch = db.batch();
+                let count = 0;
+                for (const rec of withReason) {
+                    const key = `${rec.classId}|${rec.studentId}|${rec.week}`;
+                    if (existingKeys.has(key)) continue;
+                    const ref = db.collection('attendance_notes').doc();
+                    batch.set(ref, {
+                        classId: rec.classId,
+                        studentId: rec.studentId,
+                        week: rec.week,
+                        note: '📋 Absence reason: ' + rec.reason.trim(),
+                        createdAt: rec.timestamp || firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    count++;
+                }
+                if (count > 0) {
+                    await batch.commit();
+                    console.log(`backfillAbsenceReasonNotes: wrote ${count} note(s)`);
+                }
+            } catch(e) {
+                console.warn('backfillAbsenceReasonNotes error:', e);
+            }
+        }
+
         async function syncAbsentTags() {
             try {
                 const snap = await db.collection('scheduler_attendance').where('status', '==', 'absent').get();
@@ -25857,9 +25859,7 @@ ${daySpecific}
             
             // Hide all sections initially
             document.getElementById('slotStudentRoster').style.display = 'none';
-            document.getElementById('slotDateSelection').style.display = 'none';
             document.getElementById('slotPrescheduleInfo').style.display = 'none';
-            document.getElementById('prescheduleForm').style.display = 'none';
             document.getElementById('slotEnrolledStudentsList').style.display = 'none';
             
             let html = '';
@@ -25975,9 +25975,6 @@ ${daySpecific}
                     document.getElementById('slotStudentRosterBody').innerHTML = rosterHtml;
                 }
                 
-                // Show date selection for next session
-                showDateSelection(day, endDate, true);
-                
             } else {
                 // Empty slot - show available
                 html = `
@@ -25989,11 +25986,6 @@ ${daySpecific}
                         </div>
                     </div>
                 `;
-                
-                // Show date selection (3 weeks from today as buffer)
-                const bufferDate = new Date();
-                bufferDate.setDate(bufferDate.getDate() + 21); // 3 weeks
-                showDateSelection(day, bufferDate, false);
             }
             
             document.getElementById('slotDetailsContent').innerHTML = html;
@@ -26029,17 +26021,99 @@ ${daySpecific}
                 if (!notes.length) {
                     listEl.innerHTML = '<p style="color:#555;font-size:12px;">No notes yet.</p>';
                 } else {
-                    listEl.innerHTML = notes.slice().reverse().map(n => {
+                    // Store on window so edit/delete can access by index
+                    window._slotNotesCache = notes.slice();
+                    listEl.innerHTML = notes.slice().reverse().map((n, ri) => {
+                        // ri is reverse index; real index = notes.length - 1 - ri
+                        const realIdx = notes.length - 1 - ri;
                         const d = n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '';
-                        return '<div style="border-bottom:1px solid #222;padding:8px 0;">' +
-                            '<div style="font-size:11px;color:#888;margin-bottom:3px;">' + escapeHtml(n.author||'Admin') + (d ? ' · '+d : '') + '</div>' +
-                            '<div style="color:#ddd;font-size:13px;line-height:1.5;white-space:pre-wrap;">' + escapeHtml(n.text) + '</div>' +
+                        return '<div style="border-bottom:1px solid #222;padding:8px 0;" id="slotNote-' + realIdx + '">' +
+                            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;">' +
+                                '<div style="font-size:11px;color:#888;">' + escapeHtml(n.author||'Admin') + (d ? ' · '+d : '') + '</div>' +
+                                '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px;">' +
+                                    '<button onclick="editSlotNote(' + realIdx + ')" style="background:none;border:1px solid #555;color:#aaa;font-size:10px;padding:2px 7px;border-radius:4px;cursor:pointer;">✏️</button>' +
+                                    '<button onclick="deleteSlotNote(' + realIdx + ')" style="background:none;border:1px solid #ff4444;color:#ff4444;font-size:10px;padding:2px 7px;border-radius:4px;cursor:pointer;">✕</button>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div id="slotNoteText-' + realIdx + '" style="color:#ddd;font-size:13px;line-height:1.5;white-space:pre-wrap;">' + escapeHtml(n.text) + '</div>' +
                         '</div>';
                     }).join('');
                 }
             } catch(e) {
                 listEl.innerHTML = '<p style="color:#ff4444;font-size:12px;">Error loading notes.</p>';
                 console.error('loadSlotNotes error:', e);
+            }
+        }
+
+        function editSlotNote(idx) {
+            const notes = window._slotNotesCache;
+            if (!notes || !notes[idx]) return;
+            const textEl = document.getElementById('slotNoteText-' + idx);
+            if (!textEl) return;
+            const current = notes[idx].text;
+            textEl.innerHTML =
+                '<textarea id="slotNoteEditInput-' + idx + '" rows="2" style="width:100%;background:rgba(255,255,255,0.08);border:1px solid #555;border-radius:4px;color:#fff;font-size:12px;padding:6px;resize:vertical;box-sizing:border-box;">' + escapeHtml(current) + '</textarea>' +
+                '<div style="display:flex;gap:6px;margin-top:5px;">' +
+                    '<button onclick="saveEditedSlotNote(' + idx + ')" style="background:#f5c842;border:none;color:#000;font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;font-weight:700;">Save</button>' +
+                    '<button onclick="loadSlotNotes()" style="background:rgba(255,255,255,0.08);border:1px solid #555;color:#aaa;font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer;">Cancel</button>' +
+                '</div>';
+        }
+
+        async function saveEditedSlotNote(idx) {
+            const notes = window._slotNotesCache;
+            if (!notes || !notes[idx]) return;
+            const input = document.getElementById('slotNoteEditInput-' + idx);
+            const newText = (input ? input.value : '').trim();
+            if (!newText) return;
+
+            const info = selectedSlotInfo;
+            if (!info) return;
+
+            const oldNote = notes[idx];
+            const newNote = Object.assign({}, oldNote, { text: newText });
+            const newNotes = notes.map((n, i) => i === idx ? newNote : n);
+
+            try {
+                if (info.class) {
+                    await db.collection('scheduler_classes').doc(info.class.id).update({ notes: newNotes });
+                    const ci = allClasses.findIndex(c => c.id === info.class.id);
+                    if (ci >= 0) { allClasses[ci].notes = newNotes; selectedSlotInfo.class = allClasses[ci]; }
+                } else if (info.prescheduled) {
+                    await db.collection('prescheduled_slots').doc(info.prescheduled.id).update({ notes: newNotes });
+                    const pi = allPrescheduledSlots.findIndex(p => p.id === info.prescheduled.id);
+                    if (pi >= 0) { allPrescheduledSlots[pi].notes = newNotes; selectedSlotInfo.prescheduled = allPrescheduledSlots[pi]; }
+                }
+                loadSlotNotes();
+            } catch(e) {
+                console.error('saveEditedSlotNote error:', e);
+                alert('Error saving: ' + e.message);
+            }
+        }
+
+        async function deleteSlotNote(idx) {
+            if (!confirm('Delete this note?')) return;
+            const notes = window._slotNotesCache;
+            if (!notes || !notes[idx]) return;
+
+            const info = selectedSlotInfo;
+            if (!info) return;
+
+            const newNotes = notes.filter((_, i) => i !== idx);
+
+            try {
+                if (info.class) {
+                    await db.collection('scheduler_classes').doc(info.class.id).update({ notes: newNotes });
+                    const ci = allClasses.findIndex(c => c.id === info.class.id);
+                    if (ci >= 0) { allClasses[ci].notes = newNotes; selectedSlotInfo.class = allClasses[ci]; }
+                } else if (info.prescheduled) {
+                    await db.collection('prescheduled_slots').doc(info.prescheduled.id).update({ notes: newNotes });
+                    const pi = allPrescheduledSlots.findIndex(p => p.id === info.prescheduled.id);
+                    if (pi >= 0) { allPrescheduledSlots[pi].notes = newNotes; selectedSlotInfo.prescheduled = allPrescheduledSlots[pi]; }
+                }
+                loadSlotNotes();
+            } catch(e) {
+                console.error('deleteSlotNote error:', e);
+                alert('Error deleting: ' + e.message);
             }
         }
 
@@ -26091,159 +26165,6 @@ ${daySpecific}
             }
         }
 
-        function showDateSelection(day, baseDate, hasExistingClass) {
-            document.getElementById('slotDateSelection').style.display = 'block';
-            
-            const now = new Date();
-            let startFrom;
-            
-            if (hasExistingClass && baseDate) {
-                // For occupied slots: start from when class ends
-                startFrom = new Date(baseDate);
-            } else {
-                // For empty slots: start from today
-                startFrom = new Date();
-            }
-            
-            // Find the first matching day (Saturday or Sunday) on or after startFrom
-            const targetDayNum = day === 'Saturday' ? 6 : 0;
-            while (startFrom.getDay() !== targetDayNum) {
-                startFrom.setDate(startFrom.getDate() + 1);
-            }
-            
-            // If the first date is in the past, move to next week
-            if (startFrom < now) {
-                startFrom.setDate(startFrom.getDate() + 7);
-            }
-            
-            // Calculate end date (3 weeks from startFrom)
-            const endDate = new Date(startFrom);
-            endDate.setDate(endDate.getDate() + 21); // 3 weeks
-            
-            // Generate date options within the 3 week window
-            let optionsHtml = '';
-            let currentDate = new Date(startFrom);
-            let count = 0;
-            
-            while (currentDate <= endDate && count < 5) {
-                const dateStr = toESTDateStr(currentDate);
-                const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
-                const dayLabel = currentDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' });
-                
-                optionsHtml += `
-                    <button type="button" class="btn btn-sm date-option-btn" 
-                            onclick="selectScheduleDate('${dateStr}')"
-                            style="background: rgba(57,255,20,0.2); border: 1px solid #39ff14; color: #39ff14;">
-                        ${dayLabel}, ${label}
-                    </button>
-                `;
-                
-                currentDate.setDate(currentDate.getDate() + 7); // Next week
-                count++;
-            }
-            
-            // Update the description text
-            const descText = hasExistingClass 
-                ? `Select a start date (available dates within 3 weeks after class ends):`
-                : `Select a start date (available dates within the next 3 weeks):`;
-            
-            document.getElementById('slotDateOptions').innerHTML = optionsHtml;
-            document.querySelector('#slotDateSelection p').textContent = descText;
-            
-            // Populate preschedule form dropdowns
-            const classTypeSelect = document.getElementById('prescheduleClassType');
-            const teacherSelect = document.getElementById('prescheduleTeacher');
-            
-            if (classTypeSelect) {
-                // Get levels from existing LEVELS object or data-level-select elements
-                let options = '<option value="">-- Select Class Type --</option>';
-                Object.entries(LEVELS).forEach(([key, name]) => {
-                    options += `<option value="${key}">${name}</option>`;
-                });
-                classTypeSelect.innerHTML = options;
-            }
-            
-            if (teacherSelect) {
-                let options = '<option value="">-- Select Teacher --</option>';
-                allTeachers.forEach(t => {
-                    if ((t.availableDays || []).includes(selectedSlotInfo.day)) {
-                        options += `<option value="${t.id}">${escapeHtml(t.name)}</option>`;
-                    }
-                });
-                teacherSelect.innerHTML = options;
-                
-                // Pre-select current teacher if available
-                if (selectedSlotInfo.teacher) {
-                    teacherSelect.value = selectedSlotInfo.teacher.id;
-                }
-            }
-        }
-        
-        let selectedScheduleDateValue = null;
-        
-        function selectScheduleDate(dateStr) {
-            selectedScheduleDateValue = dateStr;
-            
-            // Update button styles
-            document.querySelectorAll('.date-option-btn').forEach(btn => {
-                btn.style.background = 'rgba(57,255,20,0.2)';
-                btn.style.borderColor = '#39ff14';
-            });
-            event.target.style.background = '#39ff14';
-            event.target.style.borderColor = '#39ff14';
-            event.target.style.color = '#000';
-            
-            // Show preschedule form
-            document.getElementById('prescheduleForm').style.display = 'block';
-        }
-        
-        async function confirmPreschedule() {
-            if (!selectedScheduleDateValue) {
-                alert('Please select a date first.');
-                return;
-            }
-            
-            const classType = document.getElementById('prescheduleClassType').value;
-            const teacherId = document.getElementById('prescheduleTeacher').value;
-            
-            if (!classType) {
-                alert('Please select a class type.');
-                return;
-            }
-            
-            if (!teacherId) {
-                alert('Please select a teacher.');
-                return;
-            }
-            
-            const teacher = allTeachers.find(t => t.id === teacherId);
-            
-            try {
-                const prescheduleData = {
-                    day: selectedSlotInfo.day,
-                    time: selectedSlotInfo.time,
-                    startDate: selectedScheduleDateValue,
-                    classType: classType,
-                    teacherId: teacherId,
-                    teacherName: teacher?.name || 'Unknown',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                const ref = await db.collection('prescheduled_slots').add(prescheduleData);
-                
-                allPrescheduledSlots.push({ id: ref.id, ...prescheduleData });
-                
-                closeModal('slotDetailsModal');
-                renderSlotGrid();
-                
-                alert(`✅ Slot pre-scheduled!\n\n${selectedSlotInfo.day} @ ${selectedSlotInfo.time}\n${LEVELS[classType] || classType}\nTeacher: ${teacher?.name}\nStarts: ${new Date(selectedScheduleDateValue).toLocaleDateString()}`);
-                
-            } catch (e) {
-                console.error('Error pre-scheduling slot:', e);
-                alert('❌ Error: ' + e.message);
-            }
-        }
-        
         async function cancelPreschedule() {
             if (!selectedSlotInfo?.prescheduled) return;
             
