@@ -28442,17 +28442,12 @@ KoreanLearnin Team`;
         }
         
         // ── Shopify Orders Autofill Picker ────────────────────────────────────────
-        // Calls Cloud Function: getShopifyOrders (fetches 20 most recent orders)
-        // Returns: { success: true, orders: [{ id, name, customer: {first_name, last_name, phone, email}, ... }] }
-
-        const SHOPIFY_ORDERS_FUNCTION_URL = 'https://us-central1-korean-ta-evaluator.cloudfunctions.net/getShopifyOrders';
+        // Uses existing getShopifyCustomersWithTag Cloud Function — fetches recent customers
 
         let _shopifyOrdersCache = null;
         let _shopifyOrdersCacheTime = null;
 
         async function openShopifyOrdersPicker(targetForm) {
-            // targetForm: 'slot' | 'active'
-            // Remove any existing picker
             var existing = document.getElementById('shopifyOrdersPickerOverlay');
             if (existing) existing.remove();
 
@@ -28464,23 +28459,20 @@ KoreanLearnin Team`;
             panel.style.cssText = 'background:#1a1a2e;border:2px solid #96bf48;border-radius:12px;padding:20px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;gap:12px;';
             panel.innerHTML =
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                    '<div style="color:#96bf48;font-size:14px;font-weight:700;">🛍️ Recent Shopify Orders</div>' +
+                    '<div style="color:#96bf48;font-size:14px;font-weight:700;">🛍️ Recent Shopify Customers</div>' +
                     '<button onclick="document.getElementById(\'shopifyOrdersPickerOverlay\').remove()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>' +
                 '</div>' +
-                '<div style="font-size:11px;color:#888;">Select an order to autofill the student\'s name and phone number.</div>' +
-                '<input id="shopifyOrdersSearch" type="text" placeholder="Filter by name or phone..." oninput="_renderShopifyOrders()" style="background:rgba(255,255,255,0.07);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;padding:8px 10px;">' +
+                '<div style="font-size:11px;color:#888;">Select a customer to autofill name and phone. Showing most recent 20.</div>' +
+                '<input id="shopifyOrdersSearch" type="text" placeholder="Filter by name, email or phone..." oninput="_renderShopifyOrders()" style="background:rgba(255,255,255,0.07);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;padding:8px 10px;">' +
                 '<div id="shopifyOrdersList" style="overflow-y:auto;flex:1;border:1px solid #333;border-radius:8px;min-height:120px;">' +
-                    '<div style="text-align:center;padding:30px;color:#888;font-size:13px;">⏳ Loading orders...</div>' +
-                '</div>' +
-                '<div style="font-size:10px;color:#555;text-align:center;">Showing 20 most recent orders</div>';
+                    '<div style="text-align:center;padding:30px;color:#888;font-size:13px;">⏳ Loading...</div>' +
+                '</div>';
 
             overlay.appendChild(panel);
             document.body.appendChild(overlay);
-
-            // Store target for when user picks
             window._shopifyOrdersPickerTarget = targetForm;
 
-            // Load orders (use cache if < 3 min old)
+            // Use cache if < 3 min old
             const cacheAge = _shopifyOrdersCacheTime ? (Date.now() - _shopifyOrdersCacheTime) / 1000 / 60 : Infinity;
             if (_shopifyOrdersCache && cacheAge < 3) {
                 _renderShopifyOrders();
@@ -28488,23 +28480,38 @@ KoreanLearnin Team`;
             }
 
             try {
-                const resp = await fetch(SHOPIFY_ORDERS_FUNCTION_URL, {
+                // Fetch last 30 days of customers, then take most recent 20
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - 30);
+
+                const response = await fetch(SHOPIFY_FUNCTION_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { limit: 20, status: 'any', fields: 'id,name,customer,billing_address,created_at,line_items' } })
+                    body: JSON.stringify({
+                        data: {
+                            updated_at_min: cutoff.toISOString(),
+                            fields: 'id,email,first_name,last_name,phone,created_at'
+                        }
+                    })
                 });
-                const result = await resp.json();
-                const data = result.result || result;
-                if (data.success && data.orders) {
-                    _shopifyOrdersCache = data.orders;
+                const result = await response.json();
+                const data = result.result;
+
+                if (data.success && data.customers) {
+                    // Sort by created_at descending, take top 20
+                    const sorted = data.customers
+                        .filter(c => c.first_name || c.last_name)
+                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                        .slice(0, 20);
+                    _shopifyOrdersCache = sorted;
                     _shopifyOrdersCacheTime = Date.now();
                     _renderShopifyOrders();
                 } else {
-                    throw new Error(data.message || 'No orders returned');
+                    throw new Error(data.message || 'No customers returned');
                 }
             } catch(e) {
                 var listEl = document.getElementById('shopifyOrdersList');
-                if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4444;font-size:12px;">❌ Error loading orders: ' + escapeHtml(e.message) + '<br><span style="color:#888;font-size:11px;margin-top:6px;display:block;">Make sure the getShopifyOrders Cloud Function is deployed.</span></div>';
+                if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4444;font-size:12px;">❌ Error: ' + escapeHtml(e.message) + '</div>';
             }
         }
 
@@ -28514,39 +28521,34 @@ KoreanLearnin Team`;
             if (!listEl || !_shopifyOrdersCache) return;
 
             var q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-            var orders = _shopifyOrdersCache.filter(function(o) {
-                var name = ((o.customer ? (o.customer.first_name || '') + ' ' + (o.customer.last_name || '') : '') || (o.billing_address ? (o.billing_address.first_name || '') + ' ' + (o.billing_address.last_name || '') : '')).trim().toLowerCase();
-                var phone = (o.customer ? o.customer.phone || '' : '') || (o.billing_address ? o.billing_address.phone || '' : '');
-                return !q || name.includes(q) || phone.includes(q);
+            var customers = _shopifyOrdersCache.filter(function(c) {
+                var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim().toLowerCase();
+                var phone = (c.phone || '').toLowerCase();
+                var email = (c.email || '').toLowerCase();
+                return !q || name.includes(q) || phone.includes(q) || email.includes(q);
             });
 
-            if (!orders.length) {
-                listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#888;font-size:12px;">No orders match.</div>';
+            if (!customers.length) {
+                listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#888;font-size:12px;">No customers match.</div>';
                 return;
             }
 
-            listEl.innerHTML = orders.map(function(o) {
-                var firstName = (o.customer ? o.customer.first_name : null) || (o.billing_address ? o.billing_address.first_name : '') || '';
-                var lastName  = (o.customer ? o.customer.last_name  : null) || (o.billing_address ? o.billing_address.last_name  : '') || '';
-                var fullName  = (firstName + ' ' + lastName).trim() || 'Unknown';
-                var phone     = (o.customer ? o.customer.phone : null) || (o.billing_address ? o.billing_address.phone : '') || '';
-                var email     = (o.customer ? o.customer.email : '') || '';
-                var orderNum  = o.name || ('#' + o.id);
-                var dateStr   = o.created_at ? new Date(o.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
-                var items     = (o.line_items || []).map(function(i){ return i.title || ''; }).filter(Boolean).join(', ');
-                var safeN = fullName.replace(/'/g,"\\'"), safeP = phone.replace(/'/g,"\\'"), safeE = email.replace(/'/g,"\\'");
-                return '<div onclick="_pickShopifyOrder(\'' + safeN + '\',\'' + safeP + '\',\'' + safeE + '\')" style="padding:10px 14px;border-bottom:1px solid #222;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'rgba(150,191,72,0.1)\'" onmouseout="this.style.background=\'transparent\'">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+            listEl.innerHTML = customers.map(function(c) {
+                var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || 'Unknown';
+                var phone = c.phone || '';
+                var email = c.email || '';
+                var dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '';
+                var safeN = fullName.replace(/'/g,"\\'");
+                var safeP = phone.replace(/'/g,"\\'");
+                var safeE = email.replace(/'/g,"\\'");
+                return '<div onclick="_pickShopifyOrder(\'' + safeN + '\',\'' + safeP + '\',\'' + safeE + '\')" style="padding:10px 14px;border-bottom:1px solid #222;cursor:pointer;" onmouseover="this.style.background=\'rgba(150,191,72,0.1)\'" onmouseout="this.style.background=\'transparent\'">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                         '<div>' +
                             '<div style="color:#fff;font-size:13px;font-weight:600;">' + escapeHtml(fullName) + '</div>' +
                             (phone ? '<div style="color:#aaa;font-size:11px;margin-top:2px;">📞 ' + escapeHtml(phone) + '</div>' : '') +
                             (email ? '<div style="color:#aaa;font-size:11px;">📧 ' + escapeHtml(email) + '</div>' : '') +
-                            (items ? '<div style="color:#96bf48;font-size:10px;margin-top:3px;">' + escapeHtml(items.slice(0,60)) + (items.length>60?'…':'') + '</div>' : '') +
                         '</div>' +
-                        '<div style="text-align:right;flex-shrink:0;margin-left:10px;">' +
-                            '<div style="color:#555;font-size:10px;">' + escapeHtml(orderNum) + '</div>' +
-                            '<div style="color:#555;font-size:10px;">' + escapeHtml(dateStr) + '</div>' +
-                        '</div>' +
+                        '<div style="color:#555;font-size:10px;flex-shrink:0;margin-left:10px;">' + escapeHtml(dateStr) + '</div>' +
                     '</div>' +
                 '</div>';
             }).join('');
@@ -28568,7 +28570,6 @@ KoreanLearnin Team`;
                 if (n) n.value = name;
                 if (p) p.value = phone;
                 if (e && email) e.value = email;
-                // Make sure manual tab is showing
                 switchAddActiveClassTab('manual');
             }
             var overlay = document.getElementById('shopifyOrdersPickerOverlay');
