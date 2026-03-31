@@ -3467,6 +3467,26 @@
                 </div>
             </div>
             
+            <!-- Date Selection (for available slots only) -->
+            <div id="slotDateSelection" style="display: none; margin: 15px 0; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
+                <h4 style="color: #39ff14; margin-bottom: 10px;">📅 Schedule Next Session</h4>
+                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Select a start date (3-week buffer included):</p>
+                <div id="slotDateOptions" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                <div id="prescheduleForm" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #39ff14;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 11px;">Class Type *</label>
+                            <select id="prescheduleClassType" data-level-select style="font-size: 12px;"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 11px;">Teacher *</label>
+                            <select id="prescheduleTeacher" style="font-size: 12px;"></select>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="confirmPreschedule()" style="width: 100%;">✓ Pre-schedule This Slot</button>
+                </div>
+            </div>
+
             <!-- Pre-scheduled Info (for X slots) -->
             <div id="slotPrescheduleInfo" style="display: none; margin: 15px 0; padding: 15px; background: rgba(255,152,0,0.1); border: 2px solid #ff9800; border-radius: 8px;">
                 <h4 style="color: #ff9800; margin-bottom: 10px;">⏳ Pre-scheduled</h4>
@@ -26003,6 +26023,8 @@ ${daySpecific}
             
             // Hide all sections initially
             document.getElementById('slotStudentRoster').style.display = 'none';
+            document.getElementById('slotDateSelection').style.display = 'none';
+            document.getElementById('prescheduleForm').style.display = 'none';
             document.getElementById('slotPrescheduleInfo').style.display = 'none';
             document.getElementById('slotEnrolledStudentsList').style.display = 'none';
             
@@ -26130,6 +26152,10 @@ ${daySpecific}
                         </div>
                     </div>
                 `;
+                // Show schedule next session for available slots only
+                const bufferDate = new Date();
+                bufferDate.setDate(bufferDate.getDate() + 21);
+                showDateSelection(day, bufferDate);
             }
             
             document.getElementById('slotDetailsContent').innerHTML = html;
@@ -26306,6 +26332,90 @@ ${daySpecific}
             } catch(e) {
                 console.error('saveSlotNote error:', e);
                 if (msg) { msg.textContent = '\u274c Error saving note.'; msg.style.color='#ff4444'; msg.style.display='block'; setTimeout(function(){ msg.style.display='none'; },3000); }
+            }
+        }
+
+        let selectedScheduleDateValue = null;
+
+        function showDateSelection(day, baseDate) {
+            document.getElementById('slotDateSelection').style.display = 'block';
+
+            const now = new Date();
+            let startFrom = new Date(baseDate);
+
+            // Find the first matching day (Saturday or Sunday) on or after startFrom
+            const targetDayNum = day === 'Saturday' ? 6 : 0;
+            while (startFrom.getDay() !== targetDayNum) {
+                startFrom.setDate(startFrom.getDate() + 1);
+            }
+            if (startFrom < now) startFrom.setDate(startFrom.getDate() + 7);
+
+            const endDate = new Date(startFrom);
+            endDate.setDate(endDate.getDate() + 21);
+
+            let optionsHtml = '';
+            let currentDate = new Date(startFrom);
+            selectedScheduleDateValue = null;
+
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const displayDate = currentDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+                optionsHtml += `<button class="btn btn-sm" onclick="selectScheduleDate('${dateStr}', this)" style="background:rgba(57,255,20,0.15);border:1px solid #39ff14;color:#39ff14;font-size:11px;">${displayDate}</button>`;
+                currentDate.setDate(currentDate.getDate() + 7);
+            }
+
+            document.getElementById('slotDateOptions').innerHTML = optionsHtml;
+        }
+
+        function selectScheduleDate(dateStr, btn) {
+            selectedScheduleDateValue = dateStr;
+            document.querySelectorAll('#slotDateOptions .btn').forEach(b => {
+                b.style.background = 'rgba(57,255,20,0.15)';
+                b.style.color = '#39ff14';
+            });
+            btn.style.background = '#39ff14';
+            btn.style.color = '#000';
+
+            const prescheduleForm = document.getElementById('prescheduleForm');
+            prescheduleForm.style.display = 'block';
+
+            // Populate class type dropdown
+            const classTypeSelect = document.getElementById('prescheduleClassType');
+            classTypeSelect.innerHTML = classTypes.map(ct => `<option value="${ct.id}">${escapeHtml(ct.name || ct.id)}</option>`).join('');
+
+            // Populate teacher dropdown
+            const teacherSelect = document.getElementById('prescheduleTeacher');
+            const day = selectedSlotInfo?.day;
+            const relevantTeachers = day ? allTeachers.filter(t => (t.availableDays || []).includes(day)) : allTeachers;
+            teacherSelect.innerHTML = relevantTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+            if (selectedSlotInfo?.teacher) teacherSelect.value = selectedSlotInfo.teacher.id;
+        }
+
+        async function confirmPreschedule() {
+            if (!selectedScheduleDateValue) { alert('Please select a date first.'); return; }
+            const classType = document.getElementById('prescheduleClassType').value;
+            const teacherId = document.getElementById('prescheduleTeacher').value;
+            if (!classType) { alert('Please select a class type.'); return; }
+            if (!teacherId) { alert('Please select a teacher.'); return; }
+            const teacher = allTeachers.find(t => t.id === teacherId);
+            try {
+                const prescheduleData = {
+                    day: selectedSlotInfo.day,
+                    time: selectedSlotInfo.time,
+                    startDate: selectedScheduleDateValue,
+                    classType,
+                    teacherId,
+                    teacherName: teacher?.name || 'Unknown',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                const ref = await db.collection('prescheduled_slots').add(prescheduleData);
+                allPrescheduledSlots.push({ id: ref.id, ...prescheduleData });
+                closeModal('slotDetailsModal');
+                renderSlotGrid();
+                alert(`✅ Slot pre-scheduled!\n\n${selectedSlotInfo.day} @ ${selectedSlotInfo.time}\n${LEVELS[classType] || classType}\nTeacher: ${teacher?.name}\nStarts: ${new Date(selectedScheduleDateValue).toLocaleDateString()}`);
+            } catch(e) {
+                console.error('Error pre-scheduling slot:', e);
+                alert('❌ Error: ' + e.message);
             }
         }
 
