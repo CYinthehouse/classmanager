@@ -21230,6 +21230,8 @@ Return ONLY valid JSON (single object, not array):
             }
             
             container.innerHTML = html;
+            // Load notes for each rendered class card
+            todaysClasses.forEach(c => loadDashNotes(c.id));
         }
         
         function renderPrescheduleCardForToday(ps) {
@@ -21364,6 +21366,8 @@ Return ONLY valid JSON (single object, not array):
             }
             
             container.innerHTML = html;
+            // Load notes for each rendered class card
+            activeClasses.forEach(c => loadDashNotes(c.id));
         }
         
         function renderAdminTeacherClassCard(c, isToday) {
@@ -21502,6 +21506,17 @@ Return ONLY valid JSON (single object, not array):
                             </div>
                         </div>
                     `}
+                    <div style="margin-top:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid #333;border-radius:8px;">
+                        <div style="color:#f5c842;font-size:12px;font-weight:700;margin-bottom:8px;">📝 Class Notes</div>
+                        <div id="dash-notes-list-${c.id}" style="margin-bottom:10px;font-size:12px;color:#ccc;min-height:30px;">
+                            <span style="color:#555;font-size:11px;">Loading...</span>
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:flex-start;">
+                            <textarea id="dash-notes-input-${c.id}" rows="2" placeholder="Add a note..." style="flex:1;background:rgba(255,255,255,0.06);border:1px solid #444;border-radius:5px;color:#fff;font-size:12px;padding:7px;resize:vertical;"></textarea>
+                            <button onclick="saveDashNote('${c.id}')" style="background:linear-gradient(135deg,#f5c842,#e0a800);border:none;color:#000;font-weight:700;font-size:11px;padding:7px 12px;border-radius:5px;cursor:pointer;white-space:nowrap;align-self:flex-end;">Save</button>
+                        </div>
+                        <div id="dash-notes-msg-${c.id}" style="font-size:11px;margin-top:5px;display:none;"></div>
+                    </div>
                 </div>
             `;
         }
@@ -21557,6 +21572,112 @@ Return ONLY valid JSON (single object, not array):
         }
         
         let selectedMoveClassId = null;
+
+        // ── Dashboard class notes (same Firestore path as slot manager — auto-synced) ──
+
+        async function loadDashNotes(classId) {
+            const listEl = document.getElementById('dash-notes-list-' + classId);
+            if (!listEl) return;
+            try {
+                const doc = await db.collection('scheduler_classes').doc(classId).get();
+                const notes = doc.exists ? (doc.data().notes || []) : [];
+                window['_dashNotesCache_' + classId] = notes.slice();
+                if (!notes.length) {
+                    listEl.innerHTML = '<span style="color:#555;font-size:11px;">No notes yet.</span>';
+                } else {
+                    listEl.innerHTML = notes.slice().reverse().map((n, ri) => {
+                        const realIdx = notes.length - 1 - ri;
+                        const d = n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+                        return '<div style="border-bottom:1px solid #222;padding:6px 0;" id="dash-note-'+classId+'-'+realIdx+'">' +
+                            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">' +
+                                '<div style="font-size:10px;color:#888;">'+escapeHtml(n.author||'Admin')+(d?' · '+d:'')+'</div>' +
+                                '<div style="display:flex;gap:4px;flex-shrink:0;margin-left:6px;">' +
+                                    '<button onclick="editDashNote(\''+classId+'\','+realIdx+')" style="background:none;border:1px solid #555;color:#aaa;font-size:9px;padding:1px 6px;border-radius:3px;cursor:pointer;">✏️</button>' +
+                                    '<button onclick="deleteDashNote(\''+classId+'\','+realIdx+')" style="background:none;border:1px solid #ff4444;color:#ff4444;font-size:9px;padding:1px 6px;border-radius:3px;cursor:pointer;">✕</button>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div id="dash-note-text-'+classId+'-'+realIdx+'" style="color:#ddd;font-size:12px;line-height:1.5;white-space:pre-wrap;">'+escapeHtml(n.text)+'</div>' +
+                        '</div>';
+                    }).join('');
+                }
+            } catch(e) {
+                if (listEl) listEl.innerHTML = '<span style="color:#ff4444;font-size:11px;">Error loading notes.</span>';
+                console.error('loadDashNotes error:', e);
+            }
+        }
+
+        async function saveDashNote(classId) {
+            const input = document.getElementById('dash-notes-input-' + classId);
+            const msg = document.getElementById('dash-notes-msg-' + classId);
+            const text = (input ? input.value : '').trim();
+            if (!text) return;
+            const note = {
+                text,
+                author: currentUser ? (currentUser.name || currentUser.email || 'Admin') : 'Admin',
+                createdAt: new Date().toISOString()
+            };
+            try {
+                await db.collection('scheduler_classes').doc(classId).update({
+                    notes: firebase.firestore.FieldValue.arrayUnion(note)
+                });
+                if (input) input.value = '';
+                if (msg) { msg.textContent = '✓ Saved'; msg.style.color='#39ff14'; msg.style.display='block'; setTimeout(()=>msg.style.display='none',2500); }
+                loadDashNotes(classId);
+                // Also update allClasses cache so slot manager sees it if opened
+                const ci = allClasses.findIndex(c => c.id === classId);
+                if (ci >= 0) allClasses[ci].notes = [...(allClasses[ci].notes||[]), note];
+            } catch(e) {
+                console.error('saveDashNote error:', e);
+                if (msg) { msg.textContent = '❌ Error saving.'; msg.style.color='#ff4444'; msg.style.display='block'; setTimeout(()=>msg.style.display='none',3000); }
+            }
+        }
+
+        function editDashNote(classId, idx) {
+            const notes = window['_dashNotesCache_' + classId];
+            if (!notes || !notes[idx]) return;
+            const textEl = document.getElementById('dash-note-text-' + classId + '-' + idx);
+            if (!textEl) return;
+            textEl.innerHTML =
+                '<textarea id="dash-note-edit-'+classId+'-'+idx+'" rows="2" style="width:100%;background:rgba(255,255,255,0.08);border:1px solid #555;border-radius:4px;color:#fff;font-size:11px;padding:5px;resize:vertical;box-sizing:border-box;">'+escapeHtml(notes[idx].text)+'</textarea>' +
+                '<div style="display:flex;gap:5px;margin-top:4px;">' +
+                    '<button onclick="saveEditedDashNote(\''+classId+'\','+idx+')" style="background:#f5c842;border:none;color:#000;font-size:10px;padding:3px 9px;border-radius:3px;cursor:pointer;font-weight:700;">Save</button>' +
+                    '<button onclick="loadDashNotes(\''+classId+'\')" style="background:rgba(255,255,255,0.08);border:1px solid #555;color:#aaa;font-size:10px;padding:3px 9px;border-radius:3px;cursor:pointer;">Cancel</button>' +
+                '</div>';
+        }
+
+        async function saveEditedDashNote(classId, idx) {
+            const notes = window['_dashNotesCache_' + classId];
+            if (!notes || !notes[idx]) return;
+            const input = document.getElementById('dash-note-edit-' + classId + '-' + idx);
+            const newText = (input ? input.value : '').trim();
+            if (!newText) return;
+            const newNotes = notes.map((n, i) => i === idx ? Object.assign({}, n, {text: newText}) : n);
+            try {
+                await db.collection('scheduler_classes').doc(classId).update({ notes: newNotes });
+                const ci = allClasses.findIndex(c => c.id === classId);
+                if (ci >= 0) allClasses[ci].notes = newNotes;
+                loadDashNotes(classId);
+            } catch(e) {
+                console.error('saveEditedDashNote error:', e);
+                alert('Error saving: ' + e.message);
+            }
+        }
+
+        async function deleteDashNote(classId, idx) {
+            if (!confirm('Delete this note?')) return;
+            const notes = window['_dashNotesCache_' + classId];
+            if (!notes) return;
+            const newNotes = notes.filter((_, i) => i !== idx);
+            try {
+                await db.collection('scheduler_classes').doc(classId).update({ notes: newNotes });
+                const ci = allClasses.findIndex(c => c.id === classId);
+                if (ci >= 0) allClasses[ci].notes = newNotes;
+                loadDashNotes(classId);
+            } catch(e) {
+                console.error('deleteDashNote error:', e);
+                alert('Error deleting: ' + e.message);
+            }
+        }
         
         function openMoveStudentModal(studentId, studentName, fromClassId) {
             document.getElementById('moveStudentId').value = studentId;
