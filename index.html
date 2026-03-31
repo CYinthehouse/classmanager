@@ -28490,14 +28490,14 @@ KoreanLearnin Team`;
                     body: JSON.stringify({
                         data: {
                             updated_at_min: cutoff.toISOString(),
-                            fields: 'id,email,first_name,last_name,phone,created_at'
+                            fields: 'id,email,first_name,last_name,phone,tags,created_at,updated_at,default_address,addresses'
                         }
                     })
                 });
                 const result = await response.json();
-                const data = result.result;
+                const data = result.result || result;
 
-                if (data.success && data.customers) {
+                if (data && data.success && data.customers) {
                     // Sort by created_at descending, take top 20
                     const sorted = data.customers
                         .filter(c => c.first_name || c.last_name)
@@ -28507,7 +28507,7 @@ KoreanLearnin Team`;
                     _shopifyOrdersCacheTime = Date.now();
                     _renderShopifyOrders();
                 } else {
-                    throw new Error(data.message || 'No customers returned');
+                    throw new Error((data && data.message) || 'No customers returned');
                 }
             } catch(e) {
                 var listEl = document.getElementById('shopifyOrdersList');
@@ -28535,7 +28535,7 @@ KoreanLearnin Team`;
 
             listEl.innerHTML = customers.map(function(c) {
                 var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || 'Unknown';
-                var phone = c.phone || '';
+                var phone = c.phone || (c.default_address && c.default_address.phone) || '';
                 var email = c.email || '';
                 var dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '';
                 var safeN = fullName.replace(/'/g,"\\'");
