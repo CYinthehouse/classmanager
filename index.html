@@ -26390,11 +26390,8 @@ ${daySpecific}
             const prescheduleForm = document.getElementById('prescheduleForm');
             prescheduleForm.style.display = 'block';
 
-            // Populate class type dropdown
-            const classTypeSelect = document.getElementById('prescheduleClassType');
-            classTypeSelect.innerHTML = allClassTypes.map(ct => `<option value="${ct.id}">${escapeHtml(ct.name || ct.id)}</option>`).join('');
-
-            // Populate teacher dropdown
+            // prescheduleClassType has data-level-select so updateClassTypeSelects() already populated it
+            // Just populate teacher dropdown
             const teacherSelect = document.getElementById('prescheduleTeacher');
             teacherSelect.innerHTML = allTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
             if (selectedSlotInfo?.teacher) teacherSelect.value = selectedSlotInfo.teacher.id;
