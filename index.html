@@ -26343,8 +26343,9 @@ ${daySpecific}
             const now = new Date();
             let startFrom = new Date(baseDate);
 
-            // Find the first matching day (Saturday or Sunday) on or after startFrom
-            const targetDayNum = day === 'Saturday' ? 6 : 0;
+            // Find the first matching day on or after startFrom
+            const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const targetDayNum = dayNames.indexOf(day);
             while (startFrom.getDay() !== targetDayNum) {
                 startFrom.setDate(startFrom.getDate() + 1);
             }
@@ -26385,9 +26386,7 @@ ${daySpecific}
 
             // Populate teacher dropdown
             const teacherSelect = document.getElementById('prescheduleTeacher');
-            const day = selectedSlotInfo?.day;
-            const relevantTeachers = day ? allTeachers.filter(t => (t.availableDays || []).includes(day)) : allTeachers;
-            teacherSelect.innerHTML = relevantTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+            teacherSelect.innerHTML = allTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
             if (selectedSlotInfo?.teacher) teacherSelect.value = selectedSlotInfo.teacher.id;
         }
 
