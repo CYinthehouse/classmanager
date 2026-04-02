@@ -9245,7 +9245,7 @@
                 if (line.length > 0) {
                     result.push(line);
                 }
-                if (result.length >= 3) break;
+                // No cap on sentences per set
             }
             return result;
         }
@@ -31461,77 +31461,84 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(needsGen) qgGenerateAbsBeginnerWords(container);
         }
 
+        // ── SHARED abs-beginner word builder ────────────────────
+        // Populates qg.sets[i].absoluteBeginnerWords for every set.
+        // Pass an existing usedWords map to avoid cross-caller collisions.
+        async function qgBuildAbsBeginnerWords(usedWords){
+            var aiUrl='https://generateflashcardai-386010826708.us-central1.run.app';
+            usedWords=usedWords||{};
+            var roundsNeedingFill=[];
+
+            // STEP 1: Extract single-syllable Korean words from sentences deterministically
+            for(var i=0;i<qg.sets.length;i++){
+                var extracted=[];
+                var allText=qg.sets[i].sentences.map(function(s){return s.korean;}).join(' ');
+                var tokens=allText.replace(/[.,!?;:“”‘’""''()~…　、。]/g,' ').split(/\s+/);
+                for(var t=0;t<tokens.length;t++){
+                    var tok=tokens[t];
+                    if(/^[\uAC00-\uD7A3]$/.test(tok) && !usedWords[tok]){
+                        extracted.push(tok);
+                        usedWords[tok]=true;
+                    }
+                }
+                qg.sets[i].absoluteBeginnerWords=extracted.slice(0,5);
+                if(extracted.length<5) roundsNeedingFill.push({idx:i,need:5-extracted.length});
+            }
+
+            // STEP 2: AI fill for remaining slots
+            if(roundsNeedingFill.length>0){
+                var abPrompt='Generate simple single Korean syllable blocks (exactly 1 Korean character each, like 밥, 물, 집) to fill missing slots for absolute beginner reading practice.\n';
+                abPrompt+='RULES: Every word MUST be exactly 1 Korean character. Use common beginner vocabulary. Do NOT repeat any already-used word.\n';
+                abPrompt+='Already used: '+Object.keys(usedWords).join(', ')+'\n\nFill these rounds:\n';
+                for(var r=0;r<roundsNeedingFill.length;r++){
+                    var ri=roundsNeedingFill[r].idx;
+                    abPrompt+='Round '+(ri+1)+': need '+roundsNeedingFill[r].need+' more (have: '+qg.sets[ri].absoluteBeginnerWords.join(', ')+')\n';
+                }
+                abPrompt+='\nReturn ONLY JSON: [{"round":1,"words":["w","w"]},{"round":2,"words":["w"]}]\nOnly the fill words.';
+                try{
+                    var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
+                    var data=await resp.json();
+                    var rt=(typeof data==='string'?data:data.data||data.text||data.result||data.response||JSON.stringify(data));
+                    var clean=rt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+                    var parsed=[];
+                    try{parsed=JSON.parse(clean);}catch(e){var m=clean.match(/\[[\s\S]*\]/);if(m)try{parsed=JSON.parse(m[0]);}catch(e2){}}
+                    for(var p=0;p<parsed.length;p++){
+                        var roundNum=parsed[p].round;var fillWords=parsed[p].words||[];
+                        var ri2=-1;
+                        for(var r=0;r<roundsNeedingFill.length;r++){if(roundsNeedingFill[r].idx+1===roundNum){ri2=roundsNeedingFill[r].idx;break;}}
+                        if(ri2<0 && p<roundsNeedingFill.length) ri2=roundsNeedingFill[p].idx;
+                        if(ri2>=0){
+                            for(var fw=0;fw<fillWords.length;fw++){
+                                var w=fillWords[fw];
+                                if(/^[\uAC00-\uD7A3]$/.test(w) && !usedWords[w] && qg.sets[ri2].absoluteBeginnerWords.length<5){
+                                    qg.sets[ri2].absoluteBeginnerWords.push(w);usedWords[w]=true;
+                                }
+                            }
+                        }
+                    }
+                }catch(aiErr){console.error('AI fill error:',aiErr);}
+                // Final fallback pool (60 common single-syllable words)
+                var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발','배','돈','강','길','풀','곰','복','딝','새','옷','밑','녀','팔','복','뜻','숲','잎','복','쌌','값','샶','과','맛','힙','칼','탑','섬','벽','봄','돌','피','금','은','솔','낙','북','남','해','볱','양','싯','보','씨','벌','잔','콩','숨','벗','잌'];
+                for(var i=0;i<qg.sets.length;i++){
+                    while(qg.sets[i].absoluteBeginnerWords.length<5){
+                        var found=false;
+                        for(var pi=0;pi<pool.length;pi++){if(!usedWords[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);usedWords[pool[pi]]=true;found=true;break;}}
+                        if(!found){
+                            // Pool exhausted — allow reuse within the remaining round
+                            for(var pi=0;pi<pool.length;pi++){
+                                if(qg.sets[i].absoluteBeginnerWords.indexOf(pool[pi])===-1){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);break;}
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Preview-time wrapper: runs qgBuildAbsBeginnerWords then re-renders the preview card
         async function qgGenerateAbsBeginnerWords(container){
             try{
-                var aiUrl='https://generateflashcardai-386010826708.us-central1.run.app';
-                var usedWords={};
-                var roundsNeedingFill=[];
-
-                // STEP 1: Extract single-syllable Korean words from sentences deterministically
-                for(var i=0;i<qg.sets.length;i++){
-                    var extracted=[];
-                    var allText=qg.sets[i].sentences.map(function(s){return s.korean;}).join(' ');
-                    var tokens=allText.replace(/[.,!?;:“”‘’()~…\u3000\u3001\u3002]/g,' ').split(/\s+/);
-                    for(var t=0;t<tokens.length;t++){
-                        var tok=tokens[t];
-                        if(/^[\uAC00-\uD7A3]$/.test(tok) && !usedWords[tok]){
-                            extracted.push(tok);
-                            usedWords[tok]=true;
-                        }
-                    }
-                    qg.sets[i].absoluteBeginnerWords=extracted.slice(0,5);
-                    if(extracted.length<5) roundsNeedingFill.push({idx:i,need:5-extracted.length});
-                }
-
-                // STEP 2: Only ask AI to fill remaining slots
-                if(roundsNeedingFill.length>0){
-                    var abPrompt='Generate simple single Korean syllable blocks (exactly 1 Korean character each, like \uBC25, \uBB3C, \uC9D1) to fill missing slots for absolute beginner reading practice.\n';
-                    abPrompt+='RULES: Every word MUST be exactly 1 Korean character. Use common beginner vocabulary. Do NOT repeat any already-used word.\n';
-                    abPrompt+='Already used: '+Object.keys(usedWords).join(', ')+'\n\nFill these rounds:\n';
-                    for(var r=0;r<roundsNeedingFill.length;r++){
-                        var ri=roundsNeedingFill[r].idx;
-                        abPrompt+='Round '+(ri+1)+': need '+roundsNeedingFill[r].need+' more (have: '+qg.sets[ri].absoluteBeginnerWords.join(', ')+')\n';
-                    }
-                    abPrompt+='\nReturn ONLY JSON: [{"round":1,"words":["w","w"]},{"round":2,"words":["w"]}]\nOnly the fill words.';
-                    try{
-                        var resp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
-                        var data=await resp.json();
-                        var rt=(typeof data==='string'?data:data.data||data.text||data.result||data.response||JSON.stringify(data));
-                        var clean=rt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-                        var parsed=[];
-                        try{parsed=JSON.parse(clean);}catch(e){var m=clean.match(/\[[\s\S]*\]/);if(m)try{parsed=JSON.parse(m[0]);}catch(e2){}}
-                        for(var p=0;p<parsed.length;p++){
-                            var roundNum=parsed[p].round;var fillWords=parsed[p].words||[];
-                            var ri2=-1;
-                            for(var r=0;r<roundsNeedingFill.length;r++){if(roundsNeedingFill[r].idx+1===roundNum){ri2=roundsNeedingFill[r].idx;break;}}
-                            if(ri2<0 && p<roundsNeedingFill.length) ri2=roundsNeedingFill[p].idx;
-                            if(ri2>=0){
-                                for(var fw=0;fw<fillWords.length;fw++){
-                                    var w=fillWords[fw];
-                                    if(/^[\uAC00-\uD7A3]$/.test(w) && !usedWords[w] && qg.sets[ri2].absoluteBeginnerWords.length<5){
-                                        qg.sets[ri2].absoluteBeginnerWords.push(w);usedWords[w]=true;
-                                    }
-                                }
-                            }
-                        }
-                    }catch(aiErr){console.error('AI fill error:',aiErr);}
-                    // Final fallback pool (60 common single-syllable words)
-                    var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발','배','돈','강','길','풀','곰','빵','떡','새','옷','밭','뼈','팔','볕','뜻','숲','잎','빛','쌀','값','삶','꿈','맛','힘','칼','탑','섬','벽','봄','돌','피','금','은','솥','낮','북','남','해','뱀','양','숯','빗','씨','벌','잔','콩','숨','벗','잠'];
-                    for(var i=0;i<qg.sets.length;i++){
-                        while(qg.sets[i].absoluteBeginnerWords.length<5){
-                            var found=false;
-                            for(var pi=0;pi<pool.length;pi++){if(!usedWords[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);usedWords[pool[pi]]=true;found=true;break;}}
-                            if(!found){
-                                // Pool exhausted - allow reuse from pool for remaining slots
-                                for(var pi=0;pi<pool.length;pi++){
-                                    var alreadyInRound=qg.sets[i].absoluteBeginnerWords.indexOf(pool[pi])!==-1;
-                                    if(!alreadyInRound){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);break;}
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
+                await qgBuildAbsBeginnerWords({});
             }catch(e){
                 console.error('Abs beginner word preview gen error:',e);
                 for(var i=0;i<qg.sets.length;i++){
@@ -31598,86 +31605,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                         ti++;
                     }
 
-                // Generate Absolute Beginner syllable blocks for each round (skip if already generated at preview)
+                // Generate Absolute Beginner syllable blocks (shared helper, skips if already done at preview)
                 var abNeedsGen=false;
                 for(var i=0;i<qg.sets.length;i++){if(!qg.sets[i].absoluteBeginnerWords||qg.sets[i].absoluteBeginnerWords.length===0){abNeedsGen=true;break;}}
                 if(abNeedsGen){
-                btn.innerHTML = '<span class="quiz-loading-dots">⏳ EXTRACTING ABS. BEG WORDS</span>';
-                try {
-                    var abUsed={};
-                    var abRoundsNeedFill=[];
-                    // STEP 1: Extract single-syllable words from sentences
-                    for(var i=0;i<qg.sets.length;i++){
-                        var extracted=[];
-                        var allText=qg.sets[i].sentences.map(function(s){return s.korean;}).join(' ');
-                        var tokens=allText.replace(/[.,!?;:\u201C\u201D\u2018\u2019()~\u2026\u3000\u3001\u3002]/g,' ').split(/\s+/);
-                        for(var t=0;t<tokens.length;t++){
-                            var tok=tokens[t];
-                            if(/^[\uAC00-\uD7A3]$/.test(tok) && !abUsed[tok]){
-                                extracted.push(tok);abUsed[tok]=true;
-                            }
-                        }
-                        qg.sets[i].absoluteBeginnerWords=extracted.slice(0,5);
-                        if(extracted.length<5) abRoundsNeedFill.push({idx:i,need:5-extracted.length});
-                    }
-                    // STEP 2: AI fill for remaining slots
-                    if(abRoundsNeedFill.length>0){
-                        btn.innerHTML = '<span class="quiz-loading-dots">⏳ FILLING ABS. BEG WORDS</span>';
-                        var abPrompt='Generate simple single Korean syllable blocks (exactly 1 Korean character each) to fill missing slots for absolute beginner reading practice.\n';
-                        abPrompt+='Every word MUST be exactly 1 Korean character. Use common beginner vocabulary. Do NOT repeat used words.\n';
-                        abPrompt+='Already used: '+Object.keys(abUsed).join(', ')+'\n\nFill these rounds:\n';
-                        for(var r=0;r<abRoundsNeedFill.length;r++){
-                            var ri=abRoundsNeedFill[r].idx;
-                            abPrompt+='Round '+(ri+1)+': need '+abRoundsNeedFill[r].need+' more (have: '+qg.sets[ri].absoluteBeginnerWords.join(', ')+')\n';
-                        }
-                        abPrompt+='\nReturn ONLY JSON: [{"round":1,"words":["w","w"]}]. Only fill words.';
-                        try{
-                            var abResp=await fetch(aiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:abPrompt,max_tokens:1000})});
-                            var abData=await abResp.json();
-                            var abRt=(typeof abData==='string'?abData:abData.data||abData.text||abData.result||abData.response||JSON.stringify(abData));
-                            var abClean=abRt.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-                            var abParsed=[];
-                            try{abParsed=JSON.parse(abClean);}catch(e){var abM=abClean.match(/\[[\s\S]*\]/);if(abM)try{abParsed=JSON.parse(abM[0]);}catch(e2){}}
-                            for(var p=0;p<abParsed.length;p++){
-                                var roundNum=abParsed[p].round;var fillWords=abParsed[p].words||[];
-                                var ri2=-1;
-                                for(var r=0;r<abRoundsNeedFill.length;r++){if(abRoundsNeedFill[r].idx+1===roundNum){ri2=abRoundsNeedFill[r].idx;break;}}
-                                if(ri2<0 && p<abRoundsNeedFill.length) ri2=abRoundsNeedFill[p].idx;
-                                if(ri2>=0){
-                                    for(var fw=0;fw<fillWords.length;fw++){
-                                        var w=fillWords[fw];
-                                        if(/^[\uAC00-\uD7A3]$/.test(w) && !abUsed[w] && qg.sets[ri2].absoluteBeginnerWords.length<5){
-                                            qg.sets[ri2].absoluteBeginnerWords.push(w);abUsed[w]=true;
-                                        }
-                                    }
-                                }
-                            }
-                        }catch(aiErr){console.error('AI fill error:',aiErr);}
-                    }
-                    // Final fallback pool (60 common single-syllable words)
-                    var pool=['밥','물','집','손','눈','귀','코','산','달','별','꽃','책','차','개','말','밤','컵','문','불','발','배','돈','강','길','풀','곰','빵','떡','새','옷','밭','뼈','팔','볕','뜻','숲','잎','빛','쌀','값','삶','꿈','맛','힘','칼','탑','섬','벽','봄','돌','피','금','은','솥','낮','북','남','해','뱀','양','숯','빗','씨','벌','잔','콩','숨','벗','잠'];
-                    for(var i=0;i<qg.sets.length;i++){
-                        while(qg.sets[i].absoluteBeginnerWords.length<5){
-                            var found=false;
-                            for(var pi=0;pi<pool.length;pi++){if(!abUsed[pool[pi]]){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);abUsed[pool[pi]]=true;found=true;break;}}
-                            if(!found){
-                                // Pool exhausted - allow reuse from pool for remaining slots
-                                for(var pi=0;pi<pool.length;pi++){
-                                    var alreadyInRound=qg.sets[i].absoluteBeginnerWords.indexOf(pool[pi])!==-1;
-                                    if(!alreadyInRound){qg.sets[i].absoluteBeginnerWords.push(pool[pi]);break;}
-                                }
-                                break;
-                            }
-                        }
-                    }
-                } catch(abErr) {
-                    console.error('Abs beginner word generation error:', abErr);
-                    for (var i = 0; i < qg.sets.length; i++) {
-                        qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];
+                    btn.innerHTML = '<span class="quiz-loading-dots">⏳ BUILDING ABS. BEG WORDS</span>';
+                    try{
+                        await qgBuildAbsBeginnerWords({});
+                    }catch(abErr){
+                        console.error('Abs beginner word generation error:',abErr);
+                        for(var i=0;i<qg.sets.length;i++){qg.sets[i].absoluteBeginnerWords=['밥','물','집','손','눈'];}
                     }
                 }
-
-                } // end abNeedsGen
 
                 // Pre-generate bonus clauses for absolute beginners (goal-aware)
                 // These are stored per-round so they're instant when a student triggers bonus
@@ -31800,7 +31739,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     }catch(e){console.error('G2PK pre-calc error:',e);}
                 })();
 
-                qgShowLobby(roomCode, studentUrl);
+                qg.studentUrl=studentUrl; qgShowLobby(roomCode, studentUrl);
             } catch(err) {
                 console.error('Create error:', err); alert('Error: ' + err.message);
             } finally { btn.disabled = false; btn.innerHTML = '🎮 CREATE GAME'; }
@@ -31886,7 +31825,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:12px;">';
                 for(var ss=0;ss<slide.sentences.length;ss++){
                     var isInRound=false;
-                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean===slide.sentences[ss]){isInRound=true;break;}}
+                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean.trim()===slide.sentences[ss].trim()){isInRound=true;break;}}
                     var sBg=isInRound?'background:rgba(255,255,100,0.25);border-radius:8px;padding:4px 12px;':'padding:4px 12px;opacity:0.5;';
                     h+='<div style="font-size:28px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;'+sBg+'">'+escapeHtml(slide.sentences[ss])+'</div>';
                 }
@@ -31965,7 +31904,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 for(var ss=0;ss<slide.sentences.length;ss++){
                     // Highlight sentences that are in this round
                     var isInRound=false;
-                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean===slide.sentences[ss]){isInRound=true;break;}}
+                    for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean.trim()===slide.sentences[ss].trim()){isInRound=true;break;}}
                     var sBg=isInRound?'background:rgba(255,255,100,0.25);border-radius:8px;padding:4px 12px;':'padding:4px 12px;opacity:0.5;';
                     h+='<div style="font-size:28px;font-weight:700;color:#000;line-height:1.6;word-break:keep-all;'+sBg+'">'+escapeHtml(slide.sentences[ss])+'</div>';
                 }
@@ -31988,32 +31927,16 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">📊 SUBMISSIONS</div>';
             h+='<div id="qgSubTracker" style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
 
-            // ── LISTEN ALL (Sequential Player) ──
-            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#ff7777;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">🔊 LISTEN ALL</div>';
-            h+='<div id="qgListenAll" style="background:rgba(255,119,119,0.03);border:1px solid rgba(255,119,119,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
-            h+='<div id="qgListenControls" style="display:none;margin-bottom:10px;">';
-            h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-            h+='<button id="qgPlayAllBtn" onclick="qgPlayAll()" style="background:linear-gradient(135deg,#ff9800,#f57c00);border:none;color:#000;font-weight:700;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;">▶ Play All</button>';
-            h+='<button onclick="qgStopAll()" style="background:rgba(255,255,255,0.1);border:1px solid #666;color:#ccc;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">⏹ Stop</button>';
-            h+='<span style="color:#888;font-size:11px;margin-left:4px;">Speed:</span>';
-            var speeds=[0.5,1,1.5,2,3,5];
-            for(var sp=0;sp<speeds.length;sp++){
-                var isActive=speeds[sp]===1?'background:#ff9800;color:#000;border-color:#ff9800;':'background:rgba(255,255,255,0.08);color:#ccc;border-color:#555;';
-                h+='<button onclick="qgSetSpeed('+speeds[sp]+',this)" class="qgSpeedBtn" style="'+isActive+'padding:4px 8px;border-radius:6px;border:1px solid;font-size:11px;cursor:pointer;font-weight:600;">'+speeds[sp]+'x</button>';
-            }
-            h+='</div>';
-            h+='<div id="qgNowPlaying" style="margin-top:8px;font-size:11px;color:#888;display:none;"></div>';
-            h+='</div>';
-            h+='<div id="qgListenList" style="font-size:12px;color:#888;">Recordings will appear here as students submit...</div>';
-            h+='</div></div>';
 
             // Buttons
             h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
+            // Buttons
+            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
-            h+='<button onclick="qgShowDrillUI()" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🎙 DRILL</button>';
-            if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86,0 -2px 0 #005a86,0 2px 0 #005a86,-2px 0 0 #005a86,2px 0 0 #005a86;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➜ NEXT ROUND</button>';
-            h+='<button onclick="qgShowLeaderboardAdmin()" style="background:linear-gradient(135deg,#f0c040,#d4a017);border:none;color:#1a1a2e;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;text-shadow:-2px -2px 0 rgba(0,0,0,0.3),2px -2px 0 rgba(0,0,0,0.3),-2px 2px 0 rgba(0,0,0,0.3),2px 2px 0 rgba(0,0,0,0.3);font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏆 LEADERBOARD</button>';
-            h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
+            h+='<button onclick="qgOpenPanel()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📺 OPEN PANEL</button>';
+            h+='<button onclick="qgShowQRModal()" style="background:rgba(65,192,255,0.12);border:1px solid rgba(65,192,255,0.35);color:#41c0ff;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📱 QR CODE</button>';
+            if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➤ NEXT ROUND</button>';
+            h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
             el.innerHTML=h;
 
             // Init draw canvas + restore preview annotations
@@ -32100,7 +32023,9 @@ Return ONLY this JSON (no markdown, no code blocks):
             qgActivePointerId=e.pointerId;
             qgDrawing=true;
             if(!qgDrawCtx)return;
-            if(qgDrawEraser){
+            var isEraserTip=(e.buttons===32); // S Pen physical eraser tip
+            if(isEraserTip && !qgDrawEraser){ qgDrawEraser=true; var eb=document.getElementById('qgEraserBtn'); if(eb)eb.style.borderColor='#ff0'; }
+            if(qgDrawEraser||isEraserTip){
                 qgDrawCtx.globalCompositeOperation='destination-out';
                 qgDrawCtx.lineWidth=20;
             } else {
@@ -32275,72 +32200,42 @@ Return ONLY this JSON (no markdown, no code blocks):
             qg.unsubSession = db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB)
                 .where('round','==',round).onSnapshot(function(snap){
                 var tracker=document.getElementById('qgSubTracker');
-                var listEl=document.getElementById('qgListenList');
-                var ctrlEl=document.getElementById('qgListenControls');
-                if(!tracker||!listEl) return;
-                if(snap.empty){tracker.innerHTML='Waiting for recordings...';listEl.innerHTML='<span style="color:#888;">Recordings will appear here as students submit...</span>';if(ctrlEl)ctrlEl.style.display='none';return;}
+                if(snap.empty){if(tracker)tracker.innerHTML='Waiting for recordings...';return;}
                 var subs=[];snap.forEach(function(d){subs.push(d.data());});
-                // Exclude bonus submissions from teacher listen view
                 subs=subs.filter(function(s){return !s.isBonus;});
-                // Tracker — split all three levels
                 var absSubs=subs.filter(function(s){return s.level==='absolute_beginner';});
                 var begSubs=subs.filter(function(s){return s.level==='beginner';});
                 var advSubs=subs.filter(function(s){return s.level==='advanced';});
                 var gradingCount=subs.filter(function(s){return s.status==='grading';}).length;
                 var trackerHtml='<span style="color:#ff69b4;">🐣 Abs: '+absSubs.length+'</span> &bull; <span style="color:#8bb4d6;">🌱 Beg: '+begSubs.length+'</span> &bull; <span style="color:#c4a0e8;">🌟 Adv: '+advSubs.length+'</span>';
                 if(gradingCount>0) trackerHtml+=' &bull; <span style="color:#fbbf24;">⏳ '+gradingCount+' grading...</span>';
-                tracker.innerHTML=trackerHtml;
-
-                // Rebuild audio queue — ordered by level group: abs beginner → beginner → advanced
-                qgAudioQueue=[];
-                var lh='';
-                var levelGroups=[
-                    {key:'absolute_beginner', label:'🐣 ABS. BEGINNER', color:'#ff69b4', items:absSubs},
-                    {key:'beginner',          label:'🌱 BEGINNER',      color:'#8bb4d6', items:begSubs},
-                    {key:'advanced',          label:'🌟 ADVANCED',      color:'#c4a0e8', items:advSubs}
-                ];
-                levelGroups.forEach(function(group){
-                    if(group.items.length===0) return;
-                    // Get the expected text for this level from the first submission that has it
-                    var expectedText='';
-                    for(var gi=0;gi<group.items.length;gi++){
-                        if(group.items[gi].expectedKorean){expectedText=group.items[gi].expectedKorean;break;}
-                    }
-                    // Group header
-                    lh+='<div style="margin:10px 0 6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">';
-                    lh+='<span style="font-family:\'Press Start 2P\';font-size:8px;color:'+group.color+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+group.label+'</span>';
-                    if(expectedText) lh+='<span style="font-size:13px;color:#ddd;font-weight:600;">→ '+escapeHtml(expectedText)+'</span>';
-                    lh+='</div>';
-                    group.items.forEach(function(s){
-                        var isGrading=s.status==='grading';
-                        var lc=group.color;
-                        var borderColor=isGrading?'#fbbf2444':lc+'33';
-                        var queueIdx=-1;
-                        if(s.audioUrl && !isGrading){
-                            queueIdx=qgAudioQueue.length;
-                            qgAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0,gradeScore:s.gradeScore||0,expectedKorean:s.expectedKorean||''});
-                        }
-                        var clickAttr=queueIdx>=0?'onclick="qgPlaySingle('+queueIdx+')"':'';
-                        lh+='<div class="qgListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;'+(queueIdx>=0?'cursor:pointer;':'')+'" '+clickAttr+'>';
-                        lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
-                        lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
-                        if(isGrading){
-                            lh+='<div style="font-size:10px;color:#fbbf24;">⏳ Grading...</div></div>';
-                        } else {
-                            lh+='<div style="font-size:10px;color:'+lc+';">'+(s.score||0)+' pts</div></div>';
-                        }
-                        if(isGrading){
-                            lh+='<span style="font-size:11px;color:#fbbf24;">⏳</span>';
-                        } else {
-                            lh+='<span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';
-                        }
-                        lh+='</div>';
-                    });
-                });
-                listEl.innerHTML=lh||'<span style="color:#888;">No recordings yet.</span>';
-
-                // Show controls if we have any audio
-                if(ctrlEl) ctrlEl.style.display=qgAudioQueue.length>0?'block':'none';
+                if(tracker) tracker.innerHTML=trackerHtml;
+                // Forward update to open panel window
+                if(qg.panelWin && !qg.panelWin.closed) qg.panelWin.qgPanelOnSubs && qg.panelWin.qgPanelOnSubs(subs);
+                // Live leaderboard + top errors when all graded
+                var totalSubs=subs.length;
+                var gradedSubs=subs.filter(function(s){return s.status==='graded';});
+                if(totalSubs>0 && gradedSubs.length===totalSubs){
+                    db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_PLAYERS_SUB).get().then(function(playerSnap){
+                        var absBegBoard=[],begBoard=[],advBoard=[];
+                        playerSnap.forEach(function(d){
+                            var p=d.data();
+                            var entry={name:p.name,emoji:p.emoji,score:p.score||0};
+                            if(p.level==='absolute_beginner') absBegBoard.push(entry);
+                            else if(p.level==='beginner') begBoard.push(entry);
+                            else advBoard.push(entry);
+                        });
+                        absBegBoard.sort(function(a,b){return b.score-a.score;});
+                        begBoard.sort(function(a,b){return b.score-a.score;});
+                        advBoard.sort(function(a,b){return b.score-a.score;});
+                        db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).update({
+                            leaderboard_absolute_beginner:absBegBoard,
+                            leaderboard_beginner:begBoard,
+                            leaderboard_advanced:advBoard
+                        }).catch(function(e){console.error('Live LB update error:',e);});
+                    }).catch(function(e){console.error('Live LB player fetch error:',e);});
+                    qgRenderTopErrors(gradedSubs);
+                }
             });
         }
 
@@ -32371,6 +32266,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             clearInterval(qg.timer);
             var bar=document.getElementById('qgTimerBar');
             if(bar){bar.style.transition='none';bar.style.width=bar.offsetWidth+'px';}
+            // Capture drawpad annotations before replacing innerHTML
+            qg.savedCanvasData=null;
+            var qgDrillCv=document.getElementById('qgDrawCanvas');
+            if(qgDrillCv && qgDrawCtx) qg.savedCanvasData=qgDrillCv.toDataURL();
             var el=document.getElementById('quizGamePlayView');
             var h='<div style="padding:20px;">';
             h+='<div style="font-family:\'Press Start 2P\';font-size:12px;color:#9b59b6;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;text-align:center;margin-bottom:16px;">🎙 PRONUNCIATION DRILL</div>';
@@ -32540,27 +32439,24 @@ Return ONLY this JSON (no markdown, no code blocks):
                     lh+='<span style="font-family:\'Press Start 2P\',monospace;font-size:8px;color:'+group.color+';text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;">'+group.label+'</span>';
                     if(drillText) lh+='<span style="font-size:13px;color:#ddd;font-weight:600;">&rarr; '+escapeHtml(drillText)+'</span>';
                     lh+='</div>';
-                    items.forEach(function(s){
-                        var lc=group.color;
-                        var scoreColor=s.score>=80?'#39ff14':s.score>=60?'#fbbf24':'#ef4444';
-                        if(s.audioUrl && s.status!=='grading'){
-                            qgDrillQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0,drillText:drillText});
-                        }
-                        lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+lc+'33;border-radius:8px;">';
-                        lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
-                        lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
-                        if(s.status==='grading'){
-                            lh+='<div style="font-size:10px;color:#fbbf24;">&#x23F3; Grading...</div></div>';
-                            lh+='<span style="font-size:11px;color:#fbbf24;">&#x23F3;</span>';
-                        }else{
-                            lh+='<div style="font-size:10px;color:'+lc+';">'+(escapeHtml(s.feedback||'').replace(/•/g,'<br>•'))+'</div></div>';
-                            lh+='<span style="font-size:14px;font-weight:700;color:'+scoreColor+';">'+s.score+'</span>';
-                            if(s.audioUrl){
-                                lh+='<button onclick="qgDrillPlayAudio(this.dataset.url)" data-url="'+escapeHtml(s.audioUrl)+'" style="background:rgba(255,152,0,0.15);border:1px solid #ff9800;color:#ff9800;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">&#9654;</button>';
-                            }
-                        }
-                        lh+='</div>';
-                    });
+                     items.forEach(function(s){
+                         var lc=group.color;
+                         var isGrading=s.status==='grading';
+                         var correctIcon=isGrading?'⏳':s.correct===true?'✅':'❌';
+                         var borderColor=isGrading?'#fbbf2444':s.correct===true?'rgba(0,255,136,0.3)':'rgba(255,68,68,0.3)';
+                         if(s.audioUrl && !isGrading){
+                             qgDrillQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,drillText:drillText});
+                         }
+                         lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;">';
+                         lh+='<span>'+renderEmoji(s.emoji,22)+'</span>';
+                         lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+escapeHtml(s.playerName||'Student')+'</div>';
+                         lh+='<div style="font-size:10px;color:'+lc+';">'+escapeHtml(s.feedback||'')+'</div></div>';
+                         lh+='<span style="font-size:20px;">'+correctIcon+'</span>';
+                         if(s.audioUrl && !isGrading){
+                             lh+='<button onclick="qgDrillPlayAudio(this.dataset.url)" data-url="'+escapeHtml(s.audioUrl)+'" style="background:rgba(255,152,0,0.15);border:1px solid #ff9800;color:#ff9800;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">&#9654;</button>';
+                         }
+                         lh+='</div>';
+                     });
                 });
                 listEl.innerHTML=lh;
             });
@@ -32701,7 +32597,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             }catch(e){console.error('End drill error:',e);}
             if(qg.unsubDrill){qg.unsubDrill();qg.unsubDrill=null;}
             // Return to the active round view (not preview) — preserve timer and submissions
-            qgShowAdminRound(qg.currentRound, null);
+            qgShowAdminRound(qg.currentRound, qg.savedCanvasData||null);
         }
 
         async function qgEndRound() {
@@ -32733,40 +32629,72 @@ Return ONLY this JSON (no markdown, no code blocks):
             var te=document.getElementById('qgTimer');
             if(te){te.textContent="TIME'S UP";te.style.fontSize='14px';}
 
-            // Aggregate top 3 most-flagged words from Azure across all students this round
+            // Top 3 errors — attempt immediately; live trigger handles late graders
             try{
-                var roundSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).where('round','==',qg.currentRound).where('status','==','graded').get();
+                var endRoundSubs=await db.collection(QUIZ_GAME_COLLECTION).doc(qg.sessionId).collection(QUIZ_SUBS_SUB).where('round','==',qg.currentRound).where('status','==','graded').get();
+                var endRoundSubData=[];endRoundSubs.forEach(function(doc){endRoundSubData.push(doc.data());});
+                qgRenderTopErrors(endRoundSubData);
+            }catch(errE){}
+        }
+
+        // Shared helper — renders top 3 Azure-flagged error words into #qgRoundErrors
+        // Called from qgEndRound AND from the live-grading trigger in qgListenSubmissions
+        // Shared helper — renders top 3 error words + phoneme hints into #qgRoundErrors
+        // Called from qgEndRound AND the live-grading trigger in qgListenSubmissions
+        function qgRenderTopErrors(subs){
+            try{
+                // Build word frequency map from azureFlaggedWords
                 var wordFreq={};
-                roundSubs.forEach(function(doc){
-                    var d=doc.data();
-                    // Count unique Azure-flagged words per student
+                subs.forEach(function(d){
                     var seenWords={};
                     if(d.azureFlaggedWords&&d.azureFlaggedWords.length>0){
                         d.azureFlaggedWords.forEach(function(w){
-                            if(w && !seenWords[w]){
-                                seenWords[w]=true;
-                                wordFreq[w]=(wordFreq[w]||0)+1;
-                            }
+                            if(w&&!seenWords[w]){seenWords[w]=true;wordFreq[w]=(wordFreq[w]||0)+1;}
                         });
                     }
                 });
                 var topErr=Object.keys(wordFreq).sort(function(a,b){return wordFreq[b]-wordFreq[a];}).slice(0,3);
-                if(topErr.length>0){
-                    var errDiv=document.getElementById('qgRoundErrors');
-                    if(!errDiv){
-                        errDiv=document.createElement('div');errDiv.id='qgRoundErrors';
-                        errDiv.style.cssText='margin-top:12px;padding:14px;background:rgba(255,68,68,0.08);border:2px solid rgba(255,68,68,0.3);border-radius:10px;';
-                        var timerParent=te?te.parentNode:null;
-                        if(timerParent)timerParent.insertAdjacentElement('afterend',errDiv);
-                    }
-                    var eh='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#ff4444;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:10px;">🔤 TOP ERRORS THIS ROUND</div>';
-                    topErr.forEach(function(word,i){
-                        var cnt=wordFreq[word];
-                        eh+='<div style="font-size:15px;color:#fff;margin-bottom:6px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;">#'+(i+1)+' <span style="color:#ff4444;font-weight:bold;">'+escapeHtml(word)+'</span> <span style="color:#888;font-size:11px;">('+cnt+' student'+(cnt>1?'s':'')+')</span></div>';
+                if(topErr.length===0) return;
+
+                // For each top word, find the most common phoneme error across students whose
+                // expectedKorean contains that word and who have phonemeErrors recorded
+                var wordPhoneme={};
+                topErr.forEach(function(word){
+                    var phonemeFreq={};
+                    subs.forEach(function(d){
+                        // Only look at submissions where this word was flagged
+                        if(!d.azureFlaggedWords||d.azureFlaggedWords.indexOf(word)<0) return;
+                        if(!d.phonemeErrors||d.phonemeErrors.length===0) return;
+                        var seen={};
+                        d.phonemeErrors.forEach(function(err){
+                            var jamo=err.expected||'';
+                            if(jamo&&!seen[jamo]){
+                                seen[jamo]=true;
+                                phonemeFreq[jamo]=(phonemeFreq[jamo]||0)+1;
+                            }
+                        });
                     });
-                    errDiv.innerHTML=eh;
+                    var topJamo=Object.keys(phonemeFreq).sort(function(a,b){return phonemeFreq[b]-phonemeFreq[a];});
+                    wordPhoneme[word]=topJamo.length>0?topJamo[0]:null;
+                });
+
+                var te=document.getElementById('qgTimer');
+                var errDiv=document.getElementById('qgRoundErrors');
+                if(!errDiv){
+                    errDiv=document.createElement('div');errDiv.id='qgRoundErrors';
+                    errDiv.style.cssText='margin-top:12px;padding:14px;background:rgba(255,68,68,0.08);border:2px solid rgba(255,68,68,0.3);border-radius:10px;';
+                    var timerParent=te?te.parentNode:null;
+                    if(timerParent)timerParent.insertAdjacentElement('afterend',errDiv);
                 }
-            }catch(errE){ }
+                var eh='<div style="font-family:\'Press Start 2P\';font-size:8px;color:#ff4444;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:10px;">🔤 TOP ERRORS THIS ROUND</div>';
+                topErr.forEach(function(word,i){
+                    var cnt=wordFreq[word];
+                    var jamo=wordPhoneme[word];
+                    var label=jamo?escapeHtml(jamo)+' <span style="color:#aaa;font-size:13px;">('+escapeHtml(word)+')</span>':escapeHtml(word);
+                    eh+='<div style="font-size:15px;color:#fff;margin-bottom:6px;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;">#'+(i+1)+' <span style="color:#ff4444;font-weight:bold;">'+label+'</span> <span style="color:#888;font-size:11px;">('+cnt+' student'+(cnt>1?'s':'')+')\</span></div>';
+                });
+                errDiv.innerHTML=eh;
+            }catch(e){}
         }
 
         function qgBuildPodium(board, label, labelColor) {
@@ -32844,6 +32772,43 @@ Return ONLY this JSON (no markdown, no code blocks):
 
             h+='</div>';
             return h;
+        }
+
+        // ── ADMIN PANEL WINDOW ─────────────────────────────
+        var qg_panelWin=null;
+        function qgOpenPanel(){
+            var panelUrl=window.location.href.split('?')[0]+'?adminpanel='+encodeURIComponent(qg.sessionId);
+            if(qg_panelWin && !qg_panelWin.closed){qg_panelWin.focus();return;}
+            qg_panelWin=window.open(panelUrl,'_blank','width=780,height=960,noopener=0');
+            qg.panelWin=qg_panelWin;
+        }
+
+        function qgShowQRModal(){
+            if(!qg.studentUrl) return;
+            var ov=document.createElement('div');ov.id='qgQRModal';
+            ov.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);z-index:100002;display:flex;justify-content:center;align-items:center;padding:20px;';
+            var roomCode=(qg.studentUrl.split('quizgame=')[1]||'').toUpperCase();
+            var h='<div style="background:linear-gradient(180deg,#1a0a2e,#0d0d1a);border:3px solid #41c0ff;border-radius:16px;padding:28px;max-width:400px;width:100%;text-align:center;">';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:14px;color:#41c0ff;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:6px;">JOIN GAME</div>';
+            h+='<div style="font-family:\'Press Start 2P\';font-size:28px;color:#41c0ff;letter-spacing:8px;margin-bottom:16px;">'+roomCode+'</div>';
+            h+='<div id="qgQRModalCode" style="display:flex;justify-content:center;margin-bottom:16px;"></div>';
+            h+='<div style="word-break:break-all;font-size:11px;color:#888;margin-bottom:16px;">'+escapeHtml(qg.studentUrl)+'</div>';
+            h+='<div style="display:flex;gap:8px;justify-content:center;">';
+            h+='<button onclick="navigator.clipboard.writeText(\''+qg.studentUrl+'\');this.textContent=\'✅ Copied!\';setTimeout(function(){this.textContent=\'📋 Copy\';}.bind(this),2000)" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:8px 16px;border-radius:8px;font-size:11px;cursor:pointer;">📋 Copy</button>';
+            h+='<button onclick="document.getElementById(\'qgQRModal\').remove()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;padding:8px 16px;border-radius:8px;font-size:11px;cursor:pointer;">✕ Close</button>';
+            h+='</div></div>';
+            ov.innerHTML=h;
+            ov.onclick=function(e){if(e.target===ov)ov.remove();};
+            document.body.appendChild(ov);
+            setTimeout(function(){
+                var qrC=document.getElementById('qgQRModalCode');
+                if(qrC&&typeof QRCode!=='undefined'){
+                    qrC.innerHTML='';
+                    new QRCode(qrC,{text:qg.studentUrl,width:200,height:200,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+                    var img=qrC.querySelector('img');if(img){img.style.borderRadius='10px';img.style.border='4px solid #fff';}
+                    var cv=qrC.querySelector('canvas');if(cv){cv.style.borderRadius='10px';cv.style.border='4px solid #fff';}
+                }
+            },100);
         }
 
         function qgShowLeaderboardAdmin() {
@@ -33011,6 +32976,466 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
 
         // ══════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════
+        // 📺 ADMIN PANEL — accessed via ?adminpanel=SESSIONID
+        // Self-contained: Listen All, Drill, Leaderboard
+        // ══════════════════════════════════════════════════════
+        (function(){
+            var p=new URLSearchParams(window.location.search);
+            var panelSessionId=p.get('adminpanel');
+            if(!panelSessionId) return;
+
+            // Hide everything, render panel UI
+            document.addEventListener('DOMContentLoaded',function(){
+                document.body.innerHTML='';
+                document.body.style.cssText='margin:0;padding:0;min-height:100vh;background:#0a0a15;font-family:"Noto Sans",sans-serif;color:#fff;overflow-x:hidden;';
+                if(!document.querySelector('link[href*="Press+Start+2P"]')){var fl=document.createElement('link');fl.href='https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';fl.rel='stylesheet';document.head.appendChild(fl);}
+
+                var app=document.createElement('div');
+                app.id='_apApp';
+                app.style.cssText='max-width:760px;width:100%;margin:0 auto;padding:16px;box-sizing:border-box;';
+                document.body.appendChild(app);
+
+                // State
+                var apAudioQueue=[];var apAudioEl=null;var apAudioPlaying=false;var apAudioSpeed=1;
+                var apSortedQueue=[];var apSortedIdx=0;
+                var apDrillTarget='both';var apDrillRecorder=null;var apDrillStream=null;var apDrillChunks=[];var apDrillMime='';var apDrillActive=false;
+                var apDrillQueue=[];var apDrillAudioEl=null;var apDrillSpeed=1;var apDrillPlaying=false;
+                var apUnsubSubs=null;var apUnsubSession=null;var apUnsubDrill=null;
+                var apCurrentRound=-1;
+
+                var PSUF='-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024';
+                function ph(t){return '<span style="font-family:\'Press Start 2P\';font-size:9px;text-shadow:'+PSUF+';color:'+t+';">';}
+                function apEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+                // ── HEADER ──
+                app.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                    +'<div style="font-family:\'Press Start 2P\';font-size:12px;color:#41c0ff;text-shadow:'+PSUF+';">📺 ADMIN PANEL</div>'
+                    +'<div id="_apRound" style="font-family:\'Press Start 2P\';font-size:9px;color:#888;text-shadow:'+PSUF+';"></div>'
+                    +'</div>'
+                    // Tabs
+                    +'<div style="display:flex;gap:8px;margin-bottom:16px;">'
+                    +'<button id="_apTabListen" onclick="apShowTab(\'listen\')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #ff7777;background:rgba(255,119,119,0.2);color:#ff7777;font-family:\'Press Start 2P\';font-size:8px;cursor:pointer;">🔊 LISTEN ALL</button>'
+                    +'<button id="_apTabDrill" onclick="apShowTab(\'drill\')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #555;background:rgba(255,255,255,0.04);color:#888;font-family:\'Press Start 2P\';font-size:8px;cursor:pointer;">🎙 DRILL</button>'
+                    +'<button id="_apTabLB" onclick="apShowTab(\'lb\')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #555;background:rgba(255,255,255,0.04);color:#888;font-family:\'Press Start 2P\';font-size:8px;cursor:pointer;">🏆 LEADERBOARD</button>'
+                    +'</div>'
+                    +'<div id="_apListen" style=""></div>'
+                    +'<div id="_apDrill" style="display:none;"></div>'
+                    +'<div id="_apLB" style="display:none;"></div>';
+
+                window.apShowTab=function(tab){
+                    ['listen','drill','lb'].forEach(function(t){
+                        document.getElementById('_ap'+t.charAt(0).toUpperCase()+t.slice(1)).style.display=t===tab?'':'none';
+                        var btn=document.getElementById('_apTab'+t.charAt(0).toUpperCase()+t.slice(1));
+                        var active=t===tab;
+                        var col=t==='listen'?'#ff7777':t==='drill'?'#9b59b6':'#f5c842';
+                        btn.style.borderColor=active?col:'#555';
+                        btn.style.background=active?'rgba('+( t==='listen'?'255,119,119':t==='drill'?'155,89,182':'245,200,66')+',0.2)':'rgba(255,255,255,0.04)';
+                        btn.style.color=active?col:'#888';
+                    });
+                };
+
+                // ── LISTEN ALL ──
+                function apRenderListenAll(subs){
+                    var el=document.getElementById('_apListen');if(!el)return;
+                    var absSubs=subs.filter(function(s){return s.level==='absolute_beginner';});
+                    var begSubs=subs.filter(function(s){return s.level==='beginner';});
+                    var advSubs=subs.filter(function(s){return s.level==='advanced';});
+                    apAudioQueue=[];
+                    var lh='';
+                    // Controls
+                    lh+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">';
+                    lh+='<button id="_apPlayAllBtn" onclick="apPlayAll()" style="background:linear-gradient(135deg,#ff9800,#f57c00);border:none;color:#000;font-weight:700;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;">▶ Play All</button>';
+                    lh+='<button onclick="apStopAll()" style="background:rgba(255,255,255,0.1);border:1px solid #666;color:#ccc;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">⏹ Stop</button>';
+                    lh+='<span style="color:#888;font-size:11px;margin-left:4px;">Speed:</span>';
+                    [0.5,1,1.5,2,3,5].forEach(function(spd){
+                        var active=spd===apAudioSpeed;
+                        lh+='<button onclick="apSetSpeed('+spd+',this)" class="_apSpeedBtn" style="'+(active?'background:#ff9800;color:#000;border-color:#ff9800;':'background:rgba(255,255,255,0.08);color:#ccc;border-color:#555;')+'padding:4px 8px;border-radius:6px;border:1px solid;font-size:11px;cursor:pointer;font-weight:600;">'+spd+'x</button>';
+                    });
+                    lh+='</div>';
+                    lh+='<div id="_apNowPlaying" style="font-size:11px;color:#888;margin-bottom:8px;display:none;"></div>';
+                    var groups=[
+                        {key:'absolute_beginner',label:'🐣 ABS. BEGINNER',color:'#ff69b4',items:absSubs},
+                        {key:'beginner',label:'🌱 BEGINNER',color:'#8bb4d6',items:begSubs},
+                        {key:'advanced',label:'🌟 ADVANCED',color:'#c4a0e8',items:advSubs}
+                    ];
+                    groups.forEach(function(group){
+                        if(!group.items.length) return;
+                        var expText='';
+                        for(var gi=0;gi<group.items.length;gi++){if(group.items[gi].expectedKorean){expText=group.items[gi].expectedKorean;break;}}
+                        lh+='<div style="margin:10px 0 6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">';
+                        lh+='<span style="font-family:\'Press Start 2P\';font-size:8px;color:'+group.color+';text-shadow:'+PSUF+';">'+group.label+'</span>';
+                        if(expText) lh+='<span style="font-size:13px;color:#ddd;font-weight:600;">→ '+apEsc(expText)+'</span>';
+                        lh+='</div>';
+                        group.items.forEach(function(s){
+                            var isGrading=s.status==='grading';
+                            var lc=group.color;
+                            var borderColor=isGrading?'#fbbf2444':lc+'33';
+                            var queueIdx=-1;
+                            if(s.audioUrl&&!isGrading){
+                                queueIdx=apAudioQueue.length;
+                                apAudioQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl,emoji:s.emoji,level:s.level,score:s.score||0,gradeScore:s.gradeScore||0,expectedKorean:s.expectedKorean||''});
+                            }
+                            var clickAttr=queueIdx>=0?'onclick="apPlaySingle('+queueIdx+')"':'';
+                            lh+='<div class="_apListItem" style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;'+(queueIdx>=0?'cursor:pointer;':'')+'" '+clickAttr+'>';
+                            lh+='<span style="font-size:22px;">'+apEsc(s.emoji||'')+'</span>';
+                            lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+apEsc(s.playerName||'Student')+'</div>';
+                            if(isGrading){lh+='<div style="font-size:10px;color:#fbbf24;">⏳ Grading...</div></div><span style="font-size:11px;color:#fbbf24;">⏳</span>';}
+                            else{lh+='<div style="font-size:10px;color:'+lc+';">'+(s.score||0)+' pts</div></div><span style="font-size:16px;color:#ff9800;cursor:pointer;" title="Play">▶</span>';}
+                            lh+='</div>';
+                        });
+                    });
+                    if(!lh.includes('_apListItem')) lh+='<div style="color:#888;font-size:12px;">Recordings will appear here...</div>';
+                    el.innerHTML=(subs.length?'':'')+lh;
+                }
+
+                window.apPlayAll=function(){
+                    if(apAudioPlaying){apStopAll();return;}
+                    if(!apAudioQueue.length)return;
+                    apAudioPlaying=true;
+                    var btn=document.getElementById('_apPlayAllBtn');if(btn)btn.innerHTML='⏸ Pause';
+                    // Sort: abs beginner → beginner → advanced
+                    var order={absolute_beginner:0,beginner:1,advanced:2};
+                    apSortedQueue=apAudioQueue.slice().sort(function(a,b){return (order[a.level]||0)-(order[b.level]||0);});
+                    apSortedIdx=0;
+                    apPlayNext();
+                };
+                async function apPlayNext(){
+                    if(!apAudioPlaying||apSortedIdx>=apSortedQueue.length){apStopAll();return;}
+                    var entry=apSortedQueue[apSortedIdx];
+                    var np=document.getElementById('_apNowPlaying');
+                    if(np){np.style.display='block';np.innerHTML='🔊 Playing: <strong style="color:#ff9800;">'+apEsc(entry.name)+'</strong>';}
+                    // Highlight row
+                    document.querySelectorAll('._apListItem').forEach(function(el,i){el.style.background=i===apSortedIdx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';});
+                    await apPlayUrl(entry.audioUrl,apAudioSpeed);
+                    apSortedIdx++;
+                    apPlayNext();
+                }
+                window.apStopAll=function(){
+                    apAudioPlaying=false;apSortedIdx=0;
+                    if(apAudioEl){apAudioEl.pause();apAudioEl.src='';apAudioEl=null;}
+                    var btn=document.getElementById('_apPlayAllBtn');if(btn)btn.innerHTML='▶ Play All';
+                    var np=document.getElementById('_apNowPlaying');if(np)np.style.display='none';
+                    document.querySelectorAll('._apListItem').forEach(function(el){el.style.background='rgba(0,0,0,0.3)';});
+                };
+                window.apSetSpeed=function(spd,btn){
+                    apAudioSpeed=spd;
+                    if(apAudioEl)apAudioEl.playbackRate=spd;
+                    document.querySelectorAll('._apSpeedBtn').forEach(function(b){b.style.background='rgba(255,255,255,0.08)';b.style.color='#ccc';b.style.borderColor='#555';});
+                    if(btn){btn.style.background='#ff9800';btn.style.color='#000';btn.style.borderColor='#ff9800';}
+                };
+                window.apPlaySingle=function(idx){
+                    if(idx<0||idx>=apAudioQueue.length)return;
+                    apStopAll();
+                    var item=apAudioQueue[idx];
+                    apAudioPlaying=true;
+                    document.querySelectorAll('._apListItem').forEach(function(el,i){el.style.background=i===idx?'rgba(255,152,0,0.15)':'rgba(0,0,0,0.3)';});
+                    var np=document.getElementById('_apNowPlaying');
+                    if(np){np.style.display='block';np.innerHTML='🔊 Playing: <strong style="color:#ff9800;">'+apEsc(item.name)+'</strong>';}
+                    apPlayUrl(item.audioUrl,apAudioSpeed).then(function(){apStopAll();}).catch(function(){apStopAll();});
+                };
+                function apPlayUrl(url,speed){
+                    return new Promise(function(resolve){
+                        if(!apAudioPlaying){resolve();return;}
+                        apAudioEl=new Audio(url);
+                        apAudioEl.playbackRate=speed||1;
+                        apAudioEl.onended=resolve;
+                        apAudioEl.onerror=resolve;
+                        apAudioEl.play().catch(resolve);
+                    });
+                }
+
+                // ── EXPOSE for parent window forwarding ──
+                window.qgPanelOnSubs=function(subs){
+                    apRenderListenAll(subs);
+                };
+
+                // ── DRILL ──
+                var apDrillType='pronunciation';
+                var AP_DRILL_TYPES={
+                    pronunciation:{label:'🔊 Pronunciation Drill',color:'#9b59b6',desc:'Students read aloud — teacher hears the recording'},
+                    phrase:       {label:'💬 Phrase Drill',       color:'#41c0ff',desc:'GPT generates a phrase-completion exercise'},
+                    sentence:     {label:'📝 Sentence Drill',     color:'#00ff88',desc:'GPT generates a sentence construction prompt'},
+                    advanced:     {label:'⚡ Noun & SOV Verb Drill', color:'#f5c842',desc:'POS-controlled phrase drill — nouns, action verbs, descriptive verbs'},
+                };
+
+                function apRenderDrill(){
+                    var el=document.getElementById('_apDrill');if(!el)return;
+                    var dt=AP_DRILL_TYPES[apDrillType]||AP_DRILL_TYPES.pronunciation;
+                    var isPron=apDrillType==='pronunciation';
+                    var h='';
+                    // Drill type dropdown
+                    h+='<div style="margin-bottom:14px;">';
+                    h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Drill Type:</label>';
+                    h+='<select id="_apDrillTypeSelect" onchange="apOnDrillTypeChange(this.value)" style="width:100%;background:#0a0a15;border:2px solid '+dt.color+';border-radius:8px;color:#fff;padding:10px 12px;font-size:13px;cursor:pointer;-webkit-appearance:none;appearance:none;outline:none;">';
+                    Object.keys(AP_DRILL_TYPES).forEach(function(k){
+                        h+='<option value="'+k+'"'+(k===apDrillType?' selected':'')+'>'+AP_DRILL_TYPES[k].label+'</option>';
+                    });
+                    h+='</select>';
+                    h+='<div style="font-size:11px;color:#888;margin-top:6px;">'+dt.desc+'</div>';
+                    h+='</div>';
+                    // Input area
+                    h+='<div style="background:rgba(0,0,0,0.4);border:2px solid '+dt.color+';border-radius:12px;padding:14px;margin-bottom:14px;">';
+                    if(isPron){
+                        h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Korean text for students to read:</label>';
+                        h+='<textarea id="_apDrillText" rows="3" placeholder="Hold mic or type..." style="width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:16px;resize:vertical;box-sizing:border-box;outline:none;font-family:\'Noto Sans KR\',sans-serif;"></textarea>';
+                        h+='<div style="display:flex;gap:8px;margin-top:8px;">';
+                        h+='<button id="_apDrillMicBtn" onmousedown="apDrillHoldStart(event)" onmouseup="apDrillHoldEnd(event)" onmouseleave="apDrillHoldEnd(event)" ontouchstart="apDrillHoldStart(event)" ontouchend="apDrillHoldEnd(event)" ontouchcancel="apDrillHoldEnd(event)" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;user-select:none;-webkit-user-select:none;touch-action:none;transition:all 0.1s;">🎤 Hold to speak</button>';
+                        h+='<div id="_apDrillMicStatus" style="font-size:11px;color:#888;display:flex;align-items:center;"></div>';
+                        h+='</div>';
+                    } else {
+                        h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Context for GPT:</label>';
+                        h+='<textarea id="_apDrillContext" rows="3" placeholder="e.g. topic: food ordering, vocab: verb conjugation..." style="width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;resize:vertical;box-sizing:border-box;outline:none;"></textarea>';
+                        h+='<button id="_apGenBtn" onclick="apGenerateDrill()" style="margin-top:8px;background:linear-gradient(135deg,'+dt.color+','+dt.color+'99);border:none;color:#000;padding:10px 24px;border-radius:8px;font-family:\'Press Start 2P\',monospace;font-size:8px;cursor:pointer;font-weight:700;">✨ GENERATE</button>';
+                        h+='<div id="_apGenStatus" style="font-size:11px;color:#888;margin-top:6px;"></div>';
+                        h+='<div id="_apGenResult" style="margin-top:10px;display:none;">';
+                        h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:4px;font-weight:600;">Generated drill (edit if needed):</label>';
+                        h+='<textarea id="_apDrillText" rows="4" style="width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:15px;resize:vertical;box-sizing:border-box;outline:none;"></textarea>';
+                        h+='</div>';
+                    }
+                    h+='</div>';
+                    // Send to selector
+                    h+='<div style="margin-bottom:14px;">';
+                    h+='<label style="font-size:12px;color:#ccc;display:block;margin-bottom:6px;font-weight:600;">Send to:</label>';
+                    h+='<div style="display:flex;gap:10px;">';
+                    h+='<button id="_apDTA" onclick="apDrillPick(\'absolute_beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🐣 Abs.Beg</button>';
+                    h+='<button id="_apDTB" onclick="apDrillPick(\'beginner\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🌱 Beginner</button>';
+                    h+='<button id="_apDTC" onclick="apDrillPick(\'advanced\')" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">🌟 Advanced</button>';
+                    h+='<button id="_apDTD" onclick="apDrillPick(\'both\')" style="flex:1;background:rgba(255,105,180,0.15);border:1px solid #ff69b4;color:#ff69b4;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;">📢 All</button>';
+                    h+='</div></div>';
+                    h+='<button onclick="apDrillSend()" style="width:100%;background:linear-gradient(135deg,'+dt.color+','+dt.color+'99);border:none;color:#fff;text-shadow:'+PSUF+';padding:14px;border-radius:10px;font-family:\'Press Start 2P\',monospace;font-size:10px;cursor:pointer;margin-bottom:12px;">SEND DRILL</button>';
+                    h+='<div id="_apDrillListenArea" style="display:none;background:rgba(0,0,0,0.4);border:2px solid #9b59b644;border-radius:12px;padding:14px;">';
+                    h+='<div style="font-family:\'Press Start 2P\',monospace;font-size:9px;color:#9b59b6;margin-bottom:10px;">🎧 DRILL RECORDINGS</div>';
+                    h+='<div id="_apDrillSubList" style="font-size:12px;color:#888;">Waiting for students...</div></div>';
+                    h+='<div style="text-align:center;margin-top:10px;"><button onclick="apEndDrill()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;padding:10px 24px;border-radius:8px;font-family:\'Press Start 2P\',monospace;font-size:8px;cursor:pointer;box-shadow:rgba(0,0,0,0.3) 2px 2px 4px;">← END DRILL</button></div>';
+                    el.innerHTML=h;
+                    apDrillTarget='both';
+                    apDrillPick('both');
+                }
+
+                window.apOnDrillTypeChange=function(val){
+                    apDrillType=val;
+                    apRenderDrill();
+                };
+
+                window.apGenerateDrill=async function(){
+                    var ctx=(document.getElementById('_apDrillContext')||{}).value||'';
+                    if(!ctx.trim()){alert('Please enter context for GPT first.');return;}
+                    var genBtn=document.getElementById('_apGenBtn');
+                    var genStatus=document.getElementById('_apGenStatus');
+                    var genResult=document.getElementById('_apGenResult');
+                    if(genBtn){genBtn.disabled=true;genBtn.innerHTML='⏳ Generating...';}
+                    if(genStatus)genStatus.textContent='Asking GPT...';
+                    // PLACEHOLDER PROMPTS - replace with real prompts when ready
+                    var prompts={
+                        phrase:    'You are creating a Korean grammar drill.\n'+'I will give you:\n'+'1. a grammar point\n'+'2. a list of vocabulary\n'+'Your job:\n'+'- Create EXACTLY 10 prompts\n'+'- Each prompt must contain 2-3 vocabulary items\n'+'- Format each vocabulary item as: korean (english)\n'+'- Wrap each vocabulary item in parentheses\n'+'- DO NOT include full sentences\n'+'- DO NOT include answers\n'+'- Only output the numbered list\n'+'Rules:\n'+'- Verbs must stay in dictionary (root) form\n'+'- Do NOT conjugate anything\n'+'- Do NOT include the grammar point in the prompts\n'+'- Mix and reuse vocabulary across prompts\n'+'- Occasionally include slightly unnatural combinations to force thinking\n'+'\n'+ctx,
+                        sentence:  'You are generating Korean sentence-building practice.\n'+'I will give you a grammar point.\n'+'Your job:\n'+'- Create EXACTLY 5 sentences\n'+'For EACH sentence:\n'+'1. Write a natural English sentence FIRST\n'+'2. Then write a single line starting with: Keywords:\n'+'3. On that same line, list ALL keywords separated by commas\n'+'Formatting rules:\n'+'- Each keyword must be formatted as: korean (english)\n'+'- Verbs must be in dictionary (root) form\n'+'- The grammar point MUST be included as a keyword\n'+'- The grammar point must be separated as its own keyword\n'+'- Do NOT conjugate anything in the keyword list\n'+'- Do NOT include the Korean sentence itself\n'+'- Keep sentences simple and beginner-friendly\n'+'Output format:\n'+'English: [sentence] Keywords: word (meaning), word (meaning), grammar (meaning)\n'+'\n'+ctx,
+                        advanced:  'You are generating Korean grammar drill phrases.\n'+'I will give you a grammar point, the part(s) of speech to use, and the number of phrases.\n'+'Your job:\n'+'- Generate ONLY the first clause (no second clause)\n'+'- Output EXACTLY the requested number of phrases\n'+'- Each phrase must match the specified part(s) of speech ONLY\n'+'- Do NOT mix parts of speech unless explicitly told to\n'+'- Do NOT include full sentences\n'+'\nFormatting rules for each item:\n'+'- Write an English phrase first\n'+'- Then write one line starting with: Keywords:\n'+'- Keywords must be on ONE LINE separated by commas\n'+'- Format each keyword as: korean (english)\n'+'- Grammar must be included as its own keyword\n'+'- Verbs must be in dictionary (root) form\n'+'- Do NOT conjugate anything\n'+'\nPart of speech rules:\n'+'- noun \u2192 must pair with noun grammar (ex: (\uc774)\ub2c8\uae4c)\n'+'- action verb \u2192 must pair with verb grammar (ex: (\uc73c)\ub2c8\uae4c)\n'+'- descriptive verb \u2192 must pair with verb grammar (ex: (\uc73c)\ub2c8\uae4c)\n'+'- Do NOT violate these pairings\n'+'\n'+ctx,
+                    };
+                    var prompt=prompts[apDrillType]||prompts.phrase;
+                    try{
+                        var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                            method:'POST',headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({prompt:prompt,max_tokens:300})
+                        });
+                        var data=await resp.json();
+                        var result=typeof data==='string'?data:(data.data||data.text||data.result||data.response||'');
+                        result=result.replace(/^```[\s\S]*?\n/,'').replace(/```$/,'').trim();
+                        var tx=document.getElementById('_apDrillText');
+                        if(tx)tx.value=result;
+                        if(genResult)genResult.style.display='block';
+                        if(genStatus)genStatus.textContent='✅ Generated! Edit if needed, then Send.';
+                    }catch(e){
+                        if(genStatus)genStatus.textContent='❌ Error: '+e.message;
+                    }finally{
+                        if(genBtn){genBtn.disabled=false;genBtn.innerHTML='✨ GENERATE';}
+                    }
+                };
+
+                window.apDrillPick=function(t){
+                    apDrillTarget=t;
+                    var map={absolute_beginner:'_apDTA',beginner:'_apDTB',advanced:'_apDTC',both:'_apDTD'};
+                    Object.keys(map).forEach(function(k){
+                        var btn=document.getElementById(map[k]);
+                        if(!btn)return;
+                        var active=k===t;
+                        var cols={absolute_beginner:'#ff69b4',beginner:'#8bb4d6',advanced:'#c4a0e8',both:'#ff69b4'};
+                        btn.style.borderColor=active?cols[k]:'rgba(255,255,255,0.2)';
+                        btn.style.color=active?cols[k]:'#888';
+                        btn.style.background=active?'rgba(155,89,182,0.15)':'rgba(255,255,255,0.08)';
+                    });
+                };
+
+                window.apDrillHoldStart=function(e){
+                    e.preventDefault();
+                    if(apDrillActive) return;
+                    apDrillActive=true;apDrillChunks=[];
+                    var btn=document.getElementById('_apDrillMicBtn');
+                    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+                        if(!apDrillActive){stream.getTracks().forEach(function(t){t.stop();});return;}
+                        apDrillStream=stream;
+                        var mime='';
+                        if(typeof MediaRecorder.isTypeSupported==='function'){
+                            if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
+                            else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
+                            else if(MediaRecorder.isTypeSupported('audio/mp4'))mime='audio/mp4';
+                        }
+                        apDrillMime=mime;
+                        apDrillRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+                        apDrillRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size>0)apDrillChunks.push(ev.data);};
+                        apDrillRecorder.onstop=function(){
+                            if(apDrillStream){apDrillStream.getTracks().forEach(function(t){t.stop();});apDrillStream=null;}
+                            var blob=new Blob(apDrillChunks,{type:apDrillMime||'audio/webm'});
+                            apDrillActive=false;
+                            if(btn){btn.innerHTML='🎤 Hold to speak';btn.style.borderColor='#ef4444';btn.style.color='#ef4444';btn.style.background='rgba(239,68,68,0.15)';}
+                            var tx=document.getElementById('_apDrillText');
+                            if(tx) tx.value='[Transcribing...]';
+                            // Transcribe via speech-proxy
+                            var fd=new FormData();
+                            fd.append('audio',new Blob([blob],{type:apDrillMime||'audio/webm'}),'audio.webm');
+                            fd.append('phonetic_hangul','');fd.append('original_text','');
+                            fetch('https://speech-proxy-386010826708.us-central1.run.app/analyze',{method:'POST',body:fd})
+                                .then(function(r){return r.ok?r.json():null;})
+                                .then(function(d){
+                                    var tx2=document.getElementById('_apDrillText');
+                                    if(tx2&&d&&d.transcript)tx2.value=d.transcript;
+                                    else if(tx2)tx2.value='';
+                                }).catch(function(){var tx2=document.getElementById('_apDrillText');if(tx2)tx2.value='';});
+                        };
+                        apDrillRecorder.start();
+                        if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#ff8800';btn.style.color='#fff';btn.style.background='rgba(239,68,68,0.35)';}
+                        var ms=document.getElementById('_apDrillMicStatus');if(ms)ms.textContent='Recording...';
+                    }).catch(function(err){alert('Mic error: '+err.message);apDrillActive=false;});
+                };
+                window.apDrillHoldEnd=function(e){
+                    if(!apDrillActive)return;
+                    if(apDrillRecorder&&apDrillRecorder.state==='recording')apDrillRecorder.stop();
+                    else apDrillActive=false;
+                };
+
+                window.apDrillSend=async function(){
+                    var txt=(document.getElementById('_apDrillText')||{}).value||'';
+                    if(!txt.trim()){alert('Enter text first.');return;}
+                    var drillId=Date.now().toString();
+                    var target=apDrillTarget||'both';
+                    await db.collection(QUIZ_GAME_COLLECTION).doc(panelSessionId).update({
+                        status:'drill',drillText:txt,drillTarget:target,drillId:drillId
+                    });
+                    var la=document.getElementById('_apDrillListenArea');if(la)la.style.display='block';
+                    apListenDrillSubs(drillId,txt);
+                };
+
+                window.apEndDrill=async function(){
+                    if(apUnsubDrill){apUnsubDrill();apUnsubDrill=null;}
+                    if(apDrillAudioEl){apDrillAudioEl.pause();apDrillAudioEl=null;}
+                    await db.collection(QUIZ_GAME_COLLECTION).doc(panelSessionId).update({
+                        status:'playing',
+                        drillText:firebase.firestore.FieldValue.delete(),
+                        drillTarget:firebase.firestore.FieldValue.delete()
+                    }).catch(function(e){console.error('End drill error:',e);});
+                    var la=document.getElementById('_apDrillListenArea');if(la)la.style.display='none';
+                };
+
+                function apListenDrillSubs(drillId,drillText){
+                    if(apUnsubDrill)apUnsubDrill();
+                    apUnsubDrill=db.collection(QUIZ_GAME_COLLECTION).doc(panelSessionId).collection('drill_submissions').onSnapshot(function(snap){
+                        var listEl=document.getElementById('_apDrillSubList');if(!listEl)return;
+                        if(snap.empty){listEl.innerHTML='<span style="color:#888;">Waiting for students...</span>';return;}
+                        var subs=[];snap.forEach(function(d){subs.push(d.data());});
+                        var groups=[
+                            {key:'absolute_beginner',label:'🐣 ABS. BEGINNER',color:'#ff69b4'},
+                            {key:'beginner',label:'🌱 BEGINNER',color:'#8bb4d6'},
+                            {key:'advanced',label:'🌟 ADVANCED',color:'#c4a0e8'}
+                        ];
+                        var lh='';
+                        apDrillQueue=[];
+                        groups.forEach(function(group){
+                            var items=subs.filter(function(s){return s.level===group.key;});
+                            if(!items.length)return;
+                            lh+='<div style="margin:10px 0 6px;font-family:\'Press Start 2P\';font-size:8px;color:'+group.color+';text-shadow:'+PSUF+';">'+group.label+'</div>';
+                            items.forEach(function(s){
+                                var isGrading=s.status==='grading';
+                                var correctIcon=isGrading?'⏳':s.correct===true?'✅':'❌';
+                                var borderColor=isGrading?'#fbbf2444':s.correct===true?'rgba(0,255,136,0.3)':'rgba(255,68,68,0.3)';
+                                if(s.audioUrl&&!isGrading) apDrillQueue.push({name:s.playerName||'Student',audioUrl:s.audioUrl});
+                                lh+='<div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:6px;background:rgba(0,0,0,0.3);border:1px solid '+borderColor+';border-radius:8px;">';
+                                lh+='<span style="font-size:22px;">'+apEsc(s.emoji||'')+'</span>';
+                                lh+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;">'+apEsc(s.playerName||'Student')+'</div>';
+                                lh+='<div style="font-size:10px;color:'+group.color+';">'+apEsc(s.feedback||'')+'</div></div>';
+                                lh+='<span style="font-size:20px;">'+correctIcon+'</span>';
+                                if(s.audioUrl&&!isGrading){
+                                    lh+='<button onclick="apDrillPlayAudio(\''+apEsc(s.audioUrl)+'\')" style="background:rgba(255,152,0,0.15);border:1px solid #ff9800;color:#ff9800;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">▶</button>';
+                                }
+                                lh+='</div>';
+                            });
+                        });
+                        listEl.innerHTML=lh||'<span style="color:#888;">No submissions yet.</span>';
+                    });
+                }
+
+                window.apDrillPlayAudio=function(url){
+                    if(apDrillAudioEl){apDrillAudioEl.pause();apDrillAudioEl=null;}
+                    apDrillAudioEl=new Audio(url);
+                    apDrillAudioEl.playbackRate=apDrillSpeed;
+                    apDrillAudioEl.play().catch(function(){});
+                };
+
+                // ── LEADERBOARD ──
+                function apRenderLB(d){
+                    var el=document.getElementById('_apLB');if(!el)return;
+                    var h='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#FFD700;text-shadow:'+PSUF+';text-align:center;margin-bottom:20px;">🏆 LEADERBOARD</div>';
+                    var levels=[
+                        {key:'leaderboard_absolute_beginner',label:'🐣 ABS. BEGINNER',color:'#ff69b4'},
+                        {key:'leaderboard_beginner',label:'🌱 BEGINNER',color:'#8bb4d6'},
+                        {key:'leaderboard_advanced',label:'🌟 ADVANCED',color:'#c4a0e8'}
+                    ];
+                    levels.forEach(function(lv){
+                        var board=d[lv.key]||[];
+                        h+='<div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:16px;">';
+                        h+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:'+lv.color+';text-shadow:'+PSUF+';margin-bottom:12px;">'+lv.label+'</div>';
+                        if(!board.length){h+='<div style="color:#888;font-size:12px;">No scores yet</div></div>';return;}
+                        board.slice(0,10).forEach(function(p,i){
+                            var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'<span style="color:#888;font-size:11px;width:22px;display:inline-block;text-align:center;">'+(i+1)+'.</span>';
+                            h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin-bottom:4px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">';
+                            h+='<div style="display:flex;align-items:center;gap:8px;"><span>'+medal+'</span><span style="color:#fff;font-size:13px;font-weight:600;">'+apEsc(p.name)+'</span></div>';
+                            h+='<span style="color:#FFD700;font-weight:700;font-size:13px;">'+p.score+'</span></div>';
+                        });
+                        h+='</div>';
+                    });
+                    el.innerHTML=h;
+                }
+
+                // ── FIRESTORE LISTENERS ──
+                // Listen to session doc for drill status changes + round changes + leaderboard
+                apUnsubSession=db.collection(QUIZ_GAME_COLLECTION).doc(panelSessionId).onSnapshot(function(docSnap){
+                    if(!docSnap.exists)return;
+                    var d=docSnap.data();
+                    var roundEl=document.getElementById('_apRound');
+                    if(roundEl&&typeof d.currentRound==='number') roundEl.textContent='ROUND '+(d.currentRound+1)+' / '+(d.totalRounds||'?');
+                    apRenderLB(d);
+                    // Track round changes to re-subscribe submissions
+                    if(d.currentRound!==apCurrentRound && d.status==='playing'){
+                        apCurrentRound=d.currentRound;
+                        if(apUnsubSubs){apUnsubSubs();apUnsubSubs=null;}
+                        apUnsubSubs=db.collection(QUIZ_GAME_COLLECTION).doc(panelSessionId).collection('submissions')
+                            .where('round','==',d.currentRound).onSnapshot(function(snap){
+                                var subs=[];snap.forEach(function(doc){subs.push(doc.data());});
+                                subs=subs.filter(function(s){return !s.isBonus;});
+                                apRenderListenAll(subs);
+                            });
+                    }
+                    if(d.status==='drill') apRenderDrill();
+                });
+
+                // Initial render
+                apRenderDrill();
+                apRenderListenAll([]);
+                apShowTab('listen');
+            });
+        })();
+
+
         // STUDENT SIDE — accessed via ?quizgame=ROOMCODE
         // ══════════════════════════════════════════════════════
         (function(){
@@ -33534,6 +33959,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             // Inject sparkle CSS into head so it survives body.innerHTML clearing
             if(!document.querySelector('#sparkleStyles')){var ss=document.createElement('style');ss.id='sparkleStyles';ss.textContent='.sparkle-btn{position:relative;overflow:visible;transition:transform 0.2s,box-shadow 0.2s;}.sparkle-btn:hover{transform:scale(1.05) translateY(-2px) !important;box-shadow:0 6px 20px rgba(255,119,119,0.4) !important;}.sparkle-btn:active{transform:scale(0.98) !important;}.sparkle-btn .sparkle-svg{opacity:0;}.sparkle-btn:hover .sparkle-svg{animation:qgSparkle 0.75s both;}.sparkle-btn:hover .sparkle-svg:nth-of-type(1){animation-delay:0.15s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(2){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(3){animation-delay:0.45s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(4){animation-delay:0.3s;}.sparkle-btn:hover .sparkle-svg:nth-of-type(5){animation-delay:0.6s;}@keyframes qgSparkle{0%{transform:translate(-50%,-50%) scale(0);opacity:0;}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}.sparkle-btn::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(108deg,transparent 0% 40%,rgba(255,255,255,0.3) 40% 45%,transparent 45% 55%,rgba(255,255,255,0.2) 55% 65%,transparent 65%);background-size:200% 100%;background-position:200% 0;transition:background-position 0s;pointer-events:none;z-index:2;}.sparkle-btn:hover::after{background-position:-200% 0;transition:background-position 1.2s 0.2s ease-out;}';document.head.appendChild(ss);}
             // Inject btnPress animation CSS + JS into head
+            if(!document.querySelector('#qsGachaGlow')){var ggs=document.createElement('style');ggs.id='qsGachaGlow';ggs.textContent='@keyframes qsGachaPulse{0%,100%{box-shadow:0 0 24px rgba(155,89,182,0.7),0 0 48px rgba(155,89,182,0.35)}50%{box-shadow:0 0 40px rgba(200,100,255,0.9),0 0 80px rgba(155,89,182,0.5)}}';document.head.appendChild(ggs);}
             if(!document.querySelector('#qsFadeStyles')){var fs=document.createElement('style');fs.id='qsFadeStyles';fs.textContent='@keyframes qsFadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}.qs-fade-in{animation:qsFadeIn 0.25s ease-out both;}';document.head.appendChild(fs);}
             if(!document.querySelector('#btnPressStyles')){
                 var bps=document.createElement('style');bps.id='btnPressStyles';
@@ -34090,9 +34516,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(phonemeResult.errors&&phonemeResult.errors.length>0){
                         phonemeInfo+='- Character-level errors (comparing recognized text vs expected):\n';
                         phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')phonemeInfo+='  \u2022 Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                            else if(err.type==='deletion')phonemeInfo+='  \u2022 Missing sound '+ph(err.expected)+'\n';
-                            else if(err.type==='insertion')phonemeInfo+='  \u2022 Extra sound '+ph(err.actual)+' inserted\n';
+                            if(err.type==='substitution')phonemeInfo+='  \u2022 Expected '+err.expected+' but heard '+err.actual+'\n';
+                            else if(err.type==='deletion')phonemeInfo+='  \u2022 Missing sound '+err.expected+'\n';
+                            else if(err.type==='insertion')phonemeInfo+='  \u2022 Extra sound '+err.actual+' inserted\n';
                         });
                     }else{
                         phonemeInfo+='- No character-level errors detected.\n';
@@ -34215,7 +34641,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
                     rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
                 }
-                if(statusEl)statusEl.innerHTML=rh+'<div style="text-align:center;margin-top:10px;"><button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button></div>';
+                if(statusEl)statusEl.innerHTML=rh+'<div style="text-align:center;margin-top:10px;"><button onclick="qsCloseFeedback()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-size:12px;cursor:pointer;">✕ Close</button><div style="font-size:13px;color:#FFD700;font-weight:700;margin-top:10px;">⭐ Press Close to see your bonus round!</div></div>';
 
                 qsFlushPending();
             }catch(err){
@@ -34243,7 +34669,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(!set)return;
                 var bonusKorean='';
                 if(qs.playerLevel==='absolute_beginner'&&set.absoluteBeginnerBonus){
-                    bonusKorean=set.absoluteBeginnerBonus;
+                    bonusKorean=set.absoluteBeginnerBonus.korean;
                 } else if(set.sentences&&set.sentences.length>0){
                     var randIdx=Math.floor(Math.random()*set.sentences.length);
                     bonusKorean=set.sentences[randIdx].korean;
@@ -34255,11 +34681,11 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 var h='<div style="margin-top:16px;">';
                 h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #FFD700;border-radius:14px;padding:20px;text-align:center;margin-bottom:14px;">';
-                h+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin-bottom:10px;">⭐ BONUS ROUND</div>';
+                h+='<div style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;margin-bottom:10px;">\u2B50 BONUS ROUND</div>';
                 h+='<div style="font-size:26px;color:#fff;font-weight:700;margin-bottom:4px;">'+escapeHtml(bonusKorean)+'</div>';
                 h+='</div>';
                 h+='<div style="text-align:center;">';
-                h+='<button id="qsBonusRecBtn" onpointerdown="qsBonusHoldStart(event)" onpointerup="qsBonusHoldEnd(event)" onpointercancel="qsBonusHoldEnd(event)" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">🎤 HOLD TO RECORD</button>';
+                h+='<button id="qsBonusRecBtn" onpointerdown="qsBonusHoldStart(event)" onpointerup="qsBonusHoldEnd(event)" onpointercancel="qsBonusHoldEnd(event)" style="background:rgba(255,215,0,0.15);border:3px solid #FFD700;color:#FFD700;padding:16px 40px;border-radius:12px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">\uD83C\uDF99 HOLD TO RECORD</button>';
                 h+='<div id="qsBonusStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
                 h+='<div id="qsBonusResult" style="margin-top:12px;"></div>';
                 h+='</div></div>';
@@ -34291,16 +34717,16 @@ Return ONLY this JSON (no markdown, no code blocks):
                     qs.bonusBlob=new Blob(qsBonusHoldChunks,{type:qsBonusHoldMime||'audio/webm'});
                     qs.bonusMime=qsBonusHoldMime||'audio/webm';
                     qsBonusHoldActive=false;
-                    if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
+                    if(btn){btn.innerHTML='\uD83C\uDF99 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
                     var statusEl=document.getElementById('qsBonusStatus');
                     var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
-                    confirmHtml+='<button onclick="qsBonusConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
-                    confirmHtml+='<button onclick="qsBonusTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
+                    confirmHtml+='<button onclick="qsBonusConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">\u2713 SUBMIT</button>';
+                    confirmHtml+='<button onclick="qsBonusTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">\uD83D\uDDD1 REDO</button>';
                     confirmHtml+='</div>';
                     statusEl.innerHTML=confirmHtml;
                 };
                 qsBonusRecorder.start();
-                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#ff8800';btn.style.color='#fff';btn.style.background='rgba(255,215,0,0.35)';}
+                if(btn){btn.innerHTML='\uD83D\uDD34 RECORDING...';btn.style.borderColor='#ff8800';btn.style.color='#fff';btn.style.background='rgba(255,215,0,0.35)';}
                 document.getElementById('qsBonusStatus').textContent='Recording...';
             }).catch(function(err){alert('Mic error: '+err.message);qsBonusHoldActive=false;qs.isBusy=false;});
         }
@@ -34313,209 +34739,15 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qsBonusConfirm(){
             var statusEl=document.getElementById('qsBonusStatus');
-            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
+            statusEl.innerHTML='<div style="font-size:11px;color:#888;">\u23F3 Grading...</div>';
             qsBonusSubmit(qs.bonusBlob,qs.bonusMime);
         }
 
         function qsBonusTrash(){
             qs.bonusBlob=null;qs.bonusMime=null;
             var btn=document.getElementById('qsBonusRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
+            if(btn){btn.style.display='';btn.innerHTML='\uD83C\uDF99 HOLD TO RECORD';btn.style.borderColor='#FFD700';btn.style.color='#FFD700';btn.style.background='rgba(255,215,0,0.15)';}
             document.getElementById('qsBonusStatus').textContent='';
-        }
-
-        // ── STUDENT DRILL ──
-        var qsDrillRecorder=null;
-        function qsShowDrill(d,area,status){
-            window.scrollTo(0,0);
-            // Check if this drill targets this student's level
-            if(d.drillTarget && d.drillTarget!=='both' && d.drillTarget!==qs.playerLevel){
-                if(status){status.textContent='⏸ Waiting...';status.style.color='#888';}
-                area.innerHTML='<div style="text-align:center;padding:40px 20px;"><div style="font-size:11px;color:#888;">This drill is for '+(d.drillTarget==='absolute_beginner'?'Absolute Beginner':d.drillTarget==='beginner'?'Beginner':'Advanced')+' students only.</div></div>';
-                return;
-            }
-            ['qsWaitingHeader','qsWaitingTitle','qsPlayerEmoji','qsPlayerName','qsPlayerLevel','qsPlayers'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
-            if(status){status.textContent='🎙 PRONUNCIATION DRILL';status.style.color='#9b59b6';}
-            // Don't re-render if already showing this drill
-            if(area.querySelector('[data-drill="'+d.drillId+'"]'))return;
-            var lc=qsGetLevelColor(qs.playerLevel);
-            var h='<div data-drill="'+d.drillId+'" style="margin-top:16px;">';
-            h+='<div style="font-size:11px;color:#888;text-align:center;margin-bottom:10px;">No points — practice your pronunciation!</div>';
-            h+='<div style="background:rgba(0,0,0,0.5);border:3px solid #9b59b6;border-radius:14px;padding:20px;box-shadow:0 0 25px rgba(155,89,182,0.15);margin-bottom:16px;text-align:center;">';
-            h+='<div style="font-size:22px;color:#fff;line-height:1.8;">'+escapeHtml(d.drillText)+'</div></div>';
-            h+='<div style="text-align:center;">';
-            h+='<button id="qsDrillRecBtn" onpointerdown="qsDrillHoldStart(event)" onpointerup="qsDrillHoldEnd(event)" onpointercancel="qsDrillHoldEnd(event)" data-drilltext="'+escapeHtml(d.drillText||'')+'" data-drillid="'+(d.drillId||'')+'" style="background:rgba(155,89,182,0.15);border:3px solid #9b59b6;color:#9b59b6;padding:16px 40px;border-radius:12px;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b,0 -2px 0 #4a1a6b,0 2px 0 #4a1a6b,-2px 0 0 #4a1a6b,2px 0 0 #4a1a6b;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;">🎤 HOLD TO RECORD</button>';
-            h+='<div id="qsDrillStatus" style="font-size:11px;color:#888;margin-top:8px;"></div>';
-            h+='<div id="qsDrillResult" style="margin-top:12px;"></div>';
-            h+='</div></div>';
-            area.innerHTML=h;
-            qsFadeIn(area);
-        }
-
-        var qsDrillHoldStream=null;
-        var qsDrillHoldChunks=[];
-        var qsDrillHoldMime='';
-        var qsDrillHoldActive=false;
-
-        function qsDrillHoldStart(e){
-            e.preventDefault();
-            if(qsDrillHoldActive) return;
-            var btn=document.getElementById('qsDrillRecBtn');
-            // Read drillText/drillId from data attributes
-            var drillText=btn?btn.dataset.drilltext:'';
-            var drillId=btn?btn.dataset.drillid:'';
-            qsDrillHoldActive=true;
-            qsDrillHoldChunks=[];
-            qs.isBusy=true;
-            navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-                if(!qsDrillHoldActive){stream.getTracks().forEach(function(t){t.stop();});return;}
-                qsDrillHoldStream=stream;
-                var mime='';
-                if(typeof MediaRecorder.isTypeSupported==='function'){
-                    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))mime='audio/webm;codecs=opus';
-                    else if(MediaRecorder.isTypeSupported('audio/webm'))mime='audio/webm';
-                }
-                qsDrillHoldMime=mime;
-                qsDrillRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:{});
-                qsDrillRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size>0)qsDrillHoldChunks.push(ev.data);};
-                qsDrillRecorder.onstop=function(){
-                    if(qsDrillHoldStream){qsDrillHoldStream.getTracks().forEach(function(t){t.stop();});qsDrillHoldStream=null;}
-                    var blob=new Blob(qsDrillHoldChunks,{type:qsDrillHoldMime||'audio/webm'});
-                    qs.drillBlob=blob;
-                    qs.drillMime=qsDrillHoldMime||'audio/webm';
-                    qs.drillText=drillText;
-                    qs.drillId=drillId;
-                    if(btn){btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.background='rgba(155,89,182,0.15)';}
-                    var statusEl=document.getElementById('qsDrillStatus');
-                    var confirmHtml='<div style="display:flex;gap:12px;justify-content:center;margin-top:8px;">';
-                    confirmHtml+='<button onclick="qsDrillConfirm()" style="background:rgba(74,222,128,0.15);border:2px solid #4ade80;color:#4ade80;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">✓ SUBMIT</button>';
-                    confirmHtml+='<button onclick="qsDrillTrash()" style="background:rgba(239,68,68,0.15);border:2px solid #ef4444;color:#ef4444;padding:10px 20px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🗑 REDO</button>';
-                    confirmHtml+='</div>';
-                    statusEl.innerHTML=confirmHtml;
-                    qsDrillHoldActive=false;
-                };
-                qsDrillRecorder.start();
-                if(btn){btn.innerHTML='🔴 RECORDING...';btn.style.borderColor='#e87777';btn.style.color='#fff';btn.style.background='rgba(155,89,182,0.35)';}
-                document.getElementById('qsDrillStatus').textContent='Recording...';
-            }).catch(function(err){alert('Mic error: '+err.message);qsDrillHoldActive=false;qs.isBusy=false;});
-        }
-
-        function qsDrillHoldEnd(e){
-            if(!qsDrillHoldActive) return;
-            if(qsDrillRecorder&&qsDrillRecorder.state==='recording'){
-                qsDrillRecorder.stop();
-            } else {
-                qsDrillHoldActive=false;
-            }
-        }
-
-        function qsDrillConfirm(){
-            var statusEl=document.getElementById('qsDrillStatus');
-            statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Grading...</div>';
-            qsDrillSubmit(qs.drillBlob,qs.drillMime,qs.drillText,qs.drillId);
-        }
-
-        function qsDrillTrash(){
-            qs.drillBlob=null;qs.drillMime=null;
-            qs.isBusy=false;
-            var btn=document.getElementById('qsDrillRecBtn');
-            if(btn){btn.style.display='';btn.innerHTML='🎤 HOLD TO RECORD';btn.style.borderColor='#9b59b6';btn.style.color='#9b59b6';btn.style.background='rgba(155,89,182,0.15)';}
-            document.getElementById('qsDrillStatus').textContent='';
-        }
-
-        // Phoneme label → Hangul mapping for student-friendly feedback
-        var phoneToHangul={
-            'G':'ㄱ','GG':'ㄲ','Kh':'ㅋ','D':'ㄷ','DD':'ㄸ','Th':'ㅌ',
-            'B':'ㅂ','BB':'ㅃ','Ph':'ㅍ','J':'ㅈ','JJ':'ㅉ','CHh':'ㅊ',
-            'S':'ㅅ','SS':'ㅆ','H':'ㅎ','M':'ㅁ','N':'ㄴ','NG':'ㅇ(받침)',
-            'R':'ㄹ','L':'ㄹ',
-            'A':'ㅏ','E':'ㅔ','EO':'ㅓ','EU':'ㅡ','I':'ㅣ','O':'ㅗ','U':'ㅜ',
-            'iA':'ㅑ','iEO':'ㅕ','iO':'ㅛ','iU':'ㅠ',
-            'oA':'ㅘ','oE':'ㅚ/ㅙ','uEO':'ㅝ','uI':'ㅟ','euI':'ㅢ',
-            'k':'ㄱ(받침)','t':'ㄷ(받침)','p':'ㅂ(받침)'
-        };
-        function ph(label){return phoneToHangul[label]||label;}
-
-        // Filter out known confusion pairs the wav2vec2 model can't reliably distinguish.
-        // These substitutions are dropped from the error list and score recalculated.
-        // GPT still hears the audio independently and can catch real errors in these pairs.
-        // Extract pronunciation errors from GPT feedback text as fallback when phoneme service errors are all filtered out.
-        // GPT feedback typically contains bullet points mentioning Korean characters.
-        // Cannot flag ㅐ/ㅔ confusion (identical in modern Korean) or g2pk phonetic form differences.
-        function extractGptErrors(feedback, expectedKorean, expectedPronunciation){
-            if(!feedback) return [];
-            var errors=[];
-            var hangul=/[\u3131-\u3163]/g;
-            var bullets=feedback.split(/[•\n]/).filter(function(b){return b.trim();});
-            bullets.forEach(function(bullet){
-                var b=bullet.trim().toLowerCase();
-                if(b.indexOf('good')>-1 && b.indexOf('error')<0 && b.indexOf('but')<0) return;
-                if(b.indexOf('perfect')>-1 || b.indexOf('excellent')>-1 || b.indexOf('no error')>-1) return;
-                var chars=bullet.match(hangul);
-                if(!chars||chars.length===0) return;
-                // Substitution: "X sounded like Y" / "X instead of Y"
-                var subMatch=bullet.match(/([\u3131-\u3163]).*?(?:sounded like|instead of|confused with|heard as|came out as|pronounced as)\s*([\u3131-\u3163])/i);
-                if(subMatch){
-                    var exp=subMatch[1], act=subMatch[2];
-                    if((exp==='ㅐ'&&act==='ㅔ')||(exp==='ㅔ'&&act==='ㅐ')) return;
-                    if(expectedPronunciation && expectedPronunciation!==expectedKorean){
-                        if(expectedKorean.indexOf(exp)>-1 && expectedPronunciation.indexOf(act)>-1) return;
-                        if(expectedPronunciation.indexOf(exp)>-1 && expectedKorean.indexOf(act)>-1) return;
-                    }
-                    errors.push({expected:exp,actual:act,type:'substitution'});
-                    return;
-                }
-                // Missing/deletion
-                var missMatch=bullet.match(/(?:missing|dropped|omitted|didn.t pronounce|skipped)\s.*?([\u3131-\u3163])/i);
-                if(missMatch){
-                    errors.push({expected:missMatch[1],actual:'',type:'deletion'});
-                    return;
-                }
-                // Generic error with Korean char
-                if(chars.length<=2 && (b.indexOf('error')>-1||b.indexOf('weak')>-1||b.indexOf('soft')>-1||b.indexOf('unclear')>-1||b.indexOf('incorrect')>-1||b.indexOf('wrong')>-1||b.indexOf('confus')>-1)){
-                    var c=chars[0];
-                    if((c==='ㅐ'||c==='ㅔ')&&chars.length>1) c=chars[1];
-                    if(c!=='ㅐ'&&c!=='ㅔ') errors.push({expected:c,actual:'?',type:'substitution'});
-                }
-            });
-            return errors;
-        }
-
-        // Shared WAV conversion utility — converts any audio blob to 16kHz mono WAV.
-        // Returns {base64: string, buffer: ArrayBuffer} for GPT and phoneme service respectively.
-        async function convertBlobToWav(blob){
-            var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-            var arrayBuf=await blob.arrayBuffer();
-            var audioBuf=await audioCtx.decodeAudioData(arrayBuf);
-            audioCtx.close();
-            var samples=audioBuf.getChannelData(0);
-            var sr=audioBuf.sampleRate;
-            if(sr>16000){
-                // Proper averaging downsample (box filter) — avoids aliasing that breaks STT
-                var ratio=sr/16000;
-                var nl=Math.floor(samples.length/ratio);
-                var ds=new Float32Array(nl);
-                for(var i=0;i<nl;i++){
-                    var start=Math.floor(i*ratio);
-                    var end=Math.min(Math.floor((i+1)*ratio),samples.length);
-                    var sum=0;
-                    for(var j=start;j<end;j++) sum+=samples[j];
-                    ds[i]=sum/(end-start);
-                }
-                samples=ds;sr=16000;
-            }
-            var bl=44+samples.length*2;
-            var wb=new ArrayBuffer(bl);
-            var v=new DataView(wb);
-            function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-            ws(0,'RIFF');v.setUint32(4,bl-8,true);ws(8,'WAVE');ws(12,'fmt ');
-            v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-            v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
-            v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,samples.length*2,true);
-            for(var i=0;i<samples.length;i++){var s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
-            var bytes=new Uint8Array(wb);
-            var binary='';for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
-            return {base64:btoa(binary), buffer:wb};
         }
 
         async function qsBonusSubmit(blob,mimeType){
@@ -34523,14 +34755,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             var resultEl=document.getElementById('qsBonusResult');
             var expectedKorean=qs.bonusKorean||'';
             try{
-                statusEl.innerHTML='<div style="font-size:11px;color:#888;">⏳ Uploading...</div>';
+                statusEl.innerHTML='<div style="font-size:11px;color:#888;">\u23F3 Uploading...</div>';
                 var ext=mimeType.includes('mp4')?'mp4':'webm';
                 var path='quiz_game_audio/'+qs.sessionId+'/bonus_'+qs.playerId+'_'+(qs.bonusRound||0)+'_'+Date.now()+'.'+ext;
                 var ref=firebase.storage().ref().child(path);
                 await ref.put(blob,{contentType:mimeType});
                 var audioUrl=await ref.getDownloadURL();
 
-                // Write pending submission
                 var pendingRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_SUBS_SUB).add({
                     playerId:qs.playerId,playerName:qs.playerName,
                     emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
@@ -34542,326 +34773,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     status:'grading'
                 });
 
-                statusEl.innerHTML='<div style="font-size:11px;color:#888;">🔍 Grading...</div>';
-
-                // Convert to WAV
-                var wav=await convertBlobToWav(blob);
-                var wavBase64=wav.base64;
-                var wb=wav.buffer;
-
-                // ========== G2PK then AZURE + STT in parallel ==========
-                var phonetic=expectedKorean;
-                var phonemeResult=null;
-                var azureResult=null;
-
-                // G2PK first
-                try{
-                    var g2pResp=await fetch('https://g2pk-pronounce-386010826708.us-central1.run.app/pronounce',{
-                        method:'POST',headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({text:expectedKorean})
-                    });
-                    if(g2pResp.ok){var g2pData=await g2pResp.json();if(g2pData.pronunciation)phonetic=g2pData.pronunciation;}
-                }catch(e){}
-
-                // Azure + STT in parallel
-                var azurePromise=fetch(AZURE_PRON_URL+'/assess',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({referenceText:expectedKorean,audioBase64:wavBase64})
-                }).then(function(r){return r.ok?r.json():null;}).then(function(d){
-                    if(d&&typeof d.pronunciation==='number'&&!d.error) return d;
-                    return null;
-                }).catch(function(){return null;});
-
-                var phFormData=new FormData();
-                phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                phFormData.append('phonetic_hangul',phonetic);
-                phFormData.append('original_text',expectedKorean);
-                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFormData})
-                    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-
-                var parallel=await Promise.all([azurePromise,sttPromise]);
-                azureResult=parallel[0];
-                var bonusSttRaw=parallel[1];
-
-                // Retry STT once after 30s if empty (cold start recovery)
-                console.log('  STT raw response (bonus):', bonusSttRaw);
-                if(!bonusSttRaw || !bonusSttRaw.transcript || !bonusSttRaw.transcript.trim()){
-                    console.warn('⚠️ STT empty (bonus) — retrying in 30s...');
-                    await new Promise(function(res){setTimeout(res,30000);});
-                    var bonusRetryFd=new FormData();
-                    bonusRetryFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                    bonusRetryFd.append('phonetic_hangul',phonetic);
-                    bonusRetryFd.append('original_text',expectedKorean);
-                    var bonusSttRetry=await fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:bonusRetryFd})
-                        .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
-                    console.log('  STT retry raw response (bonus):', bonusSttRetry);
-                    if(bonusSttRetry && bonusSttRetry.transcript && bonusSttRetry.transcript.trim()){
-                        console.log('\u2705 STT retry succeeded (bonus):', bonusSttRetry.transcript);
-                        bonusSttRaw=bonusSttRetry;
-                    } else {
-                        console.warn('\u274c STT retry also empty (bonus) — falling back to GPT-only');
-                    }
-                }
-
-                if(bonusSttRaw) phonemeResult=bonusSttRaw;
-
-                // GPT grading with Azure flags + STT analysis
-                var phonemeInfo='';
-                if(azureResult){
-                    phonemeInfo+='\n\nAZURE PRONUNCIATION ASSESSMENT (word-level error detection):\n';
-                    phonemeInfo+='- Accuracy: '+azureResult.accuracy+'/100, Fluency: '+azureResult.fluency+'/100, Completeness: '+(azureResult.completeness||'N/A')+'/100\n';
-                    if(azureResult.transcript) phonemeInfo+='- Azure heard: "'+azureResult.transcript+'"\n';
-                    if(azureResult.words && azureResult.words.length>0){
-                        var errW=azureResult.words.filter(function(w){return w.error_type&&w.error_type!=='None';});
-                        if(errW.length>0){
-                            phonemeInfo+='- FLAGGED WORDS: '+errW.map(function(w){return '"'+w.word+'" ('+w.error_type+', accuracy:'+w.accuracy+')';}).join(', ')+'\n';
-                        }else{
-                            phonemeInfo+='- All words recognized correctly by Azure.\n';
-                        }
-                    }
-                }
-                if(phonemeResult){
-                    phonemeInfo+='\n\nGOOGLE SPEECH-TO-TEXT ANALYSIS:\n';
-                    if(phonemeResult.transcript) phonemeInfo+='- Google heard: "'+phonemeResult.transcript+'"\n';
-                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                        phonemeInfo+='- Character-level errors (comparing recognized text vs expected):\n';
-                        phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')phonemeInfo+='  • Expected '+ph(err.expected)+' but heard '+ph(err.actual)+'\n';
-                            else if(err.type==='deletion')phonemeInfo+='  • Missing sound '+ph(err.expected)+'\n';
-                            else if(err.type==='insertion')phonemeInfo+='  • Extra sound '+ph(err.actual)+' inserted\n';
-                        });
-                    }else{
-                        phonemeInfo+='- No character-level errors detected.\n';
-                    }
-                }
-                if(azureResult||phonemeResult){
-                    phonemeInfo+='\nINSTRUCTIONS: Use Azure to identify WHICH words have errors. Use Google STT and your own hearing to explain WHY those words are wrong. If Azure flags no errors, trust that. Do not invent errors.\n';
-                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT MATCHES THE EXPECTED TEXT (no errors you heard yourself) BUT AZURE FLAGGED WORDS:\n';
-                    phonemeInfo+='You must still give feedback on Azure-flagged words. Since you heard no errors yourself, you are guessing what Azure detected. Only suggest errors from this specific list of common confusions — do NOT invent other errors:\n';
-                    phonemeInfo+='CONSONANT CONFUSIONS (always possible):\n';
-                    phonemeInfo+='- ㅅ vs ㅆ (tensed ㅅ — student may have used plain ㅅ instead of ㅆ or vice versa)\n';
-                    phonemeInfo+='- ㅂ vs ㅍ (student may not be breathy enough for ㅍ, or too breathy for ㅂ)\n';
-                    phonemeInfo+='- ㄷ vs ㅌ (student may not be breathy enough for ㅌ, or too breathy for ㄷ)\n';
-                    phonemeInfo+='- ㄱ vs ㅋ (student may not be breathy enough for ㅋ, or too breathy for ㄱ)\n';
-                    phonemeInfo+='- ㅈ vs ㅊ (student may not be breathy enough for ㅊ, or too buzzy for ㅈ)\n';
-                    phonemeInfo+='- ㄴ vs English N: students pronounce ㄴ like English N. Tell them: say it like ND — as in \'aND I\'. NEVER say ㄴ sounded like ㄹ.\n';
-                    phonemeInfo+='- ㅁ vs English M: students pronounce ㅁ like English M. Tell them: say it like MB — as in \'siMBa\'. NEVER say ㅁ sounded like another Korean consonant.\n';
-                    phonemeInfo+='- ㄹ vs English R: students pronounce ㄹ like English R. Tell them to tap or curl their tongue. NEVER say ㄹ sounded like ㄴ. EXCEPTION: when ㄹ+ㄹ appear across syllables (e.g. 들려, 몰라, 달려) → it should sound like English L, held on the roof of the mouth — NOT a tap.\n';
-                    phonemeInfo+='TENSED CONSONANT CONFUSIONS (only suggest these if the PHONETIC form of the word actually contains the tensed consonant — consonant assimilation may turn a plain consonant into a tensed one):\n';
-                    phonemeInfo+='- ㄸ vs ㄷ: student used too much air (ㄷ sounds breathy) — tell them to stop the air, engage the throat\n';
-                    phonemeInfo+='- ㅉ vs ㅈ: student used too much air (ㅈ sounds breathy) — tell them to cut the air, tighten the throat\n';
-                    phonemeInfo+='- ㅃ vs ㅂ: student used too much air (ㅂ sounds breathy) — tell them to hold the air back, engage the throat\n';
-                    phonemeInfo+='- ㄲ vs ㄱ: student used too much air (ㄱ sounds breathy) — tell them to stop the air, engage the throat\n';
-                    phonemeInfo+='NEVER use the word soft or hard to describe any consonant error. Tensed consonants (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) are sharp and harsh — if wrong, the student used too much air. Aspirated consonants (ㄱ,ㄷ,ㅂ,ㅅ,ㅈ) need a big puff of air — if wrong, the student sounded too tense, not breathy enough. Regular/harsh consonants (ㅊ,ㅋ,ㅌ,ㅍ) need less air than aspirated — if wrong, the student was too breathy. Always describe errors in terms of air and throat.\n';
-                    phonemeInfo+='VOWELS: Do NOT comment on vowel errors when guessing — students generally get vowels correct.\n';
-                    phonemeInfo+='IMPORTANT: Look at the actual consonants in each Azure-flagged word and pick the MOST LIKELY confusion from the list above. If none of the confusions from the list clearly apply, just say: focus on reading each letter carefully for that word. Do not mention Azure or automated systems.\n';
-                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                    phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
-                    phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
-                    phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for ㅊ, ㅋ, ㅌ, ㅍ. If student is too breathy: use less air, make it sharper and harder.\n';
-                    phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                    phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                    phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                    phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                    phonemeInfo+='\nWHEN YOUR TRANSCRIPT DIFFERS FROM EXPECTED (you heard real errors):\n';
-                    phonemeInfo+='IMPORTANT: Your transcript is a clue, not gospel. Reason backwards from the EXPECTED word to figure out what likely went wrong. Do NOT just say "you said X instead of Y".\n';
-                    phonemeInfo+='Example: expected 달, you heard 탕 → ㄷ said too hard (→ sounded like ㅌ), ㄹ said like English R (→ sounded like ㅇ/ㅏ ending). Feedback: "ㄷ — let more air out, make it breathy" + "ㄹ at the end — curl your tongue toward the roof of your mouth"\n';
-                    phonemeInfo+='Use the same confusion list as above (ㅅ/ㅆ, ㅂ/ㅍ, ㄷ/ㅌ, ㄱ/ㅋ, ㅈ/ㅊ always possible; tensed pairs only if in expected word; ㄴ/ㅁ/ㄹ English habits). VOWELS: do not comment on vowels.\n';
-                    phonemeInfo+='If nothing from the list fits → just say: focus on reading each letter carefully. Do not mention Azure or automated systems.\n';
-                    phonemeInfo+='HOW TO MAKE THE RIGHT SOUND:\n';
-                    phonemeInfo+='- TENSED consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ — no air at all, your throat makes these sounds. If student is using these wrong: stop the air, engage the throat.\n';
-                    phonemeInfo+='- ASPIRATED consonants: ㄱ, ㄷ, ㅂ, ㅅ, ㅈ — use a big puff of air, very breathy. If student is too tense: let more air out, make it breathy.\n';
-                    phonemeInfo+='- REGULAR/HARSH consonants: ㅊ, ㅋ, ㅌ, ㅍ — use LESS air than aspirated, harder and sharper. NEVER tell a student to use more air or be more breathy for ㅊ, ㅋ, ㅌ, ㅍ. If student is too breathy: use less air, make it sharper and harder.\n';
-                    phonemeInfo+='- ㄴ misheard at start of word → pronounce it: ND like "aND I" (stress the ND)\n';
-                    phonemeInfo+='- ㅁ misheard at start of word → pronounce it: MB like "siMBa" (stress the MB)\n';
-                    phonemeInfo+='- ㄹ misheard in middle of word → student is likely saying it like English R. Tell them: tap your tongue quickly on the roof of your mouth — one quick tap, do not roll it. (EXCEPTION: double-ㄹ like in 들려, 몰라, 알려 → pronounce like English L, not a tap)\n';
-                    phonemeInfo+='- ㄹ misheard at end of word → student is likely saying it like English R. Tell them: curl your tongue in toward the roof of your mouth, do not let it bounce.\n'+'- EXCEPTION: ㄹ+ㄹ (double ㄹ across syllables, e.g. 들려, 달려, 몰라) → pronounce like English L, NOT a tap. Hold your tongue on the roof of your mouth.\n';
-                    if(phonetic && phonetic!==expectedKorean) phonemeInfo+='NOTE: Written "'+expectedKorean+'" and phonetic "'+phonetic+'" are the SAME pronunciation. Do NOT flag differences between them as errors.\n';
-                }
-                var gptPrompt='You are a Korean pronunciation grading assistant. Grade the student\'s pronunciation using BOTH the automated analysis below AND what you actually hear in the audio.\n\nThe student was supposed to say:\nWRITTEN FORM: "'+expectedKorean+'"'+phonemeInfo+'\nI am sending you their audio recording.\n\nCRITICAL — DETECT NO SPEECH OR WRONG LANGUAGE FIRST:\n- If you hear SILENCE, background noise, or no speech → score 0, feedback "No speech detected.", transcript ""\n- If you hear ENGLISH or non-Korean → score 0, feedback "Non-Korean speech detected. Please read the Korean text.", transcript what you heard\n- If audio is too short or garbled → score 0, feedback "Could not understand the recording. Please try again."\nDo NOT guess. Only transcribe what you ACTUALLY hear.\n\nIMPORTANT — THE PHONETIC FORM IS THE CORRECT PRONUNCIATION:\nThe phonetic form shows how the word is ACTUALLY pronounced after Korean sound rules (assimilation, linking, tensification, etc.). Use the PHONETIC form — not the written form — to judge whether the student said the word correctly. For example, if written form is 웃지 but phonetic form is 웃찌, then sounding like 웃찌 is CORRECT and must NOT be flagged.\n\nHOW TO USE THE AUTOMATED ANALYSIS:\nThe errors above are HINTS — they may contain false positives. Verify each against what you actually hear. Discard anything that sounds correct. Synthesize both sources: your hearing + the hints.\n\nRULES:\n- ㅔ and ㅐ ARE IDENTICAL in modern Korean. NEVER flag this.\n- Do NOT invent errors. Only mention what you can genuinely hear.\n- CRITICAL: Always judge consonants using the PHONETIC form, not the written form. Example: 웃지 is written with plain ㅈ but its phonetic form is 웃찌 (ㅉ) — so ㅉ is CORRECT for that word and must NOT be flagged.\n- Never say a sound is tense (ㄲ,ㄸ,ㅃ,ㅆ,ㅉ) unless the phonetic form of that word actually contains that tensed consonant.\n- If a consonant is plain in the phonetic form, do NOT say it sounded tense.\n- If a flagged error is hard to hear, explain the pronunciation rule instead (e.g. silent ㅎ, batchim linking, consonant assimilation).\n\nFEEDBACK STYLE:\n- The entire feedback MUST be in ENGLISH. Korean words/letters are OK but sentences must be English.\n- Short, informal, helpful — like a friendly tutor\n- Use bullet points (•), max 2-4. If no real errors, say so positively.\n- ALWAYS use Hangul letters (ㄱ,ㅋ,ㄲ etc.), NEVER romanized labels like /G/,/O/,/EO/\n- Say "sound" not "phoneme". Reference the actual Korean word where the error occurred.\n\nSCORING RUBRIC — grade based on what you hear. Be generous — these are language learners, not native speakers:\n- 0-10: No Korean speech detected\n- 10-40: Very difficult to understand — many serious errors throughout\n- 40-60: Understandable but with several noticeable errors\n- 60-75: Mostly correct — one or two clear errors\n- 75-85: Good — one minor error or slightly unnatural\n- 85-95: Very accurate — sounds natural, minor imperfections only\n- 95-100: Perfect or near-perfect\nPer-error penalties: plain/aspirated confusion -5 to -8; tense/plain confusion -5 to -8; wrong vowel -3 to -5; missed assimilation -3 to -5; minor rhythm -1 to -2. Err on the side of generosity. Use the FULL range.\n\nProvide a transcript of EXACTLY what you heard — do NOT copy the expected text.\n\nReply ONLY with valid JSON:\n{"score":NUMBER_0_TO_100,"feedback":"bulleted feedback in ENGLISH","transcript":"what you ACTUALLY heard"}';
-
-                var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
-                    method:'POST',headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:gptPrompt},{type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}]}],model:'gpt-4o-audio-preview',max_tokens:400,temperature:0.1})
-                });
-                var gptData=await gptResp.json();
-                var rt='';
-                if(gptData.data&&typeof gptData.data==='string')rt=gptData.data;
-                else if(gptData.data&&typeof gptData.data==='object')rt=JSON.stringify(gptData.data);
-                else if(gptData.choices&&gptData.choices[0]){
-                    var m=gptData.choices[0].message||gptData.choices[0];
-                    // Prefer content (structured JSON) over audio.transcript (spoken text)
-                    if(m.content)rt=typeof m.content==='string'?m.content:JSON.stringify(m.content);
-                    else if(m.audio&&m.audio.transcript)rt=m.audio.transcript;
-                }
-                else rt=JSON.stringify(gptData);
-                rt=rt.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
-
-                var grade={score:0,feedback:'',transcript:''};
-                try{grade=JSON.parse(rt);}catch(e){
-                    var jm=rt.match(/\{[\s\S]*\}/);
-                    if(jm)try{grade=JSON.parse(jm[0]);}catch(e2){
-                        // Last resort: extract fields with regex
-                        var sm=rt.match(/"score"\s*:\s*(\d+)/);
-                        var fm=rt.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        var tm=rt.match(/"transcript"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        if(sm)grade.score=parseInt(sm[1]);
-                        if(fm)grade.feedback=fm[1];
-                        if(tm)grade.transcript=tm[1];
-                    }
-                }
-
-                // Use the proxy's score directly — it already does accurate comparison
-                // (recalculating from word-split was breaking single-word bonus phrases)
-                if(phonemeResult){
-                    console.log('  STT score (proxy, bonus): '+phonemeResult.score+' transcript: "'+phonemeResult.transcript+'"');
-                }
-                var gptScore=typeof grade.score==='number'?grade.score:0;
-                var sttAvailableB=phonemeResult && phonemeResult.transcript && phonemeResult.transcript.trim();
-                if(sttAvailableB&&typeof phonemeResult.score==='number'){
-                    var phonemeScore=phonemeResult.score;
-                    var azureFlaggedB=azureResult ? (azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}) : null;
-                    var azureAllClearB=azureResult && azureFlaggedB && azureFlaggedB.length===0;
-                    var sttWB=azureAllClearB ? 0.1 : 0.25;
-                    var gptWB=azureAllClearB ? 0.9 : 0.75;
-                    grade.score=Math.round(phonemeScore*sttWB+gptScore*gptWB);
-                }else{
-                    // STT unavailable — GPT only
-                    grade.score=gptScore;
-                    var sttWB=0; var gptWB=1; var azureAllClearB=false;
-                }
-
-                var finalScore=typeof grade.score==='number'?grade.score:0;
-                var points=Math.round(finalScore/10);
-                console.group('%c⭐ BONUS GRADING — '+expectedKorean, 'color:#FFD700;font-weight:bold;font-size:13px');
-                console.log('Expected (written):  ', expectedKorean);
-                console.log('Phonetic form:       ', phonetic!==expectedKorean ? phonetic : '(same as written)');
-                console.log('--- Azure ---');
-                if(azureResult){
-                    console.log('  Accuracy:        ', azureResult.accuracy, '/ 100');
-                    console.log('  Fluency:         ', azureResult.fluency, '/ 100');
-                    console.log('  Azure heard:     ', azureResult.transcript||'(none)');
-                    var aw=(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';});
-                    console.log('  Flagged words:   ', aw.length ? aw : '(none — all clear)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- Google STT ---');
-                if(phonemeResult){
-                    console.log('  STT score:       ', phonemeResult.score, '/ 100');
-                    console.log('  STT heard:       ', phonemeResult.transcript||'(none)');
-                    console.log('  STT errors:      ', phonemeResult.errors&&phonemeResult.errors.length ? phonemeResult.errors : '(none)');
-                } else { console.log('  (unavailable)'); }
-                console.log('--- GPT ---');
-                console.log('  GPT score:       ', gptScore, '/ 100');
-                console.log('  GPT transcript:  ', grade.transcript||'(none)');
-                console.log('  GPT feedback:    ', grade.feedback||'(none)');
-                console.log('--- HYBRID SCORE (STT '+Math.round(sttWB*100)+'% + GPT '+Math.round(gptWB*100)+'%'+(azureAllClearB?' — Azure all clear)':')')+' ---');
-                if(phonemeResult&&typeof phonemeResult.score==='number'){
-                    console.log('  Formula:         ', phonemeResult.score+' × '+sttWB+' + '+gptScore+' × '+gptWB+' = '+finalScore);
-                } else {
-                    console.log('  Formula:          GPT-only (STT unavailable) = '+finalScore);
-                }
-                console.log('%c  FINAL SCORE:     '+finalScore+' / 100  →  +'+points+' pts', 'color:#FFD700;font-weight:bold;font-size:14px');
-                console.groupEnd();
-
-                // Collect phoneme error summary for bonus stats
-                var phonemeErrorSummary=[];
-                if(phonemeResult&&phonemeResult.errors){
-                    phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution') phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
-                        else if(err.type==='deletion') phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
-                        else if(err.type==='insertion') phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
-                    });
-                }
-                if(phonemeErrorSummary.length===0 && grade.feedback && finalScore<95){
-                    phonemeErrorSummary=extractGptErrors(grade.feedback, expectedKorean, phonetic);
-                }
-
-                // Save to Firestore
-                await pendingRef.update({
-                    transcript:grade.transcript||'',score:points,gradeScore:finalScore,
-                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,azureFlaggedWords:(function(){var bw=[];if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')bw.push(w.word);});}return bw;})(),status:'graded'
-                });
-
-                // Update player total score (bonus points count!)
-                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
-                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
-                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
-
-                // Show result
-                var scoreColor=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
-                var rh='<div style="background:rgba(0,0,0,0.6);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
-                rh+='<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';">'+finalScore+'%</div>';
-                rh+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;margin-top:4px;">⭐ +'+points+' BONUS POINTS</div>';
-                rh+='</div>';
-                // Feedback
-                if(grade.feedback){
-                    rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
-                    rh+='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:6px;text-transform:uppercase;">Feedback</div>';
-                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
-                }
-                // Transcript
-                var bonusTranscript=grade.transcript||'';
-                if(bonusTranscript){
-                    rh+='<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-top:10px;text-align:left;">';
-                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">YOU SAID:</div>';
-                    rh+='<div style="font-size:13px;color:#a855f7;margin-bottom:8px;">'+escapeHtml(bonusTranscript)+'</div>';
-                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">EXPECTED:</div>';
-                    rh+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedKorean)+'</div></div>';
-                }
-                resultEl.innerHTML=rh;
-                qs.viewingBonus=true;
-                statusEl.textContent='';
-                var btn=document.getElementById('qsBonusRecBtn');
-                if(btn){btn.style.display='none';}
-                // Don't flush yet — let student review feedback
-                // Show continue button if round ended while grading
-                if(qs.pendingStatus){
-                    var contHtml='<div style="text-align:center;margin-top:12px;">';
-                    contHtml+='<button onclick="qsBonusDismiss()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">CONTINUE →</button></div>';
-                    resultEl.innerHTML+=contHtml;
-                }else{
-                    // Round hasn't ended yet — just clear busy
-                    qs.isBusy=false;
-                }
-
-            }catch(e){
-                console.error('Bonus submit error:',e);
-                statusEl.textContent='❌ Error: '+e.message;
-                qs.isBusy=false;
-                qsFlushPending();
-                var btn=document.getElementById('qsBonusRecBtn');
-                if(btn){btn.style.display='none';}
-            }
-        }
-
-        function qsBonusDismiss(){
-            qs.isBusy=false;
-            qs.viewingBonus=false;
-            qsFlushPending();
-        }
-
-        async function qsDrillSubmit(blob,mimeType,drillText,drillId){
-            var statusEl=document.getElementById('qsDrillStatus');
-            var resultEl=document.getElementById('qsDrillResult');
-            var expectedKorean=drillText||'';
-            try{
-                statusEl.textContent='⏳ Uploading...';
-                var ext=mimeType.includes('mp4')?'mp4':'webm';
-                var path='quiz_game_audio/'+qs.sessionId+'/drill_'+qs.playerId+'_'+drillId+'.'+ext;
-                var ref=firebase.storage().ref().child(path);
-                await ref.put(blob,{contentType:mimeType});
-                var audioUrl=await ref.getDownloadURL();
-
-                var subRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection('drill_submissions').add({
-                    playerId:qs.playerId,playerName:qs.playerName,
-                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
-                    level:qs.playerLevel,drillId:drillId,drillText:drillText,
-                    audioUrl:audioUrl,score:0,feedback:'',status:'grading',
-                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
-                    submittedAt:firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                statusEl.textContent='🔍 Analyzing pronunciation...';
+                statusEl.innerHTML='<div style="font-size:11px;color:#888;">\uD83D\uDD0D Grading...</div>';
                 var wav=await convertBlobToWav(blob);
                 var wavBase64=wav.base64;
                 var wb=wav.buffer;
@@ -34885,11 +34797,11 @@ Return ONLY this JSON (no markdown, no code blocks):
                     if(d&&typeof d.pronunciation==='number'&&!d.error) return d; return null;
                 }).catch(function(){return null;});
 
-                var phFd=new FormData();
-                phFd.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
-                phFd.append('phonetic_hangul',phonetic);
-                phFd.append('original_text',expectedKorean);
-                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFd})
+                var phFormData=new FormData();
+                phFormData.append('audio',new Blob([new Uint8Array(wb)],{type:'audio/wav'}),'audio.wav');
+                phFormData.append('phonetic_hangul',phonetic);
+                phFormData.append('original_text',expectedKorean);
+                var sttPromise=fetch(SPEECH_PROXY_URL+'/analyze',{method:'POST',body:phFormData})
                     .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
 
                 var parallel=await Promise.all([azurePromise,sttPromise]);
@@ -34910,18 +34822,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(phonemeResult){
                     phonemeInfo+='\n\nGOOGLE STT:\n';
                     if(phonemeResult.transcript) phonemeInfo+='- Heard: "'+phonemeResult.transcript+'"\n';
-                    if(phonemeResult.errors&&phonemeResult.errors.length>0){
-                        phonemeResult.errors.forEach(function(err){
-                            if(err.type==='substitution')phonemeInfo+='  \u2022 Expected '+err.expected+' heard '+err.actual+'\n';
-                            else if(err.type==='deletion')phonemeInfo+='  \u2022 Missing: '+err.expected+'\n';
-                            else if(err.type==='insertion')phonemeInfo+='  \u2022 Extra: '+err.actual+'\n';
-                        });
-                    }
                 }
 
-                var consonantRules='CONSONANT RULES:\n- \u3131,\u3137,\u3142,\u3145,\u3148: aspirated \u2014 big puff of air\n- \u314a,\u314b,\u314c,\u314d: less air than aspirated\n- \u3132,\u3138,\u3143,\u3146,\u3149: tensed \u2014 no air, engage throat\n- \u3134 sounds like ND (as in "aND I")\n- \u3141 sounds like MB (as in "siMBa")\n- \u3139: tap tongue on roof of mouth (double \u3139 = English L)\nNEVER use the word "soft" or "hard". Describe errors in terms of air and throat.\n';
-
-                var gptPrompt='You are a Korean pronunciation coach. The student recorded themselves saying:\n'+'"'+expectedKorean+'"\n'+'(phonetic: "'+phonetic+'")\n'+phonemeInfo+'\n'+consonantRules+'\nGive a score 0-100 and brief feedback (2-3 sentences max). Focus only on real errors. If score >= 80 just give encouragement.\nReply ONLY as JSON: {"score":85,"transcript":"what you heard","feedback":"your feedback"}';
+                var gptPrompt='You are a Korean pronunciation grading assistant.\nStudent said: "'+expectedKorean+'" (phonetic: "'+phonetic+'")\n'+phonemeInfo+'\nScore 0-100 and brief feedback. Reply ONLY as JSON: {"score":85,"transcript":"what you heard","feedback":"your feedback"}';
 
                 var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                     method:'POST',headers:{'Content-Type':'application/json'},
@@ -34945,44 +34848,134 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var gptScore=typeof grade.score==='number'?grade.score:0;
 
                 var finalScore=gptScore;
-                var sttWB=0,gptWB=1,azureAllClear=false;
                 if(phonemeResult&&phonemeResult.transcript&&phonemeResult.transcript.trim()&&typeof phonemeResult.score==='number'){
                     var azFlagged=azureResult?(azureResult.words||[]).filter(function(w){return w.error_type&&w.error_type!=='None';}):null;
-                    azureAllClear=azureResult&&azFlagged&&azFlagged.length===0;
-                    sttWB=azureAllClear?0.1:0.25; gptWB=azureAllClear?0.9:0.75;
+                    var azureAllClear=azureResult&&azFlagged&&azFlagged.length===0;
+                    var sttWB=azureAllClear?0.1:0.25; var gptWB=azureAllClear?0.9:0.75;
                     finalScore=Math.round(phonemeResult.score*sttWB+gptScore*gptWB);
                 }
                 var points=Math.round(finalScore/10);
 
-                var phonemeErrorSummary=[];
-                if(phonemeResult&&phonemeResult.errors){
-                    phonemeResult.errors.forEach(function(err){
-                        if(err.type==='substitution')phonemeErrorSummary.push({expected:err.expected||'',actual:err.actual||'',type:'substitution'});
-                        else if(err.type==='deletion')phonemeErrorSummary.push({expected:err.expected||'',actual:'',type:'deletion'});
-                        else if(err.type==='insertion')phonemeErrorSummary.push({expected:'',actual:err.actual||'',type:'insertion'});
-                    });
-                }
-                if(phonemeErrorSummary.length===0&&grade.feedback&&finalScore<95){
-                    phonemeErrorSummary=extractGptErrors(grade.feedback,expectedKorean,phonetic);
-                }
-                var azureFlaggedWords=[];
-                if(azureResult&&azureResult.words){azureResult.words.forEach(function(w){if(w.error_type&&w.error_type!=='None')azureFlaggedWords.push(w.word);});}
-
-                await subRef.update({
-                    transcript:grade.transcript||'',score:finalScore,gradeScore:finalScore,
-                    feedback:grade.feedback||'',phonemeErrors:phonemeErrorSummary,
-                    azureFlaggedWords:azureFlaggedWords,status:'graded'
+                await pendingRef.update({
+                    transcript:grade.transcript||'',score:points,gradeScore:finalScore,
+                    feedback:grade.feedback||'',status:'graded'
                 });
 
-                qs.isBusy=false;
+                var playerDoc=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).get();
+                var currentScore=(playerDoc.exists&&playerDoc.data().score)||0;
+                await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection(QUIZ_PLAYERS_SUB).doc(qs.playerId).update({score:currentScore+points});
+
                 var scoreColor=finalScore>=80?'#00ff88':finalScore>=50?'#FFD700':'#ff4444';
-                var rh='<div style="background:rgba(0,0,0,0.5);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
+                var rh='<div style="background:rgba(0,0,0,0.6);border:2px solid '+scoreColor+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
                 rh+='<div style="font-family:\'Press Start 2P\';font-size:20px;color:'+scoreColor+';">'+finalScore+'%</div>';
+                rh+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#FFD700;margin-top:4px;">\u2B50 +'+points+' BONUS POINTS</div>';
                 rh+='</div>';
                 if(grade.feedback){
                     rh+='<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:14px;margin-top:10px;text-align:left;">';
-                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/•/g,'<br>•')+'</div></div>';
+                    rh+='<div style="font-size:13px;color:#ddd;line-height:1.6;">'+escapeHtml(grade.feedback).replace(/\u2022/g,'<br>\u2022')+'</div></div>';
                 }
+                if(grade.transcript){
+                    rh+='<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-top:10px;text-align:left;">';
+                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">YOU SAID:</div>';
+                    rh+='<div style="font-size:13px;color:#a855f7;margin-bottom:8px;">'+escapeHtml(grade.transcript)+'</div>';
+                    rh+='<div style="font-size:10px;color:#888;margin-bottom:4px;">EXPECTED:</div>';
+                    rh+='<div style="font-size:13px;color:#00ff88;">'+escapeHtml(expectedKorean)+'</div></div>';
+                }
+                resultEl.innerHTML=rh;
+                qs.viewingBonus=true;
+                statusEl.textContent='';
+                var btn=document.getElementById('qsBonusRecBtn');
+                if(btn) btn.style.display='none';
+                if(qs.pendingStatus){
+                    var contHtml='<div style="text-align:center;margin-top:12px;">';
+                    contHtml+='<button onclick="qsBonusDismiss()" style="background:rgba(255,255,255,0.1);border:2px solid #888;color:#fff;padding:10px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">CONTINUE \u2192</button></div>';
+                    resultEl.innerHTML+=contHtml;
+                } else {
+                    qs.isBusy=false;
+                }
+            }catch(e){
+                console.error('Bonus submit error:',e);
+                statusEl.textContent='\u274c Error: '+e.message;
+                qs.isBusy=false;
+                qsFlushPending();
+                var btn=document.getElementById('qsBonusRecBtn');
+                if(btn) btn.style.display='none';
+            }
+        }
+
+        function qsBonusDismiss(){
+            qs.isBusy=false;
+            qs.viewingBonus=false;
+            qsFlushPending();
+        }
+
+        async function qsDrillSubmit(blob,mimeType,drillText,drillId){
+            var statusEl=document.getElementById('qsDrillStatus');
+            var resultEl=document.getElementById('qsDrillResult');
+            var expectedKorean=drillText||'';
+            try{
+                statusEl.textContent='⏳ Uploading...';
+                var ext=mimeType.includes('mp4')?'mp4':'webm';
+                var path='quiz_game_audio/'+qs.sessionId+'/drill_'+qs.playerId+'_'+drillId+'.'+ext;
+                var ref=firebase.storage().ref().child(path);
+                await ref.put(blob,{contentType:mimeType});
+                var audioUrl=await ref.getDownloadURL();
+
+                // Save submission to Firestore (no score, status grading until GPT responds)
+                var subRef=await db.collection(QUIZ_GAME_COLLECTION).doc(qs.sessionId).collection('drill_submissions').add({
+                    playerId:qs.playerId,playerName:qs.playerName,
+                    emoji:(typeof qs.playerEmoji==='number'&&typeof emojis!=='undefined'?emojis[qs.playerEmoji]:qs.playerEmoji),
+                    level:qs.playerLevel,drillId:drillId,drillText:drillText,
+                    audioUrl:audioUrl,correct:null,feedback:'',status:'grading',
+                    tevelloId:qs.tevelloUser?qs.tevelloUser.id:null,
+                    submittedAt:firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                statusEl.textContent='🔍 Checking...';
+                var wav=await convertBlobToWav(blob);
+                var wavBase64=wav.base64;
+
+                // GPT-only right/wrong check — no STT, no Azure, no scoring
+                var gptPrompt='You are a Korean pronunciation checker. The student was supposed to say:\n'+
+                    '"'+expectedKorean+'"\n\n'+
+                    'Listen to the audio. Decide if they said it correctly or not.\n'+
+                    'RULES:\n'+
+                    '- If the student said the right Korean words (even with minor accent), mark correct.\n'+
+                    '- If they said the wrong words, silence, or non-Korean speech, mark incorrect.\n'+
+                    '- Keep feedback to 1 short sentence max. If correct, just say something encouraging.\n'+
+                    'Reply ONLY as JSON: {"correct":true,"feedback":"one short sentence"}';
+
+                var gptResp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({
+                        messages:[{role:'user',content:[
+                            {type:'text',text:gptPrompt},
+                            {type:'input_audio',input_audio:{data:wavBase64,format:'wav'}}
+                        ]}],
+                        model:'gpt-4o-audio-preview',max_tokens:100,temperature:0.1
+                    })
+                });
+                var gptData=await gptResp.json();
+                var gptRaw='';
+                if(gptData.data&&typeof gptData.data==='string')gptRaw=gptData.data;
+                else if(gptData.choices&&gptData.choices[0]){var gm=gptData.choices[0].message||gptData.choices[0];gptRaw=gm.content||(gm.audio&&gm.audio.transcript)||'';}
+                else gptRaw=JSON.stringify(gptData);
+                gptRaw=gptRaw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+                var gptMatch=gptRaw.match(/\{[\s\S]*\}/);
+                var result={correct:false,feedback:''};
+                try{result=JSON.parse(gptMatch?gptMatch[0]:gptRaw);}catch(e){}
+
+                await subRef.update({
+                    correct:result.correct===true,
+                    feedback:result.feedback||'',
+                    status:'graded'
+                });
+
+                qs.isBusy=false;
+                var rh='<div style="background:rgba(0,0,0,0.5);border:2px solid '+(result.correct?'#00ff88':'#ff4444')+';border-radius:12px;padding:16px;margin-top:8px;text-align:center;">';
+                rh+='<div style="font-size:32px;margin-bottom:6px;">'+(result.correct?'✅':'❌')+'</div>';
+                rh+='<div style="font-size:13px;color:#ddd;">'+escapeHtml(result.feedback||'')+'</div>';
+                rh+='</div>';
                 if(resultEl)resultEl.innerHTML=rh;
                 statusEl.textContent='';
                 var drillBtn=document.getElementById('qsDrillRecBtn');
@@ -35194,20 +35187,20 @@ Return ONLY this JSON (no markdown, no code blocks):
                 renderBreakdown.forEach(function(row){
                     h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;margin-bottom:4px;background:rgba(255,255,255,0.04);border-radius:8px;">';
                     h+='<span style="font-size:12px;color:#ddd;">'+escapeHtml(row.label)+'</span>';
-                    h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;">+'+row.coins+' \uD83E\uDE99</span>';
+                    h+='<span style="font-family:\'Press Start 2P\';font-size:9px;color:#FFD700;">+'+row.rolls+' \uD83E\uDE99</span>';
                     h+='</div>';
                 });
                 // Totals row
                 h+='<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,215,0,0.3);margin-top:8px;padding:8px 12px 0;">';
                 h+='<span style="font-family:\'Press Start 2P\';font-size:8px;color:#ccc;">EARNED THIS GAME</span>';
-                h+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+qs.coinsEarned+' \uD83E\uDE99</span>';
+                h+='<span style="font-family:\'Press Start 2P\';font-size:12px;color:#FFD700;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">+'+qs.gachaRolls+' \uD83E\uDE99</span>';
                 h+='</div>';
                 // Running total / login nudge
                 if(qs.tevelloUser){
                     var tc=typeof qs.tevelloUser.coins==='number'?qs.tevelloUser.coins:'?';
-                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Total coins: <span style="color:#FFD700;font-weight:700;">'+tc+' \uD83E\uDE99</span></div>';
+
                 } else {
-                    h+='<div style="font-size:11px;color:#888;margin-top:8px;">Log in to save your coins permanently!</div>';
+
                 }
                 // Gacha button — gated: once per calendar day (EST)
                 // Use stored total rolls (from Firestore) not just session-earned rolls
@@ -35383,9 +35376,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                             if(pracPhonemeResult.transcript)pracPhonemeInfo+='- Google heard: "'+pracPhonemeResult.transcript+'"\n';
                             if(pracPhonemeResult.errors&&pracPhonemeResult.errors.length){
                                 pracPhonemeResult.errors.forEach(function(err){
-                                    if(err.type==='substitution')pracPhonemeInfo+='  \u2022 Expected '+ph(err.expected)+' heard '+ph(err.actual)+'\n';
-                                    else if(err.type==='deletion')pracPhonemeInfo+='  \u2022 Missing: '+ph(err.expected)+'\n';
-                                    else if(err.type==='insertion')pracPhonemeInfo+='  \u2022 Extra: '+ph(err.actual)+'\n';
+                                    if(err.type==='substitution')pracPhonemeInfo+='  \u2022 Expected '+err.expected+' heard '+err.actual+'\n';
+                                    else if(err.type==='deletion')pracPhonemeInfo+='  \u2022 Missing: '+err.expected+'\n';
+                                    else if(err.type==='insertion')pracPhonemeInfo+='  \u2022 Extra: '+err.actual+'\n';
                                 });
                             }
                         }
@@ -36054,6 +36047,17 @@ Return ONLY this JSON (no markdown, no code blocks):
   '@keyframes _gStarShine{0%{background-position:150% 150%;opacity:0}40%{opacity:0}50%{background-position:0% 0%;opacity:1}60%{opacity:0}100%{background-position:-150% -150%;opacity:0}}',
   '._gholosc{position:absolute;inset:0;border-radius:12px;pointer-events:none;opacity:0;background:linear-gradient(115deg,transparent 0%,rgba(255,100,200,0) 30%,rgba(150,220,255,.3) 42%,rgba(255,255,255,.5) 50%,rgba(180,255,150,.3) 58%,rgba(255,180,100,0) 70%,transparent 100%);background-size:300% 300%;mix-blend-mode:screen;animation:_gHoloScan 5s ease-in-out infinite;}',
   '@keyframes _gHoloScan{0%{background-position:150% 150%;opacity:0}5%{opacity:1}14%{background-position:-50% -50%;opacity:0}100%{background-position:-50% -50%;opacity:0}}',
+  // Warning popup
+  '._gwpop{position:fixed;inset:0;z-index:9999999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}',
+  '._gwbox{background:#0a0a15;border:3px solid #ff4444;border-radius:18px;padding:28px 24px;max-width:320px;width:100%;text-align:center;position:relative;z-index:2;box-shadow:0 0 40px #ff4444aa;}',
+  '._gwrainbow{position:absolute;inset:0;z-index:1;pointer-events:none;animation:_gwRainbow 0.6s linear infinite;}',
+  '@keyframes _gwRainbow{0%{background:rgba(255,0,0,0.07)}14%{background:rgba(255,140,0,0.07)}28%{background:rgba(255,255,0,0.07)}43%{background:rgba(0,255,0,0.07)}57%{background:rgba(0,150,255,0.07)}71%{background:rgba(130,0,255,0.07)}85%{background:rgba(255,0,200,0.07)}100%{background:rgba(255,0,0,0.07)}}',
+  '._gwpop.fadeout{animation:_gwFadeOut 0.3s ease-out forwards;}',
+  '@keyframes _gwFadeOut{from{opacity:1}to{opacity:0}}',
+  // Countdown
+  '._gcdown{font-family:"Press Start 2P",monospace;font-size:32px;color:#fff;text-shadow:0 0 20px #fff;margin-bottom:16px;transition:color 0.2s,text-shadow 0.2s;}',
+  '._gcdown.urgent{color:#ff4444;text-shadow:0 0 20px #ff4444,0 0 40px #ff4444;animation:_gcPulse 0.4s ease-in-out infinite;}',
+  '@keyframes _gcPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}',
                 ].join('');
                 document.head.appendChild(st);
             }
@@ -36082,9 +36086,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '<div class="_grarsect">Character</div>',
                   '<table class="_grartbl"><tr><th>Name</th><th class="pct">Chance</th></tr><tr><td>Wombatman</td><td class="pct">26%</td></tr><tr><td>Sloman</td><td class="pct">25%</td></tr><tr><td>Pola Cola</td><td class="pct">22%</td></tr><tr><td>Muscle Turtle</td><td class="pct">13%</td></tr><tr><td>Fennec Fox</td><td class="pct">9%</td></tr><tr><td>Captain Corea</td><td class="pct">5%</td></tr></table>',
                   '<div class="_grarsect">Color</div>',
-                  '<table class="_grartbl"><tr><th>Color</th><th class="pct">Chance</th></tr><tr><td>Blue</td><td class="pct">32%</td></tr><tr><td>Green</td><td class="pct">27%</td></tr><tr><td>Yellow</td><td class="pct">18%</td></tr><tr><td>Red</td><td class="pct">15%</td></tr><tr><td>Metallic Pink</td><td class="pct">5%</td></tr><tr><td>Holo Chrome</td><td class="pct">3%</td></tr></table>',
+                  '<table class="_grartbl"><tr><th>Name</th><th>Tier</th><th class="pct">Chance</th></tr><tr><td>Wombatman</td><td class="t1">★ Common</td><td class="pct">26%</td></tr><tr><td>Sloman</td><td class="t1">★ Common</td><td class="pct">25%</td></tr><tr><td>Pola Cola</td><td class="t1">★ Common</td><td class="pct">22%</td></tr><tr><td>Muscle Turtle</td><td class="t1">★ Common</td><td class="pct">13%</td></tr><tr><td>Fennec Fox</td><td class="t2">★★ Rare</td><td class="pct">9%</td></tr><tr><td>Captain Corea</td><td class="t3">★★★ Legendary</td><td class="pct">5%</td></tr></table>',
                   '<div class="_grarsect">Item / Costume</div>',
-                  '<table class="_grartbl"><tr><th>Item</th><th>Tier</th><th class="pct">Chance</th></tr><tr><td>Cat paws</td><td class="t1">★ Common</td><td class="pct">18%</td></tr><tr><td>Dog slippers</td><td class="t1">★ Common</td><td class="pct">18%</td></tr><tr><td>Mr. Calvin slippers</td><td class="t1">★ Common</td><td class="pct">13.5%</td></tr><tr><td>KoreanLearnin fan</td><td class="t1">★ Common</td><td class="pct">13.5%</td></tr><tr><td>Wizard costume</td><td class="t2">★★ Rare</td><td class="pct">9%</td></tr><tr><td>Calico cat (Bella)</td><td class="t2">★★ Rare</td><td class="pct">9%</td></tr><tr><td>Mr. Croak Croak</td><td class="t2">★★ Rare</td><td class="pct">6%</td></tr><tr><td>Mr. Shark (상어씨)</td><td class="t2">★★ Rare</td><td class="pct">6%</td></tr><tr><td>Mr. Calvin costume</td><td class="t3">★★★ Legendary</td><td class="pct">3%</td></tr><tr><td>Calico cat kigurumi</td><td class="t3">★★★ Legendary</td><td class="pct">2%</td></tr><tr><td>Mecha costume</td><td class="t3">★★★ Legendary</td><td class="pct">1%</td></tr><tr><td>Korean Warrior</td><td class="t3">★★★ Legendary</td><td class="pct">1%</td></tr></table>',
+                  '<table class="_grartbl"><tr><th>Color</th><th>Tier</th><th class="pct">Chance</th></tr><tr><td>Blue</td><td class="t1">★ Common</td><td class="pct">32%</td></tr><tr><td>Green</td><td class="t1">★ Common</td><td class="pct">27%</td></tr><tr><td>Yellow</td><td class="t1">★ Common</td><td class="pct">18%</td></tr><tr><td>Red</td><td class="t1">★ Common</td><td class="pct">15%</td></tr><tr><td>Metallic Pink</td><td class="t3">★★★ Legendary</td><td class="pct">5%</td></tr><tr><td>Holo Chrome</td><td class="t3">★★★ Legendary</td><td class="pct">3%</td></tr></table>',
                   '<div class="_grarsect">Bonus</div>',
                   '<table class="_grartbl"><tr><th>Effect</th><th class="pct">Chance</th></tr><tr><td style="color:#f5c842">❖ Glitter</td><td class="pct">1%</td></tr></table>',
                   '<button class="_grarcls" id="_grarcls">✕ Close</button>',
@@ -36103,6 +36107,13 @@ Return ONLY this JSON (no markdown, no code blocks):
                 '<div class="_ghint" id="_ghint">Click to crack</div>',
                 '<div class="_gfmsg" id="_gfmsg">&#x2756; Something is hatching... &#x2756;</div>',
               '</div>',
+              // Warning popup (shown first, hidden after close)
+              '<div class="_gwpop" id="_gwpop"><div class="_gwrainbow"></div><div class="_gwbox">'+
+              '<div style="font-family:\'Press Start 2P\',monospace;font-size:13px;color:#ff4444;line-height:1.7;margin-bottom:18px;">CRACK THE EGG FAST<br>OR LOSE YOUR CHANCE!</div>'+
+              '<button id="_gwclose" style="background:linear-gradient(135deg,#ff4444,#cc0000);border:none;color:#fff;font-family:\'Press Start 2P\',monospace;font-size:10px;padding:14px 30px;border-radius:10px;cursor:pointer;box-shadow:0 0 20px #ff4444aa;">I\'M READY!</button>'+
+              '</div></div>',
+              // Countdown (hidden until popup closed)
+              '<div class="_gcdown" id="_gcdown" style="display:none;">10</div>',
             ].join('');
             document.body.appendChild(ov);
 
@@ -36315,46 +36326,193 @@ Return ONLY this JSON (no markdown, no code blocks):
 
             function gResetForNextRoll(){
               gApplyGlitter(false);
-              var rovEl=gGetEl('_grov');if(rovEl)rovEl.classList.remove('show');
+              var rovEl=document.getElementById('_grov');if(rovEl)rovEl.classList.remove('show');
               gCurrent=0;
-              var ei=gGetEl('_gei');if(ei)ei.src=EGG_IMGS_G[0];
+              var ei=document.getElementById('_gei');if(ei)ei.src=EGG_IMGS_G[0];
               gUpdateDots();
-              var hint=gGetEl('_ghint'),fm=gGetEl('_gfmsg');
+              var hint=document.getElementById('_ghint'),fm=document.getElementById('_gfmsg');
               if(hint)hint.classList.remove('hidden');
               if(fm)fm.classList.remove('show');
               gWigTimer=setTimeout(gStartWiggle,400);
+              // Reset tap game state for next roll
+              gClearTimers();
+              gTapCount=0;
+              gEggStarted=false;
+              gTimeLeft=10;
+              // Show warning popup again for next roll
+              var cdEl=document.getElementById('_gcdown');
+              if(cdEl){cdEl.textContent='10';cdEl.style.display='none';cdEl.classList.remove('urgent');}
+              var newPop=document.createElement('div');
+              newPop.id='_gwpop';
+              newPop.className='_gwpop';
+              newPop.innerHTML='<div class="_gwrainbow"></div><div class="_gwbox">'
+                +'<div style="font-family:\'Press Start 2P\',monospace;font-size:13px;color:#ff4444;line-height:1.7;margin-bottom:18px;">CRACK THE EGG FAST<br>OR LOSE YOUR CHANCE!</div>'
+                +'<button id="_gwclose" style="background:linear-gradient(135deg,#ff4444,#cc0000);border:none;color:#fff;font-family:\'Press Start 2P\',monospace;font-size:10px;padding:14px 30px;border-radius:10px;cursor:pointer;box-shadow:0 0 20px rgba(255,68,68,0.67);">I\'M READY!</button>'
+                +'</div>';
+              var govEl=document.getElementById('_gachaOverlay');
+              if(govEl) govEl.appendChild(newPop);
+              document.getElementById('_gwclose').addEventListener('click',function(e){
+                e.stopPropagation();
+                var pop=document.getElementById('_gwpop');
+                if(pop){pop.style.opacity='0';pop.style.transition='opacity 0.3s';setTimeout(function(){if(pop.parentNode)pop.remove();},300);}
+                gStartEgg();
+              });
+            }
+
+            // ── TAP-GATED CRACK SYSTEM ───────────────────────────────────
+            // Rules:
+            //   - Must tap >= 4 times before 8.8s or lose the roll
+            //   - If tapping, cracks happen automatically at 2.25, 4.5, 6.75, 8.8s
+            //   - No taps at all = lose the roll at 10s
+
+            var TOTAL_TIME=10, CRACK_TIMES=[2250,4500,6750,8800], MIN_TAPS=4;
+            var gCountdownTimer=null, gAutoTimer=null, gStageTimers=[];
+            var gTimeLeft=TOTAL_TIME, gEggStarted=false, gTapCount=0;
+
+            function gStartEgg(){
+                if(gEggStarted) return;
+                gEggStarted=true;
+                var cdEl=document.getElementById('_gcdown');
+                if(cdEl){cdEl.style.display='block';cdEl.textContent='10';}
+
+                // Countdown every second
+                gTimeLeft=TOTAL_TIME;
+                gCountdownTimer=setInterval(function(){
+                    gTimeLeft--;
+                    var cd=document.getElementById('_gcdown');
+                    if(cd){
+                        cd.textContent=Math.max(0,gTimeLeft);
+                        if(gTimeLeft<=3) cd.classList.add('urgent');
+                    }
+                    if(gTimeLeft<=0) clearInterval(gCountdownTimer);
+                },1000);
+
+                // Schedule auto-cracks — only fire if student has tapped
+                CRACK_TIMES.forEach(function(ms,si){
+                    var t=setTimeout(function(){
+                        if(gTapCount>0 && gCurrent<=si && gCurrent<EGG_IMGS_G.length-1){
+                            gAnimating=false;
+                            gForceAdvance();
+                        }
+                    },ms);
+                    gStageTimers.push(t);
+                });
+
+                // At 10s: check if student tapped enough
+                gAutoTimer=setTimeout(function(){
+                    gClearTimers();
+                    if(gTapCount<MIN_TAPS){
+                        // LOSE THE ROLL
+                        gLoseRoll();
+                    } else {
+                        // Had enough taps — force open if not already revealed
+                        gForceReveal();
+                    }
+                },10000);
+            }
+
+            function gClearTimers(){
+                clearInterval(gCountdownTimer);
+                clearTimeout(gAutoTimer);
+                gStageTimers.forEach(function(t){clearTimeout(t);});
+                gStageTimers=[];
+            }
+
+            function gForceAdvance(){
+                // Advance one crack stage without tap interaction
+                if(gAnimating||gCurrent>=EGG_IMGS_G.length-1) return;
+                gAnimating=true;
+                gTriggerEffects();
+                setTimeout(function(){
+                    gCurrent++;
+                    var ei=document.getElementById('_gei');if(ei)ei.src=EGG_IMGS_G[gCurrent];
+                    gUpdateDots();
+                    gAnimating=false;
+                    if(gCurrent<EGG_IMGS_G.length-1) gWigTimer=setTimeout(gStartWiggle,400);
+                },120);
+            }
+
+            function gForceReveal(){
+                // Rapidly crack remaining stages then reveal
+                if(document.getElementById('_grov')&&document.getElementById('_grov').classList.contains('show')) return;
+                function nextCrack(){
+                    if(gCurrent<EGG_IMGS_G.length-1){
+                        gAnimating=false;
+                        gForceAdvance();
+                        setTimeout(nextCrack,150);
+                    } else {
+                        var hint=document.getElementById('_ghint'),fm=document.getElementById('_gfmsg'),lb=document.getElementById('_glb');
+                        if(hint)hint.classList.add('hidden');
+                        if(fm)fm.classList.add('show');
+                        setTimeout(function(){if(lb){gCls(lb,'explode');lb.classList.add('explode');}},150);
+                        setTimeout(function(){gShowReveal(rollResults[currentRoll]);},750);
+                    }
+                }
+                nextCrack();
+            }
+
+            function gLoseRoll(){
+                // Student didn't tap enough — show lose screen, skip this roll
+                var ov2=document.getElementById('_gachaOverlay');
+                if(!ov2) return;
+                var govInner=ov2.querySelector('[style*="position:relative"]');
+                var loseDiv=document.createElement('div');
+                loseDiv.style.cssText='position:fixed;inset:0;z-index:9999998;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);';
+                loseDiv.innerHTML='<div style="font-family:\'Press Start 2P\',monospace;font-size:20px;color:#ff4444;text-shadow:0 0 20px #ff4444;margin-bottom:16px;">YOU LOST<br>THE ROLL!</div>'
+                    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:10px;color:#888;margin-bottom:28px;">Not enough taps</div>'
+                    +'<button id="_gloseOk" style="background:rgba(255,255,255,0.08);border:2px solid #888;color:#fff;font-family:\'Press Start 2P\',monospace;font-size:10px;padding:12px 28px;border-radius:8px;cursor:pointer;">OK</button>';
+                ov2.appendChild(loseDiv);
+                document.getElementById('_gloseOk').addEventListener('click',function(){
+                    loseDiv.remove();
+                    currentRoll++;
+                    if(currentRoll<rolls){
+                        gResetForNextRoll();
+                    } else {
+                        qsSaveGachaResult(allWon);
+                        var ov3=document.getElementById('_gachaOverlay');
+                        if(ov3) ov3.remove();
+                        document.removeEventListener('click',gAdvance);
+                    }
+                });
             }
 
             function gAdvance(e){
-              if(e&&e.target&&e.target.id==='_grclose')return;
-              // Don't advance if reveal is showing
-              if(gGetEl('_grov')&&gGetEl('_grov').classList.contains('show'))return;
-              if(gAnimating)return;
+              if(!e) return; // auto calls use gForceAdvance
+              if(e.target&&(e.target.id==='_grclose'||e.target.id==='_gwclose'||e.target.id==='_gwpop'||e.target.id==='_gloseOk')) return;
+              if(!gEggStarted) return;
+              if(document.getElementById('_grov')&&document.getElementById('_grov').classList.contains('show')) return;
+              if(gAnimating) return;
+              // Count this tap
+              gTapCount++;
               if(gCurrent>=EGG_IMGS_G.length-1){gTriggerEffects();return;}
               gAnimating=true;
               gTriggerEffects();
               setTimeout(function(){
                 gCurrent++;
-                var ei=gGetEl('_gei');if(ei)ei.src=EGG_IMGS_G[gCurrent];
+                var ei=document.getElementById('_gei');if(ei)ei.src=EGG_IMGS_G[gCurrent];
                 gUpdateDots();
                 if(gCurrent>=EGG_IMGS_G.length-1){
-                  var hint=gGetEl('_ghint'),fm=gGetEl('_gfmsg'),lb=gGetEl('_glb');
-                  if(hint)hint.classList.add('hidden');
-                  if(fm)fm.classList.add('show');
-                  setTimeout(function(){if(lb){gCls(lb,'explode');lb.classList.add('explode');}},150);
-                  setTimeout(function(){gShowReveal(rollResults[currentRoll]);},750);
+                  gClearTimers();
+                  if(gTapCount>=MIN_TAPS){
+                    var hint=document.getElementById('_ghint'),fm=document.getElementById('_gfmsg'),lb=document.getElementById('_glb');
+                    if(hint)hint.classList.add('hidden');
+                    if(fm)fm.classList.add('show');
+                    setTimeout(function(){if(lb){gCls(lb,'explode');lb.classList.add('explode');}},150);
+                    setTimeout(function(){gShowReveal(rollResults[currentRoll]);},750);
+                  } else {
+                    gLoseRoll();
+                  }
                 }
               },120);
               setTimeout(function(){
                 gAnimating=false;
-                if(gCurrent<EGG_IMGS_G.length-1)gWigTimer=setTimeout(gStartWiggle,400);
+                if(gCurrent<EGG_IMGS_G.length-1) gWigTimer=setTimeout(gStartWiggle,400);
               },500);
             }
 
-            // Close button logic
-            gGetEl('_grclose').addEventListener('click',function(e){
+            // Close button for reveal card
+            document.getElementById('_grclose').addEventListener('click',function(e){
               e.stopPropagation();
-              // Collect this roll's result
               var r=rollResults[currentRoll];
               allWon.push({
                 animal:r.animal.name, animalKey:r.animal.key,
@@ -36365,24 +36523,33 @@ Return ONLY this JSON (no markdown, no code blocks):
               });
               currentRoll++;
               if(currentRoll<rolls){
-                // More rolls — reset egg for next
                 gResetForNextRoll();
               } else {
-                // All done — save to Firestore and close
                 qsSaveGachaResult(allWon);
                 var ov2=document.getElementById('_gachaOverlay');
-                if(ov2)ov2.remove();
-                // Remove the click listener
+                if(ov2) ov2.remove();
                 document.removeEventListener('click',gAdvance);
               }
             });
 
-            // Click anywhere on overlay to advance (but not close button)
+            // Warning popup close — show on first load
+            document.getElementById('_gwclose').addEventListener('click',function(e){
+                e.stopPropagation();
+                var pop=document.getElementById('_gwpop');
+                if(pop){pop.style.opacity='0';pop.style.transition='opacity 0.3s';setTimeout(function(){if(pop.parentNode)pop.remove();},300);}
+                gStartEgg();
+            });
+
+            // Click anywhere to tap (advance egg)
             document.addEventListener('click',gAdvance);
         }
-
-        // Save gacha pull results to Firestore under the player's Tevello account.
         async function qsSaveGachaResult(characters){
+            // Mark gacha as used today regardless of wins (prevents replay on loss)
+            var _gNowMark=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+            var _gPartsMark=_gNowMark.split('/');
+            var _gTodayMark=_gPartsMark[2]+'-'+_gPartsMark[0]+'-'+_gPartsMark[1];
+            qs.gachaUsedToday=true; qs.gachaDayChecked=true;
+            if(qs.tevelloUser){try{db.collection(TEVELLO_COLLECTION).doc(qs.tevelloUser.id).update({gachaLastUsedDate:_gTodayMark});}catch(e){}}
             if(!characters||!characters.length) return;
             try{
                 if(qs.tevelloUser){
@@ -36484,15 +36651,21 @@ Return ONLY this JSON (no markdown, no code blocks):
 
                 // Card grid
                 h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;">';
-                sorted.forEach(function(card){
+                sorted.forEach(function(card,ci){
                     var border=rarityBorder[card.rarity]||rarityBorder.blue;
                     var dateStr='';
                     if(card.wonAt){
                         try{var d=new Date(card.wonAt);dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){}
                     }
-                    h+='<div style="background:#0e0e0e;border-radius:12px;'+border+'padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;">';
+                    // Serialize card data into a data attribute for the tap handler
+                    var cardJson=JSON.stringify({
+                        animal:card.animal||'',color:card.color||'',item:card.item||'',
+                        tier:card.tier||1,rarity:card.rarity||'blue',glitter:card.glitter||false,
+                        imageUrl:card.imageUrl||'',wonAt:dateStr
+                    }).replace(/"/g,'&quot;');
+                    h+='<div onclick="qsColCardTap(this)" data-card="'+cardJson+'" style="cursor:pointer;background:#0e0e0e;border-radius:12px;'+border+'padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;transition:transform 0.15s;" onmouseover="this.style.transform=\'scale(1.04)\'" onmouseout="this.style.transform=\'scale(1)\'">';
                     // Glitter badge
-                    if(card.glitter) h+='<div style="position:absolute;top:6px;right:6px;font-size:9px;color:#f5c842;text-shadow:0 0 6px #f5c842;">\u2756</div>';
+                    if(card.glitter) h+='<div style="position:absolute;top:6px;right:6px;font-size:9px;color:#f5c842;text-shadow:0 0 6px #f5c842;">❖</div>';
                     // Image
                     if(card.imageUrl){
                         h+='<div style="width:100%;border-radius:8px;overflow:hidden;background:#111;aspect-ratio:1;">';
@@ -36521,6 +36694,86 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
         }
 
+        // ── COLLECTION CARD TAP — fade-in detail popup ──
+        var _qsColDetailOpen=false;
+        function qsColCardTap(el){
+            // If detail already open, close it
+            var existing=document.getElementById('_qsColDetail');
+            if(existing){
+                existing.style.opacity='0';
+                setTimeout(function(){if(existing.parentNode)existing.remove();},200);
+                _qsColDetailOpen=false;
+                return;
+            }
+            var card;
+            try{card=JSON.parse(el.dataset.card.replace(/&quot;/g,'"'));}catch(e){return;}
+            var rarityLabels={holo:'HOLO ★★★',pink:'PINK ★★★',red:'RED ★★',yellow:'YELLOW ★★',green:'GREEN ★',blue:'BLUE ★'};
+            var rarityColors={holo:'#dde',pink:'#d4537e',red:'#e24b4a',yellow:'#f5c842',green:'#639922',blue:'#378add'};
+            var tierLabel={3:'★★★',2:'★★',1:'★'};
+            var tierColor={3:'#e24b4a',2:'#639922',1:'#378add'};
+            var rc=rarityColors[card.rarity]||'#378add';
+            var rl=rarityLabels[card.rarity]||'BLUE ★';
+
+            // Position popup over card
+            var rect=el.getBoundingClientRect();
+            var ov=document.getElementById('_qsCollectionOverlay');
+            var ovRect=ov?ov.getBoundingClientRect():{left:0,top:0};
+
+            var pop=document.createElement('div');
+            pop.id='_qsColDetail';
+            pop.style.cssText='position:fixed;z-index:10010;pointer-events:auto;'
+                +'background:linear-gradient(160deg,#1a1a2e,#0d0d1a);'
+                +'border:2px solid '+rc+';border-radius:16px;padding:18px;'
+                +'width:220px;box-shadow:0 0 30px '+rc+'55,0 8px 32px rgba(0,0,0,0.7);'
+                +'opacity:0;transition:opacity 0.2s;'
+                +'display:flex;flex-direction:column;align-items:center;gap:8px;';
+
+            var h='';
+            // Close hint
+            h+='<div style="font-size:9px;color:#555;align-self:flex-end;margin-bottom:-4px;">tap to close</div>';
+            // Big image
+            if(card.imageUrl){
+                h+='<div style="width:160px;height:160px;border-radius:10px;overflow:hidden;background:#111;">';
+                h+='<img src="'+escapeHtml(card.imageUrl)+'" style="width:100%;height:100%;object-fit:contain;clip-path:inset(10px 0 25px 0);margin-top:-10px;margin-bottom:-25px;">';
+                h+='</div>';
+            }
+            // Animal name
+            h+='<div style="font-family:\'Press Start 2P\';font-size:11px;color:#fff;text-align:center;">'+escapeHtml(card.animal||'')+'</div>';
+            // Color
+            h+='<div style="font-size:10px;color:#ccc;text-transform:uppercase;letter-spacing:.08em;">'+escapeHtml(card.color||'')+'</div>';
+            // Rarity badge
+            h+='<div style="background:'+rc+'22;border:1px solid '+rc+';border-radius:20px;padding:4px 14px;font-family:\'Press Start 2P\';font-size:8px;color:'+rc+';">'+rl+'</div>';
+            // Glitter
+            if(card.glitter) h+='<div style="font-size:11px;color:#f5c842;text-shadow:0 0 8px #f5c842;">❖ GLITTER</div>';
+            // Item
+            h+='<div style="font-size:9px;color:'+tierColor[card.tier||1]+';text-align:center;">'+tierLabel[card.tier||1]+' '+escapeHtml(card.item||'')+'</div>';
+            // Date
+            if(card.wonAt) h+='<div style="font-size:8px;color:#555;">'+escapeHtml(card.wonAt)+'</div>';
+            pop.innerHTML=h;
+
+            // Position: try to centre over card, keep on screen
+            document.body.appendChild(pop);
+            var pw=220, ph=350;
+            var cx=rect.left+rect.width/2-pw/2;
+            var cy=rect.top+rect.height/2-ph/2;
+            cx=Math.max(8, Math.min(cx, window.innerWidth-pw-8));
+            cy=Math.max(8, Math.min(cy, window.innerHeight-ph-8));
+            pop.style.left=cx+'px';
+            pop.style.top=cy+'px';
+
+            // Fade in
+            requestAnimationFrame(function(){pop.style.opacity='1';});
+            _qsColDetailOpen=true;
+
+            // Tap popup itself to close
+            pop.addEventListener('click',function(){
+                pop.style.opacity='0';
+                setTimeout(function(){if(pop.parentNode)pop.remove();},200);
+                _qsColDetailOpen=false;
+            });
+        }
+
+
         // ── COIN + ROLL AWARD (called once from qsShowFinished) ──────────
         async function qsAwardCoins(){
             if(qs.coinsAwarded) return; // already done this session
@@ -36537,23 +36790,21 @@ Return ONLY this JSON (no markdown, no code blocks):
                 }
             }catch(e){console.warn('qsAwardCoins: leaderboard fetch error',e);}
 
-            // Build award totals
-            var coinsToAward=10; // participation
-            var rollsToAward=1;
-            var awardBreakdown=[{label:'Participation',coins:10,rolls:1}];
+            // Build award totals — rolls only, no coins
+            var rollsToAward=1; // participation
+            var awardBreakdown=[{label:'Participation 🎰',rolls:1}];
             if(myPlacement===0){
-                coinsToAward+=30;rollsToAward+=2;
-                awardBreakdown.push({label:'1st Place \uD83E\uDD47',coins:30,rolls:2});
+                rollsToAward=3;
+                awardBreakdown=[{label:'1st Place 🥇 + Participation',rolls:3}];
             } else if(myPlacement===1){
-                coinsToAward+=25;rollsToAward+=1;
-                awardBreakdown.push({label:'2nd Place \uD83E\uDD48',coins:25,rolls:1});
+                rollsToAward=2;
+                awardBreakdown=[{label:'2nd Place 🥈 + Participation',rolls:2}];
             } else if(myPlacement===2){
-                coinsToAward+=20;rollsToAward+=1;
-                awardBreakdown.push({label:'3rd Place \uD83E\uDD49',coins:20,rolls:1});
+                rollsToAward=2;
+                awardBreakdown=[{label:'3rd Place 🥉 + Participation',rolls:2}];
             }
 
-            // Store locally first so display always works
-            qs.coinsEarned=coinsToAward;
+            qs.coinsEarned=0;
             qs.gachaRolls=rollsToAward;
             qs.awardBreakdown=awardBreakdown.slice();
             qs.coinsAwarded=true;
@@ -36568,17 +36819,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var alreadyAwarded=(awardedSessions.indexOf(qs.sessionId)>=0);
                     if(!alreadyAwarded){
                         await acctRef.update({
-                            coins: firebase.firestore.FieldValue.increment(coinsToAward),
+
                             gachaRolls: firebase.firestore.FieldValue.increment(rollsToAward),
                             coinsAwardedSessions: firebase.firestore.FieldValue.arrayUnion(qs.sessionId)
                         });
                         var acctSnap2=await acctRef.get();
                         var acctData2=acctSnap2.exists?acctSnap2.data():{};
-                        qs.tevelloUser.coins=typeof acctData2.coins==='number'?acctData2.coins:coinsToAward;
+
                         qs.tevelloUser.gachaRolls=typeof acctData2.gachaRolls==='number'?acctData2.gachaRolls:rollsToAward;
                     } else {
                         // Already saved from a prior session visit — load stored totals
-                        qs.tevelloUser.coins=typeof acctData.coins==='number'?acctData.coins:0;
+
                         qs.tevelloUser.gachaRolls=typeof acctData.gachaRolls==='number'?acctData.gachaRolls:0;
                     }
                 }catch(coinErr){console.warn('qsAwardCoins Firestore error:',coinErr);}
@@ -36623,17 +36874,22 @@ Return ONLY this JSON (no markdown, no code blocks):
                         h+='</div>';
                     });
                     // Coins earned badge
-                    if(qs.coinsEarned>0){
+                    if(qs.gachaRolls>0){
                         h+='<div style="background:linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,140,0,0.07));border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">';
-                        h+='<div style="font-size:11px;color:#ccc;">Coins earned this game</div>';
+                        h+='<div style="font-size:11px;color:#ccc;">Gacha rolls earned</div>';
                         h+='<div style="font-family:\'Press Start 2P\';font-size:13px;color:#FFD700;text-shadow:-1px -1px 0 #000024,1px -1px 0 #000024,-1px 1px 0 #000024,1px 1px 0 #000024;">+'+qs.coinsEarned+' \uD83E\uDE99</div>';
                         h+='</div>';
                     }
-                    h+='<div style="background:rgba(255,215,0,0.07);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#ccc;line-height:1.7;text-align:left;">';
-                    h+='<span style="color:#FFD700;font-weight:700;">Note:</span> A score of 80% or above is considered nearly perfect. Small differences at that level are usually minor aspiration, tensification, or intonation — not pronunciation errors.';
-                    h+='</div>';
-                    // Buttons row
+                    // Buttons row — gacha first
                     h+='<div style="display:flex;flex-direction:column;gap:10px;align-items:center;">';
+                    if(qs.tevelloUser){
+                        var _fg=typeof qs.tevelloUser.gachaRolls==="number"?qs.tevelloUser.gachaRolls:qs.gachaRolls;
+                        if(qs.gachaUsedToday){
+                            h+='<div style="background:rgba(155,89,182,0.08);border:2px solid rgba(155,89,182,0.3);border-radius:10px;padding:10px 20px;text-align:center;font-family:\'Press Start 2P\';font-size:8px;color:#c4a0e8;">🎰 GACHA USED TODAY</div>';
+                        } else if(_fg>0){
+                            h+='<button onclick="qsLaunchGacha('+_fg+')" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:none;color:#fff;text-shadow:-2px -2px 0 #2e0a4f,2px -2px 0 #2e0a4f,-2px 2px 0 #2e0a4f,2px 2px 0 #2e0a4f;padding:16px 32px;border-radius:12px;font-family:\'Press Start 2P\';font-size:10px;cursor:pointer;box-shadow:0 0 24px rgba(155,89,182,0.7),0 0 48px rgba(155,89,182,0.35);animation:qsGachaPulse 1.6s ease-in-out infinite;">🎰 UNLEASH YOUR GACHA ('+_fg+'x)</button>';
+                        }
+                    }
                     if(qs.tevelloUser){
                         h+='<button id="qsStatsBtn" onclick="qsTevShowStats()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86,0 -2px 0 #005a86,0 2px 0 #005a86,-2px 0 0 #005a86,2px 0 0 #005a86;padding:12px 28px;border-radius:10px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">&#x1F4CA; MY STATS</button>';
                     }
@@ -36658,7 +36914,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:20px; box-sizing:border-box;">
-    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px;">
         <!-- Header -->
         <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
