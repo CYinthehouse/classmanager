@@ -3470,7 +3470,7 @@
             <!-- Date Selection (for available slots only) -->
             <div id="slotDateSelection" style="display: none; margin: 15px 0; padding: 15px; background: rgba(57,255,20,0.1); border: 2px solid #39ff14; border-radius: 8px;">
                 <h4 style="color: #39ff14; margin-bottom: 10px;">📅 Schedule Next Session</h4>
-                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Select a start date (3-week buffer included):</p>
+                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">Select a start date:</p>
                 <div id="slotDateOptions" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                 <div id="prescheduleForm" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #39ff14;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -26154,7 +26154,7 @@ ${daySpecific}
                 `;
                 // Show schedule next session for available slots only
                 const bufferDate = new Date();
-                bufferDate.setDate(bufferDate.getDate() + 21);
+                // No buffer — start from current date (week 1)
                 showDateSelection(day, bufferDate);
             }
             
@@ -36914,7 +36914,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:20px; box-sizing:border-box;">
-    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px;">
+    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px; min-height:calc(100vh - 40px); display:flex; flex-direction:column;">
         <!-- Header -->
         <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
@@ -36948,7 +36948,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         <!-- Lobby -->
         <div id="quizGameLobbyView" style="display:none; padding:24px;"></div>
         <!-- Play -->
-        <div id="quizGamePlayView" style="display:none; padding:24px;"></div>
+        <div id="quizGamePlayView" style="display:none; padding:24px; flex:1;"></div>
     </div>
 </div>
 
