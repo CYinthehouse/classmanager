@@ -31826,7 +31826,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
             if(slideIdx>=0 && qg.materialSlides && qg.materialSlides[slideIdx]){
                 var slide=qg.materialSlides[slideIdx];
-                h+='<div id="qgSlideContainer" style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid rgba(251,191,36,0.4);box-shadow:0 0 20px rgba(251,191,36,0.15);">';
+                h+='<div id="qgSlideContainer" style="position:relative;width:100%;aspect-ratio:16/9;max-height:45vh;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid rgba(251,191,36,0.4);box-shadow:0 0 20px rgba(251,191,36,0.15);">';
                 h+='<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;" crossorigin="anonymous">';
                 h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:12px;">';
                 for(var ss=0;ss<slide.sentences.length;ss++){
@@ -31904,7 +31904,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
             if(slideIdx>=0 && qg.materialSlides && qg.materialSlides[slideIdx]){
                 var slide=qg.materialSlides[slideIdx];
-                h+='<div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid rgba(65,192,255,0.2);box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
+                h+='<div style="position:relative;width:100%;aspect-ratio:16/9;max-height:45vh;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid rgba(65,192,255,0.2);box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
                 h+='<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;" crossorigin="anonymous">';
                 h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:12px;">';
                 for(var ss=0;ss<slide.sentences.length;ss++){
@@ -34163,6 +34163,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='</div></div>';
             area.innerHTML=h;
             qsFadeIn(area);
+            if(qs.playerLevel==='absolute_beginner') qsAbRenderCurrentWord();
         }
 
         // ── MAIN ROUND RECORDING ─────────────────────────────────
