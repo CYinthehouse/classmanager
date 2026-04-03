@@ -33243,7 +33243,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     try{
                         var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                             method:'POST',headers:{'Content-Type':'application/json'},
-                            body:JSON.stringify({messages:[{role:'user',content:prompt}],max_tokens:500})
+                            body:JSON.stringify({messages:[{role:'user',content:prompt}],max_tokens:1200})
                         });
                         var data=await resp.json();
                         var result='';
