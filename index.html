@@ -31445,7 +31445,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
             qg.sets = [];
             for (var i = 0; i < trSets.length; i++) {
-                var sentences = getTRSentencesFromSet(trSets[i]);
+                var sentences;
+                // Use trMaterialSlides as source of truth for sentence order/content
+                if (trMaterialSlides && trMaterialSlides[i] && trMaterialSlides[i].sentences && trMaterialSlides[i].sentences.length > 0) {
+                    sentences = trMaterialSlides[i].sentences.map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
+                } else {
+                    sentences = getTRSentencesFromSet(trSets[i]);
+                }
                 if (sentences.length > 0) {
                     qg.sets.push({ setIndex: i, sentences: sentences.map(function(s) { return { korean: s, english: '' }; }) });
                 }
@@ -31928,10 +31934,10 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<div id="qgSubTracker" style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
 
 
+
+
             // Buttons
-            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
-            // Buttons
-            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">';
+            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;padding-bottom:24px;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
             h+='<button onclick="qgOpenPanel()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📺 OPEN PANEL</button>';
             h+='<button onclick="qgShowQRModal()" style="background:rgba(65,192,255,0.12);border:1px solid rgba(65,192,255,0.35);color:#41c0ff;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📱 QR CODE</button>';
@@ -33237,11 +33243,18 @@ Return ONLY this JSON (no markdown, no code blocks):
                     try{
                         var resp=await fetch('https://generateflashcardai-386010826708.us-central1.run.app',{
                             method:'POST',headers:{'Content-Type':'application/json'},
-                            body:JSON.stringify({prompt:prompt,max_tokens:300})
+                            body:JSON.stringify({messages:[{role:'user',content:prompt}],max_tokens:500})
                         });
                         var data=await resp.json();
-                        var result=typeof data==='string'?data:(data.data||data.text||data.result||data.response||'');
-                        result=result.replace(/^```[\s\S]*?\n/,'').replace(/```$/,'').trim();
+                        var result='';
+                        if(typeof data==='string') result=data;
+                        else if(data.data) result=typeof data.data==='string'?data.data:JSON.stringify(data.data);
+                        else if(data.text) result=data.text;
+                        else if(data.result) result=data.result;
+                        else if(data.response) result=data.response;
+                        else if(data.content) result=typeof data.content==='string'?data.content:JSON.stringify(data.content);
+                        else if(data.choices&&data.choices[0]) result=data.choices[0].message?data.choices[0].message.content:(data.choices[0].text||'');
+                        result=result.replace(/^```[a-z]*\s*/,'').replace(/```\s*$/,'').trim();
                         var tx=document.getElementById('_apDrillText');
                         if(tx)tx.value=result;
                         if(genResult)genResult.style.display='block';
@@ -34129,16 +34142,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(existingArea) return; // Don't re-render if already showing this round
             var h='<div data-round="'+d.currentRound+'" style="margin-top:16px;">';
             h+='<div style="background:rgba(0,0,0,0.5);border:3px solid '+lc+';border-radius:14px;padding:20px;box-shadow:0 0 25px '+lc+'22;margin-bottom:16px;">';
-            if(qs.playerLevel==='absolute_beginner' && sentences.length>1){
-                h+='<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:10px 0;">';
-                for(var i=0;i<sentences.length;i++){
-                    h+='<div id="qsAbWord-'+i+'" style="background:rgba(255,105,180,0.12);border:2px solid #ff69b4;border-radius:12px;padding:14px 22px;min-width:70px;text-align:center;transition:all 0.3s;">';
-                    h+='<div style="font-size:28px;color:#fff;font-weight:700;">'+escapeHtml(sentences[i].korean)+'</div>';
-                    if(sentences[i].english) h+='<div style="font-size:10px;color:#ff69b4;margin-top:4px;">'+escapeHtml(sentences[i].english)+'</div>';
-                    h+='<div id="qsAbWordMsg-'+i+'" style="font-size:10px;margin-top:4px;min-height:14px;"></div>';
-                    h+='</div>';
-                }
-                h+='</div>';
+            if(qs.playerLevel==='absolute_beginner'){
+                h+='<div id="qsAbWordDisplay" style="text-align:center;padding:20px 0;">';
+                h+='<div id="qsAbSingleWord" style="display:inline-block;background:rgba(255,105,180,0.12);border:3px solid #ff69b4;border-radius:16px;padding:24px 40px;min-width:120px;text-align:center;transition:all 0.3s;">';
+                h+='<div id="qsAbWordText" style="font-size:48px;color:#fff;font-weight:700;"></div>';
+                h+='<div id="qsAbWordCounter" style="font-size:11px;color:#ff69b4;margin-top:8px;"></div>';
+                h+='<div id="qsAbWordMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>';
+                h+='</div></div>';
             } else {
                 for(var i=0;i<sentences.length;i++){
                     h+='<div style="font-size:20px;color:#fff;text-align:center;line-height:1.7;margin-bottom:6px;">'+escapeHtml(sentences[i].korean)+'</div>';
@@ -34179,6 +34189,26 @@ Return ONLY this JSON (no markdown, no code blocks):
             qsAbGrading=false;
             qsAbFailedOnce={};
             qsAbConfirmed={};
+            qsAbRenderCurrentWord();
+        }
+
+        function qsAbRenderCurrentWord(){
+            var wordEl=document.getElementById('qsAbWordText');
+            var counterEl=document.getElementById('qsAbWordCounter');
+            var msgEl=document.getElementById('qsAbWordMsg');
+            var cardEl=document.getElementById('qsAbSingleWord');
+            if(!wordEl) return;
+            if(qsAbCurrentIdx>=qsAbWords.length){
+                wordEl.textContent='✅';
+                if(counterEl) counterEl.textContent='All done!';
+                if(msgEl){msgEl.textContent='';msgEl.style.color='';}
+                if(cardEl){cardEl.style.borderColor='#39ff14';cardEl.style.background='rgba(57,255,20,0.12)';}
+                return;
+            }
+            wordEl.textContent=qsAbWords[qsAbCurrentIdx]||'';
+            if(counterEl) counterEl.textContent=(qsAbCurrentIdx+1)+' / '+qsAbWords.length;
+            if(msgEl){msgEl.textContent='';msgEl.style.color='';}
+            if(cardEl){cardEl.style.borderColor='#ff69b4';cardEl.style.background='rgba(255,105,180,0.12)';}
         }
 
         // Called every 1000ms while abs beginner is recording
@@ -34219,16 +34249,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(heard){
                     // Green this tile
                     qsAbConfirmed[qsAbCurrentIdx]=true;
-                    var el=document.getElementById('qsAbWord-'+qsAbCurrentIdx);
-                    var msgEl=document.getElementById('qsAbWordMsg-'+qsAbCurrentIdx);
+                    var el=document.getElementById('qsAbSingleWord');
+                    var msgEl=document.getElementById('qsAbWordMsg');
                     if(el){el.style.borderColor='#39ff14';el.style.background='rgba(57,255,20,0.12)';}
                     if(msgEl){msgEl.textContent='✓';msgEl.style.color='#39ff14';}
                     qsAbCurrentIdx++;
+                    qsAbRenderCurrentWord();
                 } else {
                     // Mark as failed at least once (affects first-attempt score)
                     qsAbFailedOnce[qsAbCurrentIdx]=true;
                     // Show "keep going..." on current tile
-                    var msgEl2=document.getElementById('qsAbWordMsg-'+qsAbCurrentIdx);
+                    var msgEl2=document.getElementById('qsAbWordMsg');
                     if(msgEl2 && msgEl2.textContent!=='try again!'){msgEl2.textContent='keep going...';msgEl2.style.color='#aaa';}
                 }
             } catch(e){ console.warn('[AB] chunk check error:',e); }
@@ -34245,13 +34276,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 
             // Abs beginner: reset live grading state, reset tile visuals
             if(qs.playerLevel==='absolute_beginner'){
-                qsAbResetState();
-                for(var ri=0;ri<qsAbWords.length;ri++){
-                    var el=document.getElementById('qsAbWord-'+ri);
-                    if(el){el.style.borderColor='#ff69b4';el.style.background='rgba(255,105,180,0.12)';}
-                    var msgEl=document.getElementById('qsAbWordMsg-'+ri);
-                    if(msgEl){msgEl.textContent='';msgEl.style.color='';}
-                }
+                qsAbResetState(); // resets idx and renders word 1
                 console.log('[AB] Starting with words:', qsAbWords);
             }
 
