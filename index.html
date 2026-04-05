@@ -31421,6 +31421,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         }
         function closeKahootMaker() {
             document.getElementById('quizGameOverlay').style.display = 'none';
+            var _sc=document.querySelector('#quizGameOverlay>div');if(_sc){_sc.style.transform='';_sc.style.marginBottom='';}
             var _card2=document.querySelector('#quizGameOverlay > div');
             if(_card2){_card2.style.display='';_card2.style.flexDirection='';_card2.style.height='';_card2.style.paddingBottom='40px';}
             var _pv=document.getElementById('quizGamePlayView');if(_pv)_pv.style.cssText='display:none;padding:24px;';
@@ -31949,7 +31950,6 @@ Return ONLY this JSON (no markdown, no code blocks):
             h+='<button onclick="qgShowQRModal()" style="background:rgba(65,192,255,0.12);border:1px solid rgba(65,192,255,0.35);color:#41c0ff;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📱 QR CODE</button>';
             if(ri+1<qg.sets.length) h+='<button onclick="qgStartRound()" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);border:none;color:#fff;text-shadow:-2px -2px 0 #4a1a6b,2px -2px 0 #4a1a6b,-2px 2px 0 #4a1a6b,2px 2px 0 #4a1a6b;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">➤ NEXT ROUND</button>';
             h+='<button onclick="qgFinish()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#888;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">🏁 END GAME</button></div>';
-            h+='</div>';
             el.innerHTML=h;
 
             // Init draw canvas + restore preview annotations
@@ -37006,7 +37006,7 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:20px; box-sizing:border-box;">
-    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px;">
+    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px;">
         <!-- Header -->
         <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
