@@ -32098,17 +32098,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
             ov.appendChild(inner);
             document.body.appendChild(ov);
-            setTimeout(function(){
-                var fsCv=document.getElementById('qgDrawCanvas');
-                if(fsCv){
-                    var r=fsCv.getBoundingClientRect();
-                    fsCv.width=r.width; fsCv.height=r.height;
-                    qgDrawCtx=fsCv.getContext('2d');
-                    qgDrawCtx.lineCap='round'; qgDrawCtx.lineJoin='round'; qgDrawCtx.lineWidth=3;
-                    qgLastX=0; qgLastY=0; qgDrawing=false;
-                    if(qg.savedCanvasData){var img3=new Image(); img3.onload=function(){qgDrawCtx.drawImage(img3,0,0,fsCv.width,fsCv.height);}; img3.src=qg.savedCanvasData;}
-                }
-            },80);
+            // Use window dimensions — guaranteed non-zero immediately after appendChild
+            fsCanvas.width=window.innerWidth;
+            fsCanvas.height=window.innerHeight;
+            qgDrawCtx=fsCanvas.getContext('2d');
+            qgDrawCtx.lineCap='round'; qgDrawCtx.lineJoin='round'; qgDrawCtx.lineWidth=3;
+            qgLastX=0; qgLastY=0; qgDrawing=false;
+            if(qg.savedCanvasData){var img3=new Image(); img3.onload=function(){qgDrawCtx.drawImage(img3,0,0,fsCanvas.width,fsCanvas.height);}; img3.src=qg.savedCanvasData;}
         }
 
         function qgSetDrawColor(color,btn){
