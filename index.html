@@ -32030,18 +32030,23 @@ Return ONLY this JSON (no markdown, no code blocks):
         var qgDrawEraser=false;
 
         function qgBuildDrawControls(){
-            var h='<div style="position:absolute;top:8px;right:8px;z-index:3;display:flex;gap:4px;flex-wrap:wrap;">';
+            var h='<div style="position:absolute;top:8px;right:8px;z-index:3;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">';
             h+='<button onclick="qgSetDrawColor(\'#ff0000\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#ff0000;border:3px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button onclick="qgSetDrawColor(\'#0066ff\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#0066ff;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button onclick="qgSetDrawColor(\'#00cc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#00cc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button onclick="qgSetDrawColor(\'#ffcc00\',this)" class="qgColorBtn" style="width:26px;height:26px;border-radius:50%;background:#ffcc00;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></button>';
             h+='<button id="qgEraserBtn" onclick="qgToggleEraser()" style="width:26px;height:26px;border-radius:50%;background:repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 8px 8px;border:2px solid #fff;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);font-size:12px;line-height:22px;text-align:center;" title="Eraser">🗑️</button>';
-            h+='<button onclick="qgDrawClear()" style="padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.6);border:1px solid #888;color:#fff;font-size:11px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);">✕</button>';
+            h+='<button onclick="qgDrawClear()" style="padding:4px 10px;border-radius:6px;background:rgba(180,0,0,0.85);border:2px solid rgba(255,100,100,0.8);color:#fff;font-family:\'Press Start 2P\',monospace;font-size:8px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);">CLEAR ALL</button>';
+            h+='<button id="qgFsExitBtn" style="padding:4px 10px;border-radius:6px;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.5);color:#fff;font-family:\'Press Start 2P\',monospace;font-size:8px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);">✕ EXIT</button>';
             h+='</div>';
             return h;
         }
 
-        function qgSlideFullscreen(){
+                function qgSlideFullscreen(){
+            // Reset any orphaned draw state from a previous session
+            qgDrawing=false;
+            qgActivePointerId=null;
+            qgDrawCtx=null;
             var wrap=document.getElementById('qgSlideContainer');
             if(!wrap) return;
             var ov=document.createElement('div');
@@ -32055,7 +32060,7 @@ Return ONLY this JSON (no markdown, no code blocks):
             bg.crossOrigin='anonymous';
             inner.appendChild(bg);
             var textDiv=wrap.querySelector('div');
-            if(textDiv){var tc=textDiv.cloneNode(true);tc.style.cssText='position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;text-align:center;gap:16px;font-size:36px;';inner.appendChild(tc);}
+            if(textDiv){var tc=textDiv.cloneNode(true);tc.style.cssText='position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;text-align:center;gap:24px;';tc.querySelectorAll('div[style]').forEach(function(d){d.style.fontSize='42px';d.style.lineHeight='1.6';});inner.appendChild(tc);}
             var fsCanvas=document.createElement('canvas');
             fsCanvas.id='qgDrawCanvas';
             fsCanvas.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;touch-action:none;';
@@ -32065,30 +32070,24 @@ Return ONLY this JSON (no markdown, no code blocks):
             fsCanvas.addEventListener('pointercancel',qgDrawEnd);
             inner.appendChild(fsCanvas);
             inner.insertAdjacentHTML('beforeend',qgBuildDrawControls());
-            var clearBtn=document.createElement('button');
-            clearBtn.textContent='🗑️ CLEAR ALL';
-            clearBtn.style.cssText='position:absolute;bottom:20px;right:20px;z-index:5;background:rgba(180,0,0,0.75);border:2px solid rgba(255,100,100,0.8);color:#fff;border-radius:8px;padding:10px 22px;font-family:"Press Start 2P",monospace;font-size:9px;cursor:pointer;';
-            clearBtn.onclick=function(){qgDrawClear();};
-            inner.appendChild(clearBtn);
-            var exitBtn=document.createElement('button');
-            exitBtn.textContent='✕ EXIT';
-            exitBtn.style.cssText='position:absolute;bottom:20px;left:20px;z-index:5;background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.6);color:#fff;border-radius:8px;padding:10px 22px;font-family:"Press Start 2P",monospace;font-size:9px;cursor:pointer;';
-            exitBtn.onclick=function(){
-                var fsCv=document.getElementById('qgDrawCanvas');
-                if(fsCv && qgDrawCtx) qg.savedCanvasData=fsCv.toDataURL();
-                ov.remove();
-                // Redraw saved data onto small canvas
-                setTimeout(function(){
-                    var sc=document.getElementById('qgSlideContainer') && document.getElementById('qgSlideContainer').querySelector('canvas');
-                    if(!sc) return;
-                    sc.width=sc.offsetWidth; sc.height=sc.offsetHeight;
-                    if(qg.savedCanvasData){
-                        var ctx2=sc.getContext('2d');
-                        var img2=new Image(); img2.onload=function(){ctx2.drawImage(img2,0,0,sc.width,sc.height);}; img2.src=qg.savedCanvasData;
-                    }
-                },80);
-            };
-            inner.appendChild(exitBtn);
+            // Wire up the EXIT button rendered inside qgBuildDrawControls
+            var exitBtn=inner.querySelector('#qgFsExitBtn');
+            if(exitBtn){
+                exitBtn.onclick=function(){
+                    var fsCv=document.getElementById('qgDrawCanvas');
+                    if(fsCv && qgDrawCtx) qg.savedCanvasData=fsCv.toDataURL();
+                    ov.remove();
+                    setTimeout(function(){
+                        var sc=document.getElementById('qgSlideContainer') && document.getElementById('qgSlideContainer').querySelector('canvas');
+                        if(!sc) return;
+                        sc.width=sc.offsetWidth; sc.height=sc.offsetHeight;
+                        if(qg.savedCanvasData){
+                            var ctx2=sc.getContext('2d');
+                            var img2=new Image(); img2.onload=function(){ctx2.drawImage(img2,0,0,sc.width,sc.height);}; img2.src=qg.savedCanvasData;
+                        }
+                    },80);
+                };
+            }
             ov.appendChild(inner);
             document.body.appendChild(ov);
             setTimeout(function(){
