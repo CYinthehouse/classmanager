@@ -31416,14 +31416,14 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function openKahootMaker() {
             document.getElementById('quizGameOverlay').style.display = 'flex';
+            document.getElementById('quizGameCard').style.overflow = 'hidden';
             qgRenderSetup();
             setTimeout(function(){var cb=document.getElementById('quizGameCreateBtn');if(cb)addSparkles(cb);},50);
         }
         function closeKahootMaker() {
             document.getElementById('quizGameOverlay').style.display = 'none';
-            var _sc=document.querySelector('#quizGameOverlay>div');if(_sc){_sc.style.transform='';_sc.style.marginBottom='';}
-            var _card2=document.querySelector('#quizGameOverlay > div');
-            if(_card2){_card2.style.display='';_card2.style.flexDirection='';_card2.style.height='';_card2.style.paddingBottom='40px';}
+            if(window._qgFitSlideHandler){window.removeEventListener('resize',window._qgFitSlideHandler);window._qgFitSlideHandler=null;}
+            var _sc=document.getElementById('qgSlideContainer');if(_sc){_sc.style.transform='';_sc.style.marginBottom='';}
             var _pv=document.getElementById('quizGamePlayView');if(_pv)_pv.style.cssText='display:none;padding:24px;';
             clearInterval(qg.timer);
             if (qg.unsubSession) { qg.unsubSession(); qg.unsubSession = null; }
@@ -31893,15 +31893,20 @@ Return ONLY this JSON (no markdown, no code blocks):
 
         function qgShowAdminRound(ri, canvasData) {
             document.getElementById('quizGameLobbyView').style.display='none';
-            var el=document.getElementById('quizGamePlayView');el.style.display='block';
+            var el=document.getElementById('quizGamePlayView');
+            el.style.cssText='display:flex;flex-direction:column;flex:1;min-height:0;padding:24px;overflow:hidden;';
             var set=qg.sets[ri]; var tl=qg.roundTime;
-            var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+
+            // ── HEADER: round label + timer ──
+            var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0;">';
             h+='<div style="font-family:\'Press Start 2P\';font-size:10px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">ROUND '+(ri+1)+' / '+qg.sets.length+'</div>';
             h+='<div id="qgTimer" style="font-family:\'Press Start 2P\';font-size:24px;color:#e0e0e0;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;">'+tl+'</div></div>';
-            h+='<div style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;height:10px;margin-bottom:20px;overflow:hidden;">';
+
+            // ── TIMER BAR ──
+            h+='<div style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;height:10px;margin-bottom:12px;overflow:hidden;flex-shrink:0;">';
             h+='<div id="qgTimerBar" style="width:100%;height:100%;background:linear-gradient(90deg,#41c0ff,#ff7777);border-radius:20px;transition:width '+tl+'s linear;"></div></div>';
 
-            // ── SLIDE VIEWER + DRAWPAD ──
+            // ── SLIDE WRAPPER (takes all remaining vertical space) ──
             var slideIdx=-1;
             if(qg.materialSlides && qg.sentenceSlideMap && qg.sentenceSlideMap.length>0){
                 var firstK=set.sentences[0].korean;
@@ -31911,40 +31916,39 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
             if(slideIdx>=0 && qg.materialSlides && qg.materialSlides[slideIdx]){
                 var slide=qg.materialSlides[slideIdx];
-                h+='<div id="qgSlideContainer" style="position:relative;width:100%;flex:1;min-height:0;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid rgba(65,192,255,0.2);box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;">';
+                // qgSlideWrapper: flex:1 flex container that gives the slide all spare height; overflow hidden catches any scaled overshoot
+                h+='<div id="qgSlideWrapper" style="flex:1;min-height:0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;margin-bottom:10px;">';
+                // qgSlideContainer: natural 16:9 aspect ratio — JS will scale it down if it overflows the wrapper
+                h+='<div id="qgSlideContainer" style="position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:2px solid rgba(65,192,255,0.2);box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;transform-origin:top center;flex-shrink:0;">';
                 h+='<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/background_for_reading_class.png?v=1770557568" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;" crossorigin="anonymous">';
-                h+='<div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px;text-align:center;gap:8px;">';
+                h+='<div style="position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;gap:8px;">';
                 for(var ss=0;ss<slide.sentences.length;ss++){
-                    // Highlight sentences that are in this round
                     var isInRound=false;
                     for(var rs=0;rs<set.sentences.length;rs++){if(set.sentences[rs].korean.trim()===slide.sentences[ss].trim()){isInRound=true;break;}}
                     var sBg=isInRound?'background:rgba(255,255,100,0.25);border-radius:8px;padding:4px 12px;':'padding:4px 12px;opacity:0.5;';
                     h+='<div style="font-size:22px;font-weight:700;color:#000;line-height:1.5;word-break:keep-all;'+sBg+'">'+escapeHtml(slide.sentences[ss])+'</div>';
                 }
                 h+='</div>';
-                // Drawing canvas overlay
                 h+='<canvas id="qgDrawCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:default;touch-action:none;pointer-events:none;"></canvas>';
                 h+='<button onclick="qgSlideFullscreen()" style="position:absolute;top:6px;right:6px;z-index:4;background:rgba(0,0,0,0.55);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;" title="Fullscreen / Draw">\u26f6</button>';
-                h+='</div>';
+                h+='</div></div>'; // close qgSlideContainer + qgSlideWrapper
             } else {
-                // Fallback: show sentences as text if no material slides
-                h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-align:center;">';
+                // Fallback text view — no slide image
+                h+='<div style="flex:1;min-height:0;overflow:hidden;margin-bottom:10px;">';
+                h+='<div style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:12px;padding:20px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-align:center;">';
                 for(var j=0;j<set.sentences.length;j++){
                     h+='<div style="font-size:22px;color:#fff;line-height:1.6;padding:6px 10px;">'+escapeHtml(set.sentences[j].korean)+'</div>';
                     if(set.sentences[j].english) h+='<div style="font-size:12px;color:#888;margin-bottom:10px;">'+escapeHtml(set.sentences[j].english)+'</div>';
                 }
-                h+='</div>';
+                h+='</div></div>';
             }
 
-            // Submission tracker
-            h+='<div style="margin-bottom:16px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">📊 SUBMISSIONS</div>';
+            // ── SUBMISSIONS TRACKER (fixed height, flex-shrink:0) ──
+            h+='<div style="flex-shrink:0;margin-bottom:10px;"><div style="font-family:\'Press Start 2P\';font-size:9px;color:#888;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024,0 -2px 0 #000024,0 2px 0 #000024,-2px 0 0 #000024,2px 0 0 #000024;margin-bottom:8px;">📊 SUBMISSIONS</div>';
             h+='<div id="qgSubTracker" style="background:rgba(65,192,255,0.03);border:1px solid rgba(65,192,255,0.12);border-radius:8px;padding:12px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;font-size:12px;color:#888;">Waiting for recordings...</div></div>';
 
-
-
-
-            // Buttons
-            h+='<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;padding-bottom:24px;">';
+            // ── BUTTONS ROW (always at bottom, always inside card, flex-shrink:0) ──
+            h+='<div id="qgButtonsRow" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;flex-shrink:0;padding-bottom:4px;">';
             h+='<button onclick="qgEndRound()" style="background:linear-gradient(135deg,#e67e22,#d35400);border:none;color:#fff;text-shadow:-2px -2px 0 #ad0505,2px -2px 0 #ad0505,-2px 2px 0 #ad0505,2px 2px 0 #ad0505,0 -2px 0 #ad0505,0 2px 0 #ad0505,-2px 0 0 #ad0505,2px 0 0 #ad0505;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">⏹ END ROUND</button>';
             h+='<button onclick="qgOpenPanel()" style="background:linear-gradient(135deg,#41c0ff,#2da8e8);border:none;color:#fff;text-shadow:-2px -2px 0 #005a86,2px -2px 0 #005a86,-2px 2px 0 #005a86,2px 2px 0 #005a86;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;padding:12px 28px;border-radius:8px;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📺 OPEN PANEL</button>';
             h+='<button onclick="qgShowQRModal()" style="background:rgba(65,192,255,0.12);border:1px solid rgba(65,192,255,0.35);color:#41c0ff;padding:12px 28px;border-radius:8px;box-shadow:rgba(0,0,0,0.15) 1.95px 1.95px 2.6px;text-shadow:-2px -2px 0 #000024,2px -2px 0 #000024,-2px 2px 0 #000024,2px 2px 0 #000024;font-family:\'Press Start 2P\';font-size:9px;cursor:pointer;">📱 QR CODE</button>';
@@ -31978,11 +31982,41 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(te){te.textContent=timeLeft;if(timeLeft<=10){te.style.color='#e87777';}}
                 if(timeLeft<=0){clearInterval(qg.timer);qgEndRound();}
             },1000);
+            // Fit slide proportionally — run after layout settles
+            if(window._qgFitSlideHandler){window.removeEventListener('resize',window._qgFitSlideHandler);}
+            window._qgFitSlideHandler=function(){qgFitSlide();};
+            window.addEventListener('resize',window._qgFitSlideHandler);
+            setTimeout(function(){qgFitSlide();},50);
             // Reset audio player state
             qgStopAll();
             qgAudioQueue=[];
             // Listen for submissions
             qgListenSubmissions(ri);
+        }
+
+        // ── SLIDE FIT: scale slide proportionally so it never overflows the wrapper ──
+        function qgFitSlide() {
+            var wrapper = document.getElementById('qgSlideWrapper');
+            var container = document.getElementById('qgSlideContainer');
+            if (!wrapper || !container) return;
+            // Reset any previous scale so we measure natural size
+            container.style.transform = '';
+            container.style.marginBottom = '';
+            var wrapW = wrapper.offsetWidth;
+            var wrapH = wrapper.offsetHeight;
+            if (!wrapW || !wrapH) return;
+            // Natural slide height at current width (16:9)
+            var naturalH = wrapW * (9 / 16);
+            if (naturalH <= wrapH) {
+                // Slide fits — no scaling needed
+                return;
+            }
+            // Scale down so the slide height matches available wrapper height
+            var scale = wrapH / naturalH;
+            container.style.transformOrigin = 'top center';
+            container.style.transform = 'scale(' + scale + ')';
+            // Collapse the visual gap the scaled-down element leaves below itself
+            container.style.marginBottom = '-' + (naturalH * (1 - scale)) + 'px';
         }
 
         // ── DRAWPAD ──
@@ -37005,8 +37039,8 @@ Return ONLY this JSON (no markdown, no code blocks):
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- 🎮 QUIZ GAME OVERLAY (Admin)                          -->
 <!-- ═══════════════════════════════════════════════════════ -->
-<div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:20px; box-sizing:border-box;">
-    <div style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); padding-bottom:40px;">
+<div id="quizGameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,15,25,0.95); z-index:10000; overflow:hidden; padding:20px; box-sizing:border-box; align-items:flex-start; justify-content:center;">
+    <div id="quizGameCard" style="background:#1a1a2e; border:1px solid rgba(65,192,255,0.15); border-radius:16px; width:100%; max-width:900px; margin:0 auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); display:flex; flex-direction:column; height:calc(100vh - 40px); overflow:hidden;">
         <!-- Header -->
         <div style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(65,192,255,0.2); padding:18px 24px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:14px;">
@@ -37040,7 +37074,7 @@ Return ONLY this JSON (no markdown, no code blocks):
         <!-- Lobby -->
         <div id="quizGameLobbyView" style="display:none; padding:24px;"></div>
         <!-- Play -->
-        <div id="quizGamePlayView" style="display:none; padding:24px;"></div>
+        <div id="quizGamePlayView" style="display:none; padding:24px; flex:1; min-height:0; overflow:hidden; flex-direction:column;"></div>
     </div>
 </div>
 
