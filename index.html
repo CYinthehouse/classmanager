@@ -31961,12 +31961,17 @@ Return ONLY this JSON (no markdown, no code blocks):
                 setTimeout(function(){
                     var cv=document.getElementById('qgDrawCanvas');
                     if(cv){
-                        cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;
+                        var r=cv.getBoundingClientRect();
+                        cv.width=r.width; cv.height=r.height;
                         qgDrawCtx=cv.getContext('2d');qgDrawCtx.lineCap='round';qgDrawCtx.lineJoin='round';qgDrawCtx.lineWidth=3;
-                        cv.addEventListener('pointerdown',qgDrawStart);
-                        cv.addEventListener('pointermove',qgDrawMove);
-                        cv.addEventListener('pointerup',qgDrawEnd);
-                        cv.addEventListener('pointercancel',qgDrawEnd);
+                        qgLastX=0; qgLastY=0; qgDrawing=false;
+                        cv.addEventListener('mousedown',qgDrawStart);
+                        cv.addEventListener('mousemove',qgDrawMove);
+                        cv.addEventListener('mouseup',qgDrawEnd);
+                        cv.addEventListener('mouseleave',qgDrawEnd);
+                        cv.addEventListener('touchstart',qgDrawTouchStart,{passive:false});
+                        cv.addEventListener('touchmove',qgDrawTouchMove,{passive:false});
+                        cv.addEventListener('touchend',qgDrawEnd);
                         if(canvasData){
                             var img=new Image();
                             img.onload=function(){qgDrawCtx.drawImage(img,0,0,cv.width,cv.height);};
@@ -32063,11 +32068,14 @@ Return ONLY this JSON (no markdown, no code blocks):
             if(textDiv){var tc=textDiv.cloneNode(true);tc.style.cssText='position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;text-align:center;gap:24px;';tc.querySelectorAll('div[style]').forEach(function(d){d.style.fontSize='42px';d.style.lineHeight='1.6';});inner.appendChild(tc);}
             var fsCanvas=document.createElement('canvas');
             fsCanvas.id='qgDrawCanvas';
-            fsCanvas.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;touch-action:none;';
-            fsCanvas.addEventListener('pointerdown',qgDrawStart);
-            fsCanvas.addEventListener('pointermove',qgDrawMove);
-            fsCanvas.addEventListener('pointerup',qgDrawEnd);
-            fsCanvas.addEventListener('pointercancel',qgDrawEnd);
+            fsCanvas.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;cursor:crosshair;';
+            fsCanvas.addEventListener('mousedown',qgDrawStart);
+            fsCanvas.addEventListener('mousemove',qgDrawMove);
+            fsCanvas.addEventListener('mouseup',qgDrawEnd);
+            fsCanvas.addEventListener('mouseleave',qgDrawEnd);
+            fsCanvas.addEventListener('touchstart',qgDrawTouchStart,{passive:false});
+            fsCanvas.addEventListener('touchmove',qgDrawTouchMove,{passive:false});
+            fsCanvas.addEventListener('touchend',qgDrawEnd);
             inner.appendChild(fsCanvas);
             inner.insertAdjacentHTML('beforeend',qgBuildDrawControls());
             // Wire up the EXIT button rendered inside qgBuildDrawControls
@@ -32093,9 +32101,11 @@ Return ONLY this JSON (no markdown, no code blocks):
             setTimeout(function(){
                 var fsCv=document.getElementById('qgDrawCanvas');
                 if(fsCv){
-                    fsCv.width=fsCv.offsetWidth; fsCv.height=fsCv.offsetHeight;
+                    var r=fsCv.getBoundingClientRect();
+                    fsCv.width=r.width; fsCv.height=r.height;
                     qgDrawCtx=fsCv.getContext('2d');
                     qgDrawCtx.lineCap='round'; qgDrawCtx.lineJoin='round'; qgDrawCtx.lineWidth=3;
+                    qgLastX=0; qgLastY=0; qgDrawing=false;
                     if(qg.savedCanvasData){var img3=new Image(); img3.onload=function(){qgDrawCtx.drawImage(img3,0,0,fsCv.width,fsCv.height);}; img3.src=qg.savedCanvasData;}
                 }
             },80);
@@ -32120,23 +32130,15 @@ Return ONLY this JSON (no markdown, no code blocks):
             document.querySelectorAll('.qgColorBtn').forEach(function(b){b.style.borderWidth='2px';});
         }
 
-        // Active pointer IDs being drawn (so we ignore second finger for pinch/zoom)
-        var qgActivePointerId=null;
+        var qgLastX=0, qgLastY=0;
 
-        function qgDrawStart(e){
-            // S Pen barrel button (button===5) → toggle eraser
-            if(e.button===5){e.preventDefault();qgToggleEraser();return;}
-            // Ignore if already drawing with another pointer (let second finger pinch-zoom)
-            if(qgActivePointerId!==null) return;
-            // Only draw with pen/stylus, or single-touch finger (not two-finger gesture)
-            if(e.pointerType==='touch' && e.isPrimary===false) return;
-            e.target.setPointerCapture(e.pointerId);
-            qgActivePointerId=e.pointerId;
-            qgDrawing=true;
-            if(!qgDrawCtx)return;
-            var isEraserTip=(e.buttons===32); // S Pen physical eraser tip
-            if(isEraserTip && !qgDrawEraser){ qgDrawEraser=true; var eb=document.getElementById('qgEraserBtn'); if(eb)eb.style.borderColor='#ff0'; }
-            if(qgDrawEraser||isEraserTip){
+        function qgGetPos(e){
+            var r=e.target.getBoundingClientRect();
+            return [e.clientX-r.left, e.clientY-r.top];
+        }
+        function qgApplyDrawStyle(){
+            if(!qgDrawCtx) return;
+            if(qgDrawEraser){
                 qgDrawCtx.globalCompositeOperation='destination-out';
                 qgDrawCtx.lineWidth=20;
             } else {
@@ -32144,27 +32146,38 @@ Return ONLY this JSON (no markdown, no code blocks):
                 qgDrawCtx.strokeStyle=qgDrawColor;
                 qgDrawCtx.lineWidth=3;
             }
+        }
+        function qgDrawStart(e){
+            if(!qgDrawCtx) return;
+            qgDrawing=true;
+            var pos=qgGetPos(e);
+            qgLastX=pos[0]; qgLastY=pos[1];
+            qgApplyDrawStyle();
             qgDrawCtx.beginPath();
-            var r=e.target.getBoundingClientRect();
-            var x=e.clientX-r.left;
-            var y=e.clientY-r.top;
-            var sx=e.target.width/r.width;var sy=e.target.height/r.height;
-            qgDrawCtx.moveTo(x*sx,y*sy);
+            qgDrawCtx.moveTo(qgLastX,qgLastY);
         }
         function qgDrawMove(e){
             if(!qgDrawing||!qgDrawCtx) return;
-            if(e.pointerId!==qgActivePointerId) return;
-            var r=e.target.getBoundingClientRect();
-            var x=e.clientX-r.left;
-            var y=e.clientY-r.top;
-            var sx=e.target.width/r.width;var sy=e.target.height/r.height;
-            qgDrawCtx.lineTo(x*sx,y*sy);qgDrawCtx.stroke();
+            var pos=qgGetPos(e);
+            qgDrawCtx.beginPath();
+            qgDrawCtx.moveTo(qgLastX,qgLastY);
+            qgDrawCtx.lineTo(pos[0],pos[1]);
+            qgDrawCtx.stroke();
+            qgLastX=pos[0]; qgLastY=pos[1];
         }
-        function qgDrawEnd(e){
-            if(e && e.pointerId!==qgActivePointerId) return;
+        function qgDrawEnd(){
             qgDrawing=false;
-            qgActivePointerId=null;
-            if(qgDrawCtx)qgDrawCtx.globalCompositeOperation='source-over';
+            if(qgDrawCtx) qgDrawCtx.globalCompositeOperation='source-over';
+        }
+        function qgDrawTouchStart(e){
+            e.preventDefault();
+            var t=e.touches[0];
+            qgDrawStart({target:e.target,clientX:t.clientX,clientY:t.clientY});
+        }
+        function qgDrawTouchMove(e){
+            e.preventDefault();
+            var t=e.touches[0];
+            qgDrawMove({target:e.target,clientX:t.clientX,clientY:t.clientY});
         }
         function qgDrawClear(){
             if(!qgDrawCtx)return;
