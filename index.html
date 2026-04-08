@@ -36130,6 +36130,9 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '._ghint.hidden{opacity:0;}',
                   '._gfmsg{margin-top:18px;color:#f5c842;font-size:13px;letter-spacing:.2em;text-transform:uppercase;opacity:0;transition:opacity .6s;text-shadow:0 0 12px #f5c842;}',
                   '._gfmsg.show{opacity:1;}',
+  '._gtapwarn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:"Press Start 2P",monospace;font-size:22px;color:#ff4444;text-shadow:0 0 20px #ff4444,0 0 40px #ff4444;pointer-events:none;opacity:0;white-space:nowrap;z-index:10;}',
+  '._gtapwarn.show{animation:_gTapBounce 0.4s ease-in-out infinite;}',
+  '@keyframes _gTapBounce{0%,100%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-60%) scale(1.12);}}',
                   '._grov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9999999;opacity:0;pointer-events:none;transition:opacity .4s;background:rgba(0,0,0,.82);}',
                   '._grov.show{opacity:1;pointer-events:all;}',
                                   '._grov.show ._grc{transform:scale(1);}',
@@ -36159,16 +36162,16 @@ Return ONLY this JSON (no markdown, no code blocks):
                   '._gpart{position:absolute;width:6px;height:6px;background:#c8a040;border-radius:1px;pointer-events:none;opacity:0;}',
                   '._gpart.fly{animation:_gFly var(--dur) ease-out forwards;}',
                   '@keyframes _gFly{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.3);opacity:0}}',
-                  '._gctr{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:12px;color:#aaa;font-size:11px;letter-spacing:.1em;}',
+                  '._gctr{display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:2px;color:#ccc;font-size:9px;letter-spacing:.1em;}',
                   '.tier-3{background:#1a0808;color:#e24b4a;border:1px solid #e24b4a55;}.tier-2{background:#081208;color:#639922;border:1px solid #63992255;}.tier-1{background:#08080e;color:#378add;border:1px solid #378add55;}',
-  '._grc{background:#0e0e0e;border-radius:20px;padding:24px 24px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;transform:scale(.85);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:440px;width:94vw;}',
-  '._grrws{display:flex;flex-direction:column;gap:8px;width:100%;}',
-  '._grrw{display:flex;align-items:center;gap:8px;font-size:7px;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;border-radius:8px;background:#141414;border:1px solid #2a2a2a;}',
-  '._grrw ._grrl{flex:0 0 72px;color:#666;white-space:nowrap;border-right:1px solid #2a2a2a;padding-right:8px;}',
+  '._grc{background:#0e0e0e;border-radius:16px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:10px;transform:scale(.85);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:340px;width:90vw;max-height:540px;overflow:hidden;}',
+  '._grrws{display:flex;flex-direction:column;gap:6px;width:100%;}',
+  '._grrw{display:flex;align-items:center;gap:8px;font-size:6px;letter-spacing:.05em;text-transform:uppercase;padding:8px 10px;border-radius:6px;background:#141414;border:1px solid #2a2a2a;}',
+  '._grrw ._grrl{flex:0 0 72px;color:#aaa;white-space:nowrap;border-right:1px solid #444;padding-right:8px;}',
   '._grrw ._grrn{flex:1;color:#fff;font-size:7px;line-height:1.4;word-break:break-word;}',
   '._grrw ._grrt{font-size:6px;padding:3px 6px;border-radius:4px;white-space:nowrap;text-align:center;flex-shrink:0;}',
   '._grrw ._grrp{color:#f5c842;font-size:7px;white-space:nowrap;text-align:right;flex-shrink:0;min-width:42px;}',
-  '._gcmb{font-size:8px;color:#aaa;letter-spacing:.08em;text-align:center;border-top:1px solid #222;padding-top:10px;width:100%;}',
+  '._gcmb{font-size:7px;color:#ccc;letter-spacing:.06em;text-align:center;border-top:1px solid #333;padding-top:8px;margin-top:2px;width:100%;}',
   '._gcmb span{color:#f5c842;}',
   '._gsrb{background:#1a1a2e;border:1px solid #378add;color:#378add;font-family:"Press Start 2P",monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;padding:6px 14px;border-radius:6px;cursor:pointer;transition:background .2s,color .2s;}',
   '._gsrb:hover{background:#378add;color:#fff;}',
@@ -36198,8 +36201,11 @@ Return ONLY this JSON (no markdown, no code blocks):
   '._gwpop.fadeout{animation:_gwFadeOut 0.3s ease-out forwards;}',
   '@keyframes _gwFadeOut{from{opacity:1}to{opacity:0}}',
   // Countdown
-  '._gcdown{font-family:"Press Start 2P",monospace;font-size:32px;color:#fff;text-shadow:0 0 20px #fff;margin-bottom:16px;transition:color 0.2s,text-shadow 0.2s;}',
+  '._gcdown{font-family:"Press Start 2P",monospace;font-size:28px;color:#fff;text-shadow:0 0 20px #fff;transition:color 0.2s,text-shadow 0.2s;white-space:nowrap;}',
   '._gcdown.urgent{color:#ff4444;text-shadow:0 0 20px #ff4444,0 0 40px #ff4444;animation:_gcPulse 0.4s ease-in-out infinite;}',
+  '._gtbar{width:200px;height:14px;background:#111;border:2px solid #444;border-radius:3px;overflow:hidden;image-rendering:pixelated;}',
+  '._gtfill{height:100%;width:100%;background:repeating-linear-gradient(90deg,#29ff7a 0px,#29ff7a 8px,#1dd466 8px,#1dd466 10px);border-radius:2px;}',
+  '._gtfill.urgent{background:repeating-linear-gradient(90deg,#ff4444 0px,#ff4444 8px,#cc2222 8px,#cc2222 10px);}',
   '@keyframes _gcPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}',
                 ].join('');
                 document.head.appendChild(st);
@@ -36240,13 +36246,17 @@ Return ONLY this JSON (no markdown, no code blocks):
               '</div>',
               '<div class="_ggrip" id="_ggrip"><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div></div>',
               '<div style="position:relative;display:flex;flex-direction:column;align-items:center;z-index:1;">',
+                '<div id="_gtimerbox" style="display:none;align-items:center;gap:12px;margin-bottom:14px;background:rgba(0,0,0,0.5);border-radius:10px;padding:8px 16px;">',
+                  '<div class="_gtbar" id="_gtbar" style="margin-bottom:0;"><div class="_gtfill" id="_gtfill"></div></div>',
+                  '<div class="_gcdown" id="_gcdown">10</div>',
+                '</div>',
                 '<div class="_gew" id="_gew">',
                   '<div class="_gsw r1" id="_gsw1"></div><div class="_gsw r2" id="_gsw2"></div><div class="_gsw r3" id="_gsw3"></div>',
                   '<img class="_gei" id="_gei" src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/uncracked.png?v=1774043391" alt="egg" draggable="false">',
                   '<svg class="_gbst" id="_gbst" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="_bgrd" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff8d0" stop-opacity="1"/><stop offset="40%" stop-color="#f5c842" stop-opacity="0.6"/><stop offset="100%" stop-color="#ff8800" stop-opacity="0"/></radialGradient></defs><circle cx="140" cy="140" r="130" fill="url(#_bgrd)"/></svg>',
+                  '<div class="_gtapwarn" id="_gtapwarn">Tap faster!!</div>',
                   '<div id="_gparts"></div>',
                 '</div>',
-                '<div class="_gprog" id="_gprog"></div>',
                 '<div class="_ghint" id="_ghint">Click to crack</div>',
                 '<div class="_gfmsg" id="_gfmsg">&#x2756; Something is hatching... &#x2756;</div>',
               '</div>',
@@ -36255,8 +36265,6 @@ Return ONLY this JSON (no markdown, no code blocks):
               '<div style="font-family:\'Press Start 2P\',monospace;font-size:13px;color:#ff4444;line-height:1.7;margin-bottom:18px;">CRACK THE EGG FAST<br>OR LOSE YOUR CHANCE!</div>'+
               '<button id="_gwclose" style="background:linear-gradient(135deg,#ff4444,#cc0000);border:none;color:#fff;font-family:\'Press Start 2P\',monospace;font-size:10px;padding:14px 30px;border-radius:10px;cursor:pointer;box-shadow:0 0 20px #ff4444aa;">I\'M READY!</button>'+
               '</div></div>',
-              // Countdown (hidden until popup closed)
-              '<div class="_gcdown" id="_gcdown" style="display:none;">10</div>',
             ].join('');
             document.body.appendChild(ov);
 
@@ -36453,7 +36461,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 if(roll.glitter)cp.innerHTML='Pull chance: '+_gachaFmtPct(roll.pct)+' &nbsp;<span>\u2756 GLITTER \u2756</span>';
               }
               var ctr=gGetEl('_grollctr');
-              if(ctr)ctr.innerHTML='<span style="color:#888">Roll</span> <span style="color:#f5c842;font-size:13px;">'+(currentRoll+1)+'</span> <span style="color:#888">of</span> <span style="color:#f5c842;font-size:13px;">'+rolls+'</span>';
+              if(ctr)ctr.innerHTML='<span style="color:#ccc">Roll</span> <span style="color:#f5c842;font-size:13px;">'+(currentRoll+1)+'</span> <span style="color:#ccc">of</span> <span style="color:#f5c842;font-size:13px;">'+rolls+'</span>';
 
               var rovEl=gGetEl('_grov');if(rovEl)rovEl.classList.add('show');
               gApplyGlitter(roll.glitter);
@@ -36484,7 +36492,11 @@ Return ONLY this JSON (no markdown, no code blocks):
               gTimeLeft=10;
               // Show warning popup again for next roll
               var cdEl=document.getElementById('_gcdown');
-              if(cdEl){cdEl.textContent='10';cdEl.style.display='none';cdEl.classList.remove('urgent');}
+              if(cdEl){cdEl.textContent='10';cdEl.classList.remove('urgent');}
+              var timerBox2=document.getElementById('_gtimerbox');
+              if(timerBox2)timerBox2.style.display='none';
+              var fillEl2=document.getElementById('_gtfill');
+              if(fillEl2){fillEl2.style.transition='none';fillEl2.style.width='100%';fillEl2.classList.remove('urgent');}
               var newPop=document.createElement('div');
               newPop.id='_gwpop';
               newPop.className='_gwpop';
@@ -36509,14 +36521,37 @@ Return ONLY this JSON (no markdown, no code blocks):
             //   - No taps at all = lose the roll at 10s
 
             var TOTAL_TIME=10, CRACK_TIMES=[2250,4500,6750,8800], MIN_TAPS=4;
+            var TAP_WARN_THRESHOLD=5;
             var gCountdownTimer=null, gAutoTimer=null, gStageTimers=[];
+            var gTapWarnTimers=[];
             var gTimeLeft=TOTAL_TIME, gEggStarted=false, gTapCount=0;
+
+            function gShowTapWarn(){
+                var el=document.getElementById('_gtapwarn');
+                if(!el) return;
+                el.style.opacity='1';
+                el.classList.add('show');
+                setTimeout(function(){
+                    el.style.opacity='0';
+                    el.classList.remove('show');
+                },1500);
+            }
 
             function gStartEgg(){
                 if(gEggStarted) return;
                 gEggStarted=true;
                 var cdEl=document.getElementById('_gcdown');
-                if(cdEl){cdEl.style.display='block';cdEl.textContent='10';}
+                if(cdEl){cdEl.textContent='10';}
+                var timerBox=document.getElementById('_gtimerbox');
+                if(timerBox){timerBox.style.display='flex';}
+                var fillEl=document.getElementById('_gtfill');
+                if(fillEl){
+                    fillEl.style.transition='none';
+                    fillEl.style.width='100%';
+                    void fillEl.offsetWidth;
+                    fillEl.style.transition='width 10s linear';
+                    fillEl.style.width='0%';
+                }
 
                 // Countdown every second
                 gTimeLeft=TOTAL_TIME;
@@ -36527,13 +36562,15 @@ Return ONLY this JSON (no markdown, no code blocks):
                         cd.textContent=Math.max(0,gTimeLeft);
                         if(gTimeLeft<=3) cd.classList.add('urgent');
                     }
+                    var fill=document.getElementById('_gtfill');
+                    if(fill&&gTimeLeft<=3) fill.classList.add('urgent');
                     if(gTimeLeft<=0) clearInterval(gCountdownTimer);
                 },1000);
 
-                // Schedule auto-cracks — only fire if student has tapped
-                CRACK_TIMES.forEach(function(ms,si){
+                // Schedule auto-cracks — only fire if student has tapped, stops at stage 3 (length-2)
+                CRACK_TIMES.forEach(function(ms){
                     var t=setTimeout(function(){
-                        if(gTapCount>0 && gCurrent<=si && gCurrent<EGG_IMGS_G.length-1){
+                        if(gTapCount>0 && gCurrent<EGG_IMGS_G.length-2){
                             gAnimating=false;
                             gForceAdvance();
                         }
@@ -36541,17 +36578,25 @@ Return ONLY this JSON (no markdown, no code blocks):
                     gStageTimers.push(t);
                 });
 
-                // At 10s: check if student tapped enough
+                // Tap warnings at 3s and 6s elapsed if not tapping enough
+                [3000, 6000].forEach(function(ms){
+                    var tw=setTimeout(function(){
+                        if(gTapCount<TAP_WARN_THRESHOLD) gShowTapWarn();
+                    },ms);
+                    gTapWarnTimers.push(tw);
+                });
+
+                // At 9100ms: check if student tapped enough, then open
                 gAutoTimer=setTimeout(function(){
                     gClearTimers();
                     if(gTapCount<MIN_TAPS){
                         // LOSE THE ROLL
                         gLoseRoll();
                     } else {
-                        // Had enough taps — force open if not already revealed
+                        // Had enough taps — open egg now
                         gForceReveal();
                     }
-                },10000);
+                },9100);
             }
 
             function gClearTimers(){
@@ -36559,10 +36604,12 @@ Return ONLY this JSON (no markdown, no code blocks):
                 clearTimeout(gAutoTimer);
                 gStageTimers.forEach(function(t){clearTimeout(t);});
                 gStageTimers=[];
+                gTapWarnTimers.forEach(function(t){clearTimeout(t);});
+                gTapWarnTimers=[];
             }
 
             function gForceAdvance(){
-                // Advance one crack stage without tap interaction
+                // Advance one crack stage — timer-driven cracks stop at stage 3 (length-2); gForceReveal goes to length-1
                 if(gAnimating||gCurrent>=EGG_IMGS_G.length-1) return;
                 gAnimating=true;
                 gTriggerEffects();
@@ -36571,7 +36618,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                     var ei=document.getElementById('_gei');if(ei)ei.src=EGG_IMGS_G[gCurrent];
                     gUpdateDots();
                     gAnimating=false;
-                    if(gCurrent<EGG_IMGS_G.length-1) gWigTimer=setTimeout(gStartWiggle,400);
+                    if(gCurrent<EGG_IMGS_G.length-2) gWigTimer=setTimeout(gStartWiggle,400);
                 },120);
             }
 
@@ -36602,7 +36649,7 @@ Return ONLY this JSON (no markdown, no code blocks):
                 var loseDiv=document.createElement('div');
                 loseDiv.style.cssText='position:fixed;inset:0;z-index:9999998;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);';
                 loseDiv.innerHTML='<div style="font-family:\'Press Start 2P\',monospace;font-size:20px;color:#ff4444;text-shadow:0 0 20px #ff4444;margin-bottom:16px;">YOU LOST<br>THE ROLL!</div>'
-                    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:10px;color:#888;margin-bottom:28px;">Not enough taps</div>'
+                    +'<div style="font-family:\'Press Start 2P\',monospace;font-size:10px;color:#ccc;margin-bottom:28px;">Not enough taps</div>'
                     +'<button id="_gloseOk" style="background:rgba(255,255,255,0.08);border:2px solid #888;color:#fff;font-family:\'Press Start 2P\',monospace;font-size:10px;padding:12px 28px;border-radius:8px;cursor:pointer;">OK</button>';
                 ov2.appendChild(loseDiv);
                 document.getElementById('_gloseOk').addEventListener('click',function(){
@@ -36620,37 +36667,13 @@ Return ONLY this JSON (no markdown, no code blocks):
             }
 
             function gAdvance(e){
-              if(!e) return; // auto calls use gForceAdvance
+              if(!e) return;
               if(e.target&&(e.target.id==='_grclose'||e.target.id==='_gwclose'||e.target.id==='_gwpop'||e.target.id==='_gloseOk')) return;
               if(!gEggStarted) return;
               if(document.getElementById('_grov')&&document.getElementById('_grov').classList.contains('show')) return;
-              if(gAnimating) return;
-              // Count this tap
+              // Only count the tap and trigger visual effects — cracks happen on timer only
               gTapCount++;
-              if(gCurrent>=EGG_IMGS_G.length-1){gTriggerEffects();return;}
-              gAnimating=true;
               gTriggerEffects();
-              setTimeout(function(){
-                gCurrent++;
-                var ei=document.getElementById('_gei');if(ei)ei.src=EGG_IMGS_G[gCurrent];
-                gUpdateDots();
-                if(gCurrent>=EGG_IMGS_G.length-1){
-                  gClearTimers();
-                  if(gTapCount>=MIN_TAPS){
-                    var hint=document.getElementById('_ghint'),fm=document.getElementById('_gfmsg'),lb=document.getElementById('_glb');
-                    if(hint)hint.classList.add('hidden');
-                    if(fm)fm.classList.add('show');
-                    setTimeout(function(){if(lb){gCls(lb,'explode');lb.classList.add('explode');}},150);
-                    setTimeout(function(){gShowReveal(rollResults[currentRoll]);},750);
-                  } else {
-                    gLoseRoll();
-                  }
-                }
-              },120);
-              setTimeout(function(){
-                gAnimating=false;
-                if(gCurrent<EGG_IMGS_G.length-1) gWigTimer=setTimeout(gStartWiggle,400);
-              },500);
             }
 
             // Close button for reveal card
