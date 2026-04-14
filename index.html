@@ -29407,7 +29407,7 @@ ${additionalText}
                 }
                 listEl.innerHTML = snap.docs.map(function(doc) {
                     var d = doc.data();
-                    return '<button onclick="tutorOpenNotes('' + doc.id + '')" style="background:rgba(0,255,255,0.1); border:2px solid #00ffff; color:#fff; padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:120px;">'
+                    return '<button onclick="tutorOpenNotes(\'' + doc.id + '\')" style="background:rgba(0,255,255,0.1); border:2px solid #00ffff; color:#fff; padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:120px;">'
                         + '<span>' + escapeHtml(d.name) + '</span>'
                         + (d.phone ? '<span style="font-size:10px; color:#888;">&#128222; ' + escapeHtml(d.phone) + '</span>' : '')
                         + '</button>';
@@ -29470,7 +29470,7 @@ ${additionalText}
                     return '<div style="border-bottom:1px solid #222; padding:10px 0;">'
                         + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">'
                         + '<span style="font-size:11px; color:#888;">' + escapeHtml(ts) + '</span>'
-                        + '<button onclick="tutorDeleteNote('' + doc.id + '')" style="background:none; border:none; color:#ff3366; font-size:12px; cursor:pointer; padding:2px 6px;">&#x2715;</button>'
+                        + '<button onclick="tutorDeleteNote(\'' + doc.id + '\')" style="background:none; border:none; color:#ff3366; font-size:12px; cursor:pointer; padding:2px 6px;">&#x2715;</button>'
                         + '</div>'
                         + '<div style="font-size:13px; color:#ddd; white-space:pre-wrap; line-height:1.5;">' + escapeHtml(d.text) + '</div>'
                         + '</div>';
