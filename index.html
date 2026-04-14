@@ -29393,23 +29393,31 @@ ${additionalText}
         // ==================== END ACCOUNT CREATION FUNCTIONS ====================
 
         // ==================== TUTORED STUDENTS ====================
+        // Storage: settings/tutor_data (students map) + settings/tutor_notes_{id} (notes array)
+        // Uses existing 'settings' collection which already has admin write permissions.
 
         var tutorCurrentStudentId = null;
+        var _tutorStudentsCache = {};
 
         async function tutorLoadStudents() {
             var listEl = document.getElementById('tutorStudentList');
             if (!listEl) return;
             try {
-                var snap = await db.collection('tutor_students').orderBy('name', 'asc').get();
-                if (snap.empty) {
+                var doc = await db.collection('settings').doc('tutor_data').get();
+                var students = (doc.exists && doc.data().students) ? doc.data().students : {};
+                _tutorStudentsCache = students;
+                var ids = Object.keys(students).sort(function(a, b) {
+                    return (students[a].name || '').localeCompare(students[b].name || '');
+                });
+                if (ids.length === 0) {
                     listEl.innerHTML = '<p style="color:#555; font-size:12px;">No tutored students yet.</p>';
                     return;
                 }
-                listEl.innerHTML = snap.docs.map(function(doc) {
-                    var d = doc.data();
-                    return '<button onclick="tutorOpenNotes(\'' + doc.id + '\')" style="background:rgba(0,255,255,0.1); border:2px solid #00ffff; color:#fff; padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:120px;">'
-                        + '<span>' + escapeHtml(d.name) + '</span>'
-                        + (d.phone ? '<span style="font-size:10px; color:#888;">&#128222; ' + escapeHtml(d.phone) + '</span>' : '')
+                listEl.innerHTML = ids.map(function(id) {
+                    var s = students[id];
+                    return '<button onclick="tutorOpenNotes(\'' + id + '\')" style="background:rgba(0,255,255,0.1); border:2px solid #00ffff; color:#fff; padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:120px;">'
+                        + '<span>' + escapeHtml(s.name) + '</span>'
+                        + (s.phone ? '<span style="font-size:10px; color:#888;">&#128222; ' + escapeHtml(s.phone) + '</span>' : '')
                         + '</button>';
                 }).join('');
             } catch(e) {
@@ -29424,11 +29432,10 @@ ${additionalText}
             var phone = (phoneEl.value || '').trim();
             if (!name) { alert('Please enter a name.'); return; }
             try {
-                await db.collection('tutor_students').add({
-                    name: name,
-                    phone: phone || null,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                var id = 'ts_' + Date.now();
+                var update = {};
+                update['students.' + id] = { name: name, phone: phone || '', createdAt: new Date().toISOString() };
+                await db.collection('settings').doc('tutor_data').set(update, { merge: true });
                 nameEl.value = '';
                 phoneEl.value = '';
                 tutorLoadStudents();
@@ -29439,40 +29446,34 @@ ${additionalText}
 
         async function tutorOpenNotes(studentId) {
             tutorCurrentStudentId = studentId;
-            try {
-                var doc = await db.collection('tutor_students').doc(studentId).get();
-                if (!doc.exists) return;
-                var d = doc.data();
-                document.getElementById('tutorNotesStudentName').textContent = d.name;
-                document.getElementById('tutorNotesStudentPhone').textContent = d.phone ? '&#128222; ' + d.phone : '';
-                document.getElementById('tutorNotesStudentPhone').innerHTML = d.phone ? '&#128222; ' + escapeHtml(d.phone) : '';
-                document.getElementById('tutorNoteInput').value = '';
-                document.getElementById('tutorNotesModal').style.display = 'flex';
-                tutorRenderNotes(studentId);
-            } catch(e) {
-                alert('Error: ' + e.message);
-            }
+            var s = _tutorStudentsCache[studentId] || {};
+            document.getElementById('tutorNotesStudentName').textContent = s.name || '';
+            document.getElementById('tutorNotesStudentPhone').innerHTML = s.phone ? '&#128222; ' + escapeHtml(s.phone) : '';
+            document.getElementById('tutorNoteInput').value = '';
+            document.getElementById('tutorNotesModal').style.display = 'flex';
+            tutorRenderNotes(studentId);
         }
 
         async function tutorRenderNotes(studentId) {
             var listEl = document.getElementById('tutorNotesList');
             listEl.innerHTML = '<p style="color:#888; font-size:12px;">Loading...</p>';
             try {
-                var snap = await db.collection('tutor_students').doc(studentId).collection('notes')
-                    .orderBy('createdAt', 'desc').get();
-                if (snap.empty) {
+                var doc = await db.collection('settings').doc('tutor_notes_' + studentId).get();
+                var notes = (doc.exists && doc.data().notes) ? doc.data().notes : [];
+                // Sort newest first
+                notes = notes.slice().sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+                if (notes.length === 0) {
                     listEl.innerHTML = '<p style="color:#555; font-size:12px; text-align:center; padding:20px 0;">No notes yet.</p>';
                     return;
                 }
-                listEl.innerHTML = snap.docs.map(function(doc) {
-                    var d = doc.data();
-                    var ts = d.createdAt ? d.createdAt.toDate().toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}) : '';
+                listEl.innerHTML = notes.map(function(n, idx) {
+                    var ts = n.createdAt ? new Date(n.createdAt).toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}) : '';
                     return '<div style="border-bottom:1px solid #222; padding:10px 0;">'
                         + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">'
                         + '<span style="font-size:11px; color:#888;">' + escapeHtml(ts) + '</span>'
-                        + '<button onclick="tutorDeleteNote(\'' + doc.id + '\')" style="background:none; border:none; color:#ff3366; font-size:12px; cursor:pointer; padding:2px 6px;">&#x2715;</button>'
+                        + '<button onclick="tutorDeleteNote(' + idx + ')" style="background:none; border:none; color:#ff3366; font-size:12px; cursor:pointer; padding:2px 6px;">&#x2715;</button>'
                         + '</div>'
-                        + '<div style="font-size:13px; color:#ddd; white-space:pre-wrap; line-height:1.5;">' + escapeHtml(d.text) + '</div>'
+                        + '<div style="font-size:13px; color:#ddd; white-space:pre-wrap; line-height:1.5;">' + escapeHtml(n.text) + '</div>'
                         + '</div>';
                 }).join('');
             } catch(e) {
@@ -29486,10 +29487,10 @@ ${additionalText}
             var text = (input.value || '').trim();
             if (!text) return;
             try {
-                await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').add({
-                    text: text,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                var doc = await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).get();
+                var notes = (doc.exists && doc.data().notes) ? doc.data().notes : [];
+                notes.push({ text: text, createdAt: new Date().toISOString() });
+                await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).set({ notes: notes });
                 input.value = '';
                 tutorRenderNotes(tutorCurrentStudentId);
             } catch(e) {
@@ -29497,11 +29498,17 @@ ${additionalText}
             }
         }
 
-        async function tutorDeleteNote(noteId) {
+        async function tutorDeleteNote(noteIdx) {
             if (!tutorCurrentStudentId) return;
             if (!confirm('Delete this note?')) return;
             try {
-                await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').doc(noteId).delete();
+                var doc = await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).get();
+                var notes = (doc.exists && doc.data().notes) ? doc.data().notes : [];
+                // Remove sorted-by-newest index: re-sort to find real index
+                var sorted = notes.slice().sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+                var toDelete = sorted[noteIdx];
+                notes = notes.filter(function(n) { return n !== toDelete; });
+                await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).set({ notes: notes });
                 tutorRenderNotes(tutorCurrentStudentId);
             } catch(e) {
                 alert('Error: ' + e.message);
@@ -29510,16 +29517,16 @@ ${additionalText}
 
         async function tutorDeleteStudent() {
             if (!tutorCurrentStudentId) return;
-            var nameEl = document.getElementById('tutorNotesStudentName');
-            var name = nameEl ? nameEl.textContent : 'this student';
+            var s = _tutorStudentsCache[tutorCurrentStudentId] || {};
+            var name = s.name || 'this student';
             if (!confirm('Remove ' + name + ' and all their notes? This cannot be undone.')) return;
             try {
-                // Delete all notes subcollection first
-                var notesSnap = await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').get();
-                for (var i = 0; i < notesSnap.docs.length; i++) {
-                    await notesSnap.docs[i].ref.delete();
-                }
-                await db.collection('tutor_students').doc(tutorCurrentStudentId).delete();
+                // Remove from students map
+                var update = {};
+                update['students.' + tutorCurrentStudentId] = firebase.firestore.FieldValue.delete();
+                await db.collection('settings').doc('tutor_data').update(update);
+                // Delete notes doc
+                await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).delete();
                 tutorCloseNotes();
                 tutorLoadStudents();
             } catch(e) {
