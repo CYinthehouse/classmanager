@@ -1379,6 +1379,40 @@
                         </div>
                     </div>
                     
+                    <!-- Tutored Students -->
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>&#x1F393; Tutored Students</h3>
+                        <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+                            <input type="text" id="tutorStudentName" placeholder="Name" maxlength="40"
+                                style="flex:1; min-width:120px; padding:9px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#fff; font-size:13px; outline:none;">
+                            <input type="text" id="tutorStudentPhone" placeholder="Phone (optional)" maxlength="30"
+                                style="flex:1; min-width:120px; padding:9px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#fff; font-size:13px; outline:none;">
+                            <button class="btn btn-success btn-sm" onclick="tutorAddStudent()" style="white-space:nowrap;">+ Add Student</button>
+                        </div>
+                        <div id="tutorStudentList" style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <p style="color:#555; font-size:12px;">No tutored students yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tutor Notes Modal -->
+                    <div id="tutorNotesModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:100010; align-items:center; justify-content:center;">
+                        <div style="background:#1a1a2e; border:2px solid #00ffff; border-radius:12px; padding:24px; max-width:520px; width:90%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 0 30px rgba(0,255,255,0.2);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                                <div>
+                                    <div id="tutorNotesStudentName" style="color:#00ffff; font-size:16px; font-weight:700;"></div>
+                                    <div id="tutorNotesStudentPhone" style="color:#888; font-size:11px; margin-top:2px;"></div>
+                                </div>
+                                <button onclick="tutorCloseNotes()" style="background:none; border:1px solid #555; color:#aaa; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:14px;">&#x2715;</button>
+                            </div>
+                            <div id="tutorNotesList" style="flex:1; overflow-y:auto; margin-bottom:14px; min-height:80px;"></div>
+                            <textarea id="tutorNoteInput" rows="3" placeholder="Write a note..." style="width:100%; padding:10px; background:rgba(255,255,255,0.08); border:1px solid #444; border-radius:8px; color:#fff; font-size:13px; resize:vertical; box-sizing:border-box; outline:none;"></textarea>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px;">
+                                <button onclick="tutorDeleteStudent()" style="background:rgba(255,51,102,0.15); border:1px solid #ff3366; color:#ff3366; padding:7px 14px; border-radius:7px; font-size:12px; cursor:pointer;">&#x1F5D1;&#xFE0F; Remove Student</button>
+                                <button onclick="tutorSaveNote()" style="background:#00ffff; border:none; color:#000; padding:9px 22px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">Save Note</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Teacher Classes View -->
                     <div class="card" style="margin-top: 20px;">
                         <h3>👨‍🏫 View Teacher's Classes</h3>
@@ -4826,7 +4860,7 @@
             const roleLabel = currentUser.role === 'support' ? 'Support' : 'Admin';
             document.getElementById('userInfoDisplay').textContent = `${roleLabel}: ${currentUser.email || currentUser.name}`;
             loadSchedulerSettings(); loadAllStudents(); 
-            loadAllTeachers().then(() => loadTeacherButtonsForAdmin()); 
+            loadAllTeachers().then(() => { loadTeacherButtonsForAdmin(); tutorLoadStudents(); }); 
             loadClassTypes().then(() => loadAllClasses()); // Load class types first, then classes
             loadProposals();
             initSalesChat(); // Initialize sales chat system
@@ -4917,7 +4951,7 @@
             if (tab === 'outreach') { loadOutreachAnalytics(); }
             if (tab === 'movehistory') { loadMoveHistory(); }
             if (tab === 'proposals') { loadProposals(); renderAvailableStudentsForProposals(); }
-            if (tab === 'dashboard') loadTeacherButtonsForAdmin();
+            if (tab === 'dashboard') { loadTeacherButtonsForAdmin(); tutorLoadStudents(); }
             if (tab === 'slotmanager') initSlotManager();
             if (tab === 'oneclass') loadOneClassPasses();
             if (tab === 'tuesdayreading') initTuesdayReadingTab();
@@ -29357,6 +29391,148 @@ ${additionalText}
         }
 
         // ==================== END ACCOUNT CREATION FUNCTIONS ====================
+
+        // ==================== TUTORED STUDENTS ====================
+
+        var tutorCurrentStudentId = null;
+
+        async function tutorLoadStudents() {
+            var listEl = document.getElementById('tutorStudentList');
+            if (!listEl) return;
+            try {
+                var snap = await db.collection('tutor_students').orderBy('name', 'asc').get();
+                if (snap.empty) {
+                    listEl.innerHTML = '<p style="color:#555; font-size:12px;">No tutored students yet.</p>';
+                    return;
+                }
+                listEl.innerHTML = snap.docs.map(function(doc) {
+                    var d = doc.data();
+                    return '<button onclick="tutorOpenNotes('' + doc.id + '')" style="background:rgba(0,255,255,0.1); border:2px solid #00ffff; color:#fff; padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:120px;">'
+                        + '<span>' + escapeHtml(d.name) + '</span>'
+                        + (d.phone ? '<span style="font-size:10px; color:#888;">&#128222; ' + escapeHtml(d.phone) + '</span>' : '')
+                        + '</button>';
+                }).join('');
+            } catch(e) {
+                listEl.innerHTML = '<p style="color:#ff3366; font-size:12px;">Error: ' + escapeHtml(e.message) + '</p>';
+            }
+        }
+
+        async function tutorAddStudent() {
+            var nameEl = document.getElementById('tutorStudentName');
+            var phoneEl = document.getElementById('tutorStudentPhone');
+            var name = (nameEl.value || '').trim();
+            var phone = (phoneEl.value || '').trim();
+            if (!name) { alert('Please enter a name.'); return; }
+            try {
+                await db.collection('tutor_students').add({
+                    name: name,
+                    phone: phone || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                nameEl.value = '';
+                phoneEl.value = '';
+                tutorLoadStudents();
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function tutorOpenNotes(studentId) {
+            tutorCurrentStudentId = studentId;
+            try {
+                var doc = await db.collection('tutor_students').doc(studentId).get();
+                if (!doc.exists) return;
+                var d = doc.data();
+                document.getElementById('tutorNotesStudentName').textContent = d.name;
+                document.getElementById('tutorNotesStudentPhone').textContent = d.phone ? '&#128222; ' + d.phone : '';
+                document.getElementById('tutorNotesStudentPhone').innerHTML = d.phone ? '&#128222; ' + escapeHtml(d.phone) : '';
+                document.getElementById('tutorNoteInput').value = '';
+                document.getElementById('tutorNotesModal').style.display = 'flex';
+                tutorRenderNotes(studentId);
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function tutorRenderNotes(studentId) {
+            var listEl = document.getElementById('tutorNotesList');
+            listEl.innerHTML = '<p style="color:#888; font-size:12px;">Loading...</p>';
+            try {
+                var snap = await db.collection('tutor_students').doc(studentId).collection('notes')
+                    .orderBy('createdAt', 'desc').get();
+                if (snap.empty) {
+                    listEl.innerHTML = '<p style="color:#555; font-size:12px; text-align:center; padding:20px 0;">No notes yet.</p>';
+                    return;
+                }
+                listEl.innerHTML = snap.docs.map(function(doc) {
+                    var d = doc.data();
+                    var ts = d.createdAt ? d.createdAt.toDate().toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}) : '';
+                    return '<div style="border-bottom:1px solid #222; padding:10px 0;">'
+                        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">'
+                        + '<span style="font-size:11px; color:#888;">' + escapeHtml(ts) + '</span>'
+                        + '<button onclick="tutorDeleteNote('' + doc.id + '')" style="background:none; border:none; color:#ff3366; font-size:12px; cursor:pointer; padding:2px 6px;">&#x2715;</button>'
+                        + '</div>'
+                        + '<div style="font-size:13px; color:#ddd; white-space:pre-wrap; line-height:1.5;">' + escapeHtml(d.text) + '</div>'
+                        + '</div>';
+                }).join('');
+            } catch(e) {
+                listEl.innerHTML = '<p style="color:#ff3366; font-size:12px;">Error: ' + escapeHtml(e.message) + '</p>';
+            }
+        }
+
+        async function tutorSaveNote() {
+            if (!tutorCurrentStudentId) return;
+            var input = document.getElementById('tutorNoteInput');
+            var text = (input.value || '').trim();
+            if (!text) return;
+            try {
+                await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').add({
+                    text: text,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                input.value = '';
+                tutorRenderNotes(tutorCurrentStudentId);
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function tutorDeleteNote(noteId) {
+            if (!tutorCurrentStudentId) return;
+            if (!confirm('Delete this note?')) return;
+            try {
+                await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').doc(noteId).delete();
+                tutorRenderNotes(tutorCurrentStudentId);
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function tutorDeleteStudent() {
+            if (!tutorCurrentStudentId) return;
+            var nameEl = document.getElementById('tutorNotesStudentName');
+            var name = nameEl ? nameEl.textContent : 'this student';
+            if (!confirm('Remove ' + name + ' and all their notes? This cannot be undone.')) return;
+            try {
+                // Delete all notes subcollection first
+                var notesSnap = await db.collection('tutor_students').doc(tutorCurrentStudentId).collection('notes').get();
+                for (var i = 0; i < notesSnap.docs.length; i++) {
+                    await notesSnap.docs[i].ref.delete();
+                }
+                await db.collection('tutor_students').doc(tutorCurrentStudentId).delete();
+                tutorCloseNotes();
+                tutorLoadStudents();
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function tutorCloseNotes() {
+            document.getElementById('tutorNotesModal').style.display = 'none';
+            tutorCurrentStudentId = null;
+        }
+
+        // ==================== END TUTORED STUDENTS ====================
 
         // ==================== LIGHT/DARK MODE TOGGLE ====================
         function toggleLightMode() {
