@@ -1959,6 +1959,7 @@
                                 </div>
                                 <div class="mat-generate-row">
                                     <button class="mat-btn-generate" onclick="matGenerateSlides()">🎬 Generate Slideshow</button>
+                                    <button onclick="matClearInputAndSlides()" style="padding:12px 20px; background:rgba(255,255,255,0.06); border:2px solid #555; border-radius:8px; color:#aaa; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#ff7777';this.style.color='#ff7777';" onmouseout="this.style.borderColor='#555';this.style.color='#aaa';">✖ Clear</button>
                                 </div>
                             </div>
                             <div class="mat-preview-panel">
@@ -10367,116 +10368,70 @@ var MAT_GRAMMAR_DEFS = {
         }
 
         function matBuildGrammarPDF(mapping) {
-            function doLoad(src) {
-                return new Promise(function(res, rej) {
-                    if (document.querySelector('script[src="' + src + '"]')) { res(); return; }
-                    var s = document.createElement('script'); s.src = src;
-                    s.onload = res; s.onerror = rej;
-                    document.head.appendChild(s);
-                });
+            var points = matSelectedGrammarPoints;
+            var today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+            var sectionsHtml = '';
+            for (var pi = 0; pi < points.length; pi++) {
+                var gp = points[pi];
+                var sentences = mapping[gp] || [];
+                var defs = MAT_GRAMMAR_DEFS[gp] || [];
+
+                var defsHtml = '';
+                for (var di = 0; di < defs.length; di++) {
+                    defsHtml += '<p class="def-line">' + defs[di].replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+                }
+
+                var sentHtml = '';
+                if (sentences.length === 0) {
+                    sentHtml = '<p class="no-match">No matching sentences found in this story.</p>';
+                } else {
+                    for (var si = 0; si < sentences.length; si++) {
+                        sentHtml += '<div class="sentence-row"><span class="bullet"></span><span class="sentence-text">' + sentences[si].replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>';
+                    }
+                }
+
+                sectionsHtml +=
+                    '<div class="gp-section">' +
+                        '<div class="gp-header">' + gp.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
+                        (defsHtml ? '<div class="defs-block">' + defsHtml + '</div><hr class="def-divider">' : '') +
+                        '<div class="sentences-block">' + sentHtml + '</div>' +
+                    '</div>';
             }
-            doLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-            .then(function() {
-                var pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-                var pageW = 210, pageH = 297;
-                var margin = 18, y = margin;
-                var contentW = pageW - margin * 2;
 
-                function checkPage(needed) {
-                    if (y + needed > pageH - margin) { pdf.addPage(); y = margin; }
-                }
+            var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+                + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">'
+                + '<title>Grammar Study Sheet</title>'
+                + '<style>'
+                + '* { box-sizing: border-box; margin: 0; padding: 0; }'
+                + 'body { font-family: "Noto Sans KR", sans-serif; color: #1e1e2e; background: #fff; padding: 28px 36px; font-size: 13px; line-height: 1.7; }'
+                + 'h1 { font-size: 22px; font-weight: 700; color: #28285a; margin-bottom: 6px; }'
+                + '.subtitle { font-size: 11px; color: #888; margin-bottom: 8px; }'
+                + '.top-divider { border: none; border-top: 1.5px solid #6468dc; margin-bottom: 22px; }'
+                + '.gp-section { margin-bottom: 26px; page-break-inside: avoid; }'
+                + '.gp-header { background: #e6eaff; border: 1px solid #6878dc; border-radius: 5px; padding: 6px 10px; font-weight: 700; font-size: 12px; color: #323296; margin-bottom: 8px; }'
+                + '.defs-block { padding: 0 4px; margin-bottom: 6px; }'
+                + '.def-line { font-size: 11.5px; color: #3a5a3a; margin-bottom: 4px; }'
+                + '.def-divider { border: none; border-top: 0.5px solid #b4bce8; margin: 8px 4px 10px; }'
+                + '.sentences-block { padding: 0 4px; }'
+                + '.sentence-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; }'
+                + '.bullet { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: #6478dc; margin-top: 5px; }'
+                + '.sentence-text { font-size: 14px; color: #1a1a1a; }'
+                + '.no-match { font-style: italic; color: #aaa; font-size: 11px; }'
+                + '@media print { body { padding: 18px 24px; } .gp-section { page-break-inside: avoid; } }'
+                + '</style></head><body>'
+                + '<h1>Grammar Study Sheet</h1>'
+                + '<p class="subtitle">KoreanLearnin &nbsp;|&nbsp; Generated ' + today + '</p>'
+                + '<hr class="top-divider">'
+                + sectionsHtml
+                + '<script>window.onload=function(){window.print();}<\/script>'
+                + '</body></html>';
 
-                function drawWrapped(text, xPos, maxW, lineH, fontSz, bold, color) {
-                    pdf.setFontSize(fontSz);
-                    pdf.setFont('helvetica', bold ? 'bold' : 'normal');
-                    if (color) pdf.setTextColor(color[0], color[1], color[2]); else pdf.setTextColor(30, 30, 30);
-                    var lines = pdf.splitTextToSize(text, maxW);
-                    checkPage(lines.length * lineH + 2);
-                    pdf.text(lines, xPos, y);
-                    y += lines.length * lineH;
-                }
-
-                // Title
-                pdf.setFont('helvetica', 'bold');
-                pdf.setFontSize(18);
-                pdf.setTextColor(40, 40, 80);
-                pdf.text('Grammar Study Sheet', margin, y);
-                y += 10;
-
-                // Subtitle
-                pdf.setFont('helvetica', 'normal');
-                pdf.setFontSize(10);
-                pdf.setTextColor(120, 120, 140);
-                var today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-                pdf.text('KoreanLearnin  |  Generated ' + today, margin, y);
-                y += 4;
-
-                // Divider
-                pdf.setDrawColor(100, 100, 200);
-                pdf.setLineWidth(0.5);
-                pdf.line(margin, y, pageW - margin, y);
-                y += 8;
-
-                var points = matSelectedGrammarPoints;
-                for (var pi = 0; pi < points.length; pi++) {
-                    var gp = points[pi];
-                    var sentences = mapping[gp] || [];
-                    var defs = MAT_GRAMMAR_DEFS[gp] || [];
-
-                    checkPage(24);
-
-                    // Grammar point header box
-                    pdf.setFillColor(230, 235, 255);
-                    pdf.setDrawColor(100, 120, 220);
-                    pdf.setLineWidth(0.4);
-                    var headerH = 9;
-                    pdf.roundedRect(margin, y - 6, contentW, headerH, 2, 2, 'FD');
-                    pdf.setFont('helvetica', 'bold');
-                    pdf.setFontSize(11);
-                    pdf.setTextColor(50, 60, 160);
-                    pdf.text(gp, margin + 4, y);
-                    y += headerH;
-
-                    // Definition lines
-                    if (defs.length > 0) {
-                        for (var di = 0; di < defs.length; di++) {
-                            drawWrapped(defs[di], margin + 2, contentW - 4, 5.5, 9.5, false, [60, 80, 60]);
-                            y += 1.5;
-                        }
-                        y += 3;
-                        // thin divider between defs and sentences
-                        pdf.setDrawColor(180, 190, 230);
-                        pdf.setLineWidth(0.2);
-                        pdf.line(margin + 2, y, pageW - margin - 2, y);
-                        y += 5;
-                    }
-
-                    // Story sentences for this grammar point
-                    if (sentences.length === 0) {
-                        pdf.setFont('helvetica', 'italic');
-                        pdf.setFontSize(10);
-                        pdf.setTextColor(160, 160, 160);
-                        pdf.text('No matching sentences found in this story.', margin + 4, y);
-                        y += 7;
-                    } else {
-                        for (var si = 0; si < sentences.length; si++) {
-                            checkPage(14);
-                            pdf.setFillColor(100, 120, 220);
-                            pdf.circle(margin + 3, y - 1.5, 1.2, 'F');
-                            pdf.setFont('helvetica', 'normal');
-                            pdf.setFontSize(12);
-                            pdf.setTextColor(30, 30, 30);
-                            var lines = pdf.splitTextToSize(sentences[si], contentW - 10);
-                            pdf.text(lines, margin + 8, y);
-                            y += lines.length * 6 + 3;
-                        }
-                    }
-                    y += 8;
-                }
-
-                pdf.save('Grammar_Study_Sheet.pdf');
-            })
-            .catch(function(err) { alert('Could not load PDF library: ' + err.message); });
+            var win = window.open('', '_blank', 'width=860,height=1100');
+            if (!win) { alert('Popup blocked. Please allow popups for this page and try again.'); return; }
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
         }
 
 function matCloseStoryPrompt() {
@@ -10746,7 +10701,19 @@ function matCloseStoryPrompt() {
             return d.innerHTML;
         }
 
-        function matGenerateSlides() {
+        function matClearInputAndSlides() {
+            document.getElementById('matTextInput').value = '';
+            document.getElementById('matSlideCount').textContent = '0';
+            var tagsEl = document.getElementById('matGrammarTagsDisplay');
+            if (tagsEl) { tagsEl.style.display = 'none'; tagsEl.innerHTML = ''; }
+            matSlides = [];
+            matCurrentSlide = 0;
+            var area = document.getElementById('matSlideshowArea');
+            if (area) area.innerHTML = '';
+            document.getElementById('matExportBtns').style.display = 'none';
+        }
+
+function matGenerateSlides() {
             var parsed = matParseSlides();
             if (parsed.length === 0) { alert('Please enter at least one Korean sentence.'); return; }
             matSlides = parsed;
