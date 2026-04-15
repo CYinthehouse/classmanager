@@ -1033,6 +1033,9 @@
         .mat-preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
         .mat-preview-header h3 { color: #ff00ff; font-size: 16px; margin: 0; }
         .mat-export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mat-grammar-chip { padding:5px 10px; background:rgba(255,255,255,0.06); border:1px solid rgba(102,126,234,0.4); border-radius:20px; color:#c4ccf7; font-size:11px; cursor:pointer; transition:all 0.15s; font-family:inherit; }
+        .mat-grammar-chip:hover { background:rgba(102,126,234,0.25); border-color:#667eea; color:#fff; }
+        .mat-grammar-chip.selected { background:rgba(102,126,234,0.35); border-color:#667eea; color:#fff; }
         .mat-btn-export { padding: 8px 16px; border: 2px solid; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: rgba(0,0,0,0.3); }
         .mat-btn-export:hover { transform: scale(1.04); }
         .mat-btn-pdf { color: #ff3366; border-color: #ff3366; }
@@ -1968,6 +1971,7 @@
                                         <button class="mat-btn-export mat-btn-html" onclick="matExportHTML()">🌐 Export HTML</button>
                                         <button class="mat-btn-export" onclick="matPublishToWeb()" style="border-color: #3b82f6; color: #3b82f6;" id="matPublishBtn">📤 Publish to Web</button>
                                         <button class="mat-btn-export" onclick="matManagePublished()" style="border-color: #f97316; color: #f97316;">🗂️ Manage Published</button>
+                                        <button class="mat-btn-export" id="matGrammarPdfBtn" onclick="matGenerateGrammarPDF()" disabled style="border-color:#555; color:#555; cursor:not-allowed; opacity:0.45;">&#128209; Grammar Study PDF</button>
                                     </div>
                                 </div>
                                 <div id="matSlideshowArea" style="cursor: pointer;" title="Click to expand">
@@ -1996,6 +2000,26 @@
                         <h3 style="color:#fff; margin-bottom:5px; font-size:18px;">✨ AI Story Generator</h3>
                         <p style="color:#888; font-size:12px; margin-bottom:15px;">Describe a story idea in Korean or English. ChatGPT will write a Korean story for your slides.</p>
                         <textarea id="matStoryPromptInput" placeholder="Example: A funny story about a cat who learns to cook Korean food" style="width:100%; height:120px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:10px; color:#fff; padding:12px; font-size:14px; resize:vertical; font-family:inherit;"></textarea>
+                        <div style="margin-bottom:10px;">
+                            <button onclick="matToggleGrammarPanel()" id="matGrammarToggleBtn" style="padding:7px 14px; background:rgba(102,126,234,0.15); border:1px solid rgba(102,126,234,0.5); border-radius:8px; color:#a0aef7; cursor:pointer; font-size:12px; font-weight:600;">&#128218; Grammar Points</button>
+                        </div>
+                        <div id="matGrammarPanel" style="display:none; background:rgba(0,0,0,0.3); border:1px solid rgba(102,126,234,0.3); border-radius:10px; padding:12px; margin-bottom:12px;">
+                            <p style="color:#a0aef7; font-size:11px; font-weight:700; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Click a grammar point to add it to your prompt:</p>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Subject/Topic particles: 이/가, 은/는</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Object particle: 을/를</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">With: Noun(이)랑 / Noun하고 / Noun와/과</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Location particles: (으)로, 에서, 에</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Am/is/are: 이에요 / 예요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">있어요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">은/는 &amp; 있어요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Name And Hobby Introduction</button>
+                                                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerund/Noun + 같아요</button>
+                            </div>
+                        </div>
                         <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end;">
                             <button onclick="matCloseStoryPrompt()" style="padding:10px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#aaa; cursor:pointer; font-size:13px;">Cancel</button>
                             <button id="matStorySubmitBtn" onclick="matSubmitStoryPrompt()" style="padding:10px 24px; background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:13px; font-weight:600;">🚀 Generate Story</button>
@@ -10163,6 +10187,8 @@
         }
 
         // ---- AI STORY GENERATOR ----
+        var matSelectedGrammarPoints = [];
+
         var MAT_STORY_WEBHOOK = 'https://hook.us1.make.com/ymrajr08rki5mxqr3m25pgksbqe2baj5';
 
         function matOpenStoryPrompt() {
@@ -10172,7 +10198,287 @@
             document.getElementById('matStoryPromptInput').focus();
         }
 
-        function matCloseStoryPrompt() {
+        function matToggleGrammarPanel() {
+            var panel = document.getElementById('matGrammarPanel');
+            var btn = document.getElementById('matGrammarToggleBtn');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.style.background = 'rgba(102,126,234,0.35)';
+                btn.style.borderColor = '#667eea';
+                btn.style.color = '#fff';
+            } else {
+                panel.style.display = 'none';
+                btn.style.background = 'rgba(102,126,234,0.15)';
+                btn.style.borderColor = 'rgba(102,126,234,0.5)';
+                btn.style.color = '#a0aef7';
+            }
+        }
+
+        function matAddGrammarPoint(chipEl) {
+            var point = chipEl.textContent.trim();
+            var ta = document.getElementById('matStoryPromptInput');
+            var current = ta.value.trim();
+            if (current.indexOf(point) !== -1) {
+                ta.value = current.replace('\n\nGrammar focus: ' + point, '').replace('Grammar focus: ' + point, '').trim();
+                chipEl.classList.remove('selected');
+                var i = matSelectedGrammarPoints.indexOf(point);
+                if (i !== -1) matSelectedGrammarPoints.splice(i, 1);
+            } else {
+                ta.value = current + (current ? '\n\nGrammar focus: ' : 'Grammar focus: ') + point;
+                chipEl.classList.add('selected');
+                matSelectedGrammarPoints.push(point);
+            }
+            var pdfBtn = document.getElementById('matGrammarPdfBtn');
+            if (pdfBtn) {
+                if (matSelectedGrammarPoints.length > 0) {
+                    pdfBtn.disabled = false;
+                    pdfBtn.style.borderColor = '#e8c87a';
+                    pdfBtn.style.color = '#e8c87a';
+                    pdfBtn.style.cursor = 'pointer';
+                    pdfBtn.style.opacity = '1';
+                } else {
+                    pdfBtn.disabled = true;
+                    pdfBtn.style.borderColor = '#555';
+                    pdfBtn.style.color = '#555';
+                    pdfBtn.style.cursor = 'not-allowed';
+                    pdfBtn.style.opacity = '0.45';
+                }
+            }
+            ta.focus();
+        }
+
+var MAT_GRAMMAR_DEFS = {
+  'Subject/Topic particles: 이/가, 은/는': [
+    '이/가 marks the subject (who/what does something), while 은/는 marks the topic (similar to "as for..." in English).',
+    '[Topic – 은/는] EN: As for my mom, she\'s a teacher. KR: 엄마는 선생님이에요.',
+    '[Subject – 이/가] EN: The cat is sleeping. KR: 고양이가 자요. (The cat is doing the action, sleeping, so it\'s marked with the subject particle 가).'
+  ],
+  'Object particle: 을/를': [
+    '을/를 marks the object (what receives the action).',
+    'EN: I eat rice. KR: 밥을 먹어요. (Rice receiving the action (being eaten), so it gets marked with 을).'
+  ],
+  'With: Noun(이)랑 / Noun하고 / Noun와/과': [
+    'All mean "with/and," but (이)랑 is casual, 하고 is neutral/everyday, and 와/과 is formal/written. 하고 is the safest daily choice. We rarely use 와/과 but you will need it for advanced studies.',
+    '[(이)랑 – casual] EN: I\'m going with my friend. KR: 친구랑 가요.',
+    '[하고 – neutral] EN: I\'m going with my friend. KR: 친구하고 가요.',
+    '[와/과 – formal] EN: I\'m going with my friend. KR: 친구와 가요.'
+  ],
+  'Location particles: (으)로, 에서, 에': [
+    '에 is used for destinations ("to") and static location ("at/in") with verbs like 가다 (go), 오다 (come), 있다 (exist). EN: I go to school. KR: 학교에 가요.',
+    '에서 is used for the place where an action actively happens (study, eat, work, etc.). EN: I study at school. KR: 학교에서 공부해요.',
+    '(으)로 is used for direction or endpoint, often implying movement toward something rather than just arrival. EN: I go to the right. KR: 오른쪽으로 가요.'
+  ],
+  'Am/is/are: 이에요 / 예요': [
+    '이에요/예요 means "am/is/are" used to identify or describe a noun. 이에요 is used after consonants and 예요 after vowels.',
+    'EN: I am a student. KR: 학생이에요.'
+  ],
+  'Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면': [
+    'All attach to nouns, but each has a different meaning: (이)고 = "and," (이)ㄴ데 = "but/so", (이)면 = "if."',
+    '[(이)고 – and] EN: She is a teacher and a mom. KR: 선생님이고 엄마예요.',
+    '[(이)ㄴ데 – but/so] EN: I\'m a student, but I\'m busy. KR: 학생인데 바빠요.',
+    '[(이)면 – if] EN: If you\'re a student, apply. KR: 학생이면 지원해요.'
+  ],
+  '있어요': [
+    '있어요 means "to exist" or "to have."',
+    'EN: I have time. KR: 시간 있어요.'
+  ],
+  '이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요': [
+    '이에요/예요 and 이었어요/였어요 are used to describe identity, meaning they tell you what something is or was.',
+    'On the other hand, 있어요 and 있었어요 are used for existence or possession, meaning they tell you whether something exists, is present, or is/was possessed.',
+    'After consonants: use 이에요 or 이었어요. After vowels: use 예요 or 였어요.',
+    '[이에요/예요 – present identity ("is/am/are")] 이에요/예요 is used when you are identifying what something is in the present. EN: She is a teacher. KR: 선생님이에요.',
+    '[이었어요/였어요 – past identity ("was/were")] 이었어요/였어요 is used when you are identifying what something was in the past. EN: She was a teacher. KR: 선생님이었어요.',
+    '[있어요 – existence/possession ("there is/has")] 있어요 is used when you want to say that something exists or that someone has something. EN: There is a cat. KR: 고양이 있어요.',
+    '[있었어요 – past existence/possession ("there was/had")] 있었어요 is used when you want to say that something existed or someone had something in the past. EN: There was a cat. KR: 고양이 있었어요.'
+  ],
+  '은/는 & 있어요': [
+    '[은/는 & 있어요 – possession ("as for…, has")] 은/는 is used to set the topic of the sentence (it\'s close to "as for..." in English). It tells the listener what you are talking about.',
+    'When 은/는 is used with 있어요, it expresses possession naturally in Korean (similar to "I have" in English).',
+    'EN: As for me, I have a house. KR: 저는 집 있어요.'
+  ],
+  'Name And Hobby Introduction': [
+    '[Name And Hobby Introduction] Korean introductions follow a very consistent pattern using 은/는 and 이에요/예요.',
+    'This structure is used to identify who you are or what something is.',
+    'When talking about hobbies, Korean does not use verbs directly. Instead, we use -는 거 (also known as the Gerund). This allows actions to be treated as "things" that can be described.',
+    'EN: My hobby is reading books. KR: 제 취미는 책 읽는 거예요.'
+  ],
+  'Gerunds': [
+    '[Gerunds – verb → noun ("-ing")] Verb + 는 거 changes a verb into a noun-like form. This allows the action to function as a subject or object in the sentence.',
+    'It is similar to "-ing" in English, such as "reading" or "eating." This structure is very common in Korean because many sentences require verbs to act like nouns.',
+    'EN: I like reading books. KR: 책 읽는 거 좋아해요.'
+  ],
+  'Gerund/Noun + 같아요': [
+    '[Gerund/Noun + 같아요 – "seems like / I think"] 같아요 is used to express a guess, opinion, or impression. It makes the sentence sound less certain and more natural.',
+    'When used with verbs, the verb is first changed into -는 거 (gerund) form. Then 같아요 is added to show "it seems like." When used with nouns, 같아요 attaches directly to the noun.',
+    'EN: I think my friend is studying Korean. KR: 제 친구 한국어 공부하는 거 같아요.'
+  ]
+};
+
+        function matGenerateGrammarPDF() {
+            if (matSelectedGrammarPoints.length === 0) { alert('No grammar points selected.'); return; }
+            var storyText = document.getElementById('matTextInput') ? document.getElementById('matTextInput').value.trim() : '';
+            if (!storyText) { alert('No story text found. Please generate a story first.'); return; }
+
+            var btn = document.getElementById('matGrammarPdfBtn');
+            var origText = btn ? btn.innerHTML : '';
+            if (btn) { btn.innerHTML = '&#9203; Analyzing...'; btn.disabled = true; }
+
+            var allSentences = storyText.split(/\n/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
+            var pointsJson = JSON.stringify(matSelectedGrammarPoints);
+            var sentencesJson = JSON.stringify(allSentences);
+
+            var aiPrompt = 'You are a Korean grammar analyst. I will give you a list of sentences from a Korean story, and a list of grammar points.\n'
+                + 'For each grammar point, identify which sentences from the list best demonstrate that grammar point.\n'
+                + 'A sentence can appear under multiple grammar points if applicable.\n'
+                + 'Reply ONLY with a JSON object (no markdown, no backticks) where each key is a grammar point (exactly as given) '
+                + 'and each value is an array of sentence strings that demonstrate it. If no sentences clearly match a grammar point, use an empty array.\n\n'
+                + 'Grammar points: ' + pointsJson + '\n\n'
+                + 'Sentences: ' + sentencesJson;
+
+            fetch('https://generateflashcardai-386010826708.us-central1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: 'user', content: aiPrompt }], max_tokens: 2000 })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var t = '';
+                if (typeof data === 'string') t = data;
+                else if (data.data) t = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
+                else if (data.text) t = data.text;
+                else if (data.result) t = data.result;
+                else if (data.response) t = data.response;
+                else if (data.content) t = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                else if (data.choices && data.choices[0]) t = data.choices[0].message ? data.choices[0].message.content : (data.choices[0].text || '');
+                t = t.replace(/^```json\s*|```\s*$/g, '').trim();
+                var mapping;
+                try { mapping = JSON.parse(t); } catch(e) { var m = t.match(/{[\s\S]*}/); if (m) try { mapping = JSON.parse(m[0]); } catch(e2) {} }
+                if (!mapping) { alert('Could not parse AI response. Please try again.'); return; }
+                matBuildGrammarPDF(mapping);
+            })
+            .catch(function(err) {
+                console.error('Grammar PDF error:', err);
+                alert('Failed to analyze grammar: ' + err.message);
+            })
+            .finally(function() {
+                if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+            });
+        }
+
+        function matBuildGrammarPDF(mapping) {
+            function doLoad(src) {
+                return new Promise(function(res, rej) {
+                    if (document.querySelector('script[src="' + src + '"]')) { res(); return; }
+                    var s = document.createElement('script'); s.src = src;
+                    s.onload = res; s.onerror = rej;
+                    document.head.appendChild(s);
+                });
+            }
+            doLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+            .then(function() {
+                var pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                var pageW = 210, pageH = 297;
+                var margin = 18, y = margin;
+                var contentW = pageW - margin * 2;
+
+                function checkPage(needed) {
+                    if (y + needed > pageH - margin) { pdf.addPage(); y = margin; }
+                }
+
+                function drawWrapped(text, xPos, maxW, lineH, fontSz, bold, color) {
+                    pdf.setFontSize(fontSz);
+                    pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+                    if (color) pdf.setTextColor(color[0], color[1], color[2]); else pdf.setTextColor(30, 30, 30);
+                    var lines = pdf.splitTextToSize(text, maxW);
+                    checkPage(lines.length * lineH + 2);
+                    pdf.text(lines, xPos, y);
+                    y += lines.length * lineH;
+                }
+
+                // Title
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(18);
+                pdf.setTextColor(40, 40, 80);
+                pdf.text('Grammar Study Sheet', margin, y);
+                y += 10;
+
+                // Subtitle
+                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(10);
+                pdf.setTextColor(120, 120, 140);
+                var today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+                pdf.text('KoreanLearnin  |  Generated ' + today, margin, y);
+                y += 4;
+
+                // Divider
+                pdf.setDrawColor(100, 100, 200);
+                pdf.setLineWidth(0.5);
+                pdf.line(margin, y, pageW - margin, y);
+                y += 8;
+
+                var points = matSelectedGrammarPoints;
+                for (var pi = 0; pi < points.length; pi++) {
+                    var gp = points[pi];
+                    var sentences = mapping[gp] || [];
+                    var defs = MAT_GRAMMAR_DEFS[gp] || [];
+
+                    checkPage(24);
+
+                    // Grammar point header box
+                    pdf.setFillColor(230, 235, 255);
+                    pdf.setDrawColor(100, 120, 220);
+                    pdf.setLineWidth(0.4);
+                    var headerH = 9;
+                    pdf.roundedRect(margin, y - 6, contentW, headerH, 2, 2, 'FD');
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setFontSize(11);
+                    pdf.setTextColor(50, 60, 160);
+                    pdf.text(gp, margin + 4, y);
+                    y += headerH;
+
+                    // Definition lines
+                    if (defs.length > 0) {
+                        for (var di = 0; di < defs.length; di++) {
+                            drawWrapped(defs[di], margin + 2, contentW - 4, 5.5, 9.5, false, [60, 80, 60]);
+                            y += 1.5;
+                        }
+                        y += 3;
+                        // thin divider between defs and sentences
+                        pdf.setDrawColor(180, 190, 230);
+                        pdf.setLineWidth(0.2);
+                        pdf.line(margin + 2, y, pageW - margin - 2, y);
+                        y += 5;
+                    }
+
+                    // Story sentences for this grammar point
+                    if (sentences.length === 0) {
+                        pdf.setFont('helvetica', 'italic');
+                        pdf.setFontSize(10);
+                        pdf.setTextColor(160, 160, 160);
+                        pdf.text('No matching sentences found in this story.', margin + 4, y);
+                        y += 7;
+                    } else {
+                        for (var si = 0; si < sentences.length; si++) {
+                            checkPage(14);
+                            pdf.setFillColor(100, 120, 220);
+                            pdf.circle(margin + 3, y - 1.5, 1.2, 'F');
+                            pdf.setFont('helvetica', 'normal');
+                            pdf.setFontSize(12);
+                            pdf.setTextColor(30, 30, 30);
+                            var lines = pdf.splitTextToSize(sentences[si], contentW - 10);
+                            pdf.text(lines, margin + 8, y);
+                            y += lines.length * 6 + 3;
+                        }
+                    }
+                    y += 8;
+                }
+
+                pdf.save('Grammar_Study_Sheet.pdf');
+            })
+            .catch(function(err) { alert('Could not load PDF library: ' + err.message); });
+        }
+
+function matCloseStoryPrompt() {
             document.getElementById('matStoryModal').style.display = 'none';
         }
 
@@ -11420,21 +11726,8 @@
             var particleJSON = JSON.stringify(particleData);
 
             var h = '';
-            h += '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"></head><body>\n';
-            h += '<div id="klrn-reader">\n';
-            h += '  <div class="klr-slide-area">\n';
-            h += '    <div class="klr-slides" id="klrSlides"></div>\n';
-            h += '  </div>\n';
-            h += '  <div class="klr-nav">\n';
-            h += '    <button id="klrPb" onclick="KLR.go(-1)">&#9664; Prev</button>\n';
-            h += '    <span id="klrInd">1 / ' + totalSlides + '</span>\n';
-            h += '    <button id="klrNb" onclick="KLR.go(1)">Next &#9654;</button>\n';
-            h += '  </div>\n';
-            h += '  <div class="klr-dots" id="klrDots"></div>\n';
-            h += '</div>\n';
-
+            h += '<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n';
             h += '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">\n';
-
             h += '<style>\n';
             h += '#klrn-reader, #klrn-reader * { box-sizing: border-box; margin: 0; padding: 0; }\n';
             h += '#klrn-reader { font-family: "Noto Sans KR", sans-serif; width: 100%; margin: 0 auto; text-align: center; --s: 1; }\n';
@@ -11549,7 +11842,18 @@
             h += '  .klr-comp-intro-popup button { padding: 3px 12px !important; font-size: 7px !important; }\n';
             h += '  .klr-particle-overlay .klr-particle-popup { font-size: 9px !important; padding: 10px !important; max-width: 200px !important; }\n';
             h += '}\n';
-            h += '</style>\n';
+            h += '</style></head><body>\n';
+            h += '<div id="klrn-reader">\n';
+            h += '  <div class="klr-slide-area">\n';
+            h += '    <div class="klr-slides" id="klrSlides"></div>\n';
+            h += '  </div>\n';
+            h += '  <div class="klr-nav">\n';
+            h += '    <button id="klrPb" onclick="KLR.go(-1)">&#9664; Prev</button>\n';
+            h += '    <span id="klrInd">1 / ' + totalSlides + '</span>\n';
+            h += '    <button id="klrNb" onclick="KLR.go(1)">Next &#9654;</button>\n';
+            h += '  </div>\n';
+            h += '  <div class="klr-dots" id="klrDots"></div>\n';
+            h += '</div>\n';
 
             h += '<script>\n';
             h += '(function(){\n';
@@ -11679,6 +11983,7 @@
                 h += '  html += "<button class=\\"klr-play-btn" + (klrPlaying ? " playing" : "") + "\\" id=\\"klrPlayBtn\\" onclick=\\"event.stopPropagation(); KLR.togglePlay()\\">&#9654;</button>";\n';
             }
             h += '  html += "<div class=\\"klr-num\\">" + (i+1) + " / " + totalSlides + "</div>";\n';
+            h += '  if (tutActive) html += \'<button onclick="event.stopPropagation(); KLR.closeTutorial()" style="position:absolute;bottom:calc(10px * var(--s));right:calc(10px * var(--s));z-index:300002;background:rgba(0,0,0,0.55);color:#fff;border:1.5px solid rgba(255,255,255,0.35);border-radius:calc(6px * var(--s));padding:calc(5px * var(--s)) calc(12px * var(--s));font-size:calc(11px * var(--s));font-weight:700;font-family:Noto Sans KR,sans-serif;cursor:pointer;backdrop-filter:blur(4px);transition:background 0.15s;">Skip Tutorial</button>\';\n';
             h += '  html += "</div>";\n';
             h += '  el.innerHTML = html;\n';
             h += '}\n';
@@ -11946,7 +12251,7 @@
             h += '  ov.innerHTML=\'<div class="klr-comp-intro-popup"><div style="font-size:20px;font-weight:700;color:#e8c87a;margin-bottom:16px;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;">🎙️ Comparison Mode</div><div style="color:#ddd;font-size:15px;line-height:1.7;margin-bottom:22px;">Welcome to Comparison Mode. Here, you can record your voice to see how you compare to Mr. Calvin\\\'s recording. The goal here is to help you notice any subtle pronunciation mistakes you might be making. To begin, please click on any sentence.</div><button onclick="KLR.dismissCompIntro()" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#000;border:none;border-radius:10px;padding:12px 40px;font-size:16px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;">OK</button></div>\';\n';
             h += '  document.body.appendChild(ov);\n';
             h += '  var sa = document.querySelector("#klrn-reader .klr-slide-area");\n';
-            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-particle-popup"); if(pp){ var _pt=sr.top+sr.height/2, _pl=sr.left+sr.width/2; if(_pt>0 && _pt<window.innerHeight && _pl>0 && _pl<window.innerWidth){ pp.style.position="absolute"; pp.style.top=_pt+"px"; pp.style.left=_pl+"px"; pp.style.transform="translate(-50%,-50%)"; } } }\n';
+            h += '  if (sa) { var sr = sa.getBoundingClientRect(); var pp = ov.querySelector(".klr-comp-intro-popup"); if(pp){ var _pt=sr.top+sr.height/2, _pl=sr.left+sr.width/2; if(_pt>0 && _pt<window.innerHeight && _pl>0 && _pl<window.innerWidth){ pp.style.position="absolute"; pp.style.top=_pt+"px"; pp.style.left=_pl+"px"; pp.style.transform="translate(-50%,-50%)"; } } }\n';
             h += '  requestAnimationFrame(function(){ov.classList.add("visible");});\n';
             h += '}\n';
             h += 'function klrDismissCompIntro() {\n';
