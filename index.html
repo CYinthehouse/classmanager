@@ -1951,6 +1951,7 @@
                                 <button onclick="matLoadTextMenu()" style="margin-bottom:10px; padding:8px 18px; background:linear-gradient(135deg,#636e72,#95a5a6); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📂 Load</button>
                                 <textarea id="matTextInput" placeholder="오늘 날씨가 좋아요.&#10;저는 한국어를 공부합니다.&#10;내일 학교에 갈 거예요.&#10;&#10;한국은 아름다운 나라입니다.&#10;서울은 큰 도시입니다.&#10;한강이 서울을 지나갑니다."></textarea>
                                 <p style="font-size: 10px; color: #555; margin-top: 5px;">Slides detected: <span id="matSlideCount" style="color: #00ffff;">0</span> <span style="color:#444;">(separate slides with a blank line)</span></p>
+                                <div id="matGrammarTagsDisplay" style="display:none; margin-top:6px; font-size:11px; color:#f97316; line-height:1.6;"></div>
                                 <div class="mat-font-size-row">
                                     <label>Font Size</label>
                                     <input type="range" id="matFontSize" min="16" max="60" value="30" oninput="document.getElementById('matFontSizeVal').textContent=this.value+'px'; matRegenerateSlides();">
@@ -10504,6 +10505,16 @@ function matCloseStoryPrompt() {
                 matCloseStoryPrompt();
                 // Update slide count
                 matParseSlides();
+                // Show selected grammar points
+                var tagsEl = document.getElementById('matGrammarTagsDisplay');
+                if (tagsEl) {
+                    if (matSelectedGrammarPoints.length > 0) {
+                        tagsEl.innerHTML = '&#127358; Grammar focus: ' + matSelectedGrammarPoints.map(function(p) { return '<span style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.4);border-radius:12px;padding:1px 8px;margin:0 2px;white-space:nowrap;">' + p + '</span>'; }).join(' ');
+                        tagsEl.style.display = 'block';
+                    } else {
+                        tagsEl.style.display = 'none';
+                    }
+                }
             })
             .catch(function(err) {
                 console.error('Story generation error:', err);
