@@ -2007,19 +2007,58 @@
                         </div>
                         <div id="matGrammarPanel" style="display:none; background:rgba(0,0,0,0.3); border:1px solid rgba(102,126,234,0.3); border-radius:10px; padding:12px; margin-bottom:12px;">
                             <p style="color:#a0aef7; font-size:11px; font-weight:700; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Click a grammar point to add it to your prompt:</p>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                            <p style="color:#f97316; font-size:10px; font-weight:700; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Novice</p>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Subject/Topic particles: 이/가, 은/는</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Object particle: 을/를</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">With: Noun(이)랑 / Noun하고 / Noun와/과</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Location particles: (으)로, 에서, 에</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Am/is/are: 이에요 / 예요</button>
+                            </div>
+                            <p style="color:#4ade80; font-size:10px; font-weight:700; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Beginner</p>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">있어요</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">은/는 &amp; 있어요</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Name And Hobby Introduction</button>
-                                                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerund/Noun + 같아요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">~는데</button>
+                            </div>
+                            <p style="color:#a78bfa; font-size:10px; font-weight:700; margin-top:10px; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Advanced Beginner</p>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Present modifier: ROOT는</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past modifier: ROOT은 / ROOTㄴ</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Future modifier: ROOT을 / ROOTㄹ</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive modifier: ROOT고 있는</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Existential modifiers: 있는 / 있던</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)ㄹ + noun</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT는 것 / ROOT는 거 (Nominalization/gerund)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 (and)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT지만 (but)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (while doing / interrupted)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 나서 (after)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT기 전에 (before)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT서 (result/cause)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)니까 (reason)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 (if/when)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 때 (when)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 수 있다 / 없다 (can / cannot)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶다 (want to – speaker)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶어하다 (wants to – third person)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT야 하다 / 되다 (must / need to)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT도 되다 (may / allowed to)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 되다 (it's okay if / just need to)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (plan/intend to)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past tense: ROOT았/었어요</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive: ROOT고 있다</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">많다 (there is a lot / many)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">없다 (not have / there is not)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">밖에 + 없다 (only / nothing but)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (signifies an interruption)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (signifies an intention)</button>
+                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Quantifiers: 이상 (at least), 정도 (about), 쫴 (around), 약 (approximately), 더 (more)</button>
                             </div>
                             <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
                                 <input type="text" id="matCustomGrammarInput" placeholder="Type a custom grammar point..." style="flex:1; padding:6px 10px; background:rgba(255,255,255,0.08); border:1px solid rgba(102,126,234,0.4); border-radius:20px; color:#fff; font-size:11px; font-family:inherit; outline:none;" onkeydown="if(event.key==='Enter'){matAddCustomGrammarPoint();}">
@@ -10255,70 +10294,171 @@
         }
 
 var MAT_GRAMMAR_DEFS = {
-  'Subject/Topic particles: 이/가, 은/는': [
-    '이/가 marks the subject (who/what does something), while 은/는 marks the topic (similar to "as for..." in English).',
-    '[Topic – 은/는] EN: As for my mom, she\'s a teacher. KR: 엄마는 선생님이에요.',
-    '[Subject – 이/가] EN: The cat is sleeping. KR: 고양이가 자요. (The cat is doing the action, sleeping, so it\'s marked with the subject particle 가).'
-  ],
-  'Object particle: 을/를': [
-    '을/를 marks the object (what receives the action).',
-    'EN: I eat rice. KR: 밥을 먹어요. (Rice receiving the action (being eaten), so it gets marked with 을).'
-  ],
-  'With: Noun(이)랑 / Noun하고 / Noun와/과': [
-    'All mean "with/and," but (이)랑 is casual, 하고 is neutral/everyday, and 와/과 is formal/written. 하고 is the safest daily choice. We rarely use 와/과 but you will need it for advanced studies.',
-    '[(이)랑 – casual] EN: I\'m going with my friend. KR: 친구랑 가요.',
-    '[하고 – neutral] EN: I\'m going with my friend. KR: 친구하고 가요.',
-    '[와/과 – formal] EN: I\'m going with my friend. KR: 친구와 가요.'
-  ],
-  'Location particles: (으)로, 에서, 에': [
-    '에 is used for destinations ("to") and static location ("at/in") with verbs like 가다 (go), 오다 (come), 있다 (exist). EN: I go to school. KR: 학교에 가요.',
-    '에서 is used for the place where an action actively happens (study, eat, work, etc.). EN: I study at school. KR: 학교에서 공부해요.',
-    '(으)로 is used for direction or endpoint, often implying movement toward something rather than just arrival. EN: I go to the right. KR: 오른쪽으로 가요.'
-  ],
-  'Am/is/are: 이에요 / 예요': [
-    '이에요/예요 means "am/is/are" used to identify or describe a noun. 이에요 is used after consonants and 예요 after vowels.',
-    'EN: I am a student. KR: 학생이에요.'
-  ],
-  'Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면': [
-    'All attach to nouns, but each has a different meaning: (이)고 = "and," (이)ㄴ데 = "but/so", (이)면 = "if."',
-    '[(이)고 – and] EN: She is a teacher and a mom. KR: 선생님이고 엄마예요.',
-    '[(이)ㄴ데 – but/so] EN: I\'m a student, but I\'m busy. KR: 학생인데 바빠요.',
-    '[(이)면 – if] EN: If you\'re a student, apply. KR: 학생이면 지원해요.'
-  ],
-  '있어요': [
-    '있어요 means "to exist" or "to have."',
-    'EN: I have time. KR: 시간 있어요.'
-  ],
-  '이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요': [
-    '이에요/예요 and 이었어요/였어요 are used to describe identity, meaning they tell you what something is or was.',
-    'On the other hand, 있어요 and 있었어요 are used for existence or possession, meaning they tell you whether something exists, is present, or is/was possessed.',
-    'After consonants: use 이에요 or 이었어요. After vowels: use 예요 or 였어요.',
-    '[이에요/예요 – present identity ("is/am/are")] 이에요/예요 is used when you are identifying what something is in the present. EN: She is a teacher. KR: 선생님이에요.',
-    '[이었어요/였어요 – past identity ("was/were")] 이었어요/였어요 is used when you are identifying what something was in the past. EN: She was a teacher. KR: 선생님이었어요.',
-    '[있어요 – existence/possession ("there is/has")] 있어요 is used when you want to say that something exists or that someone has something. EN: There is a cat. KR: 고양이 있어요.',
-    '[있었어요 – past existence/possession ("there was/had")] 있었어요 is used when you want to say that something existed or someone had something in the past. EN: There was a cat. KR: 고양이 있었어요.'
-  ],
-  '은/는 & 있어요': [
-    '[은/는 & 있어요 – possession ("as for…, has")] 은/는 is used to set the topic of the sentence (it\'s close to "as for..." in English). It tells the listener what you are talking about.',
-    'When 은/는 is used with 있어요, it expresses possession naturally in Korean (similar to "I have" in English).',
-    'EN: As for me, I have a house. KR: 저는 집 있어요.'
-  ],
-  'Name And Hobby Introduction': [
-    '[Name And Hobby Introduction] Korean introductions follow a very consistent pattern using 은/는 and 이에요/예요.',
-    'This structure is used to identify who you are or what something is.',
-    'When talking about hobbies, Korean does not use verbs directly. Instead, we use -는 거 (also known as the Gerund). This allows actions to be treated as "things" that can be described.',
-    'EN: My hobby is reading books. KR: 제 취미는 책 읽는 거예요.'
-  ],
-  'Gerunds': [
-    '[Gerunds – verb → noun ("-ing")] Verb + 는 거 changes a verb into a noun-like form. This allows the action to function as a subject or object in the sentence.',
-    'It is similar to "-ing" in English, such as "reading" or "eating." This structure is very common in Korean because many sentences require verbs to act like nouns.',
-    'EN: I like reading books. KR: 책 읽는 거 좋아해요.'
-  ],
-  'Gerund/Noun + 같아요': [
-    '[Gerund/Noun + 같아요 – "seems like / I think"] 같아요 is used to express a guess, opinion, or impression. It makes the sentence sound less certain and more natural.',
-    'When used with verbs, the verb is first changed into -는 거 (gerund) form. Then 같아요 is added to show "it seems like." When used with nouns, 같아요 attaches directly to the noun.',
-    'EN: I think my friend is studying Korean. KR: 제 친구 한국어 공부하는 거 같아요.'
-  ]
+    "\u0022\uc774/\uac00 (Subject particle)\u0022": {
+        definition: "Marks the grammatical subject - who or what performs the action.",
+        emotion: "neutral \u00b7 identifying \u00b7 focus-marking",
+        use: "When introducing new information or answering \"who/what did it?\"",
+        avoid: "When setting a topic or contrasting - use \uc740/\ub294 instead.",
+        formulas: { N: "N\uc774 (after consonant) / N\uac00 (after vowel)", A: "-", V: "-" },
+        examples: [
+            { en: "The cat is sleeping.", kr: "\uace0\uc591\uc774\uac00 \uc790\uc694." }
+        ]
+    },
+    "\uc740/\ub294 (Topic particle)": {
+        definition: "Marks the topic - \"as for ___\" - setting what the sentence is about.",
+        emotion: "framing \u00b7 contrastive \u00b7 conversational",
+        use: "Introducing yourself, shifting subject, comparing two things.",
+        avoid: "When emphasizing who did the action - use \uc774/\uac00.",
+        formulas: { N: "N\uc740 (after consonant) / N\ub294 (after vowel)", A: "-", V: "-" },
+        examples: [
+            { en: "As for my mom, she's a teacher.", kr: "\uc5c4\ub9c8\ub294 \uc120\uc0dd\ub2d8\uc774\uc5d0\uc694." }
+        ]
+    },
+    "\uc744/\ub97c (Object particle)": {
+        definition: "Marks the direct object - what receives the action.",
+        emotion: "neutral \u00b7 grammatical \u00b7 transactional",
+        use: "Any transitive verb sentence (eat, read, buy, meet).",
+        avoid: "With \uc788\ub2e4/\uc5c6\ub2e4 or intransitive verbs - no object particle needed.",
+        formulas: { N: "N\uc744 (after consonant) / N\ub97c (after vowel)", A: "-", V: "-" },
+        examples: [
+            { en: "I eat rice.", kr: "\ubc25\uc744 \uba39\uc5b4\uc694." }
+        ]
+    },
+    "(\uc774)\ub791 / \ud558\uace0 / \uc640\u00b7\uacfc (With / and)": {
+        definition: "Connects two nouns with \"and\" or \"with.\" Register differs: (\uc774)\ub791 casual, \ud558\uace0 neutral, \uc640/\uacfc formal.",
+        emotion: "connective \u00b7 register-sensitive",
+        use: "\ud558\uace0 for everyday speech; (\uc774)\ub791 with close friends; \uc640/\uacfc in writing/formal contexts.",
+        avoid: "Joining verbs or clauses - use -\uace0 instead.",
+        formulas: { N: "N(\uc774)\ub791 / N\ud558\uace0 / N\uc640\u00b7\uacfc", A: "-", V: "-" },
+        examples: [
+            { en: "I'm going with my friend. (casual)", kr: "\uce5c\uad6c\ub791 \uac00\uc694." },
+            { en: "I'm going with my friend. (neutral)", kr: "\uce5c\uad6c\ud558\uace0 \uac00\uc694." }
+        ]
+    },
+    "\uc5d0 / \uc5d0\uc11c / (\uc73c)\ub85c (Location particles)": {
+        definition: "\uc5d0 marks destination or static location; \uc5d0\uc11c marks where an action happens; (\uc73c)\ub85c marks direction or means.",
+        emotion: "spatial \u00b7 directional \u00b7 precise",
+        use: "\uc5d0 with \uac00\ub2e4/\uc624\ub2e4/\uc788\ub2e4; \uc5d0\uc11c with active verbs (eat, study, work); (\uc73c)\ub85c for \"toward\" or \"by means of.\"",
+        avoid: "Mixing \uc5d0 and \uc5d0\uc11c - ask \"is something happening here, or am I just there?\"",
+        formulas: { N: "N\uc5d0 / N\uc5d0\uc11c / N(\uc73c)\ub85c", A: "-", V: "-" },
+        examples: [
+            { en: "I go to school.", kr: "\ud559\uad50\uc5d0 \uac00\uc694." },
+            { en: "I study at school.", kr: "\ud559\uad50\uc5d0\uc11c \uacf5\ubd80\ud574\uc694." },
+            { en: "I go to the right.", kr: "\uc624\ub978\ucabd\uc73c\ub85c \uac00\uc694." }
+        ]
+    },
+    "\uc774\uc5d0\uc694 / \uc608\uc694 (Copula - present)": {
+        definition: "The \"am/is/are\" copula used to identify or define a noun.",
+        emotion: "defining \u00b7 polite \u00b7 everyday",
+        use: "Stating identity, job, nationality, what something is.",
+        avoid: "Describing existence or possession - use \uc788\uc5b4\uc694 instead.",
+        formulas: { N: "N\uc774\uc5d0\uc694 (after consonant) / N\uc608\uc694 (after vowel)", A: "-", V: "-" },
+        examples: [
+            { en: "I am a student.", kr: "\ud559\uc0dd\uc774\uc5d0\uc694." },
+            { en: "She is a teacher.", kr: "\uc120\uc0dd\ub2d8\uc774\uc5d0\uc694." }
+        ]
+    },
+    "\uc774\uc5c8\uc5b4\uc694 / \uc600\uc5b4\uc694 (Copula - past)": {
+        definition: "The past-tense copula - \"was/were\" - used to identify what something was.",
+        emotion: "defining \u00b7 retrospective \u00b7 polite",
+        use: "Describing a past role, job, or identity.",
+        avoid: "Describing past existence or possession - use \uc788\uc5c8\uc5b4\uc694.",
+        formulas: { N: "N\uc774\uc5c8\uc5b4\uc694 (after consonant) / N\uc600\uc5b4\uc694 (after vowel)", A: "-", V: "-" },
+        examples: [
+            { en: "She was a teacher.", kr: "\uc120\uc0dd\ub2d8\uc774\uc5c8\uc5b4\uc694." }
+        ]
+    },
+    "\uc788\uc5b4\uc694 (Existence / possession - present)": {
+        definition: "Expresses that something exists or that someone has something.",
+        emotion: "neutral \u00b7 stating \u00b7 versatile",
+        use: "\"There is ___\" / \"I have ___\" / \"___ is (located) here.\"",
+        avoid: "Identifying what something is - use \uc774\uc5d0\uc694/\uc608\uc694.",
+        formulas: { N: "N(\uc774/\uac00) \uc788\uc5b4\uc694", A: "-", V: "-" },
+        examples: [
+            { en: "I have time.", kr: "\uc2dc\uac04 \uc788\uc5b4\uc694." },
+            { en: "There is a cat.", kr: "\uace0\uc591\uc774 \uc788\uc5b4\uc694." }
+        ]
+    },
+    "\uc788\uc5c8\uc5b4\uc694 (Existence / possession - past)": {
+        definition: "Past-tense of \uc788\uc5b4\uc694 - \"there was\" or \"had.\"",
+        emotion: "retrospective \u00b7 factual",
+        use: "Narrating past events, recalling what you had, describing a past state.",
+        avoid: "Past identity - use \uc774\uc5c8\uc5b4\uc694/\uc600\uc5b4\uc694.",
+        formulas: { N: "N(\uc774/\uac00) \uc788\uc5c8\uc5b4\uc694", A: "-", V: "-" },
+        examples: [
+            { en: "There was a cat.", kr: "\uace0\uc591\uc774 \uc788\uc5c8\uc5b4\uc694." }
+        ]
+    },
+    "N(\uc774)\uace0 (Noun + and)": {
+        definition: "Connects nouns or noun phrases meaning \"and\" - used when listing identities or facts.",
+        emotion: "listing \u00b7 equal-weight",
+        use: "\"She is a teacher and a mom.\" Linking two noun statements.",
+        avoid: "Contrasting - use (\uc774)\u3134\ub370 for \"but.\"",
+        formulas: { N: "N(\uc774)\uace0", A: "-", V: "-" },
+        examples: [
+            { en: "She is a teacher and a mom.", kr: "\uc120\uc0dd\ub2d8\uc774\uace0 \uc5c4\ub9c8\uc608\uc694." }
+        ]
+    },
+    "N(\uc774)\u3134\ub370 (Noun + but/so - background)": {
+        definition: "Noun form of ~\ub294\ub370; gives background info about a noun before the main clause.",
+        emotion: "softening \u00b7 contextual \u00b7 sometimes contrastive",
+        use: "Setting up a situation: \"He's a student, but he's always busy.\"",
+        avoid: "Strong contrast - use \ud558\uc9c0\ub9cc or \uadf8\ub807\uc9c0\ub9cc.",
+        formulas: { N: "N(\uc774)\u3134\ub370", A: "-", V: "-" },
+        examples: [
+            { en: "I'm a student, but I'm busy.", kr: "\ud559\uc0dd\uc778\ub370 \ubc14\ube60\uc694." }
+        ]
+    },
+    "N(\uc774)\uba74 (Noun + if)": {
+        definition: "Conditional \"if\" attached to nouns - \"if it's ___.\"",
+        emotion: "conditional \u00b7 hypothetical",
+        use: "\"If you're a student, apply.\" Hypothetical identity or category.",
+        avoid: "Factual cause - use -\uae30 \ub54c\ubb38\uc5d0.",
+        formulas: { N: "N(\uc774)\uba74", A: "-", V: "-" },
+        examples: [
+            { en: "If you're a student, apply.", kr: "\ud559\uc0dd\uc774\uba74 \uc9c0\uc6d0\ud574\uc694." }
+        ]
+    },
+    "\uc740/\ub294 + \uc788\uc5b4\uc694 (Topic + have)": {
+        definition: "Combines topic marking with existence/possession to say \"as for ___, I have ___.\"",
+        emotion: "personal \u00b7 conversational \u00b7 introducing",
+        use: "Telling someone what you have, especially when contrasting or introducing yourself.",
+        avoid: "When simply stating what exists without topic emphasis - drop \uc740/\ub294.",
+        formulas: { N: "N\uc740/\ub294 N(\uc774/\uac00) \uc788\uc5b4\uc694", A: "-", V: "-" },
+        examples: [
+            { en: "As for me, I have a house.", kr: "\uc800\ub294 \uc9d1 \uc788\uc5b4\uc694." }
+        ]
+    },
+    "~\ub294 \uac70 (Gerund - verb to noun)": {
+        definition: "Turns a verb into a noun-like form, similar to English \"-ing.\"",
+        emotion: "abstracting \u00b7 natural \u00b7 very common",
+        use: "Hobbies, likes, topics: \"I like reading.\" \"Studying is hard.\"",
+        avoid: "When you actually want the verb to stay a verb - don't force gerund where a plain clause works.",
+        formulas: { N: "-", A: "-", V: "V-\ub294 \uac70" },
+        examples: [
+            { en: "I like reading books.", kr: "\ucc45 \uc77d\ub294 \uac70 \uc88b\uc544\ud574\uc694." }
+        ]
+    },
+    "~\ub294 \uac70 \uac19\uc544\uc694 / N \uac19\uc544\uc694 (Seems like / I think)": {
+        definition: "Expresses a guess, opinion, or soft impression - \"it seems like ___.\"",
+        emotion: "hedging \u00b7 polite \u00b7 uncertain",
+        use: "Softening opinions; describing what something resembles.",
+        avoid: "Stating confirmed facts - drop \uac19\uc544\uc694.",
+        formulas: { N: "N \uac19\uc544\uc694", A: "A-(\uc73c)\u3134 \uac70 \uac19\uc544\uc694", V: "V-\ub294 \uac70 \uac19\uc544\uc694" },
+        examples: [
+            { en: "I think my friend is studying Korean.", kr: "\uc81c \uce5c\uad6c \ud55c\uad6d\uc5b4 \uacf5\ubd80\ud558\ub294 \uac70 \uac19\uc544\uc694." }
+        ]
+    },
+    "~\ub294\ub370 (Background / contrast - verb & adjective)": {
+        definition: "Sets up background or mild contrast before the main clause - \"___, but/so/and...\"",
+        emotion: "softening \u00b7 conversational \u00b7 setup",
+        use: "Giving context before a question, request, or observation.",
+        avoid: "As a standalone ending in formal writing.",
+        formulas: { N: "N(\uc774)\u3134\ub370", A: "A-(\uc73c)\u3134\ub370", V: "V-\ub294\ub370" },
+        examples: [
+            { en: "It's a gift, but I don't know.", kr: "\uc120\ubb3c\uc778\ub370 \ubab0\ub77c\uc694." }
+        ]
+    }
 };
 
         function matGenerateGrammarPDF() {
@@ -10373,69 +10513,165 @@ var MAT_GRAMMAR_DEFS = {
         }
 
         function matBuildGrammarPDF(mapping) {
-            var points = matSelectedGrammarPoints;
-            var today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+            var points = matSelectedGrammarPoints.filter(function(gp) {
+                return mapping[gp] && Array.isArray(mapping[gp]) && mapping[gp].length > 0;
+            });
 
-            var sectionsHtml = '';
-            for (var pi = 0; pi < points.length; pi++) {
-                var gp = points[pi];
-                var sentences = mapping[gp] || [];
-                var defs = MAT_GRAMMAR_DEFS[gp] || [];
+            if (points.length === 0) {
+                alert('No selected grammar points were demonstrated in this story.');
+                return;
+            }
 
-                var defsHtml = '';
-                for (var di = 0; di < defs.length; di++) {
-                    defsHtml += '<p class="def-line">' + defs[di].replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+            var now = new Date();
+            var titleDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            var y = now.getFullYear();
+            var mo = String(now.getMonth() + 1).padStart(2, '0');
+            var d = String(now.getDate()).padStart(2, '0');
+            var filename = 'Grammar_Study_Sheet_' + y + '-' + mo + '-' + d + '.pdf';
+
+            function esc(s) {
+                return String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function buildCard(gp, sentences) {
+                var info = MAT_GRAMMAR_DEFS[gp];
+                if (!info) {
+                    var fbSents = '';
+                    for (var i = 0; i < sentences.length; i++) {
+                        fbSents += '<div class="sent-row"><span class="cb">\u2610</span><span class="sent-text">' + esc(sentences[i]) + '</span></div>';
+                    }
+                    return '<div class="gp-card">'
+                        + '<div class="gp-header">' + esc(gp) + '</div>'
+                        + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
+                        + '<div class="sect-body">' + fbSents + '</div>'
+                        + '</div>';
                 }
 
-                var sentHtml = '';
-                if (sentences.length === 0) {
-                    sentHtml = '<p class="no-match">No matching sentences found in this story.</p>';
-                } else {
-                    for (var si = 0; si < sentences.length; si++) {
-                        sentHtml += '<div class="sentence-row"><span class="bullet"></span><span class="sentence-text">' + sentences[si].replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>';
+                var examplesHtml = '';
+                if (info.examples && info.examples.length) {
+                    for (var ei = 0; ei < info.examples.length; ei++) {
+                        var ex = info.examples[ei];
+                        examplesHtml += '<div class="example-row">'
+                            + '<div class="ex-en">EN: ' + esc(ex.en) + '</div>'
+                            + '<div class="ex-kr">KR: ' + esc(ex.kr) + '</div>'
+                            + '</div>';
                     }
                 }
 
-                sectionsHtml +=
-                    '<div class="gp-section">' +
-                        '<div class="gp-header">' + gp.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
-                        (defsHtml ? '<div class="defs-block">' + defsHtml + '</div><hr class="def-divider">' : '') +
-                        '<div class="sentences-block">' + sentHtml + '</div>' +
-                    '</div>';
+                var formulasHtml = '';
+                if (info.formulas) {
+                    var fRows = '';
+                    if (info.formulas.N && info.formulas.N !== '-') fRows += '<div class="formula-row"><span class="formula-label">N \u2192</span> ' + esc(info.formulas.N) + '</div>';
+                    if (info.formulas.A && info.formulas.A !== '-') fRows += '<div class="formula-row"><span class="formula-label">A \u2192</span> ' + esc(info.formulas.A) + '</div>';
+                    if (info.formulas.V && info.formulas.V !== '-') fRows += '<div class="formula-row"><span class="formula-label">V \u2192</span> ' + esc(info.formulas.V) + '</div>';
+                    if (fRows) formulasHtml = '<div class="sect-label">\ud83d\udcd0 Formulas</div><div class="sect-body formulas-block">' + fRows + '</div>';
+                }
+
+                var sentHtml = '';
+                for (var si = 0; si < sentences.length; si++) {
+                    sentHtml += '<div class="sent-row"><span class="cb">\u2610</span><span class="sent-text">' + esc(sentences[si]) + '</span></div>';
+                }
+
+                return '<div class="gp-card">'
+                    + '<div class="gp-header">' + esc(gp) + '</div>'
+                    + '<div class="meta-line"><b>\ud83d\udcd6 Definition:</b> ' + esc(info.definition) + '</div>'
+                    + '<div class="meta-line"><b>\ud83d\udcad Emotion/Tone:</b> ' + esc(info.emotion) + '</div>'
+                    + '<div class="meta-line"><b>\u2705 Use:</b> ' + esc(info.use) + '</div>'
+                    + '<div class="meta-line"><b>\u26d4 Avoid:</b> ' + esc(info.avoid) + '</div>'
+                    + formulasHtml
+                    + (examplesHtml ? '<div class="sect-label">\u270d\ufe0f Examples</div><div class="sect-body">' + examplesHtml + '</div>' : '')
+                    + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
+                    + '<div class="sect-body">' + sentHtml + '</div>'
+                    + '</div>';
             }
 
-            var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-                + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">'
+            var pagesHtml = '';
+            var CARDS_PER_PAGE = 2;
+            for (var p = 0; p < points.length; p += CARDS_PER_PAGE) {
+                var chunk = points.slice(p, p + CARDS_PER_PAGE);
+                var pageInner = '';
+                if (p === 0) {
+                    pageInner += '<div class="page-header">'
+                        + '<h1>Tuesday Reading Grammar Study Sheet</h1>'
+                        + '<div class="page-date">' + esc(titleDate) + '</div>'
+                        + '<hr class="top-divider">'
+                        + '</div>';
+                }
+                for (var ci = 0; ci < chunk.length; ci++) {
+                    pageInner += buildCard(chunk[ci], mapping[chunk[ci]]);
+                }
+                pagesHtml += '<section class="page">' + pageInner + '</section>';
+            }
+
+            var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+                + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
                 + '<title>Grammar Study Sheet</title>'
                 + '<style>'
                 + '* { box-sizing: border-box; margin: 0; padding: 0; }'
-                + 'body { font-family: "Noto Sans KR", sans-serif; color: #1e1e2e; background: #fff; padding: 28px 36px; font-size: 13px; line-height: 1.7; }'
-                + 'h1 { font-size: 22px; font-weight: 700; color: #28285a; margin-bottom: 6px; }'
-                + '.subtitle { font-size: 11px; color: #888; margin-bottom: 8px; }'
-                + '.top-divider { border: none; border-top: 1.5px solid #6468dc; margin-bottom: 22px; }'
-                + '.gp-section { margin-bottom: 26px; page-break-inside: avoid; }'
-                + '.gp-header { background: #e6eaff; border: 1px solid #6878dc; border-radius: 5px; padding: 6px 10px; font-weight: 700; font-size: 12px; color: #323296; margin-bottom: 8px; }'
-                + '.defs-block { padding: 0 4px; margin-bottom: 6px; }'
-                + '.def-line { font-size: 11.5px; color: #3a5a3a; margin-bottom: 4px; }'
-                + '.def-divider { border: none; border-top: 0.5px solid #b4bce8; margin: 8px 4px 10px; }'
-                + '.sentences-block { padding: 0 4px; }'
-                + '.sentence-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; }'
-                + '.bullet { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: #6478dc; margin-top: 5px; }'
-                + '.sentence-text { font-size: 14px; color: #1a1a1a; }'
-                + '.no-match { font-style: italic; color: #aaa; font-size: 11px; }'
-                + '@media print { body { padding: 18px 24px; } .gp-section { page-break-inside: avoid; } }'
+                + 'html, body { background: #fff; }'
+                + 'body { font-family: "Noto Sans KR", "Segoe UI", Arial, sans-serif; color: #1e1e2e; line-height: 1.45; font-size: 13px; }'
+                + '.page { width: 8.5in; min-height: 11in; padding: 0.6in; background: #fff; }'
+                + '.page-header { margin-bottom: 18px; }'
+                + 'h1 { font-size: 22px; font-weight: 700; color: #28285a; margin-bottom: 4px; }'
+                + '.page-date { font-size: 12px; color: #666; margin-bottom: 8px; }'
+                + '.top-divider { border: none; border-top: 2px solid #2453ff; margin-bottom: 4px; }'
+                + '.gp-card { border: 1.5px solid #cfe0ff; border-left: 4px solid #2453ff; background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; page-break-inside: avoid; }'
+                + '.gp-header { background: #e6eaff; border: 1px solid #6878dc; border-radius: 6px; padding: 7px 11px; font-weight: 700; font-size: 13px; color: #28285a; margin-bottom: 10px; }'
+                + '.meta-line { font-size: 12px; color: #1a1a1a; margin-bottom: 5px; line-height: 1.5; }'
+                + '.meta-line b { color: #28285a; font-weight: 700; }'
+                + '.sect-label { font-size: 12px; font-weight: 700; color: #28285a; margin-top: 9px; margin-bottom: 5px; }'
+                + '.sect-body { padding-left: 4px; margin-bottom: 4px; }'
+                + '.formulas-block { font-size: 12px; }'
+                + '.formula-row { margin-bottom: 3px; color: #1a1a1a; }'
+                + '.formula-label { display: inline-block; min-width: 28px; font-weight: 700; color: #28285a; }'
+                + '.example-row { margin-bottom: 7px; padding-left: 6px; border-left: 2px solid #cfe0ff; }'
+                + '.ex-en { font-size: 12px; color: #444; }'
+                + '.ex-kr { font-size: 13px; color: #111; font-weight: 500; }'
+                + '.sent-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 5px; }'
+                + '.cb { flex-shrink: 0; font-size: 13px; color: #2453ff; line-height: 1.4; }'
+                + '.sent-text { font-size: 13px; color: #111; line-height: 1.45; }'
                 + '</style></head><body>'
-                + '<h1>Grammar Study Sheet</h1>'
-                + '<p class="subtitle">KoreanLearnin &nbsp;|&nbsp; Generated ' + today + '</p>'
-                + '<hr class="top-divider">'
-                + sectionsHtml
-                + '<script>window.onload=function(){window.print();}<\/script>'
+                + '<div id="doc">' + pagesHtml + '</div>'
+                + '<script>'
+                + 'function ensureLib(src,testFn){if(testFn())return Promise.resolve();return new Promise(function(res,rej){var s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}'
+                + 'async function generatePDF(){'
+                + '  try{'
+                + '    if(document.fonts&&document.fonts.ready){await document.fonts.ready;}'
+                + '    await ensureLib("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",function(){return window.html2canvas;});'
+                + '    await ensureLib("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js",function(){return window.jspdf;});'
+                + '    var jsPDF=window.jspdf.jsPDF;'
+                + '    var pdf=new jsPDF("p","pt","letter");'
+                + '    var pages=document.querySelectorAll(".page");'
+                + '    for(var i=0;i<pages.length;i++){'
+                + '      var canvas=await window.html2canvas(pages[i],{scale:2,useCORS:true,backgroundColor:"#ffffff"});'
+                + '      var img=canvas.toDataURL("image/png");'
+                + '      var pw=pdf.internal.pageSize.getWidth();'
+                + '      var ph=pdf.internal.pageSize.getHeight();'
+                + '      var ratio=Math.min(pw/canvas.width,ph/canvas.height);'
+                + '      var w=canvas.width*ratio,h=canvas.height*ratio;'
+                + '      if(i>0)pdf.addPage();'
+                + '      pdf.addImage(img,"PNG",(pw-w)/2,(ph-h)/2,w,h);'
+                + '    }'
+                + '    pdf.save(' + JSON.stringify(filename) + ');'
+                + '    setTimeout(function(){window.close();},500);'
+                + '  }catch(e){'
+                + '    console.error("PDF generation failed:",e);'
+                + '    alert("PDF generation failed: "+e.message+"\\n\\nFalling back to Print dialog.");'
+                + '    window.print();'
+                + '  }'
+                + '}'
+                + 'window.addEventListener("load",function(){setTimeout(generatePDF,300);});'
+                + '<\/script>'
                 + '</body></html>';
 
-            var win = window.open('', '_blank', 'width=860,height=1100');
+            var win = window.open('', '_blank', 'width=900,height=1100');
             if (!win) { alert('Popup blocked. Please allow popups for this page and try again.'); return; }
             win.document.open();
-            win.document.write(html);
+            win.document.write(fullHtml);
             win.document.close();
         }
 
