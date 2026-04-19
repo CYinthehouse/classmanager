@@ -1033,6 +1033,11 @@
         .mat-preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
         .mat-preview-header h3 { color: #ff00ff; font-size: 16px; margin: 0; }
         .mat-export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mat-gp-section { border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom:2px; }
+        .mat-gp-toggle { display:flex; justify-content:space-between; align-items:center; width:100%; background:none; border:none; cursor:pointer; padding:5px 2px; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; font-family:inherit; }
+        .mat-gp-toggle:hover { background:rgba(255,255,255,0.04); border-radius:4px; }
+        .mat-gp-arrow { color:#888; font-size:9px; transition:transform 0.2s; }
+        .mat-gp-toggle.collapsed .mat-gp-arrow { transform:rotate(-90deg); }
         .mat-grammar-chip { padding:5px 10px; background:rgba(255,255,255,0.06); border:1px solid rgba(102,126,234,0.4); border-radius:20px; color:#c4ccf7; font-size:11px; cursor:pointer; transition:all 0.15s; font-family:inherit; }
         .mat-grammar-chip:hover { background:rgba(102,126,234,0.25); border-color:#667eea; color:#fff; }
         .mat-grammar-chip.selected { background:rgba(102,126,234,0.35); border-color:#667eea; color:#fff; }
@@ -2005,60 +2010,84 @@
                         <div style="margin-bottom:10px;">
                             <button onclick="matToggleGrammarPanel()" id="matGrammarToggleBtn" style="padding:7px 14px; background:rgba(102,126,234,0.15); border:1px solid rgba(102,126,234,0.5); border-radius:8px; color:#a0aef7; cursor:pointer; font-size:12px; font-weight:600;">&#128218; Grammar Points</button>
                         </div>
-                        <div id="matGrammarPanel" style="display:none; background:rgba(0,0,0,0.3); border:1px solid rgba(102,126,234,0.3); border-radius:10px; padding:12px; margin-bottom:12px;">
+                        <div id="matGrammarPanel" style="display:none; background:rgba(0,0,0,0.3); border:1px solid rgba(102,126,234,0.3); border-radius:10px; padding:12px; margin-bottom:12px; max-height:45vh; overflow-y:auto;">
                             <p style="color:#a0aef7; font-size:11px; font-weight:700; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Click a grammar point to add it to your prompt:</p>
-                            <p style="color:#f97316; font-size:10px; font-weight:700; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Novice</p>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Subject/Topic particles: 이/가, 은/는</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Object particle: 을/를</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">With: Noun(이)랑 / Noun하고 / Noun와/과</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Location particles: (으)로, 에서, 에</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Am/is/are: 이에요 / 예요</button>
-                            </div>
-                            <p style="color:#4ade80; font-size:10px; font-weight:700; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Beginner</p>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">있어요</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">은/는 &amp; 있어요</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Name And Hobby Introduction</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerund/Noun + 같아요</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">~는데</button>
-                            </div>
-                            <p style="color:#a78bfa; font-size:10px; font-weight:700; margin-top:10px; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Advanced Beginner</p>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Present modifier: ROOT는</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past modifier: ROOT은 / ROOTㄴ</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Future modifier: ROOT을 / ROOTㄹ</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive modifier: ROOT고 있는</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Existential modifiers: 있는 / 있던</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)ㄹ + noun</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT는 것 / ROOT는 거 (Nominalization/gerund)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 (and)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT지만 (but)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (while doing / interrupted)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 나서 (after)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT기 전에 (before)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT서 (result/cause)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)니까 (reason)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 (if/when)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 때 (when)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 수 있다 / 없다 (can / cannot)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶다 (want to – speaker)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶어하다 (wants to – third person)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT야 하다 / 되다 (must / need to)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT도 되다 (may / allowed to)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 되다 (it's okay if / just need to)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (plan/intend to)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past tense: ROOT았/었어요</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive: ROOT고 있다</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">많다 (there is a lot / many)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">없다 (not have / there is not)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">밖에 + 없다 (only / nothing but)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (signifies an interruption)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (signifies an intention)</button>
-                                <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Quantifiers: 이상 (at least), 정도 (about), 쫴 (around), 약 (approximately), 더 (more)</button>
+                            <div>
+
+                                <!-- NOVICE -->
+                                <div class="mat-gp-section">
+                                    <button class="mat-gp-toggle" onclick="matToggleGpSection(this)">
+                                        <span style="color:#f97316; font-weight:700;">Novice</span>
+                                        <span class="mat-gp-arrow">&#9660;</span>
+                                    </button>
+                                    <div class="mat-gp-chips" style="display:flex; flex-wrap:wrap; gap:6px; padding:6px 0 8px 0;">
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Subject/Topic particles: 이/가, 은/는</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Object particle: 을/를</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">With: Noun(이)랑 / Noun하고 / Noun와/과</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Location particles: (으)로, 에서, 에</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Am/is/are: 이에요 / 예요</button>
+                                    </div>
+                                </div>
+
+                                <!-- BEGINNER -->
+                                <div class="mat-gp-section">
+                                    <button class="mat-gp-toggle" onclick="matToggleGpSection(this)">
+                                        <span style="color:#4ade80; font-weight:700;">Beginner</span>
+                                        <span class="mat-gp-arrow">&#9660;</span>
+                                    </button>
+                                    <div class="mat-gp-chips" style="display:flex; flex-wrap:wrap; gap:6px; padding:6px 0 8px 0;">
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">있어요</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">은/는 &amp; 있어요</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Name And Hobby Introduction</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerund/Noun + 같아요</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">~는데</button>
+                                    </div>
+                                </div>
+
+                                <!-- ADVANCED BEGINNER -->
+                                <div class="mat-gp-section">
+                                    <button class="mat-gp-toggle" onclick="matToggleGpSection(this)">
+                                        <span style="color:#a78bfa; font-weight:700;">Advanced Beginner</span>
+                                        <span class="mat-gp-arrow">&#9660;</span>
+                                    </button>
+                                    <div class="mat-gp-chips" style="display:none; flex-wrap:wrap; gap:6px; padding:6px 0 8px 0;">
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Present modifier: ROOT는</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past modifier: ROOT은 / ROOTㄴ</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Future modifier: ROOT을 / ROOTㄹ</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive modifier: ROOT고 있는</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Existential modifiers: 있는 / 있던</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)ㄹ + noun</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT는 것 / ROOT는 거 (Nominalization/gerund)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 (and)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT지만 (but)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (while doing / interrupted)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 나서 (after)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT기 전에 (before)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT서 (result/cause)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)니까 (reason)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 (if/when)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 때 (when)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(을/ㄹ) 수 있다 / 없다 (can / cannot)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶다 (want to – speaker)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT고 싶어하다 (wants to – third person)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT야 하다 / 되다 (must / need to)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">PRESENT도 되다 (may / allowed to)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)면 되다 (it's okay if / just need to)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (plan/intend to)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Past tense: ROOT았/었어요</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Progressive: ROOT고 있다</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">많다 (there is a lot / many)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">없다 (not have / there is not)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">밖에 + 없다 (only / nothing but)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT다가 (signifies an interruption)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">ROOT(으)려고 하다 (signifies an intention)</button>
+                                        <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Quantifiers: 이상 (at least), 정도 (about), 쫴 (around), 약 (approximately), 더 (more)</button>
+                                    </div>
+                                </div>
+
                             </div>
                             <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
                                 <input type="text" id="matCustomGrammarInput" placeholder="Type a custom grammar point..." style="flex:1; padding:6px 10px; background:rgba(255,255,255,0.08); border:1px solid rgba(102,126,234,0.4); border-radius:20px; color:#fff; font-size:11px; font-family:inherit; outline:none;" onkeydown="if(event.key==='Enter'){matAddCustomGrammarPoint();}">
@@ -10244,7 +10273,14 @@
             document.getElementById('matStoryPromptInput').focus();
         }
 
-        function matToggleGrammarPanel() {
+        function matToggleGpSection(btn) {
+            var chips = btn.nextElementSibling;
+            var isOpen = chips.style.display !== 'none';
+            chips.style.display = isOpen ? 'none' : 'flex';
+            btn.classList.toggle('collapsed', isOpen);
+        }
+
+function matToggleGrammarPanel() {
             var panel = document.getElementById('matGrammarPanel');
             var btn = document.getElementById('matGrammarToggleBtn');
             if (panel.style.display === 'none') {
