@@ -10670,7 +10670,10 @@ var MAT_GRAMMAR_DEFS = {
                 if (!info) {
                     var fbBlocks = '';
                     for (var i = 0; i < sentenceItems.length; i++) fbBlocks += buildSentenceBlock(sentenceItems[i], i === sentenceItems.length - 1);
-                    return '<div class="gp-card"><div class="gp-header">' + esc(gp) + '</div>'
+                    return '<div class="gp-card"><div class="gp-header-row">'
+                        + '<div class="gp-header">' + esc(gp) + '</div>'
+                        + (mascotUrl ? '<img src="' + mascotUrl + '" class="gp-mascot" alt="">' : '')
+                        + '</div>'
                         + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
                         + '<div class="sect-body">' + fbBlocks + '</div></div>';
                 }
@@ -10703,35 +10706,54 @@ var MAT_GRAMMAR_DEFS = {
                     + '<div class="meta-line"><b>\u2705 Use:</b> ' + esc(info.use) + '</div>'
                     + '<div class="meta-line"><b>\u26d4 Avoid:</b> ' + esc(info.avoid) + '</div>';
 
-                return '<div class="gp-card"><div class="gp-header">' + esc(gp) + '</div>'
+                return '<div class="gp-card"><div class="gp-header-row">'
+                    + '<div class="gp-header">' + esc(gp) + '</div>'
+                    + (mascotUrl ? '<img src="' + mascotUrl + '" class="gp-mascot" alt="">' : '')
+                    + '</div>'
                     + metaHtml + formulasHtml
                     + (examplesHtml ? '<div class="sect-label">\u270d\ufe0f Examples</div><div class="sect-body">' + examplesHtml + '</div>' : '')
                     + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
                     + '<div class="sect-body">' + sentBlocks + '</div></div>';
             }
 
+            var KL_MASCOTS = [
+                'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Untitled_design_44_99a9f3f3-be2f-4534-8050-a31adae3f844.png?v=1775427859',
+                'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/20250927_0454_Chibi_Turtle_Pixel_Art_remix_01k656086wf9pv39trp83n2n2r_1.png?v=1775427859',
+                'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/20250927_0514_Pixel_Fox_Character_remix_01k6575q5hfdc80wrh32w9qr8k_1.png?v=1775427859',
+                'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/20250924_1611_Pixelated_Pink_Wombat-Bear_remix_01k5ynj959eahvd4mcykn8ry3y_1.png?v=1775427860',
+                'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Untitled_design_45_7324ffd0-0a2b-4b14-90ca-b42816752269.png?v=1775427882'
+            ];
             var pagesHtml = '';
             for (var p = 0; p < points.length; p++) {
                 var pageInner = '';
                 if (p === 0) {
-                    pageInner += '<div class="page-header"><h1>Tuesday Reading Grammar Study Sheet</h1>'
+                    pageInner += '<div class="page-header">'
+                        + '<div class="title-row">'
+                        + '<img src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/logo555.png?v=1757969221" class="kl-logo" alt="KoreanLearnin">'
+                        + '<h1>Tuesday Reading<br>Grammar Study Sheet</h1>'
+                        + '</div>'
                         + '<div class="page-date">' + esc(titleDate) + '</div>'
                         + '<hr class="top-divider"></div>';
                 }
-                pageInner += buildCard(points[p], mapping[points[p]]);
+                pageInner += buildCard(points[p], mapping[points[p]], KL_MASCOTS[p % KL_MASCOTS.length]);
                 pagesHtml += '<section class="page">' + pageInner + '</section>';
             }
 
             var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-                + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
+                + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Press+Start+2P&display=swap" rel="stylesheet">'
                 + '<title>Grammar Study Sheet</title><style>'
                 + '* { box-sizing: border-box; margin: 0; padding: 0; }'
                 + 'html, body { background: #fff; }'
                 + 'body { font-family: "Noto Sans KR", "Segoe UI", Arial, sans-serif; color: #1e1e2e; line-height: 1.45; font-size: 13px; }'
                 + '.page { width: 8.5in; min-height: 11in; padding: 0.6in; background: #fff; }'
                 + '.page-header { margin-bottom: 18px; }'
-                + 'h1 { font-size: 22px; font-weight: 700; color: #28285a; margin-bottom: 4px; }'
-                + '.page-date { font-size: 12px; color: #666; margin-bottom: 8px; }'
+                + '.title-row { display: flex; align-items: center; gap: 14px; margin-bottom: 2px; }'
+                + '.kl-logo { width: 58px; height: 58px; object-fit: contain; flex-shrink: 0; }'
+                + '.gp-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }'
+                + '.gp-header-row .gp-header { margin-bottom: 0; flex: 1; }'
+                + '.gp-mascot { width: 60px; height: 60px; object-fit: contain; margin-left: 10px; flex-shrink: 0; transform: rotate(-8deg); filter: drop-shadow(2px 3px 4px rgba(0,0,0,0.18)); }'
+                + 'h1 { font-family: "Press Start 2P", monospace; font-size: 13px; color: #28285a; margin-bottom: 4px; line-height: 1.65; }'
+                + '.page-date { font-size: 15px; color: #111; font-weight: 700; margin-bottom: 10px; margin-top: 8px; }'
                 + '.top-divider { border: none; border-top: 2px solid #2453ff; margin-bottom: 4px; }'
                 + '.gp-card { border: 1.5px solid #cfe0ff; border-left: 4px solid #2453ff; background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; page-break-inside: avoid; }'
                 + '.gp-header { background: #e6eaff; border: 1px solid #6878dc; border-radius: 6px; padding: 7px 11px; font-weight: 700; font-size: 13px; color: #28285a; margin-bottom: 10px; }'
