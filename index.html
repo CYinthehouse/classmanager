@@ -2021,6 +2021,11 @@
                                                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerunds</button>
                                 <button onclick="matAddGrammarPoint(this)" class="mat-grammar-chip">Gerund/Noun + 같아요</button>
                             </div>
+                            <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+                                <input type="text" id="matCustomGrammarInput" placeholder="Type a custom grammar point..." style="flex:1; padding:6px 10px; background:rgba(255,255,255,0.08); border:1px solid rgba(102,126,234,0.4); border-radius:20px; color:#fff; font-size:11px; font-family:inherit; outline:none;" onkeydown="if(event.key==='Enter'){matAddCustomGrammarPoint();}">
+                                <button onclick="matAddCustomGrammarPoint()" style="padding:5px 12px; background:rgba(102,126,234,0.25); border:1px solid rgba(102,126,234,0.5); border-radius:20px; color:#a0aef7; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:inherit;">+ Add</button>
+                            </div>
+                            <div id="matCustomChipsRow" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;"></div>
                         </div>
                         <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end;">
                             <button onclick="matCloseStoryPrompt()" style="padding:10px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:#aaa; cursor:pointer; font-size:13px;">Cancel</button>
@@ -10432,6 +10437,39 @@ var MAT_GRAMMAR_DEFS = {
             win.document.open();
             win.document.write(html);
             win.document.close();
+        }
+
+function matAddCustomGrammarPoint() {
+            var input = document.getElementById('matCustomGrammarInput');
+            var val = input.value.trim();
+            if (!val) return;
+            // Don't add duplicates
+            if (matSelectedGrammarPoints.indexOf(val) !== -1) { input.value = ''; return; }
+            matSelectedGrammarPoints.push(val);
+            // Append to prompt textarea
+            var ta = document.getElementById('matStoryPromptInput');
+            var current = ta.value.trim();
+            ta.value = current + (current ? '\n\nGrammar focus: ' : 'Grammar focus: ') + val;
+            // Render chip in custom chips row
+            var row = document.getElementById('matCustomChipsRow');
+            var chip = document.createElement('span');
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(102,126,234,0.35);border:1px solid #667eea;border-radius:20px;color:#fff;font-size:11px;font-family:inherit;';
+            chip.innerHTML = val.replace(/</g,'&lt;').replace(/>/g,'&gt;') + ' <span onclick="matRemoveCustomChip(this,\'' + val.replace(/'/g,'\\\'') + '\')" style="cursor:pointer;color:#ff9999;font-weight:700;font-size:12px;line-height:1;">&times;</span>';
+            row.appendChild(chip);
+            input.value = '';
+            // Enable PDF button
+            var pdfBtn = document.getElementById('matGrammarPdfBtn');
+            if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.style.borderColor = '#e8c87a'; pdfBtn.style.color = '#e8c87a'; pdfBtn.style.cursor = 'pointer'; pdfBtn.style.opacity = '1'; }
+        }
+
+        function matRemoveCustomChip(xEl, point) {
+            var i = matSelectedGrammarPoints.indexOf(point);
+            if (i !== -1) matSelectedGrammarPoints.splice(i, 1);
+            var ta = document.getElementById('matStoryPromptInput');
+            ta.value = ta.value.replace('\n\nGrammar focus: ' + point, '').replace('Grammar focus: ' + point, '').trim();
+            xEl.parentNode.remove();
+            var pdfBtn = document.getElementById('matGrammarPdfBtn');
+            if (pdfBtn && matSelectedGrammarPoints.length === 0) { pdfBtn.disabled = true; pdfBtn.style.borderColor = '#555'; pdfBtn.style.color = '#555'; pdfBtn.style.cursor = 'not-allowed'; pdfBtn.style.opacity = '0.45'; }
         }
 
 function matCloseStoryPrompt() {
