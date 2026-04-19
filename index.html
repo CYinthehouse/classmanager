@@ -1956,7 +1956,7 @@
                                 <button onclick="matLoadTextMenu()" style="margin-bottom:10px; padding:8px 18px; background:linear-gradient(135deg,#636e72,#95a5a6); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📂 Load</button>
                                 <textarea id="matTextInput" placeholder="오늘 날씨가 좋아요.&#10;저는 한국어를 공부합니다.&#10;내일 학교에 갈 거예요.&#10;&#10;한국은 아름다운 나라입니다.&#10;서울은 큰 도시입니다.&#10;한강이 서울을 지나갑니다."></textarea>
                                 <p style="font-size: 10px; color: #555; margin-top: 5px;">Slides detected: <span id="matSlideCount" style="color: #00ffff;">0</span> <span style="color:#444;">(separate slides with a blank line)</span></p>
-                                <div id="matGrammarTagsDisplay" style="display:none; margin-top:6px; font-size:11px; color:#f97316; line-height:1.6;"></div>
+                                <div id="matGrammarTagsDisplay" style="display:none; margin-top:6px; font-size:11px; color:#f97316; line-height:1.6; max-height:80px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:4px; align-items:flex-start;"></div>
                                 <div class="mat-font-size-row">
                                     <label>Font Size</label>
                                     <input type="range" id="matFontSize" min="16" max="60" value="30" oninput="document.getElementById('matFontSizeVal').textContent=this.value+'px'; matRegenerateSlides();">
@@ -10330,171 +10330,196 @@ function matToggleGrammarPanel() {
         }
 
 var MAT_GRAMMAR_DEFS = {
-    "\u0022\uc774/\uac00 (Subject particle)\u0022": {
-        definition: "Marks the grammatical subject - who or what performs the action.",
-        emotion: "neutral \u00b7 identifying \u00b7 focus-marking",
-        use: "When introducing new information or answering \"who/what did it?\"",
-        avoid: "When setting a topic or contrasting - use \uc740/\ub294 instead.",
-        formulas: { N: "N\uc774 (after consonant) / N\uac00 (after vowel)", A: "-", V: "-" },
+
+    // ───────────────── NOVICE ─────────────────
+
+    "Subject/Topic particles: 이/가, 은/는": {
+        definition: "이/가 marks the subject (who/what does the action). 은/는 marks the topic (\"as for ___\"). Both attach to nouns but frame the sentence differently.",
+        emotion: "foundational · framing · meaning-shaping",
+        use: "이/가 for introducing new info or emphasizing the doer. 은/는 for setting the topic, shifting subject, or contrasting.",
+        avoid: "Treating them as interchangeable - swapping 이/가 for 은/는 changes focus and nuance.",
+        formulas: { N: "N이/가 (subject) · N은/는 (topic)", A: "-", V: "-" },
         examples: [
-            { en: "The cat is sleeping.", kr: "\uace0\uc591\uc774\uac00 \uc790\uc694." }
+            { en: "The cat is sleeping.", kr: "고양이가 자요." },
+            { en: "As for my mom, she's a teacher.", kr: "엄마는 선생님이에요." }
         ]
     },
-    "\uc740/\ub294 (Topic particle)": {
-        definition: "Marks the topic - \"as for ___\" - setting what the sentence is about.",
-        emotion: "framing \u00b7 contrastive \u00b7 conversational",
-        use: "Introducing yourself, shifting subject, comparing two things.",
-        avoid: "When emphasizing who did the action - use \uc774/\uac00.",
-        formulas: { N: "N\uc740 (after consonant) / N\ub294 (after vowel)", A: "-", V: "-" },
-        examples: [
-            { en: "As for my mom, she's a teacher.", kr: "\uc5c4\ub9c8\ub294 \uc120\uc0dd\ub2d8\uc774\uc5d0\uc694." }
-        ]
-    },
-    "\uc744/\ub97c (Object particle)": {
+
+    "Object particle: 을/를": {
         definition: "Marks the direct object - what receives the action.",
-        emotion: "neutral \u00b7 grammatical \u00b7 transactional",
+        emotion: "neutral · grammatical · transactional",
         use: "Any transitive verb sentence (eat, read, buy, meet).",
-        avoid: "With \uc788\ub2e4/\uc5c6\ub2e4 or intransitive verbs - no object particle needed.",
-        formulas: { N: "N\uc744 (after consonant) / N\ub97c (after vowel)", A: "-", V: "-" },
+        avoid: "With 있다/없다 or intransitive verbs - no object particle needed.",
+        formulas: { N: "N을 (after consonant) / N를 (after vowel)", A: "-", V: "-" },
         examples: [
-            { en: "I eat rice.", kr: "\ubc25\uc744 \uba39\uc5b4\uc694." }
+            { en: "I eat rice.", kr: "밥을 먹어요." }
         ]
     },
-    "(\uc774)\ub791 / \ud558\uace0 / \uc640\u00b7\uacfc (With / and)": {
-        definition: "Connects two nouns with \"and\" or \"with.\" Register differs: (\uc774)\ub791 casual, \ud558\uace0 neutral, \uc640/\uacfc formal.",
-        emotion: "connective \u00b7 register-sensitive",
-        use: "\ud558\uace0 for everyday speech; (\uc774)\ub791 with close friends; \uc640/\uacfc in writing/formal contexts.",
-        avoid: "Joining verbs or clauses - use -\uace0 instead.",
-        formulas: { N: "N(\uc774)\ub791 / N\ud558\uace0 / N\uc640\u00b7\uacfc", A: "-", V: "-" },
+
+    "With: Noun(이)랑 / Noun하고 / Noun와/과": {
+        definition: "Connects two nouns with \"and\" or \"with.\" Register differs: (이)랑 casual, 하고 neutral, 와/과 formal.",
+        emotion: "connective · register-sensitive",
+        use: "하고 for everyday speech; (이)랑 with close friends; 와/과 in writing/formal contexts.",
+        avoid: "Joining verbs or clauses - use -고 instead.",
+        formulas: { N: "N(이)랑 / N하고 / N와·과", A: "-", V: "-" },
         examples: [
-            { en: "I'm going with my friend. (casual)", kr: "\uce5c\uad6c\ub791 \uac00\uc694." },
-            { en: "I'm going with my friend. (neutral)", kr: "\uce5c\uad6c\ud558\uace0 \uac00\uc694." }
+            { en: "I'm going with my friend. (casual)", kr: "친구랑 가요." },
+            { en: "I'm going with my friend. (neutral)", kr: "친구하고 가요." }
         ]
     },
-    "\uc5d0 / \uc5d0\uc11c / (\uc73c)\ub85c (Location particles)": {
-        definition: "\uc5d0 marks destination or static location; \uc5d0\uc11c marks where an action happens; (\uc73c)\ub85c marks direction or means.",
-        emotion: "spatial \u00b7 directional \u00b7 precise",
-        use: "\uc5d0 with \uac00\ub2e4/\uc624\ub2e4/\uc788\ub2e4; \uc5d0\uc11c with active verbs (eat, study, work); (\uc73c)\ub85c for \"toward\" or \"by means of.\"",
-        avoid: "Mixing \uc5d0 and \uc5d0\uc11c - ask \"is something happening here, or am I just there?\"",
-        formulas: { N: "N\uc5d0 / N\uc5d0\uc11c / N(\uc73c)\ub85c", A: "-", V: "-" },
+
+    "Location particles: (으)로, 에서, 에": {
+        definition: "에 marks destination or static location; 에서 marks where an action happens; (으)로 marks direction or means.",
+        emotion: "spatial · directional · precise",
+        use: "에 with 가다/오다/있다; 에서 with active verbs (eat, study, work); (으)로 for \"toward\" or \"by means of.\"",
+        avoid: "Mixing 에 and 에서 - ask \"is something happening here, or am I just there?\"",
+        formulas: { N: "N에 / N에서 / N(으)로", A: "-", V: "-" },
         examples: [
-            { en: "I go to school.", kr: "\ud559\uad50\uc5d0 \uac00\uc694." },
-            { en: "I study at school.", kr: "\ud559\uad50\uc5d0\uc11c \uacf5\ubd80\ud574\uc694." },
-            { en: "I go to the right.", kr: "\uc624\ub978\ucabd\uc73c\ub85c \uac00\uc694." }
+            { en: "I go to school.", kr: "학교에 가요." },
+            { en: "I study at school.", kr: "학교에서 공부해요." },
+            { en: "I go to the right.", kr: "오른쪽으로 가요." }
         ]
     },
-    "\uc774\uc5d0\uc694 / \uc608\uc694 (Copula - present)": {
+
+    "Am/is/are: 이에요 / 예요": {
         definition: "The \"am/is/are\" copula used to identify or define a noun.",
-        emotion: "defining \u00b7 polite \u00b7 everyday",
+        emotion: "defining · polite · everyday",
         use: "Stating identity, job, nationality, what something is.",
-        avoid: "Describing existence or possession - use \uc788\uc5b4\uc694 instead.",
-        formulas: { N: "N\uc774\uc5d0\uc694 (after consonant) / N\uc608\uc694 (after vowel)", A: "-", V: "-" },
+        avoid: "Describing existence or possession - use 있어요 instead.",
+        formulas: { N: "N이에요 (after consonant) / N예요 (after vowel)", A: "-", V: "-" },
         examples: [
-            { en: "I am a student.", kr: "\ud559\uc0dd\uc774\uc5d0\uc694." },
-            { en: "She is a teacher.", kr: "\uc120\uc0dd\ub2d8\uc774\uc5d0\uc694." }
+            { en: "I am a student.", kr: "학생이에요." },
+            { en: "She is a teacher.", kr: "선생님이에요." }
         ]
     },
-    "\uc774\uc5c8\uc5b4\uc694 / \uc600\uc5b4\uc694 (Copula - past)": {
-        definition: "The past-tense copula - \"was/were\" - used to identify what something was.",
-        emotion: "defining \u00b7 retrospective \u00b7 polite",
-        use: "Describing a past role, job, or identity.",
-        avoid: "Describing past existence or possession - use \uc788\uc5c8\uc5b4\uc694.",
-        formulas: { N: "N\uc774\uc5c8\uc5b4\uc694 (after consonant) / N\uc600\uc5b4\uc694 (after vowel)", A: "-", V: "-" },
+
+    // ───────────────── BEGINNER ─────────────────
+
+    "이에요/예요 vs 이었어요/였어요 vs 있어요 vs 있었어요": {
+        definition: "Four forms that split into identity vs. existence: 이에요/예요 (is/am/are), 이었어요/였어요 (was/were), 있어요 (there is / have), 있었어요 (there was / had).",
+        emotion: "contrasting · foundational · clarifying",
+        use: "이에요/예요 & 이었어요/였어요 tell you *what* something is/was. 있어요 & 있었어요 tell you whether something *exists* or is/was possessed.",
+        avoid: "Using 이에요 for possession or 있어요 for identity - they're not swappable.",
+        formulas: { N: "N이에요/예요 · N이었어요/였어요 · N(이/가) 있어요 · N(이/가) 있었어요", A: "-", V: "-" },
         examples: [
-            { en: "She was a teacher.", kr: "\uc120\uc0dd\ub2d8\uc774\uc5c8\uc5b4\uc694." }
+            { en: "She is a teacher.", kr: "선생님이에요." },
+            { en: "She was a teacher.", kr: "선생님이었어요." }
         ]
     },
-    "\uc788\uc5b4\uc694 (Existence / possession - present)": {
+
+    "있어요": {
         definition: "Expresses that something exists or that someone has something.",
-        emotion: "neutral \u00b7 stating \u00b7 versatile",
+        emotion: "neutral · stating · versatile",
         use: "\"There is ___\" / \"I have ___\" / \"___ is (located) here.\"",
-        avoid: "Identifying what something is - use \uc774\uc5d0\uc694/\uc608\uc694.",
-        formulas: { N: "N(\uc774/\uac00) \uc788\uc5b4\uc694", A: "-", V: "-" },
+        avoid: "Identifying what something is - use 이에요/예요.",
+        formulas: { N: "N(이/가) 있어요", A: "-", V: "-" },
         examples: [
-            { en: "I have time.", kr: "\uc2dc\uac04 \uc788\uc5b4\uc694." },
-            { en: "There is a cat.", kr: "\uace0\uc591\uc774 \uc788\uc5b4\uc694." }
+            { en: "I have time.", kr: "시간 있어요." },
+            { en: "There is a cat.", kr: "고양이 있어요." }
         ]
     },
-    "\uc788\uc5c8\uc5b4\uc694 (Existence / possession - past)": {
-        definition: "Past-tense of \uc788\uc5b4\uc694 - \"there was\" or \"had.\"",
-        emotion: "retrospective \u00b7 factual",
-        use: "Narrating past events, recalling what you had, describing a past state.",
-        avoid: "Past identity - use \uc774\uc5c8\uc5b4\uc694/\uc600\uc5b4\uc694.",
-        formulas: { N: "N(\uc774/\uac00) \uc788\uc5c8\uc5b4\uc694", A: "-", V: "-" },
+
+    "Noun + Conjunction: Noun(이)고 / Noun(이)ㄴ데 / Noun(이)면": {
+        definition: "Three noun connectors with different meanings: (이)고 = \"and,\" (이)ㄴ데 = \"but/so/background,\" (이)면 = \"if.\"",
+        emotion: "connective · meaning-specific",
+        use: "(이)고 to list identities, (이)ㄴ데 to give background or mild contrast, (이)면 for hypothetical identity.",
+        avoid: "Picking the wrong one - they all attach to nouns but each means something different.",
+        formulas: { N: "N(이)고 / N(이)ㄴ데 / N(이)면", A: "-", V: "-" },
         examples: [
-            { en: "There was a cat.", kr: "\uace0\uc591\uc774 \uc788\uc5c8\uc5b4\uc694." }
+            { en: "She is a teacher and a mom.", kr: "선생님이고 엄마예요." },
+            { en: "I'm a student, but I'm busy.", kr: "학생인데 바빠요." }
         ]
     },
-    "N(\uc774)\uace0 (Noun + and)": {
-        definition: "Connects nouns or noun phrases meaning \"and\" - used when listing identities or facts.",
-        emotion: "listing \u00b7 equal-weight",
-        use: "\"She is a teacher and a mom.\" Linking two noun statements.",
-        avoid: "Contrasting - use (\uc774)\u3134\ub370 for \"but.\"",
-        formulas: { N: "N(\uc774)\uace0", A: "-", V: "-" },
-        examples: [
-            { en: "She is a teacher and a mom.", kr: "\uc120\uc0dd\ub2d8\uc774\uace0 \uc5c4\ub9c8\uc608\uc694." }
-        ]
-    },
-    "N(\uc774)\u3134\ub370 (Noun + but/so - background)": {
-        definition: "Noun form of ~\ub294\ub370; gives background info about a noun before the main clause.",
-        emotion: "softening \u00b7 contextual \u00b7 sometimes contrastive",
-        use: "Setting up a situation: \"He's a student, but he's always busy.\"",
-        avoid: "Strong contrast - use \ud558\uc9c0\ub9cc or \uadf8\ub807\uc9c0\ub9cc.",
-        formulas: { N: "N(\uc774)\u3134\ub370", A: "-", V: "-" },
-        examples: [
-            { en: "I'm a student, but I'm busy.", kr: "\ud559\uc0dd\uc778\ub370 \ubc14\ube60\uc694." }
-        ]
-    },
-    "N(\uc774)\uba74 (Noun + if)": {
-        definition: "Conditional \"if\" attached to nouns - \"if it's ___.\"",
-        emotion: "conditional \u00b7 hypothetical",
-        use: "\"If you're a student, apply.\" Hypothetical identity or category.",
-        avoid: "Factual cause - use -\uae30 \ub54c\ubb38\uc5d0.",
-        formulas: { N: "N(\uc774)\uba74", A: "-", V: "-" },
-        examples: [
-            { en: "If you're a student, apply.", kr: "\ud559\uc0dd\uc774\uba74 \uc9c0\uc6d0\ud574\uc694." }
-        ]
-    },
-    "\uc740/\ub294 + \uc788\uc5b4\uc694 (Topic + have)": {
+
+    "은/는 & 있어요": {
         definition: "Combines topic marking with existence/possession to say \"as for ___, I have ___.\"",
-        emotion: "personal \u00b7 conversational \u00b7 introducing",
+        emotion: "personal · conversational · introducing",
         use: "Telling someone what you have, especially when contrasting or introducing yourself.",
-        avoid: "When simply stating what exists without topic emphasis - drop \uc740/\ub294.",
-        formulas: { N: "N\uc740/\ub294 N(\uc774/\uac00) \uc788\uc5b4\uc694", A: "-", V: "-" },
+        avoid: "When simply stating what exists without topic emphasis - drop 은/는.",
+        formulas: { N: "N은/는 N(이/가) 있어요", A: "-", V: "-" },
         examples: [
-            { en: "As for me, I have a house.", kr: "\uc800\ub294 \uc9d1 \uc788\uc5b4\uc694." }
+            { en: "As for me, I have a house.", kr: "저는 집 있어요." }
         ]
     },
-    "~\ub294 \uac70 (Gerund - verb to noun)": {
-        definition: "Turns a verb into a noun-like form, similar to English \"-ing.\"",
-        emotion: "abstracting \u00b7 natural \u00b7 very common",
+
+    "Name And Hobby Introduction": {
+        definition: "The standard Korean self-introduction pattern: use 은/는 to set the topic (yourself), 이에요/예요 to state name/identity, and -는 거 to turn hobby verbs into nouns.",
+        emotion: "foundational · social · polite",
+        use: "Introducing yourself, stating your name, talking about hobbies.",
+        avoid: "Using bare verbs for hobbies - Korean turns them into nouns with -는 거.",
+        formulas: { N: "제 이름은 N이에요/예요", A: "-", V: "제 취미는 V-는 거예요" },
+        examples: [
+            { en: "My name is Calvin.", kr: "제 이름은 캘빈이에요." },
+            { en: "My hobby is reading books.", kr: "제 취미는 책 읽는 거예요." }
+        ]
+    },
+
+    "Gerunds": {
+        definition: "Turns a verb into a noun-like form with -는 거, similar to English \"-ing.\"",
+        emotion: "abstracting · natural · very common",
         use: "Hobbies, likes, topics: \"I like reading.\" \"Studying is hard.\"",
         avoid: "When you actually want the verb to stay a verb - don't force gerund where a plain clause works.",
-        formulas: { N: "-", A: "-", V: "V-\ub294 \uac70" },
+        formulas: { N: "-", A: "-", V: "V-는 거" },
         examples: [
-            { en: "I like reading books.", kr: "\ucc45 \uc77d\ub294 \uac70 \uc88b\uc544\ud574\uc694." }
+            { en: "I like reading books.", kr: "책 읽는 거 좋아해요." }
         ]
     },
-    "~\ub294 \uac70 \uac19\uc544\uc694 / N \uac19\uc544\uc694 (Seems like / I think)": {
+
+    "Gerund/Noun + 같아요": {
         definition: "Expresses a guess, opinion, or soft impression - \"it seems like ___.\"",
-        emotion: "hedging \u00b7 polite \u00b7 uncertain",
+        emotion: "hedging · polite · uncertain",
         use: "Softening opinions; describing what something resembles.",
-        avoid: "Stating confirmed facts - drop \uac19\uc544\uc694.",
-        formulas: { N: "N \uac19\uc544\uc694", A: "A-(\uc73c)\u3134 \uac70 \uac19\uc544\uc694", V: "V-\ub294 \uac70 \uac19\uc544\uc694" },
+        avoid: "Stating confirmed facts - drop 같아요.",
+        formulas: { N: "N 같아요", A: "A-(으)ㄴ 거 같아요", V: "V-는 거 같아요" },
         examples: [
-            { en: "I think my friend is studying Korean.", kr: "\uc81c \uce5c\uad6c \ud55c\uad6d\uc5b4 \uacf5\ubd80\ud558\ub294 \uac70 \uac19\uc544\uc694." }
+            { en: "I think my friend is studying Korean.", kr: "제 친구 한국어 공부하는 거 같아요." }
         ]
     },
-    "~\ub294\ub370 (Background / contrast - verb & adjective)": {
+
+    "~는데": {
         definition: "Sets up background or mild contrast before the main clause - \"___, but/so/and...\"",
-        emotion: "softening \u00b7 conversational \u00b7 setup",
+        emotion: "softening · conversational · setup",
         use: "Giving context before a question, request, or observation.",
         avoid: "As a standalone ending in formal writing.",
-        formulas: { N: "N(\uc774)\u3134\ub370", A: "A-(\uc73c)\u3134\ub370", V: "V-\ub294\ub370" },
+        formulas: { N: "N(이)ㄴ데", A: "A-(으)ㄴ데", V: "V-는데" },
         examples: [
-            { en: "It's a gift, but I don't know.", kr: "\uc120\ubb3c\uc778\ub370 \ubab0\ub77c\uc694." }
+            { en: "It's a gift, but I don't know.", kr: "선물인데 몰라요." }
         ]
-    }
+    },
+
+    // ───────────────── ADVANCED BEGINNER (PLACEHOLDERS) ─────────────────
+
+    "Present modifier: ROOT는": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Past modifier: ROOT은 / ROOTㄴ": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Future modifier: ROOT을 / ROOTㄹ": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Progressive modifier: ROOT고 있는": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Existential modifiers: 있는 / 있던": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)ㄹ + noun": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT는 것 / ROOT는 거 (Nominalization/gerund)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT고 (and)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT지만 (but)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT다가 (while doing / interrupted)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT고 나서 (after)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT기 전에 (before)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT서 (result/cause)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)니까 (reason)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)면 (if/when)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(을/ㄹ) 때 (when)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(을/ㄹ) 수 있다 / 없다 (can / cannot)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT고 싶다 (want to – speaker)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT고 싶어하다 (wants to – third person)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "PRESENT야 하다 / 되다 (must / need to)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "PRESENT도 되다 (may / allowed to)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)면 되다 (it's okay if / just need to)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)려고 하다 (plan/intend to)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Past tense: ROOT았/었어요": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Progressive: ROOT고 있다": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "많다 (there is a lot / many)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "없다 (not have / there is not)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "밖에 + 없다 (only / nothing but)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT다가 (signifies an interruption)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "ROOT(으)려고 하다 (signifies an intention)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] },
+    "Quantifiers: 이상 (at least), 정도 (about), 쫴 (around), 약 (approximately), 더 (more)": { definition: "Placeholder - content coming soon.", emotion: "-", use: "-", avoid: "-", formulas: { N: "-", A: "-", V: "-" }, examples: [] }
 };
 
         function matGenerateGrammarPDF() {
@@ -10580,15 +10605,15 @@ var MAT_GRAMMAR_DEFS = {
                     for (var i = 0; i < sentences.length; i++) {
                         fbSents += '<div class="sent-row"><span class="cb">\u2610</span><span class="sent-text">' + esc(sentences[i]) + '</span></div>';
                     }
-                    return '<div class="gp-card">'
-                        + '<div class="gp-header">' + esc(gp) + '</div>'
+                    return '<div class="gp-card"><div class="gp-header">' + esc(gp) + '</div>'
                         + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
-                        + '<div class="sect-body">' + fbSents + '</div>'
-                        + '</div>';
+                        + '<div class="sect-body">' + fbSents + '</div></div>';
                 }
 
+                var isPlaceholder = info.definition === 'Placeholder - content coming soon.';
+
                 var examplesHtml = '';
-                if (info.examples && info.examples.length) {
+                if (!isPlaceholder && info.examples && info.examples.length) {
                     for (var ei = 0; ei < info.examples.length; ei++) {
                         var ex = info.examples[ei];
                         examplesHtml += '<div class="example-row">'
@@ -10599,7 +10624,7 @@ var MAT_GRAMMAR_DEFS = {
                 }
 
                 var formulasHtml = '';
-                if (info.formulas) {
+                if (!isPlaceholder && info.formulas) {
                     var fRows = '';
                     if (info.formulas.N && info.formulas.N !== '-') fRows += '<div class="formula-row"><span class="formula-label">N \u2192</span> ' + esc(info.formulas.N) + '</div>';
                     if (info.formulas.A && info.formulas.A !== '-') fRows += '<div class="formula-row"><span class="formula-label">A \u2192</span> ' + esc(info.formulas.A) + '</div>';
@@ -10612,17 +10637,17 @@ var MAT_GRAMMAR_DEFS = {
                     sentHtml += '<div class="sent-row"><span class="cb">\u2610</span><span class="sent-text">' + esc(sentences[si]) + '</span></div>';
                 }
 
-                return '<div class="gp-card">'
-                    + '<div class="gp-header">' + esc(gp) + '</div>'
-                    + '<div class="meta-line"><b>\ud83d\udcd6 Definition:</b> ' + esc(info.definition) + '</div>'
+                var metaHtml = isPlaceholder ? '' :
+                    '<div class="meta-line"><b>\ud83d\udcd6 Definition:</b> ' + esc(info.definition) + '</div>'
                     + '<div class="meta-line"><b>\ud83d\udcad Emotion/Tone:</b> ' + esc(info.emotion) + '</div>'
                     + '<div class="meta-line"><b>\u2705 Use:</b> ' + esc(info.use) + '</div>'
-                    + '<div class="meta-line"><b>\u26d4 Avoid:</b> ' + esc(info.avoid) + '</div>'
-                    + formulasHtml
+                    + '<div class="meta-line"><b>\u26d4 Avoid:</b> ' + esc(info.avoid) + '</div>';
+
+                return '<div class="gp-card"><div class="gp-header">' + esc(gp) + '</div>'
+                    + metaHtml + formulasHtml
                     + (examplesHtml ? '<div class="sect-label">\u270d\ufe0f Examples</div><div class="sect-body">' + examplesHtml + '</div>' : '')
                     + '<div class="sect-label">\ud83d\udcd6 From this week\'s story</div>'
-                    + '<div class="sect-body">' + sentHtml + '</div>'
-                    + '</div>';
+                    + '<div class="sect-body">' + sentHtml + '</div></div>';
             }
 
             var pagesHtml = '';
@@ -10631,11 +10656,9 @@ var MAT_GRAMMAR_DEFS = {
                 var chunk = points.slice(p, p + CARDS_PER_PAGE);
                 var pageInner = '';
                 if (p === 0) {
-                    pageInner += '<div class="page-header">'
-                        + '<h1>Tuesday Reading Grammar Study Sheet</h1>'
+                    pageInner += '<div class="page-header"><h1>Tuesday Reading Grammar Study Sheet</h1>'
                         + '<div class="page-date">' + esc(titleDate) + '</div>'
-                        + '<hr class="top-divider">'
-                        + '</div>';
+                        + '<hr class="top-divider"></div>';
                 }
                 for (var ci = 0; ci < chunk.length; ci++) {
                     pageInner += buildCard(chunk[ci], mapping[chunk[ci]]);
@@ -10645,8 +10668,7 @@ var MAT_GRAMMAR_DEFS = {
 
             var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
                 + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
-                + '<title>Grammar Study Sheet</title>'
-                + '<style>'
+                + '<title>Grammar Study Sheet</title><style>'
                 + '* { box-sizing: border-box; margin: 0; padding: 0; }'
                 + 'html, body { background: #fff; }'
                 + 'body { font-family: "Noto Sans KR", "Segoe UI", Arial, sans-serif; color: #1e1e2e; line-height: 1.45; font-size: 13px; }'
@@ -10775,7 +10797,7 @@ function matCloseStoryPrompt() {
                 if (tagsEl) {
                     if (matSelectedGrammarPoints.length > 0) {
                         tagsEl.innerHTML = '&#127358; Grammar focus: ' + matSelectedGrammarPoints.map(function(p) { return '<span style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.4);border-radius:12px;padding:1px 8px;margin:0 2px;white-space:nowrap;">' + p + '</span>'; }).join(' ');
-                        tagsEl.style.display = 'block';
+                        tagsEl.style.display = 'flex';
                     } else {
                         tagsEl.style.display = 'none';
                     }
