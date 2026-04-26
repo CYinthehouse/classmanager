@@ -3587,6 +3587,7 @@
                                 <th style="text-align: left; padding: 8px;">Phone</th>
                                 <th style="text-align: left; padding: 8px;">Discord</th>
                                 <th style="text-align: left; padding: 8px;">Email</th>
+                                <th style="text-align: left; padding: 8px;">Latest HW</th>
                                 <th style="text-align: center; padding: 8px;">Actions</th>
                             </tr>
                         </thead>
@@ -4400,6 +4401,8 @@
         let allTeachers = [];
         let allProposals = [];
         let allPrescheduledSlots = []; // Pre-scheduled class slots
+        let tevelloQuizCache = null; // Map of email->quiz for Tevello HW completions (lazy loaded)
+        let tevelloQuizCacheLoadedAt = 0; // Timestamp of last load (for invalidation)
         let schedulerSettings = { minStudents: 5, maxStudents: 10, currentWeek: 1, startDate: null };
         let pendingDropAction = null;
         let draggedStudentId = null;
@@ -26731,7 +26734,90 @@ ${daySpecific}
             document.body.insertAdjacentHTML('beforeend', menuHtml);
         }
 
-        function openSlotDetails(day, time) {
+        // ==================== TEVELLO QUIZ COMPLETIONS ====================
+        // Loads ALL tevello_quiz_completions docs once (cached for 5 min).
+        // Each doc is keyed by lowercased email, contains latest quiz only.
+        async function loadTevelloQuizCache(forceRefresh) {
+            const FIVE_MIN = 5 * 60 * 1000;
+            const fresh = tevelloQuizCache && (Date.now() - tevelloQuizCacheLoadedAt) < FIVE_MIN;
+            if (fresh && !forceRefresh) return tevelloQuizCache;
+            try {
+                const snap = await db.collection('tevello_quiz_completions').get();
+                const byEmail = {};
+                const byNameLower = {};
+                snap.forEach(doc => {
+                    const data = doc.data() || {};
+                    const emailKey = (data.customer_email || doc.id || '').toLowerCase().trim();
+                    if (emailKey) byEmail[emailKey] = data;
+                    const nameKey = (data.customer_name || '').toLowerCase().trim();
+                    if (nameKey) byNameLower[nameKey] = data;
+                });
+                tevelloQuizCache = { byEmail, byNameLower };
+                tevelloQuizCacheLoadedAt = Date.now();
+                return tevelloQuizCache;
+            } catch (e) {
+                console.error('Failed to load Tevello quiz cache:', e);
+                tevelloQuizCache = { byEmail: {}, byNameLower: {} };
+                return tevelloQuizCache;
+            }
+        }
+
+        // Look up a student's latest quiz. Email is preferred; falls back to first-name match
+        // against customer_name (Tevello sends only first name in our Flow body).
+        function getLatestTevelloQuiz(email, fullName) {
+            if (!tevelloQuizCache) return null;
+            const e = (email || '').toLowerCase().trim();
+            if (e && tevelloQuizCache.byEmail[e]) return tevelloQuizCache.byEmail[e];
+            const n = (fullName || '').toLowerCase().trim();
+            if (!n) return null;
+            // Try full name first, then first name only (Tevello sends firstName)
+            if (tevelloQuizCache.byNameLower[n]) return tevelloQuizCache.byNameLower[n];
+            const firstName = n.split(/\s+/)[0];
+            if (firstName && tevelloQuizCache.byNameLower[firstName]) return tevelloQuizCache.byNameLower[firstName];
+            return null;
+        }
+
+        // Build the cell HTML for the "Latest HW" column
+        function renderTevelloQuizCell(email, fullName) {
+            const q = getLatestTevelloQuiz(email, fullName);
+            if (!q) {
+                return '<span style="color:#555; font-size:11px;">—</span>';
+            }
+            const lessonTitle = escapeHtml(q.lesson_title || 'Quiz');
+            const score = (typeof q.score === 'number') ? q.score : (parseInt(q.score, 10) || 0);
+            const passed = q.passed === true || q.passed === 'true';
+            const badgeColor = passed ? '#39ff14' : '#ff4757';
+            const badgeIcon = passed ? '✓' : '✕';
+            // Time-ago string
+            let when = '';
+            if (q.completed_at) {
+                let t;
+                if (q.completed_at.toDate) t = q.completed_at.toDate();
+                else if (q.completed_at.seconds) t = new Date(q.completed_at.seconds * 1000);
+                else t = new Date(q.completed_at);
+                if (t && !isNaN(t)) {
+                    const diff = Date.now() - t.getTime();
+                    const days = Math.floor(diff / 86400000);
+                    const hours = Math.floor(diff / 3600000);
+                    const mins = Math.floor(diff / 60000);
+                    if (days >= 1) when = days + 'd ago';
+                    else if (hours >= 1) when = hours + 'h ago';
+                    else if (mins >= 1) when = mins + 'm ago';
+                    else when = 'just now';
+                }
+            }
+            return '<div style="font-size:11px; line-height:1.35;">' +
+                   '<div style="color:#fff;">' + lessonTitle + '</div>' +
+                   '<div style="margin-top:2px;">' +
+                       '<span style="background:' + badgeColor + '; color:#000; font-weight:700; padding:1px 6px; border-radius:3px; font-size:10px;">' + badgeIcon + ' ' + score + '%</span>' +
+                       (when ? ' <span style="color:#888; font-size:10px;">' + when + '</span>' : '') +
+                   '</div></div>';
+        }
+        // ==================== END TEVELLO QUIZ COMPLETIONS ====================
+
+        async function openSlotDetails(day, time) {
+            // Kick off Tevello quiz cache load (cached, 5-min TTL). Awaited before roster render below.
+            const tevelloLoad = loadTevelloQuizCache();
             const key = `${day}-${time}`;
             const selectedTeacherId = document.getElementById('slotManagerTeacher')?.value || '';
             
@@ -26841,6 +26927,8 @@ ${daySpecific}
                 // Show student roster
                 if (cls.students && cls.students.length > 0) {
                     document.getElementById('slotStudentRoster').style.display = 'block';
+                    // Wait for Tevello quiz cache before rendering rows
+                    await tevelloLoad;
                     
                     // Get full student info from allStudents
                     let rosterHtml = '';
@@ -26853,12 +26941,15 @@ ${daySpecific}
                         const hasAnyTag = isRepeat || isAbsent;
                         const repeatTag = isRepeat ? '<span style="background:#00ffff; color:#000; font-size:9px; padding:1px 6px; border-radius:4px; margin-left:5px; font-weight:700;">Repeat</span>' : '';
                         const absentTag = isAbsent ? '<span style="background:#ff4757; color:#fff; font-size:9px; padding:1px 6px; border-radius:4px; margin-left:5px; font-weight:700;">2+ Absent</span>' : '';
+                        const studentEmail = fullStudent.email || s.email || '';
+                        const tevelloCell = renderTevelloQuizCell(studentEmail, studentName);
                         rosterHtml += `
                             <tr>
                                 <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','name','${escapedName}')" title="Click to edit">${studentName}${repeatTag}${absentTag}</td>
                                 <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','phoneNumber','${(fullStudent.phoneNumber||fullStudent.phone||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${escapeHtml(fullStudent.phoneNumber) || fullStudent.phone || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
                                 <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','discord','${(fullStudent.discord||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${fullStudent.discord || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
                                 <td style="padding: 8px; cursor:pointer;" onclick="editActiveStudentField('${cls.id}','${s.id}','email','${(fullStudent.email||s.email||'').replace(/'/g,"\\\\'")}')" title="Click to edit">${escapeHtml(fullStudent.email) || s.email || '<span style=&quot;color:#555&quot;>+ add</span>'}</td>
+                                <td style="padding: 8px;">${tevelloCell}</td>
                                 <td style="padding: 8px; text-align: center;">
                                     <button class="btn btn-warning btn-sm" onclick="openMoveStudentFromClassModal('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px;" title="Move to another class">🔄</button>
                                     <button class="btn btn-sm" onclick="openTagMenu('${s.id}', '${escapedName}', '${cls.id}')" style="padding: 2px 6px; font-size: 10px; margin-right: 3px; background: ${isAbsent ? '#ff4757' : (isRepeat ? '#00ffff' : '#666')}; color: ${isRepeat && !isAbsent ? '#000' : '#fff'}; border: none; border-radius: 4px; cursor: pointer;" title="Tag student">🏷️</button>
