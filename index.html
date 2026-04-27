@@ -21904,6 +21904,9 @@ Return ONLY valid JSON (single object, not array):
                 // Store attendance data for rendering
                 window.adminTeacherAttendanceData = attendanceData;
                 
+                // Load Tevello quiz completions cache (for HW display next to student names)
+                await loadTevelloQuizCache();
+                
                 // Default to Today view
                 switchAdminTeacherViewTab('today');
                 
@@ -22223,10 +22226,14 @@ Return ONLY valid JSON (single object, not array):
                                     const studentName = s.name || 'Unknown';
                                     const studentEmail = s.email || '';
                                     const status = getAttendanceStatus(c.id, s.id, attendanceWeek);
+                                    const tevelloHw = renderTevelloQuizCell(studentEmail, studentName);
                                     return `
                                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                                            <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
-                                            <div style="display: flex; gap: 5px;">
+                                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1;">
+                                                <span style="cursor: pointer; text-decoration: underline; color: #00ffff; font-size: 12px;" onclick="openStudentAnalyticsMenu('${s.id}', '${studentName.replace(/'/g, "\\'")}', '${studentEmail.replace(/'/g, "\\'")}')">${studentName}</span>
+                                                <div style="font-size: 10px; color: #888;"><span style="color:#666;">📝 Latest HW:</span> ${tevelloHw}</div>
+                                            </div>
+                                            <div style="display: flex; gap: 5px; flex-shrink: 0;">
                                                 <button class="attendance-btn present ${status === 'present' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'present', ${attendanceWeek})">P</button>
                                                 <button class="attendance-btn late ${status === 'late' ? 'active' : ''}" onclick="markAttendanceAsAdmin('${c.id}', '${s.id}', 'late', ${attendanceWeek})">L</button>
                                                 <button class="attendance-btn absent ${status === 'absent' ? 'active' : ''}" onclick="handleAbsentClickAsAdmin('${c.id}', '${s.id}', '${studentName.replace(/'/g, "\\'")}', ${attendanceWeek})">A</button>
