@@ -30197,8 +30197,37 @@ ${additionalText}
             var listEl = document.getElementById('tutorStudentList');
             if (!listEl) return;
             try {
-                var doc = await db.collection('settings').doc('tutor_data').get();
-                var students = (doc.exists && doc.data().students) ? doc.data().students : {};
+                var docRef = db.collection('settings').doc('tutor_data');
+                var doc = await docRef.get();
+                var data = doc.exists ? (doc.data() || {}) : {};
+                var students = data.students || {};
+
+                // RECOVERY: gather any students saved with the old buggy schema
+                // (top-level keys "students.ts_xxx" instead of nested under students)
+                var oldSchemaKeys = [];
+                Object.keys(data).forEach(function(k) {
+                    if (k.indexOf('students.') === 0) {
+                        var sid = k.substring('students.'.length);
+                        if (!students[sid]) students[sid] = data[k];
+                        oldSchemaKeys.push(k);
+                    }
+                });
+                // If we found any, write them into the proper place and remove the bad keys
+                if (oldSchemaKeys.length > 0) {
+                    try {
+                        var fix = {};
+                        oldSchemaKeys.forEach(function(k) {
+                            var sid = k.substring('students.'.length);
+                            fix['students.' + sid] = data[k];
+                            fix[k] = firebase.firestore.FieldValue.delete();
+                        });
+                        await docRef.update(fix);
+                        console.log('Rescued ' + oldSchemaKeys.length + ' tutored students from old schema.');
+                    } catch(rescueErr) {
+                        console.error('Tutored students rescue failed (non-fatal):', rescueErr);
+                    }
+                }
+
                 _tutorStudentsCache = students;
                 var ids = Object.keys(students).sort(function(a, b) {
                     return (students[a].name || '').localeCompare(students[b].name || '');
@@ -30227,9 +30256,49 @@ ${additionalText}
             if (!name) { alert('Please enter a name.'); return; }
             try {
                 var id = 'ts_' + Date.now();
-                var update = {};
-                update['students.' + id] = { name: name, phone: phone || '', createdAt: new Date().toISOString() };
-                await db.collection('settings').doc('tutor_data').set(update, { merge: true });
+                var newStudent = { name: name, phone: phone || '', createdAt: new Date().toISOString() };
+                var docRef = db.collection('settings').doc('tutor_data');
+                var existing = await docRef.get();
+                if (existing.exists) {
+                    // .update() correctly interprets dot-paths as nested fields
+                    var dotUpdate = {};
+                    dotUpdate['students.' + id] = newStudent;
+                    await docRef.update(dotUpdate);
+                } else {
+                    // First-ever add: doc doesn't exist yet, .update() would fail
+                    var initial = { students: {} };
+                    initial.students[id] = newStudent;
+                    await docRef.set(initial);
+                }
+                // RECOVERY: rescue any students saved with the old buggy schema
+                // (top-level keys like "students.ts_xxx" instead of nested under students)
+                try {
+                    var fresh = await docRef.get();
+                    var data = fresh.data() || {};
+                    var rescued = {};
+                    var keysToDelete = [];
+                    Object.keys(data).forEach(function(k) {
+                        if (k.indexOf('students.') === 0) {
+                            var sid = k.substring('students.'.length);
+                            rescued[sid] = data[k];
+                            keysToDelete.push(k);
+                        }
+                    });
+                    if (keysToDelete.length > 0) {
+                        // Merge rescued students into the proper students map and delete the bad top-level keys
+                        var fixUpdate = {};
+                        Object.keys(rescued).forEach(function(sid) {
+                            fixUpdate['students.' + sid] = rescued[sid];
+                        });
+                        keysToDelete.forEach(function(k) {
+                            fixUpdate[k] = firebase.firestore.FieldValue.delete();
+                        });
+                        await docRef.update(fixUpdate);
+                        console.log('Rescued ' + keysToDelete.length + ' tutored students from old schema.');
+                    }
+                } catch(rescueErr) {
+                    console.error('Tutored students rescue check failed (non-fatal):', rescueErr);
+                }
                 nameEl.value = '';
                 phoneEl.value = '';
                 tutorLoadStudents();
