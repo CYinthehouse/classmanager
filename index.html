@@ -30384,12 +30384,39 @@ ${additionalText}
             var name = s.name || 'this student';
             if (!confirm('Remove ' + name + ' and all their notes? This cannot be undone.')) return;
             try {
-                // Remove from students map
-                var update = {};
-                update['students.' + tutorCurrentStudentId] = firebase.firestore.FieldValue.delete();
-                await db.collection('settings').doc('tutor_data').update(update);
-                // Delete notes doc
-                await db.collection('settings').doc('tutor_notes_' + tutorCurrentStudentId).delete();
+                var docRef = db.collection('settings').doc('tutor_data');
+                var sid = tutorCurrentStudentId;
+                var legacyKey = 'students.' + sid; // literal top-level key from the old buggy schema
+
+                // 1) Delete the proper nested field (students.{sid}) using a dot-path string.
+                //    In .update(), a string with dots is interpreted as a path into a nested map.
+                var nestedUpdate = {};
+                nestedUpdate['students.' + sid] = firebase.firestore.FieldValue.delete();
+                try {
+                    await docRef.update(nestedUpdate);
+                } catch(nestedErr) {
+                    console.log('Nested delete (non-fatal):', nestedErr.message);
+                }
+
+                // 2) Delete any legacy top-level key with a literal dot in its name.
+                //    Using FieldPath(string) treats the whole string as one segment,
+                //    bypassing the dot-path interpretation.
+                try {
+                    var legacyFieldPath = new firebase.firestore.FieldPath(legacyKey);
+                    await docRef.update(legacyFieldPath, firebase.firestore.FieldValue.delete());
+                } catch(legacyErr) {
+                    console.log('Legacy field cleanup (non-fatal):', legacyErr.message);
+                }
+
+                // 3) Delete the notes subdoc.
+                try {
+                    await db.collection('settings').doc('tutor_notes_' + sid).delete();
+                } catch(notesErr) {
+                    console.log('Notes doc delete (non-fatal):', notesErr.message);
+                }
+
+                // 4) Local cache cleanup so the student doesn't flicker back.
+                delete _tutorStudentsCache[sid];
                 tutorCloseNotes();
                 tutorLoadStudents();
             } catch(e) {
