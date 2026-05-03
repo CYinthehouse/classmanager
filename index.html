@@ -29290,13 +29290,10 @@ KoreanLearnin Team`;
             }
 
             try {
-                const response = await fetch('https://us-central1-korean-ta-evaluator.cloudfunctions.net/getShopifyOrders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        data: { limit: 20, status: 'any', fields: 'id,name,customer,billing_address,created_at,line_items' }
-                    })
-                });
+                const response = await callAdminFunction(
+                    'https://us-central1-korean-ta-evaluator.cloudfunctions.net/getShopifyOrders',
+                    { limit: 20, status: 'any', fields: 'id,name,customer,billing_address,created_at,line_items' }
+                );
                 const result = await response.json();
                 const data = result.result || result;
 
@@ -29614,6 +29611,32 @@ ${additionalText}
         
         // ==================== END SLOT MANAGER FUNCTIONS ====================
 
+        // ==================== ADMIN CLOUD FUNCTION HELPER ====================
+        // Wraps fetch() to automatically include the current user's Firebase ID token
+        // as a Bearer Authorization header. All admin-only Cloud Functions require this.
+        async function callAdminFunction(url, payload) {
+            try {
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('You must be signed in.');
+                }
+                const idToken = await user.getIdToken();
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + idToken,
+                    },
+                    body: JSON.stringify({ data: payload || {} }),
+                });
+                return response;
+            } catch (err) {
+                console.error('callAdminFunction error:', err);
+                throw err;
+            }
+        }
+        // ==================== END ADMIN CLOUD FUNCTION HELPER ====================
+
         // ==================== ACCOUNT CREATION FUNCTIONS (SHOPIFY) ====================
         
         // Cloud Function URL for Shopify
@@ -29720,15 +29743,9 @@ ${additionalText}
 
                 // Fetch Shopify customers via Cloud Function with date filter
                 // Request default_address to get location info
-                const response = await fetch(SHOPIFY_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        data: {
-                            updated_at_min: createdAtMin,
-                            fields: 'id,email,first_name,last_name,phone,tags,created_at,updated_at,default_address,addresses'
-                        }
-                    })
+                const response = await callAdminFunction(SHOPIFY_FUNCTION_URL, {
+                    updated_at_min: createdAtMin,
+                    fields: 'id,email,first_name,last_name,phone,tags,created_at,updated_at,default_address,addresses'
                 });
 
                 const result = await response.json();
@@ -30103,11 +30120,7 @@ ${additionalText}
             }
 
             try {
-                const response = await fetch(ACCOUNT_FUNCTIONS.freezeStudentAccount, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { email: email } })
-                });
+                const response = await callAdminFunction(ACCOUNT_FUNCTIONS.freezeStudentAccount, { email: email });
 
                 const result = await response.json();
                 
@@ -30141,11 +30154,7 @@ ${additionalText}
                 }
                 const uid = userQuery.docs[0].id;
 
-                const response = await fetch(ACCOUNT_FUNCTIONS.deleteStudentAccount, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { uid: uid } })
-                });
+                const response = await callAdminFunction(ACCOUNT_FUNCTIONS.deleteStudentAccount, { uid: uid });
 
                 const result = await response.json();
                 
