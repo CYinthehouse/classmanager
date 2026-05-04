@@ -23000,7 +23000,7 @@ Return ONLY valid JSON (single object, not array):
             const inner = document.createElement('div');
             inner.style.cssText = 'background:#1a1a2e;border:1px solid #ff3366;border-radius:12px;padding:24px;max-width:900px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 0 40px rgba(255,51,102,0.3);';
 
-            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ff3366;margin:0;">📦 Archived Classes</h3><button onclick="document.getElementById(\'archivedAttModal\').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;">✕</button></div><div id="archivedDateFilter" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;"><span style="color:#aaa;font-size:12px;font-weight:bold;">Filter:</span><input type="text" id="archivedSearchName" placeholder="Search student name..." style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;min-width:180px;" /><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">From</label><input type="date" id="archivedFilterFrom" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;color-scheme:dark;" /></div><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">To</label><input type="date" id="archivedFilterTo" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;color-scheme:dark;" /></div><button id="archivedFilterApply" style="padding:6px 14px;background:#ff3366;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:12px;font-weight:bold;">Apply</button><button id="archivedFilterClear" style="padding:6px 14px;background:rgba(255,255,255,0.08);border:1px solid #555;border-radius:6px;color:#aaa;cursor:pointer;font-size:12px;">Clear</button><span id="archivedFilterCount" style="color:#888;font-size:11px;margin-left:auto;"></span></div><div id="archivedAttContent"><p style="color:#888;">Loading...</p></div>';
+            inner.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="color:#ff3366;margin:0;">📦 Archived Classes</h3><button onclick="document.getElementById(\'archivedAttModal\').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;">✕</button></div><div id="archivedDateFilter" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;"><span style="color:#aaa;font-size:12px;font-weight:bold;">Filter:</span><input type="text" id="archivedSearchName" placeholder="Search name or Discord..." style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;min-width:200px;" /><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">From</label><input type="date" id="archivedFilterFrom" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;color-scheme:dark;" /></div><div style="display:flex;align-items:center;gap:6px;"><label style="color:#888;font-size:11px;">To</label><input type="date" id="archivedFilterTo" style="padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;color-scheme:dark;" /></div><button id="archivedFilterApply" style="padding:6px 14px;background:#ff3366;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:12px;font-weight:bold;">Apply</button><button id="archivedFilterClear" style="padding:6px 14px;background:rgba(255,255,255,0.08);border:1px solid #555;border-radius:6px;color:#aaa;cursor:pointer;font-size:12px;">Clear</button><span id="archivedFilterCount" style="color:#888;font-size:11px;margin-left:auto;"></span></div><div id="archivedAttContent"><p style="color:#888;">Loading...</p></div>';
             modal.appendChild(inner);
             modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
             document.body.appendChild(modal);
@@ -23134,10 +23134,20 @@ Return ONLY valid JSON (single object, not array):
                             if (fromVal && cls.startDate < fromVal) return false;
                             if (toVal && cls.startDate > toVal) return false;
                         }
-                        // Student name filter — keep class if any student name matches
+                        // Student name or Discord filter — keep class if any student matches
                         if (nameQuery) {
                             const students = cls.students || [];
-                            const match = students.some(s => (s.name || '').toLowerCase().includes(nameQuery));
+                            // Strip a leading @ if the user typed it
+                            const q = nameQuery.startsWith('@') ? nameQuery.slice(1) : nameQuery;
+                            const match = students.some(s => {
+                                const nameMatch = (s.name || '').toLowerCase().includes(q);
+                                if (nameMatch) return true;
+                                // Look up Discord from the global allStudents roster (archived students don't carry it)
+                                const fullStudent = (typeof allStudents !== 'undefined' ? allStudents : []).find(st => st.id === s.id);
+                                const discord = (fullStudent && fullStudent.discord) ? fullStudent.discord : '';
+                                const discordClean = discord.toLowerCase().replace(/^@/, '');
+                                return discordClean && discordClean.includes(q);
+                            });
                             if (!match) return false;
                         }
                         return true;
