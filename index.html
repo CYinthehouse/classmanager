@@ -4197,6 +4197,38 @@
             // Secondary app for creating accounts without logging out admin
             const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
             secondaryAuth = secondaryApp.auth();
+
+            // Keep users signed in across refreshes. Firebase already persists
+            // the session (LOCAL) by default; the app just never restored it on
+            // load, so a refresh dropped back to the login screen. This fires
+            // once on boot and, if a session exists, routes straight to the
+            // right dashboard. Later auth changes (manual login/logout) are
+            // handled by the login functions and ignored here.
+            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+            var _authBootDone = false;
+            auth.onAuthStateChanged(async function(user){
+                if (_authBootDone) return;
+                _authBootDone = true;
+                if (!user || currentUser) return;
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    const role = userDoc.exists ? userDoc.data().role : null;
+                    if (role === 'admin' || role === 'support') {
+                        currentUser = { ...userDoc.data(), uid: user.uid, role: role };
+                        showAdminDashboard();
+                        return;
+                    }
+                    const q = await db.collection('scheduler_teachers').where('email', '==', user.email).get();
+                    if (!q.empty) {
+                        currentUser = { ...q.docs[0].data(), odId: q.docs[0].id, uid: user.uid, role: 'teacher' };
+                        showTeacherDashboard();
+                        return;
+                    }
+                    await auth.signOut(); // signed in but not authorized for any dashboard
+                } catch (e) {
+                    console.error('Session restore failed:', e);
+                }
+            });
             
         } catch (error) {
             console.error("Firebase initialization error:", error);
