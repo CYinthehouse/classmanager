@@ -26822,7 +26822,7 @@ ${daySpecific}
             const selectedTeacherId = document.getElementById('slotManagerTeacher')?.value || '';
             
             // Check for prescheduled slot first
-            const prescheduled = allPrescheduledSlots.find(ps => ps.day === day && ps.time === time);
+            const prescheduled = allPrescheduledSlots.find(ps => ps.day === day && ps.time === time && (!selectedTeacherId || ps.teacherId === selectedTeacherId));
             
             // Find class info for this slot
             const cls = allClasses.find(c => c.day === day && c.time === time && c.status !== 'completed' && 
