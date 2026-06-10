@@ -5621,9 +5621,12 @@
             // Admin-only migration control
             const migDiv = document.getElementById('teacherMigrationControls');
             if (migDiv) {
-                const missing = allTeachers.filter(t => !((t.availableDays || []).includes('Friday'))).length;
+                const needsChange = allTeachers.filter(t => {
+                    const d = t.availableDays || [];
+                    return !d.includes('Friday') || d.includes('Thursday');
+                }).length;
                 migDiv.innerHTML = canDelete()
-                    ? `<button class="btn btn-sm" onclick="migrateAddFridayAvailability()" style="background:#39ff14;color:#000;">📅 Make all teachers available Fridays${missing > 0 ? ` (${missing} need it)` : ' (all set ✓)'}</button>`
+                    ? `<button class="btn btn-sm" onclick="migrateAddFridayAvailability()" style="background:#39ff14;color:#000;">📅 Fix teacher days: +Friday / −Thursday${needsChange > 0 ? ` (${needsChange} need it)` : ' (all set ✓)'}</button>`
                     : '';
             }
             if (allTeachers.length === 0) { container.innerHTML = '<p style="color: #888; font-size: 12px;">No teachers yet.</p>'; return; }
@@ -5636,24 +5639,43 @@
         // ── Migration: ensure every teacher is available on Fridays ──
         async function migrateAddFridayAvailability() {
             if (!canDelete()) { alert('Admin only.'); return; }
-            const needing = allTeachers.filter(t => !((t.availableDays || []).includes('Friday')));
-            if (needing.length === 0) { alert('All teachers are already available on Fridays. ✓'); return; }
-            if (!confirm(`Add 'Friday' to availableDays for ${needing.length} teacher(s)?\n\n${needing.map(t => '• ' + t.name).join('\n')}`)) return;
+
+            // Compute desired availableDays per teacher: add Friday, remove Thursday.
+            const changes = []; // { t, newDays }
+            allTeachers.forEach(t => {
+                const cur = t.availableDays || [];
+                let next = cur.filter(d => d !== 'Thursday');
+                if (!next.includes('Friday')) next.push('Friday');
+                // Only count as a change if the set actually differs
+                const same = cur.length === next.length && cur.every(d => next.includes(d));
+                if (!same) changes.push({ t, newDays: next });
+            });
+
+            if (changes.length === 0) { alert('All teachers already have Friday and no leftover Thursday. ✓'); return; }
+
+            const summary = changes.map(c => {
+                const added = c.newDays.includes('Friday') && !(c.t.availableDays || []).includes('Friday');
+                const removed = (c.t.availableDays || []).includes('Thursday');
+                const tags = [added ? '+Fri' : '', removed ? '−Thu' : ''].filter(Boolean).join(' ');
+                return `• ${c.t.name} (${tags})`;
+            }).join('\n');
+
+            if (!confirm(`Update availableDays for ${changes.length} teacher(s)?\n(Adds Friday, removes Thursday)\n\n${summary}`)) return;
+
             try {
                 const batch = db.batch();
-                needing.forEach(t => {
-                    const newDays = [...(t.availableDays || []), 'Friday'];
-                    batch.update(db.collection('scheduler_teachers').doc(t.id), { availableDays: newDays });
+                changes.forEach(c => {
+                    batch.update(db.collection('scheduler_teachers').doc(c.t.id), { availableDays: c.newDays });
                 });
                 await batch.commit();
                 // Update local cache so UI reflects immediately
-                needing.forEach(t => {
-                    const idx = allTeachers.findIndex(x => x.id === t.id);
-                    if (idx !== -1) allTeachers[idx].availableDays = [...(allTeachers[idx].availableDays || []), 'Friday'];
+                changes.forEach(c => {
+                    const idx = allTeachers.findIndex(x => x.id === c.t.id);
+                    if (idx !== -1) allTeachers[idx].availableDays = c.newDays;
                 });
                 renderTeachersList();
                 if (typeof renderSlotGrid === 'function') renderSlotGrid();
-                alert(`Done. ${needing.length} teacher(s) updated.`);
+                alert(`Done. ${changes.length} teacher(s) updated.`);
             } catch (e) {
                 console.error('migrateAddFridayAvailability error:', e);
                 alert('Migration failed: ' + e.message);
