@@ -29854,6 +29854,61 @@ ${additionalText}
         let banReasonLabels = { '6week': '6 Week Ended', 'failed': 'Failed Payment', 'cancelled': 'Cancellation' };
         let banReasonColors = { '6week': '#a855f7', 'failed': '#ff3366', 'cancelled': '#e91e63' };
 
+        // Map of Shopify customerId -> { status, changedAt:Date } observed across scans
+        let statusTrackingMap = {};
+
+        // Load the stored status-transition record into memory.
+        async function loadStatusTracking() {
+            try {
+                const snap = await db.collection('subscription_status_tracking').get();
+                statusTrackingMap = {};
+                snap.forEach(d => {
+                    const x = d.data();
+                    statusTrackingMap[d.id] = {
+                        status: x.status || 'unknown',
+                        changedAt: x.statusChangedAt?.toDate ? x.statusChangedAt.toDate() : null
+                    };
+                });
+            } catch (e) {
+                console.warn('loadStatusTracking failed:', e.message);
+            }
+        }
+
+        // Compare a freshly-scanned customer list against stored statuses and stamp any
+        // transitions with the current time. Only writes docs that are new or changed.
+        // `customers` is the raw Shopify customer array. Safe to call from any scan.
+        async function syncStatusTracking(customers) {
+            if (!customers || !customers.length) return;
+            try {
+                if (Object.keys(statusTrackingMap).length === 0) await loadStatusTracking();
+                let batch = db.batch();
+                let ops = 0, committed = 0;
+                for (const c of customers) {
+                    if (!c.id) continue;
+                    const status = getSubscriptionStatus(c.tags);
+                    // Only track the subscription lifecycle statuses we care about
+                    if (!['active', 'paused', 'failed', 'cancelled'].includes(status)) continue;
+                    const prev = statusTrackingMap[String(c.id)];
+                    if (prev && prev.status === status) continue; // no change
+                    // New customer or status changed -> stamp transition now
+                    const ref = db.collection('subscription_status_tracking').doc(String(c.id));
+                    batch.set(ref, {
+                        status,
+                        statusChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        fullName: `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+                        email: c.email || null
+                    }, { merge: true });
+                    statusTrackingMap[String(c.id)] = { status, changedAt: new Date() };
+                    ops++;
+                    if (ops >= 400) { await batch.commit(); committed += ops; batch = db.batch(); ops = 0; }
+                }
+                if (ops > 0) { await batch.commit(); committed += ops; }
+                if (committed > 0) console.log(`syncStatusTracking: stamped ${committed} status transition(s)`);
+            } catch (e) {
+                console.warn('syncStatusTracking failed:', e.message);
+            }
+        }
+
         function normalizeName(n) {
             return (n || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
         }
@@ -29913,6 +29968,11 @@ ${additionalText}
                         }
                     }
                 }
+
+                // Sync status-transition tracking, then compute candidates using stamped dates
+                if (statusEl) statusEl.textContent = 'Updating status history…';
+                await loadStatusTracking();
+                await syncStatusTracking(allShopifyCustomersForAccounts);
 
                 banCandidates = computeBanCandidates();
                 if (statusEl) statusEl.textContent = `${banCandidates.length} student(s) flagged`;
@@ -29978,7 +30038,10 @@ ${additionalText}
                 const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim();
                 if (!fullName) return;
                 if (!nameInArchivedClasses(fullName)) return; // spec: must match an archived student
-                const evt = c.updated_at ? new Date(c.updated_at) : null;
+                // Prefer the stamped transition time; fall back to Shopify updated_at until tracked.
+                const tracked = statusTrackingMap[String(c.id)];
+                const evt = (tracked && tracked.changedAt) ? tracked.changedAt
+                          : (c.updated_at ? new Date(c.updated_at) : null);
                 addCandidate(fullName, status, status === 'failed' ? 'Shopify · Failed Payment' : 'Shopify · Cancelled', evt);
             });
 
@@ -30317,6 +30380,9 @@ ${additionalText}
                     updateAccountDashboard();
                     renderShopifyCustomersForAccounts();
                     updateAccountCacheStatus();
+
+                    // Stamp any subscription status transitions seen in this scan (fire-and-forget)
+                    syncStatusTracking(allShopifyCustomersForAccounts);
                 } else {
                     throw new Error(data.message || 'Failed to fetch customers');
                 }
