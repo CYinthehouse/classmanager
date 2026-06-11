@@ -2464,21 +2464,33 @@
                         <div id="banUsersDashboard" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;"></div>
 
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center;">
-                            <input type="text" id="banSearch" placeholder="🔍 Search name or Discord..." oninput="renderBanList()" style="flex: 1; min-width: 200px; padding: 6px 10px;">
-                            <select id="banReasonFilter" onchange="renderBanList()" style="padding: 6px 10px;">
+                            <input type="text" id="banSearch" placeholder="🔍 Search name or Discord..." oninput="banCurrentPage=1; renderBanList()" style="flex: 1; min-width: 200px; padding: 6px 10px;">
+                            <select id="banReasonFilter" onchange="banCurrentPage=1; renderBanList()" style="padding: 6px 10px;">
                                 <option value="all">All Reasons</option>
                                 <option value="6week">6 Week Ended</option>
                                 <option value="failed">Failed Payment</option>
                                 <option value="cancelled">Cancellation</option>
+                                <option value="paused">Paused</option>
                             </select>
-                            <select id="banSortOrder" onchange="renderBanList()" style="padding: 6px 10px;">
+                            <select id="banSortOrder" onchange="banCurrentPage=1; renderBanList()" style="padding: 6px 10px;">
                                 <option value="recent">Most Recent → Longest Ago</option>
                                 <option value="oldest">Longest Ago → Most Recent</option>
+                            </select>
+                            <select id="banPerPage" onchange="banCurrentPage=1; renderBanList()" style="padding: 6px 10px;">
+                                <option value="25">25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
                             </select>
                         </div>
 
                         <div id="banUsersList">
                             <p style="color: #888; font-size: 12px;">Click "Recalculate Ban List" to scan classes and Shopify subscription statuses.</p>
+                        </div>
+
+                        <div id="banPagination" style="margin-top: 16px; text-align: center; display: none;">
+                            <button class="btn btn-info btn-sm" id="banPrevBtn" onclick="banPrevPage()">◀ Prev</button>
+                            <span id="banPageInfo" style="margin: 0 15px; font-size: 13px; color: #aaa;"></span>
+                            <button class="btn btn-info btn-sm" id="banNextBtn" onclick="banNextPage()">Next ▶</button>
                         </div>
                     </div>
                 </div>
@@ -29850,9 +29862,10 @@ ${additionalText}
         
         // ==================== BAN USERS ====================
         let banCandidates = [];           // computed list of {key, fullName, discord, reason, source, notes}
+        let banCurrentPage = 1;           // pagination current page
         let banDismissedKeys = new Set();  // names already banned or moved to monthly (don't re-surface)
-        let banReasonLabels = { '6week': '6 Week Ended', 'failed': 'Failed Payment', 'cancelled': 'Cancellation' };
-        let banReasonColors = { '6week': '#a855f7', 'failed': '#ff3366', 'cancelled': '#e91e63' };
+        let banReasonLabels = { '6week': '6 Week Ended', 'failed': 'Failed Payment', 'cancelled': 'Cancellation', 'paused': 'Paused' };
+        let banReasonColors = { '6week': '#a855f7', 'failed': '#ff3366', 'cancelled': '#e91e63', 'paused': '#ff9800' };
 
         // Map of Shopify customerId -> { status, changedAt:Date } observed across scans
         let statusTrackingMap = {};
@@ -29975,6 +29988,7 @@ ${additionalText}
                 await syncStatusTracking(allShopifyCustomersForAccounts);
 
                 banCandidates = computeBanCandidates();
+                banCurrentPage = 1;
                 if (statusEl) statusEl.textContent = `${banCandidates.length} student(s) flagged`;
                 renderBanList();
             } catch (e) {
@@ -30030,19 +30044,26 @@ ${additionalText}
                 }
             });
 
-            // (2) Failed payment & (3) Cancellation — from Shopify subscription tags,
-            //     but only if the full name also appears in an archived class.
+            // (2) Failed payment, (3) Cancellation, (4) Paused — from Shopify subscription tags.
+            //     Includes ALL customers (not just archived), within the last 180 days.
+            const cutoff180 = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
             (allShopifyCustomersForAccounts || []).forEach(c => {
                 const status = getSubscriptionStatus(c.tags);
-                if (status !== 'failed' && status !== 'cancelled') return;
+                if (status !== 'failed' && status !== 'cancelled' && status !== 'paused') return;
                 const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim();
                 if (!fullName) return;
-                if (!nameInArchivedClasses(fullName)) return; // spec: must match an archived student
                 // Prefer the stamped transition time; fall back to Shopify updated_at until tracked.
                 const tracked = statusTrackingMap[String(c.id)];
                 const evt = (tracked && tracked.changedAt) ? tracked.changedAt
                           : (c.updated_at ? new Date(c.updated_at) : null);
-                addCandidate(fullName, status, status === 'failed' ? 'Shopify · Failed Payment' : 'Shopify · Cancelled', evt);
+                // Only include events within the last 180 days. If no date is known, skip.
+                if (!evt || isNaN(evt) || evt < cutoff180) return;
+                const sourceMap = {
+                    failed: 'Shopify · Failed Payment',
+                    cancelled: 'Shopify · Cancelled',
+                    paused: 'Shopify · Paused'
+                };
+                addCandidate(fullName, status, sourceMap[status], evt);
             });
 
             // Default sort: most recent event first (sort control may re-order in renderBanList)
@@ -30060,13 +30081,16 @@ ${additionalText}
                 const c6 = banCandidates.filter(x => x.reason === '6week').length;
                 const cf = banCandidates.filter(x => x.reason === 'failed').length;
                 const cc = banCandidates.filter(x => x.reason === 'cancelled').length;
+                const cp = banCandidates.filter(x => x.reason === 'paused').length;
                 dashEl.innerHTML = `
                     <div style="background:rgba(168,85,247,0.18);border:2px solid #a855f7;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
                         <div style="font-size:20px;color:#a855f7;font-weight:bold;">${c6}</div><div style="font-size:10px;color:#888;">6 WEEK ENDED</div></div>
                     <div style="background:rgba(255,51,102,0.18);border:2px solid #ff3366;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
                         <div style="font-size:20px;color:#ff3366;font-weight:bold;">${cf}</div><div style="font-size:10px;color:#888;">FAILED PAYMENT</div></div>
                     <div style="background:rgba(233,30,99,0.18);border:2px solid #e91e63;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
-                        <div style="font-size:20px;color:#e91e63;font-weight:bold;">${cc}</div><div style="font-size:10px;color:#888;">CANCELLED</div></div>`;
+                        <div style="font-size:20px;color:#e91e63;font-weight:bold;">${cc}</div><div style="font-size:10px;color:#888;">CANCELLED</div></div>
+                    <div style="background:rgba(255,152,0,0.18);border:2px solid #ff9800;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
+                        <div style="font-size:20px;color:#ff9800;font-weight:bold;">${cp}</div><div style="font-size:10px;color:#888;">PAUSED</div></div>`;
             }
 
             const q = normalizeName(document.getElementById('banSearch')?.value || '');
@@ -30092,11 +30116,21 @@ ${additionalText}
 
             if (rows.length === 0) {
                 listEl.innerHTML = '<p style="color:#888;font-size:12px;">No students flagged for banning. 🎉</p>';
+                const pag = document.getElementById('banPagination');
+                if (pag) pag.style.display = 'none';
                 return;
             }
 
+            // Pagination
+            const perPage = parseInt(document.getElementById('banPerPage')?.value || '25');
+            const totalPages = Math.ceil(rows.length / perPage);
+            if (banCurrentPage > totalPages) banCurrentPage = totalPages;
+            if (banCurrentPage < 1) banCurrentPage = 1;
+            const startIdx = (banCurrentPage - 1) * perPage;
+            const pageRows = rows.slice(startIdx, startIdx + perPage);
+
             let html = '';
-            rows.forEach(x => {
+            pageRows.forEach(x => {
                 const color = banReasonColors[x.reason] || '#888';
                 const discordDisplay = x.discord
                     ? `<span style="color:#5865F2;">🎮 ${escapeHtml(x.discord)}</span>`
@@ -30125,11 +30159,23 @@ ${additionalText}
                     </div>`;
             });
             listEl.innerHTML = html;
+
+            // Pagination footer
+            const pag = document.getElementById('banPagination');
+            if (pag) {
+                pag.style.display = totalPages > 1 ? 'block' : 'none';
+                document.getElementById('banPageInfo').textContent =
+                    `Page ${banCurrentPage} of ${totalPages} · ${rows.length} result${rows.length !== 1 ? 's' : ''}`;
+                document.getElementById('banPrevBtn').disabled = banCurrentPage <= 1;
+                document.getElementById('banNextBtn').disabled = banCurrentPage >= totalPages;
+            }
         }
 
-        function updateBanNote(key, value) {
-            const c = banCandidates.find(x => x.key === key);
-            if (c) c.notes = value;
+        function banPrevPage() {
+            if (banCurrentPage > 1) { banCurrentPage--; renderBanList(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        }
+        function banNextPage() {
+            banCurrentPage++; renderBanList(); window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function getBanCandidate(key) { return banCandidates.find(x => x.key === key); }
