@@ -1322,6 +1322,7 @@
                     <button class="nav-tab" onclick="showAdminTab('group_outreach')">📞 Outreach Portal ▾</button>
                     <button class="nav-tab" onclick="showAdminTab('group_classinfo')">📚 Class Info ▾</button>
                     <button class="nav-tab" onclick="showAdminTab('accounts')">👤 Account Creation</button>
+                    <button class="nav-tab" onclick="showAdminTab('banusers')" style="border-color: #ff3366; color: #ff3366; background: rgba(255,51,102,0.15);">🚫 Ban Users</button>
                     <button class="nav-tab" onclick="showAdminTab('settings')">⚙️ Settings</button>
                 </div>
 
@@ -2444,6 +2445,40 @@
                             <button class="btn btn-info btn-sm" id="accountPrevBtn" onclick="accountPrevPage()">◀ Prev</button>
                             <span id="accountPageInfo" style="margin: 0 15px; font-size: 13px;"></span>
                             <button class="btn btn-info btn-sm" id="accountNextBtn" onclick="accountNextPage()">Next ▶</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ban Users Tab -->
+                <div id="adminTabBanusers" class="tab-content">
+                    <div class="card">
+                        <h3 style="color: #ff3366;">🚫 Ban Users</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Students flagged for banning: 6-week program ended, failed payment, or subscription cancelled. Each entry resolves a Discord username by matching the full name against student records. Mark as banned to remove them from the list, or move them to the Monthly Program record.</p>
+
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center;">
+                            <button class="btn" style="background:#ff3366;color:#fff;" onclick="initBanUsers(true)">🔄 Recalculate Ban List</button>
+                            <button class="btn btn-info" onclick="openMonthlyProgramRecord()">📋 View Monthly Program Record</button>
+                            <span id="banUsersStatus" style="font-size: 12px; color: #888;"></span>
+                        </div>
+
+                        <div id="banUsersDashboard" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;"></div>
+
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center;">
+                            <input type="text" id="banSearch" placeholder="🔍 Search name or Discord..." oninput="renderBanList()" style="flex: 1; min-width: 200px; padding: 6px 10px;">
+                            <select id="banReasonFilter" onchange="renderBanList()" style="padding: 6px 10px;">
+                                <option value="all">All Reasons</option>
+                                <option value="6week">6 Week Ended</option>
+                                <option value="failed">Failed Payment</option>
+                                <option value="cancelled">Cancellation</option>
+                            </select>
+                            <select id="banSortOrder" onchange="renderBanList()" style="padding: 6px 10px;">
+                                <option value="recent">Most Recent → Longest Ago</option>
+                                <option value="oldest">Longest Ago → Most Recent</option>
+                            </select>
+                        </div>
+
+                        <div id="banUsersList">
+                            <p style="color: #888; font-size: 12px;">Click "Recalculate Ban List" to scan classes and Shopify subscription statuses.</p>
                         </div>
                     </div>
                 </div>
@@ -5087,6 +5122,7 @@
                 // If no cache, just show the load controls (don't auto-load)
             }
             if (tab === 'drillmaker') { initDrillMaker(); }
+            if (tab === 'banusers') { initBanUsers(); }
         }
 
         // Teacher Dashboard
@@ -29812,6 +29848,341 @@ ${additionalText}
         // Cloud Function URL for Shopify
         const SHOPIFY_FUNCTION_URL = 'https://us-central1-korean-ta-evaluator.cloudfunctions.net/getShopifyCustomersWithTag';
         
+        // ==================== BAN USERS ====================
+        let banCandidates = [];           // computed list of {key, fullName, discord, reason, source, notes}
+        let banDismissedKeys = new Set();  // names already banned or moved to monthly (don't re-surface)
+        let banReasonLabels = { '6week': '6 Week Ended', 'failed': 'Failed Payment', 'cancelled': 'Cancellation' };
+        let banReasonColors = { '6week': '#a855f7', 'failed': '#ff3366', 'cancelled': '#e91e63' };
+
+        function normalizeName(n) {
+            return (n || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        // Resolve a Discord username by exact full-name match against student records
+        function resolveDiscordByName(fullName) {
+            const target = normalizeName(fullName);
+            if (!target) return null;
+            const match = allStudents.find(s => normalizeName(s.name) === target);
+            if (!match) return null;
+            return match.discord || match.discordName || null;
+        }
+
+        // Is this student's name present in any ARCHIVED (completed) class?
+        function nameInArchivedClasses(fullName) {
+            const target = normalizeName(fullName);
+            return allClasses.some(c => c.status === 'completed' &&
+                (c.students || []).some(s => normalizeName(s.name) === target));
+        }
+
+        async function initBanUsers(forceRecalc = false) {
+            const statusEl = document.getElementById('banUsersStatus');
+            const listEl = document.getElementById('banUsersList');
+            if (statusEl) statusEl.textContent = 'Calculating…';
+
+            try {
+                // Load dismissed keys (already banned or moved) so they don't resurface
+                banDismissedKeys = new Set();
+                const [bannedSnap, monthlySnap] = await Promise.all([
+                    db.collection('banned_users').get(),
+                    db.collection('monthly_program_students').get()
+                ]);
+                bannedSnap.forEach(d => { const x = d.data(); if (x.dismissKey) banDismissedKeys.add(x.dismissKey); });
+                monthlySnap.forEach(d => { const x = d.data(); if (x.dismissKey) banDismissedKeys.add(x.dismissKey); });
+
+                // Ensure Shopify customers are available for failed/cancelled detection
+                if (forceRecalc || !allShopifyCustomersForAccounts || allShopifyCustomersForAccounts.length === 0) {
+                    if (shopifyCustomersCache && shopifyCustomersCache.length) {
+                        allShopifyCustomersForAccounts = shopifyCustomersCache;
+                    } else {
+                        if (statusEl) statusEl.textContent = 'Loading Shopify subscription statuses…';
+                        try {
+                            const response = await callAdminFunction(SHOPIFY_FUNCTION_URL, {
+                                updated_at_min: null,
+                                fields: 'id,email,first_name,last_name,phone,tags,created_at,updated_at'
+                            });
+                            const result = await response.json();
+                            const data = result.result;
+                            if (data && data.success && data.customers) {
+                                allShopifyCustomersForAccounts = data.customers;
+                                shopifyCustomersCache = data.customers;
+                                shopifyCustomersCacheTime = Date.now();
+                                shopifyCustomersCacheRange = 'all';
+                            }
+                        } catch (e) {
+                            console.warn('Ban Users: could not load Shopify customers —', e.message);
+                        }
+                    }
+                }
+
+                banCandidates = computeBanCandidates();
+                if (statusEl) statusEl.textContent = `${banCandidates.length} student(s) flagged`;
+                renderBanList();
+            } catch (e) {
+                console.error('initBanUsers error:', e);
+                if (listEl) listEl.innerHTML = `<p style="color:#ff3366;">Error: ${escapeHtml(e.message)}</p>`;
+                if (statusEl) statusEl.textContent = '';
+            }
+        }
+
+        function computeBanCandidates() {
+            const candidates = [];
+            const seen = new Set();
+
+            const addCandidate = (fullName, reason, sourceLabel, eventDate) => {
+                const cleanName = (fullName || '').trim();
+                if (!cleanName) return;
+                const key = normalizeName(cleanName) + '|' + reason;
+                if (seen.has(key)) return;            // dedup within this run
+                if (banDismissedKeys.has(key)) return; // already banned/moved
+                seen.add(key);
+                const discord = resolveDiscordByName(cleanName);
+                candidates.push({
+                    key,
+                    fullName: cleanName,
+                    discord: discord,            // null => "No Discord username found"
+                    reason,
+                    source: sourceLabel,
+                    eventDate: eventDate instanceof Date && !isNaN(eventDate) ? eventDate : null,
+                    notes: ''
+                });
+            };
+
+            // (1) 6-week ended — pull from archived AND current classes that have reached their week total
+            const now = new Date();
+            allClasses.forEach(cls => {
+                const weeksTotal = getLevelWeeks(cls.level) || 6;
+                let ended = cls.status === 'completed';
+                let endDate = null;
+                if (cls.startDate) {
+                    const start = parseLocalDate(cls.startDate);
+                    if (start) {
+                        endDate = new Date(start);
+                        endDate.setDate(endDate.getDate() + (weeksTotal * 7));
+                        if (!ended) {
+                            const daysDiff = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+                            const currentWeek = Math.floor(daysDiff / 7) + 1;
+                            if (currentWeek >= weeksTotal) ended = true;
+                        }
+                    }
+                }
+                if (ended) {
+                    (cls.students || []).forEach(s => addCandidate(s.name, '6week', `${LEVELS[cls.level] || cls.level || 'Class'} · ${cls.day} @ ${cls.time}`, endDate));
+                }
+            });
+
+            // (2) Failed payment & (3) Cancellation — from Shopify subscription tags,
+            //     but only if the full name also appears in an archived class.
+            (allShopifyCustomersForAccounts || []).forEach(c => {
+                const status = getSubscriptionStatus(c.tags);
+                if (status !== 'failed' && status !== 'cancelled') return;
+                const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+                if (!fullName) return;
+                if (!nameInArchivedClasses(fullName)) return; // spec: must match an archived student
+                const evt = c.updated_at ? new Date(c.updated_at) : null;
+                addCandidate(fullName, status, status === 'failed' ? 'Shopify · Failed Payment' : 'Shopify · Cancelled', evt);
+            });
+
+            // Default sort: most recent event first (sort control may re-order in renderBanList)
+            candidates.sort((a, b) => (b.eventDate?.getTime() || 0) - (a.eventDate?.getTime() || 0));
+            return candidates;
+        }
+
+        function renderBanList() {
+            const listEl = document.getElementById('banUsersList');
+            const dashEl = document.getElementById('banUsersDashboard');
+            if (!listEl) return;
+
+            // Dashboard counts
+            if (dashEl) {
+                const c6 = banCandidates.filter(x => x.reason === '6week').length;
+                const cf = banCandidates.filter(x => x.reason === 'failed').length;
+                const cc = banCandidates.filter(x => x.reason === 'cancelled').length;
+                dashEl.innerHTML = `
+                    <div style="background:rgba(168,85,247,0.18);border:2px solid #a855f7;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
+                        <div style="font-size:20px;color:#a855f7;font-weight:bold;">${c6}</div><div style="font-size:10px;color:#888;">6 WEEK ENDED</div></div>
+                    <div style="background:rgba(255,51,102,0.18);border:2px solid #ff3366;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
+                        <div style="font-size:20px;color:#ff3366;font-weight:bold;">${cf}</div><div style="font-size:10px;color:#888;">FAILED PAYMENT</div></div>
+                    <div style="background:rgba(233,30,99,0.18);border:2px solid #e91e63;padding:10px 16px;border-radius:8px;text-align:center;min-width:110px;">
+                        <div style="font-size:20px;color:#e91e63;font-weight:bold;">${cc}</div><div style="font-size:10px;color:#888;">CANCELLED</div></div>`;
+            }
+
+            const q = normalizeName(document.getElementById('banSearch')?.value || '');
+            const reasonFilter = document.getElementById('banReasonFilter')?.value || 'all';
+            const sortOrder = document.getElementById('banSortOrder')?.value || 'recent';
+            let rows = banCandidates.filter(x => {
+                if (reasonFilter !== 'all' && x.reason !== reasonFilter) return false;
+                if (q) {
+                    return normalizeName(x.fullName).includes(q) || normalizeName(x.discord || '').includes(q);
+                }
+                return true;
+            });
+
+            // Sort by event date. Entries with no date sort to the bottom either way.
+            rows.sort((a, b) => {
+                const ta = a.eventDate?.getTime();
+                const tb = b.eventDate?.getTime();
+                if (ta == null && tb == null) return a.fullName.localeCompare(b.fullName);
+                if (ta == null) return 1;
+                if (tb == null) return -1;
+                return sortOrder === 'oldest' ? ta - tb : tb - ta;
+            });
+
+            if (rows.length === 0) {
+                listEl.innerHTML = '<p style="color:#888;font-size:12px;">No students flagged for banning. 🎉</p>';
+                return;
+            }
+
+            let html = '';
+            rows.forEach(x => {
+                const color = banReasonColors[x.reason] || '#888';
+                const discordDisplay = x.discord
+                    ? `<span style="color:#5865F2;">🎮 ${escapeHtml(x.discord)}</span>`
+                    : `<span style="color:#888;font-style:italic;">No Discord username found</span>`;
+                html += `
+                    <div style="background:rgba(0,0,0,0.3);border:1px solid ${color};border-left:4px solid ${color};border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:200px;">
+                                <div style="font-size:15px;font-weight:bold;color:#fff;">${escapeHtml(x.fullName)}</div>
+                                <div style="font-size:13px;margin-top:3px;">${discordDisplay}</div>
+                                <div style="margin-top:6px;">
+                                    <span style="display:inline-block;background:${color};color:#fff;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;">${banReasonLabels[x.reason]}</span>
+                                    <span style="font-size:11px;color:#888;margin-left:8px;">${escapeHtml(x.source || '')}</span>
+                                    ${x.eventDate ? `<span style="font-size:11px;color:#666;margin-left:8px;">🗓️ ${x.eventDate.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</span>` : ''}
+                                </div>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:150px;">
+                                <button class="btn btn-sm" style="background:${color};color:#fff;" onclick="markStudentBanned('${x.key.replace(/'/g, "\\'")}')">🚫 Mark Banned</button>
+                                <button class="btn btn-sm btn-info" onclick="moveStudentToMonthly('${x.key.replace(/'/g, "\\'")}')">📋 Move to Monthly</button>
+                                ${x.discord ? `<button class="btn btn-sm" style="background:#5865F2;color:#fff;" onclick="copyToClipboard('${(x.discord || '').replace(/'/g, "\\'")}')">📋 Copy Discord</button>` : ''}
+                            </div>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <textarea id="banNote_${x.key.replace(/[^a-zA-Z0-9]/g, '_')}" placeholder="Notes (optional)…" oninput="updateBanNote('${x.key.replace(/'/g, "\\'")}', this.value)" style="width:100%;min-height:38px;background:rgba(0,0,0,0.3);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;padding:6px 8px;resize:vertical;">${escapeHtml(x.notes || '')}</textarea>
+                        </div>
+                    </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function updateBanNote(key, value) {
+            const c = banCandidates.find(x => x.key === key);
+            if (c) c.notes = value;
+        }
+
+        function getBanCandidate(key) { return banCandidates.find(x => x.key === key); }
+
+        async function markStudentBanned(key) {
+            const c = getBanCandidate(key);
+            if (!c) return;
+            if (!confirm(`Mark "${c.fullName}" as BANNED?\n\nReason: ${banReasonLabels[c.reason]}\nDiscord: ${c.discord || 'None found'}\n\nThis removes them from the list.`)) return;
+            try {
+                await db.collection('banned_users').add({
+                    dismissKey: c.key,
+                    fullName: c.fullName,
+                    discord: c.discord || null,
+                    reason: c.reason,
+                    reasonLabel: banReasonLabels[c.reason],
+                    source: c.source || '',
+                    notes: c.notes || '',
+                    bannedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    bannedBy: currentUser?.email || 'admin'
+                });
+                banDismissedKeys.add(c.key);
+                banCandidates = banCandidates.filter(x => x.key !== key);
+                document.getElementById('banUsersStatus').textContent = `${banCandidates.length} student(s) flagged`;
+                renderBanList();
+            } catch (e) {
+                console.error('markStudentBanned error:', e);
+                alert('Failed to mark banned: ' + e.message);
+            }
+        }
+
+        async function moveStudentToMonthly(key) {
+            const c = getBanCandidate(key);
+            if (!c) return;
+            if (!confirm(`Move "${c.fullName}" to the Monthly Program record?\n\nThis removes them from the ban list and saves them under Monthly Program.`)) return;
+            try {
+                await db.collection('monthly_program_students').add({
+                    dismissKey: c.key,
+                    fullName: c.fullName,
+                    discord: c.discord || null,
+                    reason: c.reason,
+                    reasonLabel: banReasonLabels[c.reason],
+                    source: c.source || '',
+                    notes: c.notes || '',
+                    movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    movedBy: currentUser?.email || 'admin'
+                });
+                banDismissedKeys.add(c.key);
+                banCandidates = banCandidates.filter(x => x.key !== key);
+                document.getElementById('banUsersStatus').textContent = `${banCandidates.length} student(s) flagged`;
+                renderBanList();
+            } catch (e) {
+                console.error('moveStudentToMonthly error:', e);
+                alert('Failed to move to monthly: ' + e.message);
+            }
+        }
+
+        async function openMonthlyProgramRecord() {
+            const existing = document.getElementById('monthlyProgramModal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'monthlyProgramModal';
+            modal.className = 'modal-overlay active';
+            modal.innerHTML = `
+                <div class="modal" style="max-width:720px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <h3 style="color:#00aaff;margin:0;">📋 Monthly Program Record</h3>
+                        <button onclick="document.getElementById('monthlyProgramModal').remove()" style="background:none;border:none;color:#888;font-size:22px;cursor:pointer;">✕</button>
+                    </div>
+                    <div id="monthlyProgramContent"><p style="color:#888;">Loading…</p></div>
+                </div>`;
+            document.body.appendChild(modal);
+
+            try {
+                const snap = await db.collection('monthly_program_students').orderBy('movedAt', 'desc').get();
+                const content = document.getElementById('monthlyProgramContent');
+                if (snap.empty) {
+                    content.innerHTML = '<p style="color:#888;">No students in the Monthly Program record yet.</p>';
+                    return;
+                }
+                let html = '';
+                snap.forEach(doc => {
+                    const x = doc.data();
+                    const discord = x.discord ? `<span style="color:#5865F2;">🎮 ${escapeHtml(x.discord)}</span>` : '<span style="color:#888;font-style:italic;">No Discord</span>';
+                    const when = x.movedAt?.toDate ? x.movedAt.toDate().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+                    html += `
+                        <div style="background:rgba(0,170,255,0.08);border:1px solid #00aaff;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                                <div>
+                                    <div style="font-weight:bold;color:#fff;">${escapeHtml(x.fullName)}</div>
+                                    <div style="font-size:12px;margin-top:2px;">${discord}</div>
+                                    <div style="font-size:11px;color:#888;margin-top:4px;">${escapeHtml(x.reasonLabel || x.reason || '')}${when ? ' · ' + when : ''}</div>
+                                    ${x.notes ? `<div style="font-size:11px;color:#aaa;margin-top:4px;border-top:1px solid #333;padding-top:4px;">📝 ${escapeHtml(x.notes)}</div>` : ''}
+                                </div>
+                                <button class="btn btn-sm btn-danger" onclick="removeFromMonthly('${doc.id}')">🗑️</button>
+                            </div>
+                        </div>`;
+                });
+                content.innerHTML = html;
+            } catch (e) {
+                console.error('openMonthlyProgramRecord error:', e);
+                document.getElementById('monthlyProgramContent').innerHTML = `<p style="color:#ff3366;">Error: ${escapeHtml(e.message)}</p>`;
+            }
+        }
+
+        async function removeFromMonthly(docId) {
+            if (!confirm('Remove this student from the Monthly Program record?')) return;
+            try {
+                await db.collection('monthly_program_students').doc(docId).delete();
+                openMonthlyProgramRecord(); // refresh
+            } catch (e) {
+                console.error('removeFromMonthly error:', e);
+                alert('Failed to remove: ' + e.message);
+            }
+        }
+
         // Global variables for account creation pagination
         let allShopifyCustomersForAccounts = [];
         let filteredShopifyCustomersForAccounts = [];
