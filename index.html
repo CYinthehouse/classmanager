@@ -9,6 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- QR Code generator for Quiz Game -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         /* ============================================================
            KAWAII PASTEL THEME — variables drive everything.
@@ -1322,6 +1324,21 @@
         .mat-expanded-hint { color: rgba(255,255,255,0.35); font-size: 12px; flex-shrink: 0; }
         /* ==================== END MATERIALS CREATION WINDOW STYLES ==================== */
         /* ==================== END TUESDAY READING CLASS STYLES ==================== */
+
+        /* Grader PDF export: force light-theme variable values so the printout is always
+           crisp white regardless of whether the app is in dark mode at capture time. */
+        .grader-pdf-export {
+            --bg: #fff5f8; --bg-2: #ffeaf3; --bg-3: #fdf4ff;
+            --pink: #ffb6d1; --pink-soft: #ffd6e6; --pink-deep: #ff8cb3;
+            --lavender: #b89ae0; --lavender-soft: #e8e0ff;
+            --mint: #b8ecd5; --mint-soft: #d6f5e6; --mint-deep: #4fb88a;
+            --peach: #ffd5b8; --peach-deep: #e8895a;
+            --yellow: #fff2b8; --yellow-deep: #c79a2e;
+            --sky: #c5e4ff; --sky-deep: #4f9fd8;
+            --rose: #ffc2cf; --rose-deep: #e8526f;
+            --ink: #4a3550; --ink-soft: #7a6585; --ink-light: #b4a3bf;
+            --white: #ffffff; --card: #ffffff; --line: #f3d9e6;
+        }
     </style>
 </head>
 <body>
@@ -33046,13 +33063,87 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             return 'var(--rose-deep)';
         }
 
+        var graderLastResult = null;      // the current graded result (mutable via teacher edits)
+        var graderLastStudent = '';       // student name for the current result
+        var graderEditMode = false;       // whether score inputs are shown
+
         function renderGraderResult(result, studentName) {
+            graderLastResult = result;
+            graderLastStudent = studentName || '';
+            graderEditMode = false;
+            drawGraderResult();
+        }
+
+        function recomputeGraderTotal() {
+            if (!graderLastResult || !graderLastResult.items) return 0;
+            var sum = 0;
+            for (var i = 0; i < graderLastResult.items.length; i++) {
+                var a = parseInt(graderLastResult.items[i].awarded, 10);
+                if (isNaN(a)) a = 0;
+                sum += a;
+            }
+            return sum;
+        }
+
+        // Called live when a teacher edits an item score
+        function graderEditItem(idx, value) {
+            if (!graderLastResult || !graderLastResult.items[idx]) return;
+            var max = parseInt(graderLastResult.items[idx].max, 10) || 0;
+            var v = parseInt(value, 10);
+            if (isNaN(v)) v = 0;
+            if (v < 0) v = 0;
+            if (v > max) v = max;
+            graderLastResult.items[idx].awarded = v;
+            graderLastResult.items[idx].found = v > 0;
+            // If a teacher hasn't manually pinned the total, keep it synced to the sum
+            if (!graderLastResult.totalManual) {
+                graderLastResult.total = recomputeGraderTotal();
+            }
+            // Update just the header number + the row pill color without full redraw (keeps inputs focused)
+            var totalEl = document.getElementById('graderTotalNum');
+            if (totalEl && !graderLastResult.totalManual) totalEl.textContent = graderLastResult.total;
+        }
+
+        // Called when teacher edits the overall score directly
+        function graderEditTotal(value) {
+            if (!graderLastResult) return;
+            var v = parseInt(value, 10);
+            if (isNaN(v)) v = 0;
+            if (v < 0) v = 0;
+            if (v > 100) v = 100;
+            graderLastResult.total = v;
+            graderLastResult.totalManual = true; // teacher pinned it; stop auto-summing
+        }
+
+        function toggleGraderEditMode() {
+            if (!graderLastResult) return;
+            graderEditMode = !graderEditMode;
+            drawGraderResult();
+        }
+
+        function drawGraderResult() {
             var results = document.getElementById('graderResults');
+            if (!graderLastResult) { results.innerHTML = ''; return; }
+            var result = graderLastResult;
+            var studentName = graderLastStudent;
             var total = (typeof result.total === 'number') ? result.total : parseInt(result.total, 10) || 0;
             var pct = total / 100;
             var scoreColor = graderColorForPct(pct);
 
             var html = '';
+
+            // Action bar (not captured in the PDF)
+            html += '<div id="graderActionBar" style="display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 14px; flex-wrap: wrap;">';
+            html += '<button class="btn btn-sm" onclick="toggleGraderEditMode()" style="background: ' + (graderEditMode ? 'var(--mint-deep)' : 'var(--lavender)') + '; border-color: ' + (graderEditMode ? 'var(--mint-deep)' : 'var(--lavender)') + '; color: #fff;">' + (graderEditMode ? '\u2713 Done Editing' : '\u270F\uFE0F Adjust Scores') + '</button>';
+            html += '<button class="btn btn-sm" onclick="downloadGraderPDF()" style="background: var(--sky-deep); border-color: var(--sky-deep); color: #fff;">\u2B07\uFE0F Download PDF</button>';
+            html += '</div>';
+
+            if (graderEditMode) {
+                html += '<div style="font-size: 12px; color: var(--ink-soft); background: var(--mint-soft); border: 1px solid var(--mint-deep); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;">Editing scores. Adjust any number below \u2014 the total updates automatically. You can also overwrite the overall score directly. Click <strong>Done Editing</strong> when finished.</div>';
+            }
+
+            // ---- Capturable area starts here (this is what becomes the PDF) ----
+            html += '<div id="graderCaptureArea">';
 
             // Score header
             html += '<div style="background: var(--card); border: 2px solid ' + scoreColor + '; border-radius: var(--radius); padding: 22px; margin-bottom: 16px; text-align: center;">';
@@ -33061,7 +33152,14 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             } else {
                 html += '<div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">Novice Week 5 \u2014 Self &amp; Friend Introduction</div>';
             }
-            html += '<div style="font-family: var(--font-display); font-size: 48px; font-weight: 800; color: ' + scoreColor + '; line-height: 1;">' + total + '<span style="font-size: 22px; color: var(--ink-light);">/100</span></div>';
+            if (graderEditMode) {
+                html += '<div style="display: flex; align-items: baseline; justify-content: center; gap: 4px;">';
+                html += '<input type="number" min="0" max="100" value="' + total + '" onchange="graderEditTotal(this.value); drawGraderResult();" style="width: 110px; font-family: var(--font-display); font-size: 40px; font-weight: 800; color: ' + scoreColor + '; text-align: center; background: var(--bg-3); border: 2px solid ' + scoreColor + '; border-radius: var(--radius-sm); padding: 4px;">';
+                html += '<span style="font-size: 22px; color: var(--ink-light);">/100</span>';
+                html += '</div>';
+            } else {
+                html += '<div style="font-family: var(--font-display); font-size: 48px; font-weight: 800; color: ' + scoreColor + '; line-height: 1;"><span id="graderTotalNum">' + total + '</span><span style="font-size: 22px; color: var(--ink-light);">/100</span></div>';
+            }
             if (result.summary) {
                 html += '<p style="font-size: 13px; color: var(--ink); margin-top: 14px; line-height: 1.6; max-width: 560px; margin-left: auto; margin-right: auto;">' + escapeHtml(result.summary) + '</p>';
             }
@@ -33083,7 +33181,14 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                     html += '<div style="padding: 11px 0; border-bottom: 1px solid var(--line);">';
                     html += '<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">';
                     html += '<span style="font-size: 13px; font-weight: 700; color: var(--ink);">' + icon + ' ' + escapeHtml(it.label || it.id || '') + '</span>';
-                    html += '<span style="flex-shrink: 0; font-size: 12px; font-weight: 700; color: ' + icolor + '; background: var(--bg-3); border: 1px solid ' + icolor + '; border-radius: 20px; padding: 3px 10px;">' + awarded + ' / ' + max + '</span>';
+                    if (graderEditMode) {
+                        html += '<span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;">';
+                        html += '<input type="number" min="0" max="' + max + '" value="' + awarded + '" onchange="graderEditItem(' + i + ', this.value)" style="width: 52px; font-size: 13px; font-weight: 700; color: var(--ink); text-align: center; background: var(--bg-3); border: 2px solid ' + icolor + '; border-radius: 8px; padding: 3px;">';
+                        html += '<span style="font-size: 12px; color: var(--ink-light);">/ ' + max + '</span>';
+                        html += '</span>';
+                    } else {
+                        html += '<span style="flex-shrink: 0; font-size: 12px; font-weight: 700; color: ' + icolor + '; background: var(--bg-3); border: 1px solid ' + icolor + '; border-radius: 20px; padding: 3px 10px;">' + awarded + ' / ' + max + '</span>';
+                    }
                     html += '</div>';
                     if (it.evidence && String(it.evidence).trim()) {
                         html += '<div style="font-size: 12px; color: var(--ink); margin-top: 6px; padding: 6px 10px; background: var(--bg-3); border-left: 3px solid ' + icolor + '; border-radius: 6px; line-height: 1.6;">\u201C' + escapeHtml(it.evidence) + '\u201D</div>';
@@ -33096,7 +33201,84 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                 html += '</div>';
             }
 
+            html += '</div>'; // end graderCaptureArea
             results.innerHTML = html;
+        }
+
+        // ---- PDF export: render a clean light-themed clone and screenshot it ----
+        function downloadGraderPDF() {
+            if (!graderLastResult) { alert('Grade a paragraph first.'); return; }
+            if (typeof html2canvas === 'undefined' || !window.jspdf) {
+                alert('PDF libraries are still loading. Please try again in a moment.');
+                return;
+            }
+
+            var source = document.getElementById('graderCaptureArea');
+            if (!source) return;
+
+            // Build an off-screen, forced-light wrapper so the PDF is always crisp white,
+            // regardless of whether the app is in dark mode.
+            var wrapper = document.createElement('div');
+            wrapper.className = 'grader-pdf-export';
+            wrapper.style.position = 'fixed';
+            wrapper.style.left = '-99999px';
+            wrapper.style.top = '0';
+            wrapper.style.width = '760px';
+            wrapper.style.padding = '32px';
+            wrapper.style.background = '#ffffff';
+
+            // Title block for the printout
+            var title = document.createElement('div');
+            title.style.marginBottom = '20px';
+            title.style.borderBottom = '2px solid #f3d9e6';
+            title.style.paddingBottom = '14px';
+            title.innerHTML = '<div style="font-family: \'Nunito\', sans-serif; font-size: 22px; font-weight: 800; color: #ff8cb3;">KoreanLearnin \u2014 Paragraph Grade</div>'
+                + '<div style="font-family: \'Quicksand\', sans-serif; font-size: 12px; color: #7a6585; margin-top: 4px;">Novice \u00B7 Week 5 \u00B7 Self &amp; Friend Introduction \u00B7 ' + graderFormatDate() + '</div>';
+            wrapper.appendChild(title);
+
+            var clone = source.cloneNode(true);
+            // Strip any leftover input elements (shouldn't be any if not in edit mode, but be safe)
+            wrapper.appendChild(clone);
+
+            document.body.appendChild(wrapper);
+
+            html2canvas(wrapper, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false })
+                .then(function(canvas) {
+                    document.body.removeChild(wrapper);
+                    var imgData = canvas.toDataURL('image/png');
+                    var jsPDF = window.jspdf.jsPDF;
+                    var pdf = new jsPDF('p', 'mm', 'a4');
+                    var pageW = pdf.internal.pageSize.getWidth();
+                    var pageH = pdf.internal.pageSize.getHeight();
+                    var imgW = pageW;
+                    var imgH = canvas.height * imgW / canvas.width;
+
+                    // Paginate if the result is taller than one page
+                    var heightLeft = imgH;
+                    var position = 0;
+                    pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+                    heightLeft -= pageH;
+                    while (heightLeft > 0) {
+                        position -= pageH;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH);
+                        heightLeft -= pageH;
+                    }
+
+                    var safeName = (graderLastStudent || 'student').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+                    pdf.save('grade_' + safeName + '_novice_w5.pdf');
+                })
+                .catch(function(err) {
+                    if (wrapper.parentNode) document.body.removeChild(wrapper);
+                    console.error('PDF export error:', err);
+                    alert('Could not generate the PDF: ' + err.message);
+                });
+        }
+
+        function graderFormatDate() {
+            var d = new Date();
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
         }
         // ===================== END GRADER =====================
 
