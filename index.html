@@ -32919,7 +32919,7 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
         }
 
         function buildGraderPrompt(paragraph, studentName) {
-            // Build a strict rubric string for the model.
+            // Build the rubric string for the model.
             var rubricText = '';
             for (var i = 0; i < GRADER_NOVICE_W5_RUBRIC.length; i++) {
                 var r = GRADER_NOVICE_W5_RUBRIC[i];
@@ -32927,21 +32927,32 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             }
 
             var prompt = '';
-            prompt += 'You are a Korean language teacher grading a beginner (Novice, Week 5) student\'s written paragraph. ';
-            prompt += 'The assignment is a self-and-friend introduction. Grade STRICTLY but FAIRLY against the rubric below. ';
-            prompt += 'This is a Novice student, so accept natural beginner-level Korean; do not penalize for advanced nuance. ';
-            prompt += 'Award partial credit when an element is attempted but has grammar errors.\n\n';
+            prompt += 'You are a strict Korean language teacher grading a Novice (Week 5) student\'s paragraph for a self-and-friend introduction assignment. ';
+            prompt += 'Your job is to detect what is ACTUALLY in the text, not what a typical introduction would contain.\n\n';
+
+            prompt += 'CRITICAL GRADING RULES:\n';
+            prompt += '1. For EACH rubric element, you MUST first find and quote the EXACT Korean text from the paragraph that satisfies it. Copy it verbatim into the "evidence" field.\n';
+            prompt += '2. If you CANNOT quote specific text that directly satisfies an element, that element is ABSENT. Set "found": false, "awarded": 0, and "evidence": "" (empty). Do NOT award any points for absent elements.\n';
+            prompt += '3. Do NOT infer, assume, or give benefit of the doubt. A paragraph mentioning a friend does NOT mean professions, hobbies, or any other element is present unless the specific required text is there.\n';
+            prompt += '4. Each element must be satisfied by its OWN distinct text. Do not reuse the same sentence to satisfy multiple different elements unless it genuinely contains both.\n';
+            prompt += '5. The required grammar pattern matters. For example: "Hobbies as gerunds" requires the -는 거/것 gerund form with 좋아해요/싫어해요 — a plain noun + 좋아해요 without the gerund does NOT fully satisfy it. "Guessing friend\'s preference" requires 좋아하는 거 같아요 / 싫어하는 거 같아요 specifically. "Invitation with 같이" requires the word 같이 to actually appear.\n';
+            prompt += '6. Partial credit is ONLY for an element that is clearly present and attempted but has grammar mistakes — never for an element that is missing.\n\n';
+
+            prompt += 'This is a Novice student: accept natural beginner-level Korean and minor spelling slips on elements that ARE present. But absence is absence.\n\n';
+
             prompt += 'RUBRIC (total 100 points):\n' + rubricText + '\n';
             prompt += 'STUDENT PARAGRAPH:\n"""\n' + paragraph + '\n"""\n\n';
+
+            prompt += 'Work through each rubric element in order. For each one, scan the paragraph for the specific required text/grammar before deciding.\n\n';
             prompt += 'Respond with ONLY valid JSON (no markdown, no backticks, no preamble) in EXACTLY this shape:\n';
             prompt += '{\n';
             prompt += '  "total": <integer 0-100>,\n';
-            prompt += '  "summary": "<2-3 sentence overall feedback in English>",\n';
+            prompt += '  "summary": "<2-3 sentence overall feedback in English; mention which required elements were missing>",\n';
             prompt += '  "items": [\n';
-            prompt += '    { "id": "<rubric id>", "label": "<rubric label>", "awarded": <integer>, "max": <integer>, "found": <true|false>, "feedback": "<one sentence: what they did / what to fix, may quote their Korean>" }\n';
+            prompt += '    { "id": "<rubric id>", "label": "<rubric label>", "awarded": <integer>, "max": <integer>, "found": <true|false>, "evidence": "<exact Korean quote from the paragraph, or empty string if absent>", "feedback": "<one sentence explaining the score>" }\n';
             prompt += '  ]\n';
             prompt += '}\n';
-            prompt += 'Include one item object for EVERY rubric line, in order. "total" MUST equal the sum of all "awarded" values.';
+            prompt += 'Include one item object for EVERY rubric line, in order. "total" MUST equal the sum of all "awarded" values. If an element is absent, awarded MUST be 0.';
             return prompt;
         }
 
@@ -32973,8 +32984,8 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                 body: JSON.stringify({
                     messages: [ { role: 'user', content: prompt } ],
                     model: 'gpt-4o',
-                    max_tokens: 1500,
-                    temperature: 0.2
+                    max_tokens: 1800,
+                    temperature: 0.1
                 })
             })
             .then(function(resp) { return resp.json(); })
@@ -33074,6 +33085,9 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                     html += '<span style="font-size: 13px; font-weight: 700; color: var(--ink);">' + icon + ' ' + escapeHtml(it.label || it.id || '') + '</span>';
                     html += '<span style="flex-shrink: 0; font-size: 12px; font-weight: 700; color: ' + icolor + '; background: var(--bg-3); border: 1px solid ' + icolor + '; border-radius: 20px; padding: 3px 10px;">' + awarded + ' / ' + max + '</span>';
                     html += '</div>';
+                    if (it.evidence && String(it.evidence).trim()) {
+                        html += '<div style="font-size: 12px; color: var(--ink); margin-top: 6px; padding: 6px 10px; background: var(--bg-3); border-left: 3px solid ' + icolor + '; border-radius: 6px; line-height: 1.6;">\u201C' + escapeHtml(it.evidence) + '\u201D</div>';
+                    }
                     if (it.feedback) {
                         html += '<div style="font-size: 12px; color: var(--ink-soft); margin-top: 5px; line-height: 1.5;">' + escapeHtml(it.feedback) + '</div>';
                     }
