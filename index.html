@@ -2945,7 +2945,7 @@
                             <!-- Rubric display -->
                             <div style="background: var(--bg-3); border: 2px solid var(--lavender); border-radius: var(--radius); padding: 18px; margin-bottom: 20px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleGraderRubric()">
-                                    <h4 style="font-family: var(--font-display); color: var(--lavender); font-size: 15px; font-weight: 800; margin: 0;">📋 Week 5 Rubric &mdash; Self &amp; Friend Introduction</h4>
+                                    <h4 style="font-family: var(--font-display); color: var(--lavender); font-size: 15px; font-weight: 800; margin: 0;">📋 Week 5 Rubric: Self &amp; Friend Introduction</h4>
                                     <span id="graderRubricChevron" style="color: var(--lavender); font-size: 14px;">▼</span>
                                 </div>
                                 <div id="graderRubricBody" style="margin-top: 15px;">
@@ -2956,7 +2956,7 @@
 
                             <!-- Student name (optional) -->
                             <div class="form-group">
-                                <label>Student Name <span style="color: var(--ink-light); font-weight: 400;">(optional &mdash; appears on the result)</span></label>
+                                <label>Student Name <span style="color: var(--ink-light); font-weight: 400;">(optional, appears on the result)</span></label>
                                 <input type="text" id="graderStudentName" placeholder="e.g. Alyssa">
                             </div>
 
@@ -32880,7 +32880,7 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
 
         var GRADER_AI_URL = 'https://generateflashcardai-386010826708.us-central1.run.app';
 
-        // Week 5 rubric — 11 required elements, 100 pts total.
+        // Week 5 rubric, 11 required elements, 100 pts total.
         var GRADER_NOVICE_W5_RUBRIC = [
             { id: 'dnp', label: 'Dual Noun Possession (DNP)', points: 10, desc: 'Uses possessive correctly to link two nouns (e.g. 제 친구의 취미, 친구 이름).' },
             { id: 'names', label: 'Names (self + friend)', points: 8, desc: 'States their own name and the friend\u2019s name, using \uB2D8 appropriately.' },
@@ -32952,8 +32952,8 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             prompt += '2. If you CANNOT quote specific text that directly satisfies an element, that element is ABSENT. Set "found": false, "awarded": 0, and "evidence": "" (empty). Do NOT award any points for absent elements.\n';
             prompt += '3. Do NOT infer, assume, or give benefit of the doubt. A paragraph mentioning a friend does NOT mean professions, hobbies, or any other element is present unless the specific required text is there.\n';
             prompt += '4. Each element must be satisfied by its OWN distinct text. Do not reuse the same sentence to satisfy multiple different elements unless it genuinely contains both.\n';
-            prompt += '5. The required grammar pattern matters. For example: "Hobbies as gerunds" requires the -는 거/것 gerund form with 좋아해요/싫어해요 — a plain noun + 좋아해요 without the gerund does NOT fully satisfy it. "Guessing friend\'s preference" requires 좋아하는 거 같아요 / 싫어하는 거 같아요 specifically. "Invitation with 같이" requires the word 같이 to actually appear.\n';
-            prompt += '6. Partial credit is ONLY for an element that is clearly present and attempted but has grammar mistakes — never for an element that is missing.\n\n';
+            prompt += '5. The required grammar pattern matters. For example: "Hobbies as gerunds" requires the -는 거/것 gerund form with 좋아해요/싫어해요 (a plain noun + 좋아해요 without the gerund does NOT fully satisfy it). "Guessing friend\'s preference" requires 좋아하는 거 같아요 / 싫어하는 거 같아요 specifically. "Invitation with 같이" requires the word 같이 to actually appear.\n';
+            prompt += '6. Partial credit is ONLY for an element that is clearly present and attempted but has grammar mistakes; never for an element that is missing.\n\n';
 
             prompt += 'This is a Novice student: accept natural beginner-level Korean and minor spelling slips on elements that ARE present. But absence is absence.\n\n';
 
@@ -32969,7 +32969,8 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             prompt += '    { "id": "<rubric id>", "label": "<rubric label>", "awarded": <integer>, "max": <integer>, "found": <true|false>, "evidence": "<exact Korean quote from the paragraph, or empty string if absent>", "feedback": "<one sentence explaining the score>" }\n';
             prompt += '  ]\n';
             prompt += '}\n';
-            prompt += 'Include one item object for EVERY rubric line, in order. "total" MUST equal the sum of all "awarded" values. If an element is absent, awarded MUST be 0.';
+            prompt += 'Include one item object for EVERY rubric line, in order. "total" MUST equal the sum of all "awarded" values. If an element is absent, awarded MUST be 0. ';
+            prompt += 'Do NOT use em-dash characters anywhere in your output; use commas, colons, or periods instead.';
             return prompt;
         }
 
@@ -33025,8 +33026,9 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                 var parsed = parseGraderJSON(raw);
                 if (!parsed) {
                     console.error('Grader raw response:', data);
-                    results.innerHTML = '<div class="message error">Could not parse the grade. The AI response was unexpected \u2014 check the console and try again.</div>';
+                    results.innerHTML = '<div class="message error">Could not parse the grade. The AI response was unexpected. Check the console and try again.</div>';
                 } else {
+                    graderStripDashes(parsed);
                     renderGraderResult(parsed, studentName);
                 }
             })
@@ -33054,6 +33056,24 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                     try { return JSON.parse(cleaned.substring(start, end + 1)); } catch (e2) { return null; }
                 }
                 return null;
+            }
+        }
+
+        // Belt-and-suspenders: strip em/en dashes from AI-generated text fields,
+        // replacing them with commas so no dash slips into the result or PDF.
+        function graderStripDashes(obj) {
+            function clean(s) {
+                if (typeof s !== 'string') return s;
+                // em-dash (—), en-dash (–), and " — " spaced variants -> ", "
+                return s.replace(/\s*[\u2014\u2013]\s*/g, ', ').replace(/, ,/g, ',');
+            }
+            if (obj.summary) obj.summary = clean(obj.summary);
+            if (obj.items && obj.items.length) {
+                for (var i = 0; i < obj.items.length; i++) {
+                    if (obj.items[i].feedback) obj.items[i].feedback = clean(obj.items[i].feedback);
+                    if (obj.items[i].label) obj.items[i].label = clean(obj.items[i].label);
+                    // evidence is a verbatim Korean quote; leave it untouched
+                }
             }
         }
 
@@ -33115,6 +33135,12 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             graderLastResult.totalManual = true; // teacher pinned it; stop auto-summing
         }
 
+        // Called as the teacher types a note; stored without redraw so the textarea keeps focus
+        function graderEditNote(value) {
+            if (!graderLastResult) return;
+            graderLastResult.teacherNote = value;
+        }
+
         function toggleGraderEditMode() {
             if (!graderLastResult) return;
             graderEditMode = !graderEditMode;
@@ -33139,7 +33165,7 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             html += '</div>';
 
             if (graderEditMode) {
-                html += '<div style="font-size: 12px; color: var(--ink-soft); background: var(--mint-soft); border: 1px solid var(--mint-deep); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;">Editing scores. Adjust any number below \u2014 the total updates automatically. You can also overwrite the overall score directly. Click <strong>Done Editing</strong> when finished.</div>';
+                html += '<div style="font-size: 12px; color: var(--ink-soft); background: var(--mint-soft); border: 1px solid var(--mint-deep); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;">Editing scores. Adjust any number below and the total updates automatically. You can also overwrite the overall score directly. Click <strong>Done Editing</strong> when finished.</div>';
             }
 
             // ---- Capturable area starts here (this is what becomes the PDF) ----
@@ -33148,9 +33174,9 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             // Score header
             html += '<div style="background: var(--card); border: 2px solid ' + scoreColor + '; border-radius: var(--radius); padding: 22px; margin-bottom: 16px; text-align: center;">';
             if (studentName) {
-                html += '<div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">' + escapeHtml(studentName) + '\u2019s Paragraph \u2014 Novice Week 5</div>';
+                html += '<div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">' + escapeHtml(studentName) + '\u2019s Paragraph, Novice Week 5</div>';
             } else {
-                html += '<div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">Novice Week 5 \u2014 Self &amp; Friend Introduction</div>';
+                html += '<div style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">Novice Week 5, Self &amp; Friend Introduction</div>';
             }
             if (graderEditMode) {
                 html += '<div style="display: flex; align-items: baseline; justify-content: center; gap: 4px;">';
@@ -33164,6 +33190,20 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
                 html += '<p style="font-size: 13px; color: var(--ink); margin-top: 14px; line-height: 1.6; max-width: 560px; margin-left: auto; margin-right: auto;">' + escapeHtml(result.summary) + '</p>';
             }
             html += '</div>';
+
+            // Teacher's note: editable textarea while editing, styled card when present in view mode.
+            var note = result.teacherNote ? String(result.teacherNote) : '';
+            if (graderEditMode) {
+                html += '<div style="background: var(--card); border: 2px dashed var(--lavender); border-radius: var(--radius); padding: 16px; margin-bottom: 16px;">';
+                html += '<label style="display: block; font-size: 13px; font-weight: 700; color: var(--lavender); margin-bottom: 8px;">\u270D\uFE0F Teacher\u2019s Note <span style="color: var(--ink-light); font-weight: 400;">(optional, appears on the PDF)</span></label>';
+                html += '<textarea id="graderTeacherNote" rows="3" placeholder="Add a comment or clarification for the student..." onchange="graderEditNote(this.value)" oninput="graderEditNote(this.value)" style="width: 100%; resize: vertical; line-height: 1.6; font-family: var(--font-body); font-size: 13px;">' + escapeHtml(note) + '</textarea>';
+                html += '</div>';
+            } else if (note.trim()) {
+                html += '<div style="background: var(--lavender-soft); border: 2px solid var(--lavender); border-radius: var(--radius); padding: 16px; margin-bottom: 16px;">';
+                html += '<div style="font-size: 12px; font-weight: 700; color: var(--lavender); margin-bottom: 6px;">\u270D\uFE0F Teacher\u2019s Note</div>';
+                html += '<div style="font-size: 13px; color: var(--ink); line-height: 1.6; white-space: pre-wrap;">' + escapeHtml(note) + '</div>';
+                html += '</div>';
+            }
 
             // Per-item breakdown
             if (result.items && result.items.length) {
@@ -33232,7 +33272,7 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             title.style.marginBottom = '20px';
             title.style.borderBottom = '2px solid #f3d9e6';
             title.style.paddingBottom = '14px';
-            title.innerHTML = '<div style="font-family: \'Nunito\', sans-serif; font-size: 22px; font-weight: 800; color: #ff8cb3;">KoreanLearnin \u2014 Paragraph Grade</div>'
+            title.innerHTML = '<div style="font-family: \'Nunito\', sans-serif; font-size: 22px; font-weight: 800; color: #ff8cb3;">KoreanLearnin Paragraph Grade</div>'
                 + '<div style="font-family: \'Quicksand\', sans-serif; font-size: 12px; color: #7a6585; margin-top: 4px;">Novice \u00B7 Week 5 \u00B7 Self &amp; Friend Introduction \u00B7 ' + graderFormatDate() + '</div>';
             wrapper.appendChild(title);
 
