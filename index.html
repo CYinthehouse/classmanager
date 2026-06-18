@@ -26572,6 +26572,17 @@ ${daySpecific}
 
             const sortedTimeSlots = [...TIME_SLOTS].sort((a, b) => slotToMinutes(a) - slotToMinutes(b));
 
+            // Map any stored time (clean "6:10 PM" or range "6:10 PM-7:10 PM")
+            // to the canonical grid slot whose START time matches. This lets
+            // tutoring slots (created with clean times by the gacha booking
+            // bridge) land in the correct grid cell even though TIME_SLOTS uses
+            // legacy range strings for some rows. Falls back to the raw value.
+            function canonicalSlot(time) {
+                const target = slotLabel(time);
+                const match = TIME_SLOTS.find(ts => slotLabel(ts) === target);
+                return match || time;
+            }
+
             const relevantTeachers = selectedTeacherId 
                 ? allTeachers.filter(t => t.id === selectedTeacherId)
                 : allTeachers;
@@ -26593,13 +26604,13 @@ ${daySpecific}
             
             // First, mark all prescheduled slots
             allPrescheduledSlots.forEach(ps => {
-                const key = `${ps.day}-${ps.time}`;
+                const key = `${ps.day}-${canonicalSlot(ps.time)}`;
                 const startDate = parseLocalDate(ps.startDate);
                 
                 // Check if there's an active class that replaced this prescheduled slot for THIS teacher
                 const hasActiveClass = allClasses.some(cls => 
                     cls.day === ps.day && 
-                    cls.time === ps.time && 
+                    canonicalSlot(cls.time) === canonicalSlot(ps.time) && 
                     cls.teacherId === ps.teacherId &&
                     cls.status !== 'completed'
                 );
@@ -26637,7 +26648,7 @@ ${daySpecific}
             allClasses.forEach(cls => {
                 if (cls.status === 'completed') return;
                 
-                const key = `${cls.day}-${cls.time}`;
+                const key = `${cls.day}-${canonicalSlot(cls.time)}`;
                 const startDate = cls.startDate ? parseLocalDate(cls.startDate) : null;
                 
                 let currentWeek = 0;
