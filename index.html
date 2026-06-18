@@ -6150,7 +6150,25 @@
         }
         
         function getLevelWeeks(level) {
+            if (level === 'tutoring') return 1; // 1:1 sessions are single, not multi-week
             return CLASS_TYPE_WEEKS[level] || 6;
+        }
+
+        // ── Time-format helpers (clean "6:10 PM" vs legacy range "6:10 PM-7:10 PM") ──
+        // Tutoring slots (from the gacha booking bridge) store CLEAN start times,
+        // while the cohort grid uses range strings for some rows. These let
+        // lookups match regardless of which format a slot/class uses.
+        function timeStart(t) {
+            t = String(t || '');
+            return t.includes('-') ? t.split('-')[0].trim() : t.trim();
+        }
+        function sameSlotTime(a, b) {
+            return timeStart(a) === timeStart(b);
+        }
+        // Friendly label for a slot's class type, including tutoring.
+        function slotTypeName(classType) {
+            if (classType === 'tutoring') return '1:1 Tutoring';
+            return LEVELS[classType] || classType || 'Class';
         }
 
         async function loadAllClasses() {
@@ -6219,7 +6237,7 @@
                 html += allPrescheduledSlots.map(ps => {
                     const startDate = ps.startDate ? parseLocalDate(ps.startDate) : null;
                     const startDateStr = startDate ? formatDateInEST(ps.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
-                    const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const classTypeName = slotTypeName(ps.classType);
                     const enrolledStudents = ps.enrolledStudents || [];
                     
                     // Calculate days until start
@@ -6352,7 +6370,7 @@
             const ps = allPrescheduledSlots.find(p => p.id === prescheduleId);
             if (!ps) return;
             
-            if (!confirm(`Delete pre-scheduled class?\n\n${ps.day} @ ${ps.time}\n${LEVELS[ps.classType] || ps.classType}`)) return;
+            if (!confirm(`Delete pre-scheduled class?\n\n${ps.day} @ ${ps.time}\n${slotTypeName(ps.classType)}`)) return;
             
             try {
                 await db.collection('prescheduled_slots').doc(prescheduleId).delete();
@@ -19608,7 +19626,7 @@ Return ONLY valid JSON (single object, not array):
                 function renderPrescheduledCard(ps) {
                     const startDate = parseLocalDate(ps.startDate);
                     const startDateDisplay = ps.startDate ? formatDateInEST(ps.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
-                    const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const classTypeName = slotTypeName(ps.classType);
                     const enrolledStudents = ps.enrolledStudents || [];
                     const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
                     
@@ -20591,7 +20609,7 @@ Return ONLY valid JSON (single object, not array):
         }
         
         function renderTeacherPrescheduleCardForToday(ps) {
-            const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+            const classTypeName = slotTypeName(ps.classType);
             const enrolledStudents = ps.enrolledStudents || [];
             const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
             
@@ -22280,7 +22298,7 @@ Return ONLY valid JSON (single object, not array):
         }
         
         function renderPrescheduleCardForToday(ps) {
-            const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+            const classTypeName = slotTypeName(ps.classType);
             const enrolledStudents = ps.enrolledStudents || [];
             const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
             
@@ -22340,7 +22358,7 @@ Return ONLY valid JSON (single object, not array):
                 html += teacherPreschedules.map(ps => {
                     const startDate = parseLocalDate(ps.startDate);
                     const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
-                    const classTypeName = LEVELS[ps.classType] || ps.classType || 'Class';
+                    const classTypeName = slotTypeName(ps.classType);
                     const enrolledStudents = ps.enrolledStudents || [];
                     const linkedCount = enrolledStudents.filter(s => s.odId || s.id).length;
                     
@@ -26512,7 +26530,7 @@ ${daySpecific}
                             day: ps.day, time: ps.time,
                             teacherName: ps.teacherName || allTeachers.find(t => t.id === ps.teacherId)?.name || 'Unknown',
                             studentName: s.name || '(unnamed)',
-                            label: LEVELS[ps.classType] || ps.classType || 'Class',
+                            label: slotTypeName(ps.classType),
                             kind: 'Pre-scheduled'
                         });
                     }
@@ -26736,7 +26754,7 @@ ${daySpecific}
                         borderColor = '#ff3366';
                         statusText = 'Full';
                         statusIcon = '🔴';
-                        const classTypeName = LEVELS[slot.classType] || slot.classType || 'Class';
+                        const classTypeName = slotTypeName(slot.classType);
                         xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: var(--rose-deep); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${slot.enrolledCount}/${slot.maxSeats}</div>`;
                         xBadge += `<div style="font-size: 9px; color: var(--rose-deep); margin-top: 3px;">${classTypeName}</div>`;
                     } else if (slot?.status === 'prescheduled') {
@@ -26744,7 +26762,7 @@ ${daySpecific}
                         borderColor = '#ff9800';
                         statusText = 'Pre-scheduled';
                         statusIcon = '⏳';
-                        const classTypeName = LEVELS[slot.classType] || slot.classType || 'Class';
+                        const classTypeName = slotTypeName(slot.classType);
                         const seatInfo = `${slot.enrolledCount || 0}/${slot.maxSeats || 5}`;
                         xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: var(--peach-deep); color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${seatInfo}</div>`;
                         xBadge += `<div style="font-size: 9px; color: var(--peach-deep); margin-top: 3px;">${classTypeName}</div>`;
@@ -27036,7 +27054,7 @@ ${daySpecific}
             
             allClasses.forEach(cls => {
                 if (cls.status === 'completed') return;
-                if (cls.day === day && cls.time === time) {
+                if (cls.day === day && sameSlotTime(cls.time, time)) {
                     const teacher = allTeachers.find(t => t.id === cls.teacherId);
                     const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
                     const maxSeats = cls.maxSeats || 5;
@@ -27053,8 +27071,8 @@ ${daySpecific}
             });
             
             allPrescheduledSlots.forEach(ps => {
-                if (ps.day === day && ps.time === time) {
-                    const hasActive = allClasses.some(c => c.day === day && c.time === time && c.teacherId === ps.teacherId && c.status !== 'completed');
+                if (ps.day === day && sameSlotTime(ps.time, time)) {
+                    const hasActive = allClasses.some(c => c.day === day && sameSlotTime(c.time, time) && c.teacherId === ps.teacherId && c.status !== 'completed');
                     if (hasActive) return;
                     const teacher = allTeachers.find(t => t.id === ps.teacherId);
                     const enrolledCount = ps.enrolledStudents?.length || 0;
@@ -27064,7 +27082,7 @@ ${daySpecific}
                         prescheduledId: ps.id,
                         teacherName: teacher?.name || ps.teacherName || 'Unknown',
                         teacherId: ps.teacherId,
-                        level: LEVELS[ps.classType] || ps.classType || 'Class',
+                        level: slotTypeName(ps.classType),
                         students: `${enrolledCount}/${maxSeats}`,
                         isFull: enrolledCount >= maxSeats
                     });
@@ -27194,11 +27212,11 @@ ${daySpecific}
             const key = `${day}-${time}`;
             const selectedTeacherId = document.getElementById('slotManagerTeacher')?.value || '';
             
-            // Check for prescheduled slot first
-            const prescheduled = allPrescheduledSlots.find(ps => ps.day === day && ps.time === time && (!selectedTeacherId || ps.teacherId === selectedTeacherId));
+            // Check for prescheduled slot first (format-tolerant time match).
+            const prescheduled = allPrescheduledSlots.find(ps => ps.day === day && sameSlotTime(ps.time, time) && (!selectedTeacherId || ps.teacherId === selectedTeacherId));
             
             // Find class info for this slot
-            const cls = allClasses.find(c => c.day === day && c.time === time && c.status !== 'completed' && 
+            const cls = allClasses.find(c => c.day === day && sameSlotTime(c.time, time) && c.status !== 'completed' && 
                 (!selectedTeacherId || c.teacherId === selectedTeacherId));
             
             const teacher = cls ? allTeachers.find(t => t.id === cls.teacherId) : 
@@ -27221,7 +27239,7 @@ ${daySpecific}
             if (prescheduled && !cls) {
                 // Show prescheduled info
                 const startDateDisplay = prescheduled.startDate ? formatDateInEST(prescheduled.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
-                const classTypeName = LEVELS[prescheduled.classType] || prescheduled.classType || 'Class';
+                const classTypeName = slotTypeName(prescheduled.classType);
                 
                 html = `
                     <div style="background: rgba(255,152,0,0.2); border: 2px solid var(--peach-deep); padding: 20px; border-radius: 8px; text-align: center;">
@@ -28593,7 +28611,7 @@ ${daySpecific}
                 if (!proceed) return;
             }
             
-            if (!confirm(`🚀 Create class from this pre-schedule?\n\n📅 ${ps.day} @ ${ps.time}\n📚 ${LEVELS[ps.classType] || ps.classType}\n👨‍🏫 ${ps.teacherName}\n👥 ${enrolledStudents.length} students\n\nThis will:\n• Create the actual class\n• Add all enrolled students\n• Delete the pre-schedule entry`)) {
+            if (!confirm(`🚀 Create class from this pre-schedule?\n\n📅 ${ps.day} @ ${ps.time}\n📚 ${slotTypeName(ps.classType)}\n👨‍🏫 ${ps.teacherName}\n👥 ${enrolledStudents.length} students\n\nThis will:\n• Create the actual class\n• Add all enrolled students\n• Delete the pre-schedule entry`)) {
                 return;
             }
             
@@ -31969,7 +31987,7 @@ ${additionalText}
             const startDate = parsedStartDate ? parsedStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD';
             
             document.getElementById('salesSlotTitle').textContent = `${currentSalesSlot.day} @ ${currentSalesSlot.time} EST`;
-            document.getElementById('salesSlotDetails').textContent = `${LEVELS[prescheduled.classType] || prescheduled.classType} • ${prescheduled.teacherName} • Starts ${startDate}`;
+            document.getElementById('salesSlotDetails').textContent = `${slotTypeName(prescheduled.classType)} • ${prescheduled.teacherName} • Starts ${startDate}`;
             
             const seatsContainer = document.getElementById('salesSlotSeats');
             let seatsHtml = '';
