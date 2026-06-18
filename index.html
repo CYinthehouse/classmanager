@@ -3871,8 +3871,9 @@
             </div>
 
             <!-- Shopify Orders Autofill -->
-            <div style="margin-bottom: 16px;">
-                <button onclick="openShopifyOrdersPicker('slot')" style="width:100%;background:linear-gradient(135deg,rgba(150,191,72,0.15),rgba(150,191,72,0.08));border:1px solid #96bf48;color:#96bf48;padding:9px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🛍️ Autofill from Recent Shopify Orders</button>
+            <div style="margin-bottom: 16px; display:flex; gap:8px;">
+                <button onclick="openShopifyOrdersPicker('slot')" style="flex:1;background:linear-gradient(135deg,rgba(150,191,72,0.15),rgba(150,191,72,0.08));border:1px solid #96bf48;color:#96bf48;padding:9px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🛍️ Recent Orders</button>
+                <button onclick="openShopifyCustomerSearch('slot')" style="flex:1;background:linear-gradient(135deg,rgba(111,182,240,0.15),rgba(111,182,240,0.08));border:1px solid #6fb6f0;color:#6fb6f0;padding:9px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🔍 Search All Customers</button>
             </div>
             
             <div class="form-group">
@@ -29779,6 +29780,139 @@ KoreanLearnin Team`;
                 switchAddActiveClassTab('manual');
             }
             var overlay = document.getElementById('shopifyOrdersPickerOverlay');
+            if (overlay) overlay.remove();
+        }
+
+        // ── Shopify Full Customer Search ──────────────────────────────────────────
+        // Searches the ENTIRE Shopify customer base (not just recent 20 orders).
+        // Reuses the same getShopifyCustomersWithTag Cloud Function used by account creation.
+
+        let _shopifyCustSearchCache = null;
+        let _shopifyCustSearchCacheTime = null;
+
+        async function openShopifyCustomerSearch(targetForm) {
+            var existing = document.getElementById('shopifyCustSearchOverlay');
+            if (existing) existing.remove();
+
+            window._shopifyCustSearchTarget = targetForm;
+
+            var overlay = document.createElement('div');
+            overlay.id = 'shopifyCustSearchOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+            var panel = document.createElement('div');
+            panel.style.cssText = 'background:#1a1a2e;border:2px solid #6fb6f0;border-radius:12px;padding:20px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;gap:12px;';
+            panel.innerHTML =
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<div style="color:#6fb6f0;font-size:14px;font-weight:700;">🔍 Search All Shopify Customers</div>' +
+                    '<button onclick="document.getElementById(\'shopifyCustSearchOverlay\').remove()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;">✕</button>' +
+                '</div>' +
+                '<div style="font-size:11px;color:#888;">Searches your entire Shopify customer base. Select a result to autofill name, email and phone.</div>' +
+                '<input id="shopifyCustSearchInput" type="text" placeholder="Type name, email or phone..." oninput="_renderShopifyCustSearch()" autocomplete="off" style="background:rgba(255,255,255,0.07);border:1px solid #444;border-radius:6px;color:#fff;font-size:12px;padding:8px 10px;">' +
+                '<div id="shopifyCustSearchStatus" style="font-size:11px;color:#888;"></div>' +
+                '<div id="shopifyCustSearchList" style="overflow-y:auto;flex:1;border:1px solid #333;border-radius:8px;min-height:120px;">' +
+                    '<div style="text-align:center;padding:30px;color:#888;font-size:13px;">⏳ Loading customer base...</div>' +
+                '</div>';
+
+            overlay.appendChild(panel);
+            document.body.appendChild(overlay);
+
+            // Use cache if < 5 min old (matches account-page cache TTL)
+            const cacheAge = _shopifyCustSearchCacheTime ? (Date.now() - _shopifyCustSearchCacheTime) / 1000 / 60 : Infinity;
+            if (_shopifyCustSearchCache && cacheAge < 5) {
+                _renderShopifyCustSearch();
+                var inp = document.getElementById('shopifyCustSearchInput');
+                if (inp) inp.focus();
+                return;
+            }
+
+            try {
+                const response = await callAdminFunction(
+                    'https://us-central1-korean-ta-evaluator.cloudfunctions.net/getShopifyCustomersWithTag',
+                    { updated_at_min: null, fields: 'id,email,first_name,last_name,phone,tags,created_at' }
+                );
+                const result = await response.json();
+                const data = result.result || result;
+
+                if (data && data.success && data.customers) {
+                    _shopifyCustSearchCache = data.customers;
+                    _shopifyCustSearchCacheTime = Date.now();
+                    _renderShopifyCustSearch();
+                    var inp2 = document.getElementById('shopifyCustSearchInput');
+                    if (inp2) inp2.focus();
+                } else {
+                    throw new Error((data && data.message) || 'No customers returned');
+                }
+            } catch(e) {
+                var listEl = document.getElementById('shopifyCustSearchList');
+                if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4444;font-size:12px;">❌ Error: ' + escapeHtml(e.message) + '</div>';
+            }
+        }
+
+        function _renderShopifyCustSearch() {
+            var listEl = document.getElementById('shopifyCustSearchList');
+            var searchEl = document.getElementById('shopifyCustSearchInput');
+            var statusEl = document.getElementById('shopifyCustSearchStatus');
+            if (!listEl || !_shopifyCustSearchCache) return;
+
+            var q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+
+            if (!q) {
+                if (statusEl) statusEl.textContent = _shopifyCustSearchCache.length + ' customers loaded. Start typing to search.';
+                listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#888;font-size:12px;">Type above to search the full customer base.</div>';
+                return;
+            }
+
+            var matches = _shopifyCustSearchCache.filter(function(c) {
+                var name  = ((c.first_name || '') + ' ' + (c.last_name || '')).trim().toLowerCase();
+                var email = (c.email || '').toLowerCase();
+                var phone = (c.phone || '').toLowerCase();
+                return name.includes(q) || email.includes(q) || phone.includes(q);
+            });
+
+            // Sort: name matches first, then by last name
+            matches.sort(function(a, b) {
+                return (((a.last_name || '') + (a.first_name || '')).toLowerCase())
+                    .localeCompare(((b.last_name || '') + (b.first_name || '')).toLowerCase());
+            });
+
+            var capped = matches.slice(0, 50);
+            if (statusEl) statusEl.textContent = matches.length + ' match' + (matches.length === 1 ? '' : 'es') + (matches.length > 50 ? ' (showing first 50)' : '');
+
+            if (!matches.length) {
+                listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#888;font-size:12px;">No customers match "' + escapeHtml(q) + '".</div>';
+                return;
+            }
+
+            listEl.innerHTML = capped.map(function(c) {
+                var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || 'Unknown';
+                var phone    = c.phone || '';
+                var email    = c.email || '';
+                var dateStr  = c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '';
+                var hasAcct  = (typeof existingAccountEmails !== 'undefined' && existingAccountEmails && email) ? existingAccountEmails.has(email.toLowerCase()) : false;
+                var safeN = fullName.replace(/'/g,"\\'");
+                var safeP = phone.replace(/'/g,"\\'");
+                var safeE = email.replace(/'/g,"\\'");
+                return '<div onclick="_pickShopifyCustSearch(\'' + safeN + '\',\'' + safeP + '\',\'' + safeE + '\')" style="padding:10px 14px;border-bottom:1px solid #222;cursor:pointer;" onmouseover="this.style.background=\'rgba(111,182,240,0.1)\'" onmouseout="this.style.background=\'transparent\'">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<div>' +
+                            '<div style="color:#fff;font-size:13px;font-weight:600;">' + escapeHtml(fullName) +
+                                (hasAcct ? ' <span style="color:#5fc99a;font-size:9px;font-weight:700;">● HAS ACCOUNT</span>' : '') +
+                            '</div>' +
+                            (email ? '<div style="color:#aaa;font-size:11px;margin-top:2px;">📧 ' + escapeHtml(email) + '</div>' : '<div style="color:#555;font-size:11px;margin-top:2px;">No email</div>') +
+                            (phone ? '<div style="color:#aaa;font-size:11px;">📞 ' + escapeHtml(phone) + '</div>' : '') +
+                        '</div>' +
+                        '<div style="color:#555;font-size:10px;flex-shrink:0;margin-left:10px;">' + escapeHtml(dateStr) + '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function _pickShopifyCustSearch(name, phone, email) {
+            // Reuse the same field-targeting logic as the recent-orders picker
+            window._shopifyOrdersPickerTarget = window._shopifyCustSearchTarget;
+            _pickShopifyOrder(name, phone, email);
+            var overlay = document.getElementById('shopifyCustSearchOverlay');
             if (overlay) overlay.remove();
         }
 
