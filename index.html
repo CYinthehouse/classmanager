@@ -1532,6 +1532,16 @@
                         <p style="font-size: 11px; color: #888; margin-top: 10px;">Class Types: <span id="classTypesDisplay">Loading...</span></p>
                     </div>
 
+                    <!-- Permanent (hardcoded) classes -->
+                    <div class="card" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="margin: 0; color: var(--rose-deep);">🔴 Permanent Classes</h3>
+                            <button class="btn btn-sm" style="background: linear-gradient(135deg, var(--rose-deep), #cc0033); border-color: var(--rose-deep); color: #fff;" onclick="openAddPermanentClassModal()">➕ Add Permanent Class</button>
+                        </div>
+                        <p style="font-size: 11px; color: #888; margin-top: 8px;">Hardcode a permanent class to a teacher. It shows as a red slot in the Slot Manager, never expires, and you can add students to it like any other slot.</p>
+                        <div id="permanentClassesList" style="margin-top: 12px;"><p style="color: #888; font-size: 12px;">No permanent classes yet.</p></div>
+                    </div>
+
                     <div class="card"><h3>📚 Classes</h3><p style="font-size: 11px; color: #888; margin-bottom: 10px;">Use the 🗑️ on a class to delete it (including classes already started).</p><div id="classesContainer"><p style="color: #888; font-size: 12px;">No classes yet.</p></div></div>
                 </div>
 
@@ -3779,6 +3789,47 @@
         </div>
     </div>
 
+    <!-- Add Permanent Class Modal -->
+    <div class="modal-overlay" id="addPermanentClassModal">
+        <div class="modal" style="max-width: 500px;">
+            <button class="modal-close" onclick="closeAddPermanentClassModal()">✕</button>
+            <h3 class="modal-title" style="color: var(--rose-deep);">🔴 Add Permanent Class</h3>
+            <p style="font-size: 12px; color: #888; margin-bottom: 18px;">Hardcode a permanent class to a teacher. It appears as a red slot in the Slot Manager and never expires.</p>
+            <div id="addPermanentClassMessage"></div>
+
+            <div class="form-group">
+                <label>Teacher *</label>
+                <select id="permClassTeacher"><option value="">-- Select Teacher --</option></select>
+            </div>
+
+            <div class="form-group">
+                <label>Day *</label>
+                <select id="permClassDay"><option value="">-- Select Day --</option></select>
+            </div>
+
+            <div class="form-group">
+                <label>Time Slot *</label>
+                <select id="permClassTime"><option value="">-- Select Time --</option></select>
+            </div>
+
+            <div class="form-group">
+                <label>Custom Class Label *</label>
+                <input type="text" id="permClassLabel" placeholder="e.g. Advanced Conversation" maxlength="60">
+                <p style="font-size: 10px; color: #888; margin-top: 4px;">Shown on the slot card before it's clicked.</p>
+            </div>
+
+            <div class="form-group">
+                <label>Max Seats <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                <input type="number" id="permClassMaxSeats" placeholder="5" min="1" max="50" value="5">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeAddPermanentClassModal()">Cancel</button>
+                <button class="btn" style="flex: 1; background: linear-gradient(135deg, var(--rose-deep), #cc0033); border-color: var(--rose-deep); color: #fff;" onclick="savePermanentClass()">🔴 Create Permanent Class</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Student to Active Class Modal -->
     <div class="modal-overlay" id="addStudentToActiveClassModal">
         <div class="modal" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
@@ -5149,6 +5200,7 @@
             if (tab === 'proposals') { loadProposals(); renderAvailableStudentsForProposals(); }
             if (tab === 'dashboard') { loadTeacherButtonsForAdmin(); tutorLoadStudents(); }
             if (tab === 'slotmanager') initSlotManager();
+            if (tab === 'classes') { renderPermanentClassesList(); }
             if (tab === 'oneclass') loadOneClassPasses();
             if (tab === 'tuesdayreading') initTuesdayReadingTab();
             if (tab === 'accounts') {
@@ -26395,6 +26447,22 @@ ${daySpecific}
                 
                 if (hasActiveClass) return;
                 
+                // Permanent (hardcoded) classes: always red, never expire, custom label.
+                if (ps.permanent) {
+                    if (!selectedTeacherId || ps.teacherId === selectedTeacherId) {
+                        addSlotEntry(key, {
+                            status: 'permanent',
+                            prescheduled: ps,
+                            teacherId: ps.teacherId,
+                            teacherName: ps.teacherName || allTeachers.find(t => t.id === ps.teacherId)?.name || 'Unknown',
+                            classType: ps.customLabel || ps.classType,
+                            enrolledCount: ps.enrolledStudents?.length || 0,
+                            maxSeats: ps.maxSeats || 5
+                        });
+                    }
+                    return;
+                }
+                
                 if (!selectedTeacherId || ps.teacherId === selectedTeacherId) {
                     const enrolledCount = ps.enrolledStudents?.length || 0;
                     const maxSeats = ps.maxSeats || 5;
@@ -26509,7 +26577,16 @@ ${daySpecific}
                     
                     let bgColor, borderColor, statusText, statusIcon, clickable = true, xBadge = '';
                     
-                    if (slot?.status === 'prescheduled-full') {
+                    if (slot?.status === 'permanent') {
+                        // Permanent (hardcoded) class — always red, shows custom label.
+                        bgColor = 'rgba(255,51,102,0.3)';
+                        borderColor = '#ff3366';
+                        statusText = 'Permanent';
+                        statusIcon = '🔴';
+                        const permLabel = slot.classType || 'Class';
+                        xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: var(--rose-deep); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${slot.enrolledCount}/${slot.maxSeats}</div>`;
+                        xBadge += `<div style="font-size: 9px; color: var(--rose-deep); margin-top: 3px; font-weight: 700;">${escapeHtml(permLabel)}</div>`;
+                    } else if (slot?.status === 'prescheduled-full') {
                         bgColor = 'rgba(255,51,102,0.3)';
                         borderColor = '#ff3366';
                         statusText = 'Full';
@@ -27000,29 +27077,61 @@ ${daySpecific}
                 // Show prescheduled info
                 const startDateDisplay = prescheduled.startDate ? formatDateInEST(prescheduled.startDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set';
                 const classTypeName = slotTypeName(prescheduled.classType);
+                const isPermanent = !!prescheduled.permanent;
+                const permLabel = prescheduled.customLabel || prescheduled.classType || 'Class';
                 
-                html = `
-                    <div style="background: rgba(255,152,0,0.2); border: 2px solid var(--peach-deep); padding: 20px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
-                        <div style="color: var(--peach-deep); font-weight: bold; font-size: 16px;">Pre-scheduled</div>
-                        <div style="color: #fff; margin-top: 10px;">
-                            <div><strong>Class:</strong> ${classTypeName}</div>
-                            <div><strong>Teacher:</strong> ${prescheduled.teacherName || 'Unknown'}</div>
-                            ${prescheduled.startDate ? `<div><strong>Starts:</strong> ${startDateDisplay}</div>` : ''}
+                if (isPermanent) {
+                    html = `
+                        <div style="background: rgba(255,51,102,0.2); border: 2px solid var(--rose-deep); padding: 20px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">🔴</div>
+                            <div style="color: var(--rose-deep); font-weight: bold; font-size: 16px;">Permanent Class</div>
+                            <div style="color: #fff; margin-top: 10px;">
+                                <div><strong>Class:</strong> ${escapeHtml(permLabel)}</div>
+                                <div><strong>Teacher:</strong> ${prescheduled.teacherName || 'Unknown'}</div>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    html = `
+                        <div style="background: rgba(255,152,0,0.2); border: 2px solid var(--peach-deep); padding: 20px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
+                            <div style="color: var(--peach-deep); font-weight: bold; font-size: 16px;">Pre-scheduled</div>
+                            <div style="color: #fff; margin-top: 10px;">
+                                <div><strong>Class:</strong> ${classTypeName}</div>
+                                <div><strong>Teacher:</strong> ${prescheduled.teacherName || 'Unknown'}</div>
+                                ${prescheduled.startDate ? `<div><strong>Starts:</strong> ${startDateDisplay}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
                 
-                // Show preschedule info section with cancel button
+                // Show preschedule info section
                 document.getElementById('slotPrescheduleInfo').style.display = 'block';
                 document.getElementById('prescheduleDetails').innerHTML = `
                     <div style="font-size: 13px;">
-                        <div><strong>Class Type:</strong> ${classTypeName}</div>
+                        <div><strong>Class Type:</strong> ${isPermanent ? escapeHtml(permLabel) : classTypeName}</div>
                         <div><strong>Teacher:</strong> ${prescheduled.teacherName}</div>
-                        ${prescheduled.startDate ? `<div><strong>Start Date:</strong> ${startDateDisplay}</div>` : ''}
+                        ${(!isPermanent && prescheduled.startDate) ? `<div><strong>Start Date:</strong> ${startDateDisplay}</div>` : ''}
                         <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || 5} filled</div>
+                        ${isPermanent ? '<div style="color: var(--rose-deep); margin-top:6px;">🔴 Permanent — manage or delete this class in Class Settings.</div>' : ''}
                     </div>
                 `;
+                
+                // For permanent classes, only "Add Student" applies — hide convert/cancel/sales-chat.
+                const psActionBtns = document.querySelectorAll('#slotPrescheduleInfo button');
+                psActionBtns.forEach(btn => {
+                    const oc = btn.getAttribute('onclick') || '';
+                    if (isPermanent && (oc.includes('cancelPreschedule') || oc.includes('convertPrescheduleToClass') || oc.includes('openSalesChatFromSlotModal'))) {
+                        btn.style.display = 'none';
+                    } else {
+                        btn.style.display = '';
+                    }
+                });
+                // Hide the "Start Class" container border block for permanent
+                const startClassBtn = document.querySelector('#slotPrescheduleInfo button[onclick*="convertPrescheduleToClass"]');
+                if (startClassBtn && startClassBtn.parentElement) {
+                    startClassBtn.parentElement.style.display = isPermanent ? 'none' : '';
+                }
                 
                 // Show enrolled students list
                 updateSlotEnrolledStudentsList();
@@ -27506,7 +27615,124 @@ ${daySpecific}
         function closeAddStudentToSlotModal() {
             document.getElementById('addStudentToSlotModal').classList.remove('active');
         }
-        
+
+        // ==================== PERMANENT (HARDCODED) CLASSES ====================
+        // A permanent class is a prescheduled_slots doc with permanent:true and a
+        // free-text customLabel. It renders red in the Slot Manager, never expires,
+        // and reuses the normal slot enrollment machinery for adding students.
+
+        function openAddPermanentClassModal() {
+            // Populate teacher dropdown
+            const teacherSel = document.getElementById('permClassTeacher');
+            teacherSel.innerHTML = '<option value="">-- Select Teacher --</option>' +
+                allTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+
+            // Populate day dropdown
+            const daySel = document.getElementById('permClassDay');
+            daySel.innerHTML = '<option value="">-- Select Day --</option>' +
+                DAYS.map(d => `<option value="${d}">${d}</option>`).join('');
+
+            // Populate time dropdown (show clean start-time labels, store the canonical slot value)
+            const timeSel = document.getElementById('permClassTime');
+            timeSel.innerHTML = '<option value="">-- Select Time --</option>' +
+                TIME_SLOTS.map(ts => {
+                    const label = ts.includes('-') ? ts.split('-')[0].trim() : ts;
+                    return `<option value="${ts}">${label}</option>`;
+                }).join('');
+
+            document.getElementById('permClassLabel').value = '';
+            document.getElementById('permClassMaxSeats').value = '5';
+            document.getElementById('addPermanentClassMessage').innerHTML = '';
+            document.getElementById('addPermanentClassModal').classList.add('active');
+        }
+
+        function closeAddPermanentClassModal() {
+            document.getElementById('addPermanentClassModal').classList.remove('active');
+        }
+
+        async function savePermanentClass() {
+            const teacherId = document.getElementById('permClassTeacher').value;
+            const day = document.getElementById('permClassDay').value;
+            const time = document.getElementById('permClassTime').value;
+            const label = document.getElementById('permClassLabel').value.trim();
+            const maxSeats = parseInt(document.getElementById('permClassMaxSeats').value) || 5;
+
+            if (!teacherId || !day || !time || !label) {
+                showMessage('addPermanentClassMessage', 'Please fill in teacher, day, time, and label.', 'error');
+                return;
+            }
+
+            const teacher = allTeachers.find(t => t.id === teacherId);
+            const teacherName = teacher ? teacher.name : 'Unknown';
+
+            try {
+                const docData = {
+                    day,
+                    time,
+                    teacherId,
+                    teacherName,
+                    classType: label,        // free-text label; slotTypeName falls back to this
+                    customLabel: label,
+                    permanent: true,
+                    maxSeats,
+                    enrolledStudents: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                const ref = await db.collection('prescheduled_slots').add(docData);
+
+                // Update local cache so it shows immediately
+                allPrescheduledSlots.push({ id: ref.id, ...docData });
+
+                closeAddPermanentClassModal();
+                renderPermanentClassesList();
+                if (typeof renderSlotGrid === 'function') renderSlotGrid();
+                showToast(`🔴 Permanent class "${label}" created!`, 'success');
+            } catch (e) {
+                console.error('Error creating permanent class:', e);
+                showMessage('addPermanentClassMessage', 'Error: ' + e.message, 'error');
+            }
+        }
+
+        function renderPermanentClassesList() {
+            const container = document.getElementById('permanentClassesList');
+            if (!container) return;
+            const perms = (allPrescheduledSlots || []).filter(ps => ps.permanent);
+            if (perms.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 12px;">No permanent classes yet.</p>';
+                return;
+            }
+            container.innerHTML = perms.map(ps => {
+                const label = ps.customLabel || ps.classType || 'Class';
+                const timeLabel = (ps.time || '').includes('-') ? ps.time.split('-')[0].trim() : ps.time;
+                const count = (ps.enrolledStudents || []).length;
+                const seats = ps.maxSeats || 5;
+                return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:rgba(255,51,102,0.08); border:1px solid var(--rose-deep); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
+                    <div style="font-size:12px;">
+                        <div style="color:var(--rose-deep); font-weight:700;">🔴 ${escapeHtml(label)}</div>
+                        <div style="color:#aaa; margin-top:3px;">👨‍🏫 ${escapeHtml(ps.teacherName || 'Unknown')} · ${escapeHtml(ps.day)} @ ${escapeHtml(timeLabel)} · ${count}/${seats} students</div>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="deletePermanentClass('${ps.id}')" title="Delete permanent class">🗑️</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function deletePermanentClass(id) {
+            const ps = (allPrescheduledSlots || []).find(p => p.id === id);
+            const label = ps ? (ps.customLabel || ps.classType || 'this class') : 'this class';
+            if (!confirm(`Delete permanent class "${label}"?\n\nThis removes the slot and its enrolled-student list.`)) return;
+            try {
+                await db.collection('prescheduled_slots').doc(id).delete();
+                const idx = allPrescheduledSlots.findIndex(p => p.id === id);
+                if (idx !== -1) allPrescheduledSlots.splice(idx, 1);
+                renderPermanentClassesList();
+                if (typeof renderSlotGrid === 'function') renderSlotGrid();
+                showToast('Permanent class deleted.', 'success');
+            } catch (e) {
+                console.error('Error deleting permanent class:', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
         // ==================== ADD STUDENT TO ACTIVE CLASS (Slot Manager) ====================
         
         // Bridge function: open add-student modal from Classes tab for an active class
