@@ -366,7 +366,6 @@
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
         .status-pending { background: var(--yellow); color: var(--yellow-deep); }
         .status-assigned { background: var(--mint-soft); color: var(--mint-deep); }
-        .status-limbo { background: var(--rose); color: var(--rose-deep); }
         .status-proposed { background: var(--sky); color: var(--sky-deep); }
 
         /* ---------- Availability grid ---------- */
@@ -416,11 +415,6 @@
         .rank-dot.rank-2 { background: var(--yellow-deep); }
         .rank-dot.rank-3 { background: var(--peach-deep); }
 
-        /* ---------- Limbo / drag ---------- */
-        .limbo-section { background: var(--rose); border: 2px dashed var(--rose-deep); border-radius: var(--radius); padding: 20px; min-height: 100px; }
-        .limbo-student { background: var(--card); border: 2px solid var(--rose-deep); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px; cursor: grab; }
-        .drop-zone { border: 2px dashed var(--sky-deep); border-radius: var(--radius-sm); padding: 15px; text-align: center; margin-top: 10px; opacity: 0; transition: opacity 0.2s; font-size: 12px; color: var(--sky-deep); font-weight: 700; }
-        .drop-zone.active { opacity: 1; background: var(--sky); }
 
         /* ---------- Week tracker / attendance ---------- */
         .week-tracker { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -629,8 +623,6 @@
         .absence-status-badge.not-contacted { background: var(--rose); color: var(--rose-deep); }
         .absence-week-badge { background: var(--bg-2); padding: 3px 10px; border-radius: 20px; font-size: 11px; color: var(--ink-soft); }
 
-        /* ---------- Limbo availability ---------- */
-        .limbo-availability { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
         .avail-tag { padding: 4px 10px; border-radius: 20px; font-size: 11px; border: 2px solid; }
         .avail-tag.pref-1 { background: var(--mint-soft); border-color: var(--mint-deep); color: var(--mint-deep); }
         .avail-tag.pref-2 { background: var(--yellow); border-color: var(--yellow-deep); color: var(--yellow-deep); }
@@ -1476,9 +1468,6 @@
                 <div id="adminTabDashboard" class="tab-content active">
                     <div class="stats-grid">
                         <div class="stat-card cyan"><div class="stat-number" id="statTotalStudents">0</div><div class="stat-label">TOTAL STUDENTS</div></div>
-                        <div class="stat-card green"><div class="stat-number" id="statAssignedStudents">0</div><div class="stat-label">ASSIGNED</div></div>
-                        <div class="stat-card yellow"><div class="stat-number" id="statPendingStudents">0</div><div class="stat-label">PENDING LEVEL</div></div>
-                        <div class="stat-card orange"><div class="stat-number" id="statLimboStudents">0</div><div class="stat-label">IN LIMBO</div></div>
                         <div class="stat-card pink"><div class="stat-number" id="statTotalClasses">0</div><div class="stat-label">CLASSES</div></div>
                     </div>
                     <div class="card"><h3>📅 Current Week</h3><div class="week-tracker" id="dashboardWeekTracker"></div></div>
@@ -2908,30 +2897,11 @@
             <!-- Teacher Dashboard -->
             <div id="teacherDashboard" style="display: none;">
                 <div class="nav-tabs">
-                    <button class="nav-tab" onclick="showTeacherTab('today')">📅 Today</button>
-                    <button class="nav-tab active" onclick="showTeacherTab('myClasses')">📚 My Classes</button>
-                    <button class="nav-tab" onclick="showTeacherTab('dashboard')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📊 Dashboard</button>
+                    <button class="nav-tab active" onclick="showTeacherTab('dashboard')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📊 Dashboard</button>
                     <button class="nav-tab" onclick="showTeacherTab('attendance')">📊 Attendance</button>
-                    <button class="nav-tab" onclick="showTeacherTab('slotmanager')" style="border-color: var(--mint-deep); color: var(--mint-deep); background: var(--mint-soft);">📅 Slot Manager</button>
-                    <button class="nav-tab" onclick="showTeacherTab('completed')">✅ Completed</button>
                     <button class="nav-tab" onclick="showTeacherTab('materials')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📖 Materials</button>
+                    <button class="nav-tab" onclick="showTeacherTab('slotmanager')" style="border-color: var(--mint-deep); color: var(--mint-deep); background: var(--mint-soft);">📅 Slot Manager</button>
                     <button class="nav-tab" onclick="showTeacherTab('grader')" style="border-color: var(--lavender); color: var(--lavender); background: var(--lavender-soft);">✏️ Grader</button>
-                </div>
-                
-                <!-- Today Tab -->
-                <div id="teacherTabToday" class="tab-content">
-                    <div class="card">
-                        <h3>📅 Today's Classes</h3>
-                        <div id="todayClassesContainer"><p style="color: #888;">Loading...</p></div>
-                    </div>
-                </div>
-                
-                <!-- My Classes Tab -->
-                <div id="teacherTabMyClasses" class="tab-content active">
-                    <div class="card">
-                        <h3>📚 My Classes</h3>
-                        <div id="teacherClassesContainer"><p style="color: #888;">Loading...</p></div>
-                    </div>
                 </div>
                 
                 <!-- Teacher Attendance Tab (admin-parity) -->
@@ -2966,29 +2936,6 @@
                         <div id="t_adminAttendanceContainer">
                             <p style="color: #888; font-size: 12px;">Click refresh to load attendance...</p>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Completed Classes Tab -->
-                <div id="teacherTabCompleted" class="tab-content">
-                    <div class="card">
-                        <h3>✅ Completed Classes</h3>
-                        <p style="color: #888; font-size: 12px; margin-bottom: 15px;">Track 1-Year Academy enrollment for graduated students</p>
-                        
-                        <!-- Date Filter -->
-                        <div style="margin-bottom: 15px;">
-                            <label style="font-size: 12px; color: #888; margin-bottom: 5px; display: block;">Filter by completion date:</label>
-                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                <button class="btn btn-sm completed-filter-btn active" onclick="filterCompletedClasses('7')" data-days="7">Last 7 days</button>
-                                <button class="btn btn-sm completed-filter-btn" onclick="filterCompletedClasses('14')" data-days="14">Last 14 days</button>
-                                <button class="btn btn-sm completed-filter-btn" onclick="filterCompletedClasses('28')" data-days="28">Last 28 days</button>
-                                <button class="btn btn-sm completed-filter-btn" onclick="filterCompletedClasses('90')" data-days="90">Last 3 months</button>
-                                <button class="btn btn-sm completed-filter-btn" onclick="filterCompletedClasses('180')" data-days="180">Last 6 months</button>
-                                <button class="btn btn-sm completed-filter-btn" onclick="filterCompletedClasses('all')" data-days="all">All time</button>
-                            </div>
-                        </div>
-                        
-                        <div id="teacherCompletedClassesContainer"><p style="color: #888; font-size: 12px;">No completed classes yet.</p></div>
                     </div>
                 </div>
                 
@@ -3162,12 +3109,6 @@
             
             <div id="classPreviewContainer" style="margin-bottom: 20px;">
                 <p style="color: #888; font-size: 12px;">Select a teacher above to generate class previews...</p>
-            </div>
-            
-            <div id="limboPreviewContainer" style="display: none; margin-bottom: 20px; padding: 15px; background: rgba(255,51,102,0.1); border: 2px solid var(--rose-deep); border-radius: 8px;">
-                <h4 style="color: var(--rose-deep); font-size: 14px; margin-bottom: 10px;">⚠️ Students Without Enough Classmates (Limbo)</h4>
-                <p style="font-size: 11px; color: #888; margin-bottom: 10px;">These students don't have enough classmates with matching availability. They will be marked as "limbo".</p>
-                <div id="limboStudentsList"></div>
             </div>
             
             <div style="display: flex; gap: 10px; justify-content: center; padding-top: 15px; border-top: 2px solid #333;">
@@ -5234,6 +5175,9 @@
             // teacher dashboard mount points (one set of IDs, no duplicates).
             relocateAdminPanelsForTeacher();
 
+            // Show the Dashboard tab by default (was previously "My Classes").
+            showTeacherTab('dashboard');
+
             // Load class types first, then settings and classes
             loadClassTypes().then(() => {
                 // Load settings FIRST, then load classes (so currentWeek is correct)
@@ -5279,10 +5223,14 @@
             document.querySelectorAll('#teacherDashboard .nav-tab').forEach(t => t.classList.remove('active'));
             const panel = document.getElementById(`teacherTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
             if (panel) panel.classList.add('active');
-            if (event && event.target) event.target.classList.add('active');
+            if (typeof event !== 'undefined' && event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Programmatic call: highlight the matching nav button
+                const btn = document.querySelector(`#teacherDashboard .nav-tab[onclick*="'${tab}'"]`);
+                if (btn) btn.classList.add('active');
+            }
             if (tab === 'materials') loadMaterialsForLevel('t_');
-            if (tab === 'today') loadTodayClasses();
-            if (tab === 'completed') loadTeacherCompletedClasses();
             if (tab === 'attendance') loadAdminAttendance('t_');
             if (tab === 'dashboard') { loadTeacherButtonsForAdmin(); tutorLoadStudents(); updateDashboardStats(); updateWeekTrackers(); }
             if (tab === 'slotmanager') initSlotManager();
@@ -5771,13 +5719,6 @@
             const g = (sfx) => document.getElementById(pfx + sfx);
             if (!g('statTotalStudents')) return; // dashboard panel not present
             g('statTotalStudents').textContent = allStudents.length;
-            g('statAssignedStudents').textContent = allStudents.filter(s => s.status === 'assigned').length;
-            g('statPendingStudents').textContent = allStudents.filter(s => !s.level && s.status !== 'assigned' && s.status !== 'completed').length;
-            // Limbo count includes students with status 'limbo' OR students with a level who aren't assigned/completed/proposed
-            g('statLimboStudents').textContent = allStudents.filter(s => 
-                s.status === 'limbo' || 
-                (s.level && s.status !== 'assigned' && s.status !== 'completed' && s.status !== 'proposed')
-            ).length;
             g('statTotalClasses').textContent = allClasses.filter(c => c.status !== 'completed').length;
         }
 
@@ -6171,7 +6112,7 @@
                     const startDateStr = c.startDate ? formatDateInEST(c.startDate, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set';
                     const canEditDate = currentUser?.role === 'admin' || currentUser?.role === 'support';
                     return `
-                        <div class="class-card" ondragover="event.preventDefault()" ondrop="handleDrop(event, '${c.id}')">
+                        <div class="class-card">
                             <div class="class-header">
                                 <div>
                                     <div class="class-day">${c.day}</div>
@@ -6196,7 +6137,6 @@
                                 <button class="btn btn-sm btn-success" onclick="markCourseComplete('${c.id}')" style="flex: 1;">🎓 Complete</button>
                                 <button class="btn btn-sm btn-danger admin-delete-btn" onclick="deleteClass('${c.id}')" title="Delete Class" ${canDelete() ? '' : 'style="display:none;"'}>🗑️</button>
                             </div>
-                            <div class="drop-zone">Drop student here</div>
                         </div>
                     `;
                 }).join('');
@@ -6277,42 +6217,7 @@
         }
 
         function renderLimboStudents() {
-            const container = document.getElementById('limboContainer');
-            if (!container) return; // not present in teacher view
-            // Include students with status 'limbo' OR students with a level who aren't assigned/completed/proposed
-            const limbo = allStudents.filter(s => 
-                s.status === 'limbo' || 
-                (s.level && s.status !== 'assigned' && s.status !== 'completed' && s.status !== 'proposed')
-            );
-            if (limbo.length === 0) { container.innerHTML = '<p style="color: #888; font-size: 12px;">No students in limbo.</p>'; return; }
-            container.innerHTML = limbo.map(s => {
-                const avail = s.availabilities || {};
-                const hasLegacyAvail = avail[1] || avail[2] || avail[3];
-                const isReturning = s.isReturningStudent ? '<span style="background: #ff9900; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">RETURNING</span>' : '';
-                const needsLevel = !s.level ? '<span style="background: var(--rose-deep); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">NEEDS CLASS</span>' : '';
-                
-                let availHtml;
-                if (s.classTime && !hasLegacyAvail) {
-                    const parts = s.classTime.split('-');
-                    availHtml = '<span class="avail-tag pref-1">' + parts[0] + ' @ ' + parts.slice(1).join('-') + '</span>';
-                } else if (hasLegacyAvail) {
-                    availHtml = (avail[1] ? '<span class="avail-tag pref-1">1st: ' + avail[1] + '</span>' : '') + (avail[2] ? '<span class="avail-tag pref-2">2nd: ' + avail[2] + '</span>' : '') + (avail[3] ? '<span class="avail-tag pref-3">3rd: ' + avail[3] + '</span>' : '');
-                } else {
-                    availHtml = '<span style="color: #888; font-size: 11px;">No availability set</span>';
-                }
-                
-                return `
-                <div class="limbo-student" draggable="true" ondragstart="draggedStudentId='${s.id}'; document.querySelectorAll('.drop-zone').forEach(z=>z.classList.add('active'));" ondragend="draggedStudentId=null; document.querySelectorAll('.drop-zone').forEach(z=>z.classList.remove('active'));">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="color: var(--sky-deep); margin-bottom: 5px;">${escapeHtml(s.name)}${isReturning}${needsLevel}</div>
-                        <button class="btn btn-sm" style="background: var(--peach-deep); color: #000; padding: 2px 6px; font-size: 10px;" onclick="event.stopPropagation(); returnToAccountCreation('${s.id}', '${s.name.replace(/'/g, "\\'")}')">↩️ Return</button>
-                    </div>
-                    ${s.level ? `<span class="level-badge level-${s.level}">${LEVELS[s.level]}</span>` : '<span style="color: #888; font-size: 11px;">No class assigned</span>'}
-                    <div class="limbo-availability">
-                        ${availHtml}
-                    </div>
-                </div>
-            `}).join('');
+            // Limbo system removed; no-op stub kept for legacy callers.
         }
         
         async function returnToAccountCreation(studentId, studentName) {
@@ -6530,7 +6435,6 @@
             
             // Clear preview container
             document.getElementById('classPreviewContainer').innerHTML = '<p style="color: #888; font-size: 12px;">Select a teacher above to generate class previews...</p>';
-            document.getElementById('limboPreviewContainer').style.display = 'none';
             document.getElementById('selectedTeacherInfo').style.display = 'none';
             document.getElementById('generateProposalsBtn').disabled = true;
             
@@ -6807,8 +6711,6 @@
         
         function renderClassPreviews() {
             const container = document.getElementById('classPreviewContainer');
-            const limboContainer = document.getElementById('limboPreviewContainer');
-            const limboList = document.getElementById('limboStudentsList');
             const generateBtn = document.getElementById('generateProposalsBtn');
             
             // Generate Saturday options for quick select
@@ -6846,18 +6748,6 @@
             }
             
             container.innerHTML = html;
-            
-            // Show limbo students if any
-            if (previewedLimboStudents.length > 0) {
-                limboContainer.style.display = 'block';
-                limboList.innerHTML = previewedLimboStudents.map(s => `
-                    <span style="display: inline-block; padding: 5px 10px; margin: 3px; background: rgba(255,51,102,0.2); border-radius: 15px; font-size: 11px; color: var(--rose-deep);">
-                        ${escapeHtml(s.name)} (${LEVELS[s.level]})
-                    </span>
-                `).join('');
-            } else {
-                limboContainer.style.display = 'none';
-            }
             
             updateGenerateButtonState();
         }
@@ -7060,13 +6950,6 @@
                     }
                 }
 
-                // Mark limbo students
-                for (const s of previewedLimboStudents) {
-                    await db.collection('scheduler_students').doc(s.id).update({ status: 'limbo' });
-                    const idx = allStudents.findIndex(st => st.id === s.id);
-                    if (idx !== -1) allStudents[idx].status = 'limbo';
-                }
-
                 allProposals = [...allProposals, ...newProposals];
                 previewedClasses = [];
                 previewedLimboStudents = [];
@@ -7082,49 +6965,12 @@
         }
 
         // Drag & Drop
-        async function handleDrop(event, classId) {
-            event.preventDefault();
-            if (!draggedStudentId) return;
-
-            const student = allStudents.find(s => s.id === draggedStudentId);
-            const targetClass = allClasses.find(c => c.id === classId);
-            if (!student || !targetClass) return;
-
-            const warnings = [];
-            if ((targetClass.students || []).length >= schedulerSettings.maxStudents) warnings.push(`Class is full (${schedulerSettings.maxStudents} max)`);
-            if (student.level !== targetClass.level) warnings.push(`Level mismatch: ${LEVELS[student.level]} vs ${LEVELS[targetClass.level]}`);
-
-            if (warnings.length > 0) {
-                pendingDropAction = { studentId: draggedStudentId, classId };
-                document.getElementById('warningMessage').innerHTML = warnings.join('<br>');
-                document.getElementById('warningModal').classList.add('active');
-            } else {
-                await executeDropAction(draggedStudentId, classId);
-            }
-        }
-
-        async function executeDropAction(studentId, classId) {
-            const student = allStudents.find(s => s.id === studentId);
-            const targetClass = allClasses.find(c => c.id === classId);
-
-            let rank = 3;
-            const classSlot = `${targetClass.day}-${targetClass.time}`;
-            Object.entries(student.availabilities || {}).forEach(([r, slot]) => { if (slot === classSlot) rank = parseInt(r); });
-
-            targetClass.students = targetClass.students || [];
-            targetClass.students.push({ id: student.id, name: student.name, rank, timezone: student.timezone });
-
-            await db.collection('scheduler_classes').doc(classId).update({ students: targetClass.students });
-            await db.collection('scheduler_students').doc(studentId).update({ status: 'assigned', classId });
-
-            const idx = allStudents.findIndex(s => s.id === studentId);
-            if (idx !== -1) { allStudents[idx].status = 'assigned'; allStudents[idx].classId = classId; }
-
-            renderClasses(); renderLimboStudents(); renderStudentsTable(); updateDashboardStats();
-        }
-
-        function closeWarningModal() { document.getElementById('warningModal').classList.remove('active'); pendingDropAction = null; }
-        async function confirmWarningAction() { if (pendingDropAction) await executeDropAction(pendingDropAction.studentId, pendingDropAction.classId); closeWarningModal(); }
+        // Limbo drag-to-link system removed. Stubs kept so any lingering
+        // references don't throw.
+        async function handleDrop(event, classId) { if (event && event.preventDefault) event.preventDefault(); }
+        async function executeDropAction(studentId, classId) {}
+        function closeWarningModal() { const m = document.getElementById('warningModal'); if (m) m.classList.remove('active'); pendingDropAction = null; }
+        async function confirmWarningAction() { closeWarningModal(); }
 
         // Settings
         async function saveSettings() {
@@ -19549,6 +19395,7 @@ Return ONLY valid JSON (single object, not array):
                 const prescheduledSlots = prescheduledSnap.docs.map(d => ({ id: d.id, ...d.data() }));
                 
                 const container = document.getElementById('teacherClassesContainer');
+                if (!container) return; // My Classes tab removed
                 
                 if (activeClasses.length === 0 && prescheduledSlots.length === 0) { 
                     container.innerHTML = '<p style="color: #888; font-size: 12px;">No classes assigned.</p>'; 
