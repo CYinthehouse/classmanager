@@ -3808,8 +3808,15 @@
             </div>
 
             <div class="form-group">
-                <label>Time Slot *</label>
-                <select id="permClassTime"><option value="">-- Select Time --</option></select>
+                <label>Grid Slot to Occupy *</label>
+                <select id="permClassTime"><option value="">-- Select Grid Slot --</option></select>
+                <p style="font-size: 10px; color: #888; margin-top: 4px;">Which standard slot the red card sits in on the grid (6:10, 7:20, 8:30, 9:50, or 11:00).</p>
+            </div>
+
+            <div class="form-group">
+                <label>Custom Time (shown on card) <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                <input type="text" id="permClassDisplayTime" placeholder="e.g. 6:30 PM" maxlength="40">
+                <p style="font-size: 10px; color: #888; margin-top: 4px;">If the actual class time differs from the grid slot, type it here. Leave blank to use the grid slot time.</p>
             </div>
 
             <div class="form-group">
@@ -3826,6 +3833,53 @@
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-secondary" onclick="closeAddPermanentClassModal()">Cancel</button>
                 <button class="btn" style="flex: 1; background: linear-gradient(135deg, var(--rose-deep), #cc0033); border-color: var(--rose-deep); color: #fff;" onclick="savePermanentClass()">🔴 Create Permanent Class</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Permanent Class Modal -->
+    <div class="modal-overlay" id="editPermanentClassModal">
+        <div class="modal" style="max-width: 500px;">
+            <button class="modal-close" onclick="closeEditPermanentClassModal()">✕</button>
+            <h3 class="modal-title" style="color: var(--sky-deep);">✏️ Edit Permanent Class</h3>
+            <p style="font-size: 12px; color: #888; margin-bottom: 18px;">Move this class to a different day/time slot, or update its details. Enrolled students are kept.</p>
+            <div id="editPermanentClassMessage"></div>
+            <input type="hidden" id="editPermClassId">
+
+            <div class="form-group">
+                <label>Teacher *</label>
+                <select id="editPermClassTeacher"><option value="">-- Select Teacher --</option></select>
+            </div>
+
+            <div class="form-group">
+                <label>Day *</label>
+                <select id="editPermClassDay"><option value="">-- Select Day --</option></select>
+            </div>
+
+            <div class="form-group">
+                <label>Grid Slot to Occupy *</label>
+                <select id="editPermClassTime"><option value="">-- Select Grid Slot --</option></select>
+                <p style="font-size: 10px; color: #888; margin-top: 4px;">Which standard slot the red card sits in (6:10, 7:20, 8:30, 9:50, or 11:00).</p>
+            </div>
+
+            <div class="form-group">
+                <label>Custom Time (shown on card) <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                <input type="text" id="editPermClassDisplayTime" placeholder="e.g. 6:30 PM" maxlength="40">
+            </div>
+
+            <div class="form-group">
+                <label>Custom Class Label *</label>
+                <input type="text" id="editPermClassLabel" placeholder="e.g. Advanced Conversation" maxlength="60">
+            </div>
+
+            <div class="form-group">
+                <label>Max Seats <span style="color: #888; font-size: 11px;">(Optional)</span></label>
+                <input type="number" id="editPermClassMaxSeats" placeholder="5" min="1" max="50" value="5">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeEditPermanentClassModal()">Cancel</button>
+                <button class="btn btn-success" style="flex: 1;" onclick="saveEditedPermanentClass()">💾 Save Changes</button>
             </div>
         </div>
     </div>
@@ -26456,6 +26510,7 @@ ${daySpecific}
                             teacherId: ps.teacherId,
                             teacherName: ps.teacherName || allTeachers.find(t => t.id === ps.teacherId)?.name || 'Unknown',
                             classType: ps.customLabel || ps.classType,
+                            displayTime: ps.displayTime || null,
                             enrolledCount: ps.enrolledStudents?.length || 0,
                             maxSeats: ps.maxSeats || 5
                         });
@@ -26662,7 +26717,7 @@ ${daySpecific}
                              style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 8px; padding: 10px; 
                                     cursor: ${clickable ? 'pointer' : 'not-allowed'}; transition: all 0.2s; text-align: center; position: relative; width: 180px; flex-shrink: 0;">
                             ${xBadge}
-                            <div style="font-size: 14px; font-weight: bold; color: #fff;">${slotLabel(time)}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: #fff;">${slot?.status === 'permanent' && slot.displayTime ? escapeHtml(slot.displayTime) : slotLabel(time)}</div>
                             <div style="font-size: 18px; margin: 5px 0;">${statusIcon}</div>
                             <div style="font-size: 11px; color: ${borderColor};">${statusText}</div>
                             ${classInfo}
@@ -27088,6 +27143,7 @@ ${daySpecific}
                             <div style="color: #fff; margin-top: 10px;">
                                 <div><strong>Class:</strong> ${escapeHtml(permLabel)}</div>
                                 <div><strong>Teacher:</strong> ${prescheduled.teacherName || 'Unknown'}</div>
+                                ${prescheduled.displayTime ? `<div><strong>Time:</strong> ${escapeHtml(prescheduled.displayTime)}</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -27111,6 +27167,7 @@ ${daySpecific}
                     <div style="font-size: 13px;">
                         <div><strong>Class Type:</strong> ${isPermanent ? escapeHtml(permLabel) : classTypeName}</div>
                         <div><strong>Teacher:</strong> ${prescheduled.teacherName}</div>
+                        ${(isPermanent && prescheduled.displayTime) ? `<div><strong>Time:</strong> ${escapeHtml(prescheduled.displayTime)}</div>` : ''}
                         ${(!isPermanent && prescheduled.startDate) ? `<div><strong>Start Date:</strong> ${startDateDisplay}</div>` : ''}
                         <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || 5} filled</div>
                         ${isPermanent ? '<div style="color: var(--rose-deep); margin-top:6px;">🔴 Permanent — manage or delete this class in Class Settings.</div>' : ''}
@@ -27632,14 +27689,15 @@ ${daySpecific}
             daySel.innerHTML = '<option value="">-- Select Day --</option>' +
                 DAYS.map(d => `<option value="${d}">${d}</option>`).join('');
 
-            // Populate time dropdown (show clean start-time labels, store the canonical slot value)
+            // Populate grid-slot dropdown (show clean start-time labels, store the canonical slot value)
             const timeSel = document.getElementById('permClassTime');
-            timeSel.innerHTML = '<option value="">-- Select Time --</option>' +
+            timeSel.innerHTML = '<option value="">-- Select Grid Slot --</option>' +
                 TIME_SLOTS.map(ts => {
                     const label = ts.includes('-') ? ts.split('-')[0].trim() : ts;
                     return `<option value="${ts}">${label}</option>`;
                 }).join('');
 
+            document.getElementById('permClassDisplayTime').value = '';
             document.getElementById('permClassLabel').value = '';
             document.getElementById('permClassMaxSeats').value = '5';
             document.getElementById('addPermanentClassMessage').innerHTML = '';
@@ -27654,11 +27712,12 @@ ${daySpecific}
             const teacherId = document.getElementById('permClassTeacher').value;
             const day = document.getElementById('permClassDay').value;
             const time = document.getElementById('permClassTime').value;
+            const displayTime = document.getElementById('permClassDisplayTime').value.trim();
             const label = document.getElementById('permClassLabel').value.trim();
             const maxSeats = parseInt(document.getElementById('permClassMaxSeats').value) || 5;
 
             if (!teacherId || !day || !time || !label) {
-                showMessage('addPermanentClassMessage', 'Please fill in teacher, day, time, and label.', 'error');
+                showMessage('addPermanentClassMessage', 'Please fill in teacher, grid slot, and label.', 'error');
                 return;
             }
 
@@ -27669,6 +27728,7 @@ ${daySpecific}
                 const docData = {
                     day,
                     time,
+                    displayTime: displayTime || null,
                     teacherId,
                     teacherName,
                     classType: label,        // free-text label; slotTypeName falls back to this
@@ -27703,7 +27763,8 @@ ${daySpecific}
             }
             container.innerHTML = perms.map(ps => {
                 const label = ps.customLabel || ps.classType || 'Class';
-                const timeLabel = (ps.time || '').includes('-') ? ps.time.split('-')[0].trim() : ps.time;
+                const gridLabel = (ps.time || '').includes('-') ? ps.time.split('-')[0].trim() : ps.time;
+                const timeLabel = ps.displayTime ? `${ps.displayTime} (grid: ${gridLabel})` : gridLabel;
                 const count = (ps.enrolledStudents || []).length;
                 const seats = ps.maxSeats || 5;
                 return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:rgba(255,51,102,0.08); border:1px solid var(--rose-deep); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
@@ -27711,7 +27772,10 @@ ${daySpecific}
                         <div style="color:var(--rose-deep); font-weight:700;">🔴 ${escapeHtml(label)}</div>
                         <div style="color:#aaa; margin-top:3px;">👨‍🏫 ${escapeHtml(ps.teacherName || 'Unknown')} · ${escapeHtml(ps.day)} @ ${escapeHtml(timeLabel)} · ${count}/${seats} students</div>
                     </div>
-                    <button class="btn btn-sm btn-danger" onclick="deletePermanentClass('${ps.id}')" title="Delete permanent class">🗑️</button>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-sm" style="background:var(--sky-deep); color:#000;" onclick="openEditPermanentClassModal('${ps.id}')" title="Edit day/time">✏️</button>
+                        <button class="btn btn-sm btn-danger" onclick="deletePermanentClass('${ps.id}')" title="Delete permanent class">🗑️</button>
+                    </div>
                 </div>`;
             }).join('');
         }
@@ -27730,6 +27794,91 @@ ${daySpecific}
             } catch (e) {
                 console.error('Error deleting permanent class:', e);
                 alert('Error: ' + e.message);
+            }
+        }
+
+        function openEditPermanentClassModal(id) {
+            const ps = (allPrescheduledSlots || []).find(p => p.id === id);
+            if (!ps) { alert('Permanent class not found.'); return; }
+
+            // Populate dropdowns
+            const teacherSel = document.getElementById('editPermClassTeacher');
+            teacherSel.innerHTML = '<option value="">-- Select Teacher --</option>' +
+                allTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+
+            const daySel = document.getElementById('editPermClassDay');
+            daySel.innerHTML = '<option value="">-- Select Day --</option>' +
+                DAYS.map(d => `<option value="${d}">${d}</option>`).join('');
+
+            const timeSel = document.getElementById('editPermClassTime');
+            timeSel.innerHTML = '<option value="">-- Select Grid Slot --</option>' +
+                TIME_SLOTS.map(ts => {
+                    const label = ts.includes('-') ? ts.split('-')[0].trim() : ts;
+                    return `<option value="${ts}">${label}</option>`;
+                }).join('');
+
+            // Prefill with current values. For time, match the canonical grid slot.
+            document.getElementById('editPermClassId').value = id;
+            teacherSel.value = ps.teacherId || '';
+            daySel.value = ps.day || '';
+            // Find which TIME_SLOTS entry matches this slot's stored time (by start time)
+            const matchTime = TIME_SLOTS.find(ts => timeStart(ts) === timeStart(ps.time)) || ps.time;
+            timeSel.value = matchTime;
+            document.getElementById('editPermClassDisplayTime').value = ps.displayTime || '';
+            document.getElementById('editPermClassLabel').value = ps.customLabel || ps.classType || '';
+            document.getElementById('editPermClassMaxSeats').value = ps.maxSeats || 5;
+            document.getElementById('editPermanentClassMessage').innerHTML = '';
+
+            document.getElementById('editPermanentClassModal').classList.add('active');
+        }
+
+        function closeEditPermanentClassModal() {
+            document.getElementById('editPermanentClassModal').classList.remove('active');
+        }
+
+        async function saveEditedPermanentClass() {
+            const id = document.getElementById('editPermClassId').value;
+            const teacherId = document.getElementById('editPermClassTeacher').value;
+            const day = document.getElementById('editPermClassDay').value;
+            const time = document.getElementById('editPermClassTime').value;
+            const displayTime = document.getElementById('editPermClassDisplayTime').value.trim();
+            const label = document.getElementById('editPermClassLabel').value.trim();
+            const maxSeats = parseInt(document.getElementById('editPermClassMaxSeats').value) || 5;
+
+            if (!teacherId || !day || !time || !label) {
+                showMessage('editPermanentClassMessage', 'Please fill in teacher, grid slot, and label.', 'error');
+                return;
+            }
+
+            const ps = (allPrescheduledSlots || []).find(p => p.id === id);
+            if (!ps) { showMessage('editPermanentClassMessage', 'Class not found.', 'error'); return; }
+
+            const teacher = allTeachers.find(t => t.id === teacherId);
+            const teacherName = teacher ? teacher.name : 'Unknown';
+
+            try {
+                const updates = {
+                    teacherId,
+                    teacherName,
+                    day,
+                    time,
+                    displayTime: displayTime || null,
+                    classType: label,
+                    customLabel: label,
+                    maxSeats
+                };
+                await db.collection('prescheduled_slots').doc(id).update(updates);
+
+                // Update local cache (preserves enrolledStudents and other fields)
+                Object.assign(ps, updates);
+
+                closeEditPermanentClassModal();
+                renderPermanentClassesList();
+                if (typeof renderSlotGrid === 'function') renderSlotGrid();
+                showToast(`✅ "${label}" updated!`, 'success');
+            } catch (e) {
+                console.error('Error updating permanent class:', e);
+                showMessage('editPermanentClassMessage', 'Error: ' + e.message, 'error');
             }
         }
 
