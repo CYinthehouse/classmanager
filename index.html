@@ -1427,9 +1427,9 @@
                     <button class="nav-tab" onclick="showAdminTab('drillmaker')">🧠 Drill + HW</button>
                     <button class="nav-tab" onclick="showAdminTab('grader')" style="border-color: var(--lavender); color: var(--lavender); background: var(--lavender-soft);">✏️ Grader</button>
                     <button class="nav-tab" onclick="showAdminTab('group_outreach')">📞 Outreach Portal ▾</button>
-                    <button class="nav-tab" onclick="showAdminTab('group_classinfo')">📚 Class Info ▾</button>
                     <button class="nav-tab" onclick="showAdminTab('accounts')">👤 Account Creation</button>
                     <button class="nav-tab" onclick="showAdminTab('banusers')" style="border-color: var(--rose-deep); color: var(--rose-deep); background: var(--rose);">🚫 Ban Users</button>
+                    <button class="nav-tab" onclick="showAdminTab('group_classinfo')">📚 Class &amp; Teacher Settings ▾</button>
                     <button class="nav-tab" onclick="showAdminTab('settings')">⚙️ Settings</button>
                 </div>
 
@@ -1458,20 +1458,16 @@
                 <!-- Group: Class Info -->
                 <div id="adminTabGroup_classinfo" class="tab-content">
                     <div class="card">
-                        <h3 style="color: var(--mint-deep); margin-bottom: 5px;">📚 Class Info</h3>
+                        <h3 style="color: var(--mint-deep); margin-bottom: 5px;">📚 Class &amp; Teacher Settings</h3>
                         <p style="font-size: 12px; color: #888; margin-bottom: 25px;">Select a section to open.</p>
                         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                             <div onclick="showAdminTab('classes')" style="cursor: pointer; background: rgba(57,255,20,0.08); border: 2px solid var(--mint-deep); border-radius: 12px; padding: 30px 40px; text-align: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(57,255,20,0.2)'" onmouseout="this.style.background='rgba(57,255,20,0.08)'">
-                                <div style="font-size: 36px; margin-bottom: 10px;">📚</div>
-                                <div style="color: var(--mint-deep); font-size: 14px; font-weight: 700;">Classes</div>
+                                <div style="font-size: 36px; margin-bottom: 10px;">⚙️</div>
+                                <div style="color: var(--mint-deep); font-size: 14px; font-weight: 700;">Class Settings</div>
                             </div>
                             <div onclick="showAdminTab('teachers')" style="cursor: pointer; background: rgba(57,255,20,0.08); border: 2px solid var(--mint-deep); border-radius: 12px; padding: 30px 40px; text-align: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(57,255,20,0.2)'" onmouseout="this.style.background='rgba(57,255,20,0.08)'">
                                 <div style="font-size: 36px; margin-bottom: 10px;">👨‍🏫</div>
                                 <div style="color: var(--mint-deep); font-size: 14px; font-weight: 700;">Teachers</div>
-                            </div>
-                            <div onclick="showAdminTab('students')" style="cursor: pointer; background: rgba(57,255,20,0.08); border: 2px solid var(--mint-deep); border-radius: 12px; padding: 30px 40px; text-align: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(57,255,20,0.2)'" onmouseout="this.style.background='rgba(57,255,20,0.08)'">
-                                <div style="font-size: 36px; margin-bottom: 10px;">📋</div>
-                                <div style="color: var(--mint-deep); font-size: 14px; font-weight: 700;">Students</div>
                             </div>
                         </div>
                     </div>
@@ -1535,36 +1531,19 @@
                 </div>
 
                 <!-- Calendar Tab -->
-                <div id="adminTabStudents" class="tab-content">
-                    <div class="card">
-                        <h3>📋 Registered Students</h3>
-                        <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button class="btn btn-info" onclick="loadAllStudents()">🔄 Refresh Students</button>
-                            <button class="btn btn-success" onclick="autoGenerateClasses()">🤖 Auto-Generate Classes</button>
-                            <button class="btn btn-warning" onclick="openExistingStudentSearch()">🔍 Add Existing Student</button>
-                        </div>
-                        <div style="overflow-x: auto;"><table><thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Timezone</th><th>Availability</th><th>Video</th><th>Class</th><th>Status</th><th>Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="9" style="text-align: center; color: #888;">Loading...</td></tr></tbody></table></div>
-                    </div>
-                </div>
-
                 <div id="adminTabClasses" class="tab-content">
-                    <!-- Class Management Buttons -->
+                    <!-- Class Settings -->
                     <div class="card" style="margin-bottom: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <h3 style="margin: 0;">🎓 Class Management</h3>
+                            <h3 style="margin: 0;">⚙️ Class Settings</h3>
                             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="btn btn-sm" style="background: linear-gradient(135deg, var(--pink-deep), #cc00cc); border-color: var(--pink-deep);" onclick="openAddClassTypeModal()">➕ Add Class Type</button>
-                                <button class="btn btn-sm" style="background: linear-gradient(135deg, var(--sky-deep), #00cccc); border-color: var(--sky-deep); color: #000;" onclick="openAddClassModal()">➕ Add Class</button>
+                                <button class="btn btn-sm" style="background: linear-gradient(135deg, var(--pink-deep), #cc00cc); border-color: var(--pink-deep);" onclick="openAddClassTypeModal()">➕ Add / Remove Class Type</button>
                             </div>
                         </div>
                         <p style="font-size: 11px; color: #888; margin-top: 10px;">Class Types: <span id="classTypesDisplay">Loading...</span></p>
                     </div>
-                    
-                    <div class="card"><h3>📅 Week Tracker</h3><div class="week-tracker" id="classesWeekTracker"></div></div>
-                    <div class="grid-2">
-                        <div class="card"><h3>📚 Generated Classes</h3><div id="classesContainer"><p style="color: #888; font-size: 12px;">No classes yet.</p></div></div>
-                        <div class="card"><h3 style="color: var(--rose-deep); border-color: var(--rose-deep);">⚠️ Limbo Students</h3><div class="limbo-section" id="limboContainer"><p style="color: #888; font-size: 12px;">No students in limbo.</p></div></div>
-                    </div>
+
+                    <div class="card"><h3>📚 Classes</h3><p style="font-size: 11px; color: #888; margin-bottom: 10px;">Use the 🗑️ on a class to delete it (including classes already started).</p><div id="classesContainer"><p style="color: #888; font-size: 12px;">No classes yet.</p></div></div>
                 </div>
 
                 <!-- Check-in Tab (Weekly Attendance) -->
@@ -19998,62 +19977,16 @@ Return ONLY valid JSON (single object, not array):
         
         // Check if Week 6 is complete for admin view
         async function checkWeek6CompleteAdmin(classId) {
-            try {
-                const classDoc = await db.collection('scheduler_classes').doc(classId).get();
-                if (!classDoc.exists) return;
-                
-                const classData = classDoc.data();
-                const students = classData.students || [];
-                
-                const attendanceSnap = await db.collection('scheduler_attendance')
-                    .where('classId', '==', classId)
-                    .where('week', '==', 6)
-                    .get();
-                
-                const markedStudents = new Set();
-                attendanceSnap.docs.forEach(doc => {
-                    markedStudents.add(doc.data().studentId);
-                });
-                
-                const allMarked = students.every(s => markedStudents.has(s.id));
-                
-                if (allMarked) {
-                    showWeek6ReminderModal(classId, classData);
-                }
-            } catch (e) {
-                console.error('Error checking Week 6 completion:', e);
-            }
+            // Disabled: the "Week 6 Complete!" discount/academy reminder popup no
+            // longer shows after marking attendance (removed for all roles).
+            return;
         }
         
         // Check if Week 6 is complete and show reminder
         async function checkWeek6Complete(classId) {
-            try {
-                const classDoc = await db.collection('scheduler_classes').doc(classId).get();
-                if (!classDoc.exists) return;
-                
-                const classData = classDoc.data();
-                const students = classData.students || [];
-                
-                // Check if all students have Week 6 attendance
-                const attendanceSnap = await db.collection('scheduler_attendance')
-                    .where('classId', '==', classId)
-                    .where('week', '==', 6)
-                    .get();
-                
-                const markedStudents = new Set();
-                attendanceSnap.docs.forEach(doc => {
-                    markedStudents.add(doc.data().studentId);
-                });
-                
-                const allMarked = students.every(s => markedStudents.has(s.id));
-                
-                if (allMarked) {
-                    // Show reminder modal
-                    showWeek6ReminderModal(classId, classData);
-                }
-            } catch (e) {
-                console.error('Error checking Week 6 completion:', e);
-            }
+            // Disabled: the "Week 6 Complete!" discount/academy reminder popup no
+            // longer shows for teachers after marking attendance.
+            return;
         }
         
         // Show Week 6 completion reminder
@@ -23282,50 +23215,9 @@ Return ONLY valid JSON (single object, not array):
         let communityReminderShown = false;
         
         async function checkWeek6Reminder() {
-            if (!currentUser || currentUser.role !== 'teacher') return;
-            if (communityReminderShown) return;
-            
-            // Check if there are any completed classes with pending academy status
-            try {
-                const completedSnap = await db.collection('scheduler_classes')
-                    .where('teacherId', '==', currentUser.odId)
-                    .where('status', '==', 'completed')
-                    .get();
-                
-                let hasPendingAcademyStatus = false;
-                
-                for (const doc of completedSnap.docs) {
-                    const classData = doc.data();
-                    const students = classData.students || [];
-                    const academyStatus = classData.academyStatus || {};
-                    
-                    // Check if any student has pending (or no) academy status
-                    for (const student of students) {
-                        const status = academyStatus[student.id];
-                        if (!status || status === 'pending') {
-                            hasPendingAcademyStatus = true;
-                            break;
-                        }
-                    }
-                    if (hasPendingAcademyStatus) break;
-                }
-                
-                // Also show reminder if it's Week 6 and no completed classes yet
-                const isWeek6 = schedulerSettings.currentWeek === 6;
-                
-                // Show reminder if: (Week 6 OR has completed classes) AND has pending academy statuses
-                if (hasPendingAcademyStatus || (isWeek6 && completedSnap.empty)) {
-                    communityReminderShown = true;
-                    document.getElementById('communityReminderModal').classList.add('active');
-                }
-            } catch (e) {
-                console.error('Error checking Week 6 reminder:', e);
-                // Fallback to old behavior
-                if (schedulerSettings.currentWeek === 6) {
-                    communityReminderShown = true;
-                    document.getElementById('communityReminderModal').classList.add('active');
-                }
-            }
+            // Disabled: the "Final Week Reminder" upgrade/discount popup no longer
+            // shows for teachers at login.
+            return;
         }
         
         function closeCommunityReminderModal() {
@@ -25265,32 +25157,9 @@ Return ONLY valid JSON (single object, not array):
         let classCompleteReminderShownFor = new Set(); // Track which classes we've shown reminder for
         
         async function checkClassAttendanceComplete(classId) {
-            // Only check if it's week 6
-            if (schedulerSettings.currentWeek !== 6) return;
-            
-            // Don't show again for same class in this session
-            if (classCompleteReminderShownFor.has(classId)) return;
-            
-            const cls = allClasses.find(c => c.id === classId);
-            if (!cls || !cls.students || cls.students.length === 0) return;
-            
-            try {
-                // Get all attendance records for this class in week 6
-                const attendanceSnap = await db.collection('scheduler_attendance')
-                    .where('classId', '==', classId)
-                    .where('week', '==', 6)
-                    .get();
-                
-                const markedStudents = new Set(attendanceSnap.docs.map(d => d.data().studentId));
-                const allMarked = cls.students.every(s => markedStudents.has(s.id));
-                
-                if (allMarked) {
-                    classCompleteReminderShownFor.add(classId);
-                    document.getElementById('classCompleteReminderModal').classList.add('active');
-                }
-            } catch (e) {
-                console.error('Error checking class attendance complete:', e);
-            }
+            // Disabled: the "All Students Marked!" discount/academy reminder popup
+            // no longer shows for teachers after marking the final week.
+            return;
         }
         
         function closeClassCompleteReminderModal() {
