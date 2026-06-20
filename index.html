@@ -5835,7 +5835,7 @@
             if (allTeachers.length === 0) { container.innerHTML = '<p style="color: #888; font-size: 12px;">No teachers yet.</p>'; return; }
             container.innerHTML = allTeachers.map(t => {
                 const tc = allClasses.filter(c => c.teacherId === t.id);
-                return `<div class="teacher-card"><div class="teacher-name">👨‍🏫 ${escapeHtml(t.name)}</div><div class="teacher-classes">📧 ${escapeHtml(t.email)}<br>📅 ${(t.availableDays || []).join(', ')}<br>📚 ${tc.length} classes</div>${canDelete() ? `<button class="btn btn-sm btn-danger admin-delete-btn" onclick="deleteTeacher('${t.id}')" style="margin-top: 10px;">🗑️</button>` : ''}</div>`;
+                return `<div class="teacher-card"><div class="teacher-name">👨‍🏫 ${escapeHtml(t.name)}</div><div class="teacher-classes">📧 ${escapeHtml(t.email)}<br>📅 ${(t.availableDays || []).join(', ')}<br>📚 ${tc.length} classes</div>${canDelete() ? `<div style="display:flex; gap:8px; margin-top:10px;"><button class="btn btn-sm" onclick="editTeacherEmail('${t.id}')" style="background:var(--rose-deep);color:#000;">✏️ Edit Email</button><button class="btn btn-sm btn-danger admin-delete-btn" onclick="deleteTeacher('${t.id}')">🗑️</button></div>` : ''}</div>`;
             }).join('');
         }
 
@@ -6476,6 +6476,46 @@
             } catch (e) { 
                 console.error('Error creating teacher:', e);
                 showMessage('addTeacherMessage', 'Error: ' + e.message, 'error'); 
+            }
+        }
+
+        async function editTeacherEmail(id) {
+            if (!canDelete()) { alert('Admin only.'); return; }
+            const t = allTeachers.find(x => x.id === id);
+            if (!t) { alert('Teacher not found.'); return; }
+
+            const newEmail = prompt(`Change email for ${t.name}\n\nCurrent: ${t.email}\n\nEnter the NEW email:`, t.email);
+            if (newEmail === null) return; // cancelled
+            const email = newEmail.trim();
+            if (!email) { alert('Email cannot be empty.'); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That doesn\'t look like a valid email.'); return; }
+            if (email.toLowerCase() === (t.email || '').toLowerCase()) { alert('That\'s already the current email.'); return; }
+
+            // Warn if another teacher already uses this email
+            const dup = allTeachers.find(x => x.id !== id && (x.email || '').toLowerCase() === email.toLowerCase());
+            if (dup && !confirm(`Another teacher (${dup.name}) already uses ${email}. Continue anyway?`)) return;
+
+            if (!confirm(`Update email to:\n${email}\n\nThis keeps the teacher ID, name, and all ${allClasses.filter(c => c.teacherId === id).length} assigned class(es) intact.\n\nNote: this changes the email stored in the database (used for the Teacher List and class assignment). It does NOT change the teacher's Firebase login email — if they sign in, they'll still use their old email/password unless you also update that in the Firebase console.`)) return;
+
+            try {
+                // 1) Update the scheduler_teachers doc — ID, name, availableDays, uid all untouched
+                await db.collection('scheduler_teachers').doc(id).update({ email });
+
+                // 2) Mirror to the users collection (keyed by uid) if present, so role/profile stays in sync
+                if (t.uid) {
+                    try { await db.collection('users').doc(t.uid).update({ email }); }
+                    catch (e) { console.warn('users doc not updated (may not exist):', e.message); }
+                }
+
+                // 3) Update local cache and re-render immediately
+                const idx = allTeachers.findIndex(x => x.id === id);
+                if (idx !== -1) allTeachers[idx].email = email;
+                renderTeachersList();
+                if (typeof renderClasses === 'function') renderClasses();
+                alert(`Email updated to ${email}. ✓`);
+            } catch (e) {
+                console.error('editTeacherEmail error:', e);
+                alert('Failed to update email: ' + e.message);
             }
         }
 
