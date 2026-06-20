@@ -1418,8 +1418,7 @@
             <div id="adminDashboard" style="display: none;">
                 <div class="nav-tabs">
                     <button class="nav-tab active" onclick="showAdminTab('dashboard')">📊 Dashboard</button>
-                    <button class="nav-tab" onclick="showAdminTab('calendar')">🗓️ Calendar</button>
-                    <button class="nav-tab" onclick="showAdminTab('schedule')">📅 Schedule</button>
+
                     <button class="nav-tab" onclick="showAdminTab('attendance')">📊 Attendance</button>
                     <button class="nav-tab" onclick="showAdminTab('materials')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📖 Materials</button>
                     <button class="nav-tab" onclick="showAdminTab('tuesdayreading')" style="border-color: var(--peach-deep); color: var(--peach-deep); background: var(--peach);">📖 Tuesday Reading</button>
@@ -1536,55 +1535,6 @@
                 </div>
 
                 <!-- Calendar Tab -->
-                <div id="adminTabCalendar" class="tab-content">
-                    <div class="card">
-                        <h3>🗓️ Monthly Calendar</h3>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <button class="btn btn-info" onclick="changeCalendarMonth(-1)">◀ Prev</button>
-                            <span id="calendarMonthLabel" style="font-size: 12px; color: var(--sky-deep);"></span>
-                            <button class="btn btn-info" onclick="changeCalendarMonth(1)">Next ▶</button>
-                        </div>
-                        <div class="monthly-calendar" id="monthlyCalendarGrid"></div>
-                        
-                        <!-- Legend -->
-                        <div class="schedule-legend" style="margin-top: 15px;">
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--mint-deep);"></div><span>Class Day</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--sky-deep);"></div><span>Today</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--pink-deep);"></div><span>Course Start/End</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Schedule Tab -->
-                <div id="adminTabSchedule" class="tab-content">
-                    <div class="card">
-                        <h3>📅 Weekly Schedule Overview</h3>
-                        
-                        <!-- Summary Stats -->
-                        <div class="schedule-summary" id="adminScheduleSummary">
-                            <div class="summary-box total"><div class="summary-number" id="schedTotalSlots">16</div><div class="summary-label">TOTAL SLOTS</div></div>
-                            <div class="summary-box active"><div class="summary-number" id="schedActiveClasses">0</div><div class="summary-label">ACTIVE CLASSES</div></div>
-                            <div class="summary-box needs-teacher"><div class="summary-number" id="schedNeedsTeacher">0</div><div class="summary-label">NEED TEACHER</div></div>
-                            <div class="summary-box full"><div class="summary-number" id="schedFullClasses">0</div><div class="summary-label">FULL CLASSES</div></div>
-                            <div class="summary-box empty"><div class="summary-number" id="schedEmptySlots">16</div><div class="summary-label">EMPTY SLOTS</div></div>
-                            <div class="summary-box available"><div class="summary-number" id="schedAvailableSpots">0</div><div class="summary-label">SPOTS AVAILABLE</div></div>
-                        </div>
-                        
-                        <!-- Legend -->
-                        <div class="schedule-legend">
-                            <div class="legend-item"><div class="legend-bar active"></div><span>Active (has teacher)</span></div>
-                            <div class="legend-item"><div class="legend-bar needs-teacher"></div><span>Needs Teacher</span></div>
-                            <div class="legend-item"><div class="legend-bar full"></div><span>Full (max students)</span></div>
-                            <div class="legend-item"><div class="legend-bar empty"></div><span>Empty Slot</span></div>
-                        </div>
-                        
-                        <!-- Schedule Grid -->
-                        <div class="schedule-grid" id="adminScheduleGrid">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-
                 <div id="adminTabStudents" class="tab-content">
                     <div class="card">
                         <h3>📋 Registered Students</h3>
@@ -2981,12 +2931,12 @@
                 <div class="nav-tabs">
                     <button class="nav-tab" onclick="showTeacherTab('today')">📅 Today</button>
                     <button class="nav-tab active" onclick="showTeacherTab('myClasses')">📚 My Classes</button>
-                    <button class="nav-tab" onclick="showTeacherTab('calendar')">🗓️ Calendar</button>
-                    <button class="nav-tab" onclick="showTeacherTab('schedule')">📅 Schedule</button>
+                    <button class="nav-tab" onclick="showTeacherTab('dashboard')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📊 Dashboard</button>
                     <button class="nav-tab" onclick="showTeacherTab('attendance')">📊 Attendance</button>
+                    <button class="nav-tab" onclick="showTeacherTab('slotmanager')" style="border-color: var(--mint-deep); color: var(--mint-deep); background: var(--mint-soft);">📅 Slot Manager</button>
                     <button class="nav-tab" onclick="showTeacherTab('completed')">✅ Completed</button>
-                    <button class="nav-tab" onclick="showTeacherTab('materials')">📖 Materials</button>
-
+                    <button class="nav-tab" onclick="showTeacherTab('materials')" style="border-color: var(--sky-deep); color: var(--sky-deep); background: var(--sky);">📖 Materials</button>
+                    <button class="nav-tab" onclick="showTeacherTab('grader')" style="border-color: var(--lavender); color: var(--lavender); background: var(--lavender-soft);">✏️ Grader</button>
                 </div>
                 
                 <!-- Today Tab -->
@@ -3005,57 +2955,38 @@
                     </div>
                 </div>
                 
-                <!-- Teacher Calendar Tab -->
-                <div id="teacherTabCalendar" class="tab-content">
-                    <div class="card">
-                        <h3>🗓️ Monthly Calendar</h3>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <button class="btn btn-info" onclick="changeCalendarMonth(-1)">◀ Prev</button>
-                            <span id="teacherCalendarMonthLabel" style="font-size: 12px; color: var(--sky-deep);"></span>
-                            <button class="btn btn-info" onclick="changeCalendarMonth(1)">Next ▶</button>
-                        </div>
-                        <div class="monthly-calendar" id="teacherMonthlyCalendarGrid"></div>
-                        
-                        <!-- Legend -->
-                        <div class="schedule-legend" style="margin-top: 15px;">
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--mint-deep);"></div><span>Class Day</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--sky-deep);"></div><span>Today</span></div>
-                            <div class="legend-item"><div class="legend-bar" style="background: var(--pink-deep);"></div><span>Course Start/End</span></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Teacher Schedule Tab -->
-                <div id="teacherTabSchedule" class="tab-content">
-                    <div class="card">
-                        <h3>📅 My Weekly Schedule</h3>
-                        
-                        <!-- Summary Stats for Teacher -->
-                        <div class="schedule-summary" id="teacherScheduleSummary">
-                            <div class="summary-box active"><div class="summary-number" id="teacherTotalClasses">0</div><div class="summary-label">MY CLASSES</div></div>
-                            <div class="summary-box cyan"><div class="summary-number" id="teacherTotalStudents">0</div><div class="summary-label">TOTAL STUDENTS</div></div>
-                            <div class="summary-box full"><div class="summary-number" id="teacherFullClasses">0</div><div class="summary-label">FULL CLASSES</div></div>
-                            <div class="summary-box available"><div class="summary-number" id="teacherAvailableSpots">0</div><div class="summary-label">SPOTS AVAILABLE</div></div>
-                        </div>
-                        
-                        <!-- Legend -->
-                        <div class="schedule-legend">
-                            <div class="legend-item"><div class="legend-bar active"></div><span>My Class</span></div>
-                            <div class="legend-item"><div class="legend-bar full"></div><span>Full</span></div>
-                            <div class="legend-item"><div class="legend-bar empty"></div><span>Not Assigned</span></div>
-                        </div>
-                        
-                        <!-- Schedule Grid -->
-                        <div class="schedule-grid" id="teacherScheduleGrid">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
+                <!-- Teacher Attendance Tab (admin-parity) -->
                 <div id="teacherTabAttendance" class="tab-content">
                     <div class="card">
-                        <h3>📊 Attendance History</h3>
-                        <div class="form-group"><label>Select Class</label><select id="attendanceClassSelect" onchange="loadAttendanceHistory()"><option value="">-- Select --</option></select></div>
-                        <div style="overflow-x: auto;"><table><thead><tr><th>Student</th><th>W1</th><th>W2</th><th>W3</th><th>W4</th><th>W5</th><th>W6</th></tr></thead><tbody id="attendanceHistoryBody"><tr><td colspan="7" style="text-align: center; color: #888;">Select a class</td></tr></tbody></table></div>
+                        <h3>📊 Attendance Overview</h3>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 15px;">View and manage attendance for all classes.</p>
+
+                        <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <button class="btn btn-info" onclick="loadAdminAttendance('t_')">🔄 Refresh</button>
+                            <div class="form-group" style="margin: 0;">
+                                <select id="t_adminAttendanceClassFilter" onchange="loadAdminAttendance('t_')" style="padding: 8px; font-size: 12px;">
+                                    <option value="all">All Classes</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-sm" style="background: rgba(255,51,102,0.15); border: 1px solid var(--rose-deep); color: var(--rose-deep);" onclick="openArchivedAttendanceModal()">📦 Show Archived</button>
+                        </div>
+
+                        <div class="schedule-summary" style="margin-bottom: 20px;">
+                            <div class="summary-box" style="border-color: var(--mint-deep);"><div class="summary-number" id="t_adminAttendancePresent" style="color: var(--mint-deep);">0</div><div class="summary-label">PRESENT</div></div>
+                            <div class="summary-box" style="border-color: var(--yellow-deep);"><div class="summary-number" id="t_adminAttendanceLate" style="color: var(--yellow-deep);">0</div><div class="summary-label">LATE</div></div>
+                            <div class="summary-box" style="border-color: var(--rose-deep);"><div class="summary-number" id="t_adminAttendanceAbsent" style="color: var(--rose-deep);">0</div><div class="summary-label">ABSENT</div></div>
+                            <div class="summary-box" style="border-color: #888;"><div class="summary-number" id="t_adminAttendanceNotMarked" style="color: #888;">0</div><div class="summary-label">NOT MARKED</div></div>
+                        </div>
+
+                        <div class="schedule-legend" style="margin-bottom: 15px;">
+                            <div class="legend-item"><div class="legend-bar" style="background: var(--mint-deep);"></div><span>Present</span></div>
+                            <div class="legend-item"><div class="legend-bar" style="background: var(--yellow-deep);"></div><span>Late</span></div>
+                            <div class="legend-item"><div class="legend-bar" style="background: var(--rose-deep);"></div><span>Absent</span></div>
+                        </div>
+
+                        <div id="t_adminAttendanceContainer">
+                            <p style="color: #888; font-size: 12px;">Click refresh to load attendance...</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -3082,19 +3013,20 @@
                     </div>
                 </div>
                 
+                <!-- Teacher Materials Tab (admin editor parity) -->
                 <div id="teacherTabMaterials" class="tab-content">
                     <div class="card">
                         <h3>📖 Teaching Materials</h3>
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; align-items: flex-end;">
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label>Select Level</label>
-                                <select id="teacherMaterialLevel" onchange="loadTeacherMaterials()" data-level-select>
+                                <select id="t_materialLevelSelect" onchange="loadMaterialsForLevel('t_')" data-level-select>
                                     <!-- Populated dynamically -->
                                 </select>
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label>Select Week</label>
-                                <select id="teacherMaterialWeek" onchange="loadTeacherMaterials()">
+                                <select id="t_materialWeekSelect" onchange="loadMaterialsForLevel('t_')">
                                     <option value="1">Week 1</option>
                                     <option value="2">Week 2</option>
                                     <option value="3">Week 3</option>
@@ -3103,10 +3035,29 @@
                                     <option value="6">Week 6</option>
                                 </select>
                             </div>
+                            <div style="margin-bottom: 0;">
+                                <button class="btn btn-sm" onclick="openCurriculumOverlay()" style="background: linear-gradient(135deg, #0f9d58, #34a853); border-color: #0f9d58; color: #fff;">📊 Curriculum Overview</button>
+                            </div>
                         </div>
-                        <div id="teacherMaterialsDisplay"><p style="color: #888; font-size: 14px; font-family: 'Noto Sans', sans-serif;">Select a level and week to view materials.</p></div>
+                        <div style="margin-bottom: 15px;">
+                            <button class="btn btn-sm btn-primary" onclick="addMaterialBlock('text', 't_')">📝 Text</button>
+                            <button class="btn btn-sm btn-info" onclick="addMaterialBlock('link', 't_')">🔗 Link</button>
+                            <button class="btn btn-sm btn-success" onclick="addMaterialBlock('image', 't_')">🖼️ Image</button>
+                            <button class="btn btn-sm btn-warning" onclick="addMaterialBlock('file', 't_')">📁 File</button>
+                            <button class="btn btn-sm" style="background: linear-gradient(135deg, #9c27b0, #673ab7); border-color: #9c27b0; color: #fff;" onclick="addMaterialBlock('permutation-game', 't_')">🌟 Yodafy Game</button>
+                        </div>
+                        <div id="t_materialsContainer"><p style="color: #888; font-size: 14px; font-family: 'Noto Sans', sans-serif;">No materials yet.</p></div>
                     </div>
                 </div>
+
+                <!-- Teacher admin-parity tabs (Dashboard / Slot Manager / Grader).
+                     Empty mount points; at teacher login the real admin panel nodes
+                     are relocated into them (relocateAdminPanelsForTeacher), so all
+                     existing element IDs and functions work unchanged with no
+                     duplicate IDs in the DOM. -->
+                <div id="teacherTabDashboard" class="tab-content"></div>
+                <div id="teacherTabSlotmanager" class="tab-content"></div>
+                <div id="teacherTabGrader" class="tab-content"></div>
                 
             </div>
         </div>
@@ -5299,7 +5250,11 @@
             document.getElementById('adminDashboard').style.display = 'none';
             document.getElementById('teacherDashboard').style.display = 'block';
             document.getElementById('userInfoDisplay').textContent = `Teacher: ${escapeHtml(currentUser.name)}`;
-            
+
+            // Relocate admin Dashboard / Slot Manager / Grader panels into the
+            // teacher dashboard mount points (one set of IDs, no duplicates).
+            relocateAdminPanelsForTeacher();
+
             // Load class types first, then settings and classes
             loadClassTypes().then(() => {
                 // Load settings FIRST, then load classes (so currentWeek is correct)
@@ -5307,21 +5262,52 @@
                     checkWeek6Reminder();
                     loadTeacherClasses(); 
                     loadAllClassesForTeacher();
-                    loadAllTeachers(); // Load teachers so names show in class details
+                    loadAllTeachers().then(() => { loadTeacherButtonsForAdmin(); tutorLoadStudents(); });
+                    // Admin-parity tabs (Dashboard / Slot Manager / Attendance) need
+                    // the full school-wide data that a teacher login didn't load before.
+                    loadAllStudents();
+                    loadAllClasses();
+                    setupPrescheduledSlotsListener();
                 });
             });
+        }
+
+        // Move the live admin panel nodes into the teacher dashboard mount points.
+        // Runs once; guarded so re-entry is a no-op.
+        let _adminPanelsRelocated = false;
+        function relocateAdminPanelsForTeacher() {
+            if (_adminPanelsRelocated) return;
+            const moves = [
+                ['adminTabDashboard', 'teacherTabDashboard'],
+                ['adminTabSlotmanager', 'teacherTabSlotmanager'],
+                ['adminTabGrader', 'teacherTabGrader'],
+            ];
+            moves.forEach(([srcId, mountId]) => {
+                const src = document.getElementById(srcId);
+                const mount = document.getElementById(mountId);
+                if (!src || !mount) return;
+                // Move all children of the admin panel into the mount, then drop the
+                // now-empty admin shell's active state. We keep the admin node in place
+                // (hidden dashboard) but emptied, so its ID no longer duplicates anything.
+                while (src.firstChild) mount.appendChild(src.firstChild);
+                src.classList.remove('active');
+            });
+            _adminPanelsRelocated = true;
         }
 
         function showTeacherTab(tab) {
             document.querySelectorAll('#teacherDashboard .tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('#teacherDashboard .nav-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`teacherTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+            const panel = document.getElementById(`teacherTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (panel) panel.classList.add('active');
             if (event && event.target) event.target.classList.add('active');
-            if (tab === 'materials') loadTeacherMaterials();
-            if (tab === 'schedule') renderTeacherSchedule();
-            if (tab === 'calendar') renderTeacherCalendar();
+            if (tab === 'materials') loadMaterialsForLevel('t_');
             if (tab === 'today') loadTodayClasses();
             if (tab === 'completed') loadTeacherCompletedClasses();
+            if (tab === 'attendance') loadAdminAttendance('t_');
+            if (tab === 'dashboard') { loadTeacherButtonsForAdmin(); tutorLoadStudents(); updateDashboardStats(); updateWeekTrackers(); }
+            if (tab === 'slotmanager') initSlotManager();
+            if (tab === 'grader') initGrader();
         }
         
         function renderTeacherCalendar() {
@@ -5629,12 +5615,14 @@
                 updateDashboardStats();
             } catch (e) { 
                 console.error('Error loading students:', e); 
-                document.getElementById('studentsTableBody').innerHTML = `<tr><td colspan="9" style="color: var(--rose-deep);">Error loading: ${escapeHtml(e.message)}</td></tr>`;
+                const _stb = document.getElementById('studentsTableBody');
+                if (_stb) _stb.innerHTML = `<tr><td colspan="9" style="color: var(--rose-deep);">Error loading: ${escapeHtml(e.message)}</td></tr>`;
             }
         }
 
         function renderStudentsTable() {
             const tbody = document.getElementById('studentsTableBody');
+            if (!tbody) return; // not present in teacher view
             // Only show students that are NOT assigned, proposed, or completed
             const unassignedStudents = allStudents.filter(s => s.status !== 'assigned' && s.status !== 'completed' && s.status !== 'proposed');
             
@@ -5799,16 +5787,19 @@
             if (modal) modal.remove();
         }
 
-        function updateDashboardStats() {
-            document.getElementById('statTotalStudents').textContent = allStudents.length;
-            document.getElementById('statAssignedStudents').textContent = allStudents.filter(s => s.status === 'assigned').length;
-            document.getElementById('statPendingStudents').textContent = allStudents.filter(s => !s.level && s.status !== 'assigned' && s.status !== 'completed').length;
+        function updateDashboardStats(pfx) {
+            if (typeof pfx !== 'string') pfx = '';
+            const g = (sfx) => document.getElementById(pfx + sfx);
+            if (!g('statTotalStudents')) return; // dashboard panel not present
+            g('statTotalStudents').textContent = allStudents.length;
+            g('statAssignedStudents').textContent = allStudents.filter(s => s.status === 'assigned').length;
+            g('statPendingStudents').textContent = allStudents.filter(s => !s.level && s.status !== 'assigned' && s.status !== 'completed').length;
             // Limbo count includes students with status 'limbo' OR students with a level who aren't assigned/completed/proposed
-            document.getElementById('statLimboStudents').textContent = allStudents.filter(s => 
+            g('statLimboStudents').textContent = allStudents.filter(s => 
                 s.status === 'limbo' || 
                 (s.level && s.status !== 'assigned' && s.status !== 'completed' && s.status !== 'proposed')
             ).length;
-            document.getElementById('statTotalClasses').textContent = allClasses.filter(c => c.status !== 'completed').length;
+            g('statTotalClasses').textContent = allClasses.filter(c => c.status !== 'completed').length;
         }
 
         async function loadAllTeachers() {
@@ -5957,20 +5948,20 @@
                 }
             }
             
-            const teacherMaterialLevel = document.getElementById('teacherMaterialLevel');
-            if (teacherMaterialLevel) {
-                const currentValue = teacherMaterialLevel.value;
-                teacherMaterialLevel.innerHTML = Object.entries(LEVELS).map(([id, name]) => 
+            const t_materialLevelSelect = document.getElementById('t_materialLevelSelect');
+            if (t_materialLevelSelect) {
+                const currentValue = t_materialLevelSelect.value;
+                t_materialLevelSelect.innerHTML = Object.entries(LEVELS).map(([id, name]) => 
                     `<option value="${id}">${name}</option>`
                 ).join('');
                 if (currentValue && LEVELS[currentValue]) {
-                    teacherMaterialLevel.value = currentValue;
+                    t_materialLevelSelect.value = currentValue;
                 }
             }
             
             // Update other level selects throughout the app with data-level-select attribute
             document.querySelectorAll('select[data-level-select]').forEach(select => {
-                if (select.id === 'levelSelect' || select.id === 'materialLevelSelect' || select.id === 'teacherMaterialLevel' || select.id === 'addClassType') return; // Already handled
+                if (select.id === 'levelSelect' || select.id === 'materialLevelSelect' || select.id === 't_materialLevelSelect' || select.id === 'addClassType') return; // Already handled
                 const currentValue = select.value;
                 select.innerHTML = '<option value="">-- Select --</option>' + 
                     Object.entries(LEVELS).map(([id, name]) => 
@@ -6187,6 +6178,7 @@
 
         function renderClasses() {
             const container = document.getElementById('classesContainer');
+            if (!container) return; // not present in teacher view
             // Only show active classes, not completed
             const activeClasses = allClasses.filter(c => c.status !== 'completed');
             
@@ -6307,6 +6299,7 @@
 
         function renderLimboStudents() {
             const container = document.getElementById('limboContainer');
+            if (!container) return; // not present in teacher view
             // Include students with status 'limbo' OR students with a level who aren't assigned/completed/proposed
             const limbo = allStudents.filter(s => 
                 s.status === 'limbo' || 
@@ -6491,23 +6484,17 @@
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That doesn\'t look like a valid email.'); return; }
             if (email.toLowerCase() === (t.email || '').toLowerCase()) { alert('That\'s already the current email.'); return; }
 
-            // Warn if another teacher already uses this email
             const dup = allTeachers.find(x => x.id !== id && (x.email || '').toLowerCase() === email.toLowerCase());
             if (dup && !confirm(`Another teacher (${dup.name}) already uses ${email}. Continue anyway?`)) return;
 
             if (!confirm(`Update email to:\n${email}\n\nThis keeps the teacher ID, name, and all ${allClasses.filter(c => c.teacherId === id).length} assigned class(es) intact.\n\nNote: this changes the email stored in the database (used for the Teacher List and class assignment). It does NOT change the teacher's Firebase login email — if they sign in, they'll still use their old email/password unless you also update that in the Firebase console.`)) return;
 
             try {
-                // 1) Update the scheduler_teachers doc — ID, name, availableDays, uid all untouched
                 await db.collection('scheduler_teachers').doc(id).update({ email });
-
-                // 2) Mirror to the users collection (keyed by uid) if present, so role/profile stays in sync
                 if (t.uid) {
                     try { await db.collection('users').doc(t.uid).update({ email }); }
                     catch (e) { console.warn('users doc not updated (may not exist):', e.message); }
                 }
-
-                // 3) Update local cache and re-render immediately
                 const idx = allTeachers.findIndex(x => x.id === id);
                 if (idx !== -1) allTeachers[idx].email = email;
                 renderTeachersList();
@@ -7180,9 +7167,15 @@
         }
 
         // Materials (simplified)
-        async function loadMaterialsForLevel() {
-            const level = document.getElementById('materialLevelSelect').value;
-            const week = document.getElementById('materialWeekSelect').value;
+        // materialsCtx tracks which dashboard's Materials tab is active:
+        // '' = admin, 't_' = teacher. Shared save/edit/reorder/delete functions
+        // read this so they target the correct select + container.
+        let materialsCtx = '';
+        async function loadMaterialsForLevel(prefix) {
+            if (typeof prefix === 'string') materialsCtx = prefix;
+            const p = materialsCtx;
+            const level = document.getElementById(p + 'materialLevelSelect').value;
+            const week = document.getElementById(p + 'materialWeekSelect').value;
             try {
                 let snap = await db.collection('scheduler_materials').get();
                 let materials = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -7194,12 +7187,12 @@
                 renderMaterials(materials);
             } catch (e) {
                 console.error('Error loading materials:', e);
-                document.getElementById('materialsContainer').innerHTML = `<p style="color: var(--rose-deep); font-size: 12px;">Error loading materials: ${escapeHtml(e.message)}</p>`;
+                document.getElementById(materialsCtx + 'materialsContainer').innerHTML = `<p style="color: var(--rose-deep); font-size: 12px;">Error loading materials: ${escapeHtml(e.message)}</p>`;
             }
         }
 
         function renderMaterials(materials) {
-            const container = document.getElementById('materialsContainer');
+            const container = document.getElementById(materialsCtx + 'materialsContainer');
             if (materials.length === 0) { container.innerHTML = '<p style="color: #888; font-size: 14px; font-family: Noto Sans, sans-serif;">No materials for this selection.</p>'; return; }
             
             // Store materials for drag/drop
@@ -18679,7 +18672,8 @@ Return ONLY valid JSON (single object, not array):
         }
         // ==================== END PERMUTATION GAME ====================
 
-        function addMaterialBlock(type) {
+        function addMaterialBlock(type, prefix) {
+            if (typeof prefix === 'string') materialsCtx = prefix;
             document.getElementById('editingMaterialId').value = '';
             document.getElementById('editingMaterialType').value = type;
             document.getElementById('materialModalTitle').textContent = `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`;
@@ -18946,8 +18940,8 @@ Return ONLY valid JSON (single object, not array):
 
         async function saveMaterial() {
             const type = document.getElementById('editingMaterialType').value;
-            const level = document.getElementById('materialLevelSelect').value;
-            const week = document.getElementById('materialWeekSelect').value;
+            const level = document.getElementById(materialsCtx + 'materialLevelSelect').value;
+            const week = document.getElementById(materialsCtx + 'materialWeekSelect').value;
             const id = document.getElementById('editingMaterialId').value;
 
             const data = { type, level, week: parseInt(week) };
@@ -20975,6 +20969,7 @@ Return ONLY valid JSON (single object, not array):
         
         function renderAdminSchedule() {
             const grid = document.getElementById('adminScheduleGrid');
+            if (!grid) return; // Schedule tab removed
             const totalSlots = TIME_SLOTS.length * DAYS.length;
             
             // Filter to only active classes (not completed)
@@ -21108,6 +21103,7 @@ Return ONLY valid JSON (single object, not array):
         
         function renderTeacherSchedule() {
             const grid = document.getElementById('teacherScheduleGrid');
+            if (!grid) return; // Schedule tab removed
             const classes = allClassesForTeacher || [];
             
             // Build a map of classes by day and time
@@ -23528,12 +23524,19 @@ Return ONLY valid JSON (single object, not array):
             }
         }
         
-        async function loadAdminAttendance() {
-            const container = document.getElementById('adminAttendanceContainer');
+        // pfx '' = admin dashboard, 't_' = teacher dashboard (admin-parity attendance).
+        // attendanceCtx remembers the active dashboard so internal reloads
+        // (after marking a cell / saving a note) refresh the correct container.
+        let attendanceCtx = '';
+        async function loadAdminAttendance(pfx) {
+            if (typeof pfx === 'string') attendanceCtx = pfx;
+            pfx = attendanceCtx;
+            const container = document.getElementById(pfx + 'adminAttendanceContainer');
+            if (!container) return;
             container.innerHTML = '<p style="color: #888; font-size: 12px;">Loading attendance...</p>';
             
             // Populate class filter dropdown
-            const classFilter = document.getElementById('adminAttendanceClassFilter');
+            const classFilter = document.getElementById(pfx + 'adminAttendanceClassFilter');
             const activeClasses = allClasses.filter(c => c.status !== 'completed');
             classFilter.innerHTML = '<option value="all">All Classes</option>' + 
                 activeClasses.map(c => `<option value="${c.id}">${c.day} ${c.time} - ${LEVELS[c.level]}${c.status === 'completed' ? ' (Archived)' : ''}</option>`).join('');
@@ -23657,10 +23660,10 @@ Return ONLY valid JSON (single object, not array):
                 }
                 
                 // Update stats
-                document.getElementById('adminAttendancePresent').textContent = presentCount;
-                document.getElementById('adminAttendanceLate').textContent = lateCount;
-                document.getElementById('adminAttendanceAbsent').textContent = absentCount;
-                document.getElementById('adminAttendanceNotMarked').textContent = notMarkedCount;
+                document.getElementById(pfx + 'adminAttendancePresent').textContent = presentCount;
+                document.getElementById(pfx + 'adminAttendanceLate').textContent = lateCount;
+                document.getElementById(pfx + 'adminAttendanceAbsent').textContent = absentCount;
+                document.getElementById(pfx + 'adminAttendanceNotMarked').textContent = notMarkedCount;
                 
                 container.innerHTML = html;
                 
