@@ -374,7 +374,8 @@
     };
     var ps = "font-family:'Press Start 2P',monospace";
     return "" +
-    ":host{display:block}" +
+    ":host(.kl-floating){position:fixed !important;inset:0 !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;display:block !important;width:auto !important;height:auto !important;margin:0 !important;padding:0 !important;pointer-events:none !important;z-index:2147483000 !important;visibility:visible !important;opacity:1 !important}" +
+    ":host(.kl-inline){display:block !important;width:100% !important}" +
     "*{box-sizing:border-box;font-family:'Noto Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}" +
     ".launch,.panel{pointer-events:auto}" +
     ".launch{position:absolute;right:20px;bottom:20px;width:58px;height:58px;border-radius:2px;border:2px solid " + p.line + ";cursor:pointer;background:" + p.gold + ";padding:7px;box-shadow:4px 4px 0 " + p.shadow + ";transition:transform .1s,box-shadow .1s}" +
@@ -440,8 +441,9 @@
 
     var host = document.createElement("div");
     host.id = "kl-chatbot-host";
-    // Floating mode: a full-viewport, click-through overlay so the launcher/panel
-    // anchor correctly even if an ancestor has a transform (robust everywhere).
+    host.className = inline ? "kl-inline" : "kl-floating";
+    // Position the host from INSIDE the shadow CSS (:host) so a page sanitizer or the
+    // theme's own body layout can't strip/override it. The inline style is a backup.
     host.style.cssText = inline
       ? "display:block;width:100%"
       : "position:fixed;inset:0;pointer-events:none;z-index:2147483000";
