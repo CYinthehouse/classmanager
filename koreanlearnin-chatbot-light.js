@@ -188,6 +188,8 @@
   // Tolerant to a few proxy response shapes (raw OpenAI, unwrapped, or plain text).
   function extractText(d) {
     try {
+      if (d && typeof d.data === "string") return d.data;              // generateflashcardai: {success, data}
+      if (d && d.data && typeof d.data.content === "string") return d.data.content;
       if (d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content != null)
         return d.choices[0].message.content;
       if (d && d.result && d.result.choices && d.result.choices[0] && d.result.choices[0].message)
