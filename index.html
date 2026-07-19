@@ -3751,7 +3751,7 @@
             
             <div style="background: rgba(255,152,0,0.1); border: 2px solid var(--peach-deep); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
                 <p style="font-size: 13px; color: var(--peach-deep); margin: 0;" id="addStudentSlotInfo">Saturday @ 8:30 PM EST</p>
-                <p style="font-size: 11px; color: #888; margin-top: 4px;" id="addStudentSlotSeats">0/5 seats filled</p>
+                <p style="font-size: 11px; color: #888; margin-top: 4px;" id="addStudentSlotSeats">0/8 seats filled</p>
             </div>
 
             <!-- Shopify Orders Autofill -->
@@ -26515,7 +26515,7 @@ ${daySpecific}
                             classType: ps.customLabel || ps.classType,
                             displayTime: ps.displayTime || null,
                             enrolledCount: ps.enrolledStudents?.length || 0,
-                            maxSeats: ps.maxSeats || 5
+                            maxSeats: ps.maxSeats || salesChatSettings.defaultMaxSeats || 8
                         });
                     }
                     return;
@@ -26523,7 +26523,7 @@ ${daySpecific}
                 
                 if (!selectedTeacherId || ps.teacherId === selectedTeacherId) {
                     const enrolledCount = ps.enrolledStudents?.length || 0;
-                    const maxSeats = ps.maxSeats || 5;
+                    const maxSeats = ps.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                     const isFull = enrolledCount >= maxSeats;
                     const weeksTotal = getLevelWeeks(ps.classType) || 6;
                     let endDate = null;
@@ -26658,7 +26658,7 @@ ${daySpecific}
                         statusText = 'Pre-scheduled';
                         statusIcon = '⏳';
                         const classTypeName = slotTypeName(slot.classType);
-                        const seatInfo = `${slot.enrolledCount || 0}/${slot.maxSeats || 5}`;
+                        const seatInfo = `${slot.enrolledCount || 0}/${slot.maxSeats || salesChatSettings.defaultMaxSeats || 8}`;
                         xBadge = `<div style="position: absolute; top: -8px; right: -8px; background: var(--peach-deep); color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;">${seatInfo}</div>`;
                         xBadge += `<div style="font-size: 9px; color: var(--peach-deep); margin-top: 3px;">${classTypeName}</div>`;
                     } else if (!slot) {
@@ -26952,7 +26952,7 @@ ${daySpecific}
                 if (cls.day === day && sameSlotTime(cls.time, time)) {
                     const teacher = allTeachers.find(t => t.id === cls.teacherId);
                     const studentCount = (cls.students || []).filter(s => !(s.tags && s.tags.includes('Repeat'))).length;
-                    const maxSeats = cls.maxSeats || 5;
+                    const maxSeats = cls.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                     entries.push({
                         type: 'class',
                         classId: cls.id,
@@ -26971,7 +26971,7 @@ ${daySpecific}
                     if (hasActive) return;
                     const teacher = allTeachers.find(t => t.id === ps.teacherId);
                     const enrolledCount = ps.enrolledStudents?.length || 0;
-                    const maxSeats = ps.maxSeats || 5;
+                    const maxSeats = ps.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                     entries.push({
                         type: 'prescheduled',
                         prescheduledId: ps.id,
@@ -27172,7 +27172,7 @@ ${daySpecific}
                         <div><strong>Teacher:</strong> ${prescheduled.teacherName}</div>
                         ${(isPermanent && prescheduled.displayTime) ? `<div><strong>Time:</strong> ${escapeHtml(prescheduled.displayTime)}</div>` : ''}
                         ${(!isPermanent && prescheduled.startDate) ? `<div><strong>Start Date:</strong> ${startDateDisplay}</div>` : ''}
-                        <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || 5} filled</div>
+                        <div><strong>Seats:</strong> ${prescheduled.enrolledStudents?.length || 0}/${prescheduled.maxSeats || salesChatSettings.defaultMaxSeats || 8} filled</div>
                         ${isPermanent ? '<div style="color: var(--rose-deep); margin-top:6px;">🔴 Permanent — manage or delete this class in Class Settings.</div>' : ''}
                     </div>
                 `;
@@ -27656,7 +27656,7 @@ ${daySpecific}
             if (!selectedSlotInfo?.prescheduled) return;
             
             const ps = selectedSlotInfo.prescheduled;
-            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 5;
+            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 8;
             const currentCount = ps.enrolledStudents?.length || 0;
             
             document.getElementById('addStudentSlotInfo').textContent = `${selectedSlotInfo.day} @ ${selectedSlotInfo.time} EST`;
@@ -27717,7 +27717,7 @@ ${daySpecific}
             const time = document.getElementById('permClassTime').value;
             const displayTime = document.getElementById('permClassDisplayTime').value.trim();
             const label = document.getElementById('permClassLabel').value.trim();
-            const maxSeats = parseInt(document.getElementById('permClassMaxSeats').value) || 5;
+            const maxSeats = parseInt(document.getElementById('permClassMaxSeats').value) || 8;
 
             if (!teacherId || !day || !time || !label) {
                 showMessage('addPermanentClassMessage', 'Please fill in teacher, grid slot, and label.', 'error');
@@ -27769,7 +27769,7 @@ ${daySpecific}
                 const gridLabel = (ps.time || '').includes('-') ? ps.time.split('-')[0].trim() : ps.time;
                 const timeLabel = ps.displayTime ? `${ps.displayTime} (grid: ${gridLabel})` : gridLabel;
                 const count = (ps.enrolledStudents || []).length;
-                const seats = ps.maxSeats || 5;
+                const seats = ps.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                 return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:rgba(255,51,102,0.08); border:1px solid var(--rose-deep); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
                     <div style="font-size:12px;">
                         <div style="color:var(--rose-deep); font-weight:700;">🔴 ${escapeHtml(label)}</div>
@@ -27829,7 +27829,7 @@ ${daySpecific}
             timeSel.value = matchTime;
             document.getElementById('editPermClassDisplayTime').value = ps.displayTime || '';
             document.getElementById('editPermClassLabel').value = ps.customLabel || ps.classType || '';
-            document.getElementById('editPermClassMaxSeats').value = ps.maxSeats || 5;
+            document.getElementById('editPermClassMaxSeats').value = ps.maxSeats || salesChatSettings.defaultMaxSeats || 8;
             document.getElementById('editPermanentClassMessage').innerHTML = '';
 
             document.getElementById('editPermanentClassModal').classList.add('active');
@@ -27846,7 +27846,7 @@ ${daySpecific}
             const time = document.getElementById('editPermClassTime').value;
             const displayTime = document.getElementById('editPermClassDisplayTime').value.trim();
             const label = document.getElementById('editPermClassLabel').value.trim();
-            const maxSeats = parseInt(document.getElementById('editPermClassMaxSeats').value) || 5;
+            const maxSeats = parseInt(document.getElementById('editPermClassMaxSeats').value) || 8;
 
             if (!teacherId || !day || !time || !label) {
                 showMessage('editPermanentClassMessage', 'Please fill in teacher, grid slot, and label.', 'error');
@@ -28269,7 +28269,7 @@ ${daySpecific}
             }
             
             // Update seat count in preschedule details
-            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 5;
+            const maxSeats = ps.maxSeats || salesChatSettings?.defaultMaxSeats || 8;
             const seatsHtml = `<div style="margin-top: 8px;"><strong>Seats:</strong> ${students.length}/${maxSeats} filled</div>`;
             
             const detailsEl = document.getElementById('prescheduleDetails');
@@ -28940,7 +28940,7 @@ ${daySpecific}
             
             container.innerHTML = availableSlots.map(ps => {
                 const enrolledCount = (ps.enrolledStudents || []).length;
-                const maxSeats = ps.maxSeats || 5;
+                const maxSeats = ps.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                 const isFull = enrolledCount >= maxSeats;
                 const teacher = allTeachers.find(t => t.id === ps.teacherId);
                 const levelMatch = currentSlot.level === ps.level;
@@ -32253,7 +32253,7 @@ ${additionalText}
             banner.style.display = 'flex';
             
             const enrolledCount = prescheduled.enrolledStudents?.length || 0;
-            const maxSeats = prescheduled.maxSeats || salesChatSettings.defaultMaxSeats || 5;
+            const maxSeats = prescheduled.maxSeats || salesChatSettings.defaultMaxSeats || 8;
             const parsedStartDate = parseLocalDate(prescheduled.startDate);
             const startDate = parsedStartDate ? parsedStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD';
             
@@ -32499,7 +32499,7 @@ ${additionalText}
                 // Build context
                 const ps = currentSalesSlot?.prescheduled;
                 const enrolledCount = ps?.enrolledStudents?.length || 0;
-                const maxSeats = ps?.maxSeats || salesChatSettings.defaultMaxSeats || 5;
+                const maxSeats = ps?.maxSeats || salesChatSettings.defaultMaxSeats || 8;
                 const seatsLeft = maxSeats - enrolledCount;
                 
                 const systemPrompt = buildSalesSystemPrompt(chat, ps, seatsLeft);
@@ -32741,7 +32741,7 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
         
         function populateSalesSettingsForm() {
             document.getElementById('salesSettingTemplate').value = salesChatSettings.firstMessageTemplate || '';
-            document.getElementById('salesSettingMaxSeats').value = salesChatSettings.defaultMaxSeats || 5;
+            document.getElementById('salesSettingMaxSeats').value = salesChatSettings.defaultMaxSeats || 8;
             document.getElementById('salesSettingPostSellMessage').value = salesChatSettings.postSellMessage || '';
             document.getElementById('salesSettingAgentName').value = salesChatSettings.agentName || 'Calvin';
             document.getElementById('salesSettingAgentRole').value = salesChatSettings.agentRole || '';
