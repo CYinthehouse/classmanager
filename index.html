@@ -3370,7 +3370,10 @@
             <div style="flex: 1; overflow-y: auto; padding: 20px;">
                 <div class="sales-settings-panel active" id="salesSettingsGeneral">
                     <div class="form-group"><label>First Message Template</label><textarea id="salesSettingTemplate" rows="4" placeholder="Use {customerName}, {teacherName}, {day}, {time}"></textarea></div>
-                    <div class="form-group"><label>Default Max Seats</label><input type="number" id="salesSettingMaxSeats" min="1" max="20" value="5"></div>
+                    <div class="form-group"><label>Default Max Seats</label><input type="number" id="salesSettingMaxSeats" min="1" max="20" value="8">
+                        <button class="btn btn-sm" style="margin-top:8px;" onclick="migrateSlotSeatsTo(8)">Set all existing slots to 8 seats</button>
+                        <span id="migrateSeatsMsg" style="font-size:11px; color:#888; margin-left:8px;"></span>
+                    </div>
                     <div class="form-group"><label>Post-Sell Message</label><textarea id="salesSettingPostSellMessage" rows="3" placeholder="🎉 Awesome {customerName}! You're all set..."></textarea></div>
                 </div>
                 <div class="sales-settings-panel" id="salesSettingsPersonality">
@@ -3827,7 +3830,7 @@
 
             <div class="form-group">
                 <label>Max Seats <span style="color: #888; font-size: 11px;">(Optional)</span></label>
-                <input type="number" id="permClassMaxSeats" placeholder="5" min="1" max="50" value="5">
+                <input type="number" id="permClassMaxSeats" placeholder="8" min="1" max="50" value="8">
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -3874,7 +3877,7 @@
 
             <div class="form-group">
                 <label>Max Seats <span style="color: #888; font-size: 11px;">(Optional)</span></label>
-                <input type="number" id="editPermClassMaxSeats" placeholder="5" min="1" max="50" value="5">
+                <input type="number" id="editPermClassMaxSeats" placeholder="8" min="1" max="50" value="8">
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -27699,7 +27702,7 @@ ${daySpecific}
 
             document.getElementById('permClassDisplayTime').value = '';
             document.getElementById('permClassLabel').value = '';
-            document.getElementById('permClassMaxSeats').value = '5';
+            document.getElementById('permClassMaxSeats').value = '8';
             document.getElementById('addPermanentClassMessage').innerHTML = '';
             document.getElementById('addPermanentClassModal').classList.add('active');
         }
@@ -32113,7 +32116,7 @@ ${additionalText}
         
         let salesChatSettings = {
             firstMessageTemplate: '안녕하세요 {customerName}님! This is {teacherName}, the Korean Teacher from TikTok! I have {seatsMessage} for {day}, {time} EST. Did you want to register for class?',
-            defaultMaxSeats: 5,
+            defaultMaxSeats: 8,
             postSellMessage: '',
             agentName: 'Calvin',
             agentRole: 'Korean Teacher from TikTok',
@@ -32752,9 +32755,39 @@ ${chat.messages?.slice(-4).map(m => `• ${m.role === 'customer' ? 'Customer' : 
             document.getElementById('salesSettingPromotion').value = salesChatSettings.currentPromotion || '';
         }
         
+        async function migrateSlotSeatsTo(target) {
+            target = parseInt(target) || 8;
+            if (!confirm('Update every existing pre-scheduled slot with fewer than ' + target + ' max seats up to ' + target + ' seats? Slots already at ' + target + ' or higher are left unchanged.')) return;
+            const msgEl = document.getElementById('migrateSeatsMsg');
+            if (msgEl) msgEl.textContent = 'Migrating…';
+            try {
+                const snap = await db.collection('prescheduled_slots').get();
+                let updated = 0;
+                const batchLimit = 400;
+                let batch = db.batch();
+                let ops = 0;
+                for (const docSnap of snap.docs) {
+                    const cur = docSnap.data().maxSeats;
+                    if (typeof cur !== 'number' || cur < target) {
+                        batch.update(docSnap.ref, { maxSeats: target });
+                        updated++;
+                        ops++;
+                        if (ops >= batchLimit) { await batch.commit(); batch = db.batch(); ops = 0; }
+                    }
+                }
+                if (ops > 0) await batch.commit();
+                // Refresh local cache so the UI reflects the change immediately
+                allPrescheduledSlots.forEach(s => { if (typeof s.maxSeats !== 'number' || s.maxSeats < target) s.maxSeats = target; });
+                if (msgEl) msgEl.textContent = 'Updated ' + updated + ' slot(s).';
+            } catch (e) {
+                console.error('Seat migration failed:', e);
+                if (msgEl) msgEl.textContent = 'Migration failed — see console.';
+            }
+        }
+
         async function saveSalesChatSettings() {
             salesChatSettings.firstMessageTemplate = document.getElementById('salesSettingTemplate').value.trim();
-            salesChatSettings.defaultMaxSeats = parseInt(document.getElementById('salesSettingMaxSeats').value) || 5;
+            salesChatSettings.defaultMaxSeats = parseInt(document.getElementById('salesSettingMaxSeats').value) || 8;
             salesChatSettings.postSellMessage = document.getElementById('salesSettingPostSellMessage').value.trim();
             salesChatSettings.agentName = document.getElementById('salesSettingAgentName').value.trim() || 'Calvin';
             salesChatSettings.agentRole = document.getElementById('salesSettingAgentRole').value.trim();
